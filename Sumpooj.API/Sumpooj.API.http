@@ -1,0 +1,6 @@
+@Sumpooj.API_HostAddress = http://localhost:5148
+
+GET {{Sumpooj.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

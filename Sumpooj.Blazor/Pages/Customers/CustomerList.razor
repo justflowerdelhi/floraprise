@@ -1,0 +1,74 @@
+﻿@page "/customers"
+@attribute [Authorize]
+
+@using Sumpooj.Blazor.Models
+@using Sumpooj.Blazor.Services
+@inject CustomerApiService CustomerApi
+@inject NavigationManager Nav
+
+<h3>Customers</h3>
+<button class="btn btn-primary"
+        @onclick='() => Nav.NavigateTo("/customers/new")'>
+    + Add Customer
+</button>
+
+@if (loading)
+{
+    <p>Loading...</p>
+}
+else
+{
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in customers)
+            {
+                <tr>
+                    <td>@c.Name</td>
+                    <td>@c.Email</td>
+                    <td>@c.Phone</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<CustomerDto> customers = new();
+    private bool loading = true;
+    private bool _loaded;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_loaded)
+        {
+            _loaded = true;
+            await Load();
+            StateHasChanged();
+        }
+    }
+
+    private async Task Load()
+    {
+        loading = true;
+
+        try
+        {
+            var result = await CustomerApi.SearchAsync(null, 1, 10);
+            customers = result.Items;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            // Optional: redirect to login
+        }
+
+        loading = false;
+    }
+}

@@ -1,0 +1,58 @@
+﻿@page "/auth/login"
+@using Sumpooj.Blazor.Auth
+@using Sumpooj.Blazor.Models
+@using Sumpooj.Blazor.Services
+@inject AuthApiService AuthApi
+@inject ITokenStorage TokenStorage
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+
+
+<h3>Login</h3>
+
+<div class="card p-3" style="max-width:400px">
+    <input class="form-control mb-2"
+           placeholder="Email"
+           @bind="model.Email" />
+
+    <input class="form-control mb-2"
+           type="password"
+           placeholder="Password"
+           @bind="model.Password" />
+
+    <button class="btn btn-primary w-100"
+            @onclick="LoginAction">
+        Login
+    </button>
+
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <div class="text-danger mt-2">@error</div>
+    }
+</div>
+
+@code {
+    private LoginRequest model = new();
+    private string? error;
+
+    private async Task LoginAction()
+    {
+        error = null;
+
+        var token = await AuthApi.LoginAsync(model);
+        if (token == null)
+        {
+            error = "Invalid email or password";
+            return;
+        }
+
+        await TokenStorage.SetAsync(token);
+
+        if (AuthState is JwtAuthenticationStateProvider prov)
+        {
+            prov.NotifyUserAuthentication();
+        }
+
+        Nav.NavigateTo("/customers", true);
+    }
+}

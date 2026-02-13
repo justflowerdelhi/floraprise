@@ -1,0 +1,50 @@
+﻿@page "/customers/new"
+@using Sumpooj.Blazor.Models
+@using Sumpooj.Blazor.Services
+@attribute [Authorize]
+
+@inject CustomerApiService CustomerApi
+@inject NavigationManager Nav
+
+<h3>Add Customer</h3>
+
+<div class="card p-3" style="max-width:500px">
+    <div class="mb-2">
+        <label>Name</label>
+        <input class="form-control" @bind="model.Name" />
+    </div>
+
+    <div class="mb-2">
+        <label>Email</label>
+        <input class="form-control" @bind="model.Email" />
+    </div>
+
+    <div class="mb-2">
+        <label>Phone</label>
+        <input class="form-control" @bind="model.Phone" />
+    </div>
+
+    <div class="mb-2">
+        <label>Default Card Message</label>
+        <textarea class="form-control"
+                  @bind="model.DefaultCardMessage"></textarea>
+    </div>
+
+    <button class="btn btn-primary" @onclick="Save">
+        Save
+    </button>
+
+    <button class="btn btn-secondary ms-2" @onclick='() => Nav.NavigateTo("/customers")' >
+        Cancel
+    </button>
+</div>
+
+@code {
+    private CreateCustomerRequest model = new();
+
+    private async Task Save()
+    {
+        await CustomerApi.CreateAsync(model);
+        Nav.NavigateTo("/customers");
+    }
+}

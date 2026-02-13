@@ -1,0 +1,25 @@
+﻿@if (TotalPages > 1)
+{
+    <nav>
+        <ul class="pagination">
+            @for (int i = 1; i <= TotalPages; i++)
+            {
+                <li class="page-item @(i == Page ? "active" : "")">
+                    <button class="page-link"
+                            @onclick="() => OnPageChanged.InvokeAsync(i)">
+                        @i
+                    </button>
+                </li>
+            }
+        </ul>
+    </nav>
+}
+
+@code {
+    [Parameter] public int Total { get; set; }
+    [Parameter] public int Page { get; set; }
+    [Parameter] public int PageSize { get; set; }
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+
+    private int TotalPages => (int)Math.Ceiling((double)Total / PageSize);
+}
