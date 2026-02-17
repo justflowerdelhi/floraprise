@@ -22,7 +22,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import SectionCard from '../SectionCard';
-import { FormSectionProps } from '../../types/product.types';
+import type { FormSectionProps } from '../../types/product.types';
 
 interface ImageUploadSectionProps extends FormSectionProps {
   images: File[];

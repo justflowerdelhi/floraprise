@@ -7,7 +7,7 @@ import { Grid, Box, Typography, Divider } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SectionCard from '../SectionCard';
 import { FormSwitch, FormTagInput } from '../FormFields';
-import { FormSectionProps } from '../../types/product.types';
+import type { FormSectionProps } from '../../types/product.types';
 
 const SettingsSection = ({
   control,

@@ -21,7 +21,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { Controller } from 'react-hook-form';
 import SectionCard from '../SectionCard';
 import { FormTextField } from '../FormFields';
-import { FormSectionProps, Supplier } from '../../types/product.types';
+import type { FormSectionProps, Supplier } from '../../types/product.types';
 import { fetchSuppliers } from '../../api/product.api';
 
 interface SupplierSectionProps extends FormSectionProps {

@@ -8,11 +8,11 @@ import ColorLensIcon from '@mui/icons-material/ColorLens';
 import SectionCard from '../SectionCard';
 import { FormTextField, FormSelect, FormMultiSelect } from '../FormFields';
 import {
-  FormSectionProps,
   FLOWER_GRADES,
   COUNTRIES,
   SEASONALITY_OPTIONS,
 } from '../../types/product.types';
+import type { FormSectionProps } from '../../types/product.types';
 import { COMMON_FLOWER_COLORS } from '../../utils/product.utils';
 
 interface FlowerAttributesSectionProps extends FormSectionProps {

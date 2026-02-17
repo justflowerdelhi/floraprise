@@ -8,7 +8,7 @@ import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import SectionCard from '../SectionCard';
 import { FormTextField, FormSwitch } from '../FormFields';
-import { FormSectionProps } from '../../types/product.types';
+import type { FormSectionProps } from '../../types/product.types';
 import { calculateExpiryDate, formatDate, isLowShelfLife } from '../../utils/product.utils';
 
 interface PerishableSectionProps extends FormSectionProps {

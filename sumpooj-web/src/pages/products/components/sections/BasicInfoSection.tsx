@@ -11,8 +11,8 @@ import { FormTextField, FormSelect, FormSwitch } from '../FormFields';
 import {
   PRODUCT_TYPES,
   UNITS_OF_MEASURE,
-  FormSectionProps,
 } from '../../types/product.types';
+import type { FormSectionProps } from '../../types/product.types';
 import { generateSku } from '../../utils/product.utils';
 
 interface BasicInfoSectionProps extends FormSectionProps {

@@ -10,7 +10,8 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import SectionCard from '../SectionCard';
 import { FormCurrencyField, FormSelect } from '../FormFields';
-import { FormSectionProps, TAX_CATEGORIES } from '../../types/product.types';
+import { TAX_CATEGORIES } from '../../types/product.types';
+import type { FormSectionProps } from '../../types/product.types';
 import { calculateMargin, formatCurrency, formatPercent } from '../../utils/product.utils';
 
 const PricingSection = ({

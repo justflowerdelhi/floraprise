@@ -20,7 +20,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import BusinessIcon from '@mui/icons-material/Business';
-import { Supplier } from '../types/product.types';
+import type { Supplier } from '../types/product.types';
 import { createSupplier } from '../api/product.api';
 
 interface QuickAddSupplierModalProps {

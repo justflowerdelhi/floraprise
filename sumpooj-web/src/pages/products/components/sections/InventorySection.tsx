@@ -7,7 +7,7 @@ import { Grid, Alert, Collapse } from '@mui/material';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import SectionCard from '../SectionCard';
 import { FormTextField } from '../FormFields';
-import { FormSectionProps } from '../../types/product.types';
+import type { FormSectionProps } from '../../types/product.types';
 
 interface InventorySectionProps extends FormSectionProps {
   isEnabled: boolean;

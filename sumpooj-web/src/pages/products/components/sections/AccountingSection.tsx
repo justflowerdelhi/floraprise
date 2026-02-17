@@ -7,7 +7,8 @@ import { Grid, Alert, Typography } from '@mui/material';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import SectionCard from '../SectionCard';
 import { FormSelect } from '../FormFields';
-import { FormSectionProps, INCOME_ACCOUNTS, EXPENSE_ACCOUNTS } from '../../types/product.types';
+import { INCOME_ACCOUNTS, EXPENSE_ACCOUNTS } from '../../types/product.types';
+import type { FormSectionProps } from '../../types/product.types';
 
 const AccountingSection = ({
   control,
