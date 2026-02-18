@@ -9,9 +9,8 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [isAuthenticated, setAuth] = useState(
-    !!localStorage.getItem("auth_token")
-  );
+  // DEV MODE: Bypass login - set to true for development
+  const [isAuthenticated, setAuth] = useState(true);
 
   const login = (token: string) => {
     localStorage.setItem("auth_token", token);

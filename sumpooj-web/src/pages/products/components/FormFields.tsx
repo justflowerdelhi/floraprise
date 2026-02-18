@@ -22,7 +22,7 @@ import {
   Typography,
 } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 // ============================================
 // COMMON PROPS
@@ -124,7 +124,20 @@ export const FormTextField = ({
           sx={{
             '& .MuiOutlinedInput-root': {
               backgroundColor: darkMode ? 'grey.900' : 'white',
+              ...(darkMode && {
+                color: 'grey.100',
+                '& fieldset': { borderColor: 'grey.700' },
+                '&:hover fieldset': { borderColor: 'grey.500' },
+                '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+              }),
             },
+            ...(darkMode && {
+              '& .MuiInputLabel-root': { color: 'grey.400' },
+              '& .MuiInputLabel-root.Mui-focused': { color: 'primary.light' },
+              '& .MuiInputBase-input': { color: 'grey.100' },
+              '& .MuiInputBase-input::placeholder': { color: 'grey.600', opacity: 1 },
+              '& .MuiInputAdornment-root': { color: 'grey.500' },
+            }),
           }}
         />
       )}
@@ -191,7 +204,20 @@ export const FormCurrencyField = ({
           sx={{
             '& .MuiOutlinedInput-root': {
               backgroundColor: darkMode ? 'grey.900' : 'white',
+              ...(darkMode && {
+                color: 'grey.100',
+                '& fieldset': { borderColor: 'grey.700' },
+                '&:hover fieldset': { borderColor: 'grey.500' },
+                '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+              }),
             },
+            ...(darkMode && {
+              '& .MuiInputLabel-root': { color: 'grey.400' },
+              '& .MuiInputLabel-root.Mui-focused': { color: 'primary.light' },
+              '& .MuiInputBase-input': { color: 'grey.100' },
+              '& .MuiInputBase-input::placeholder': { color: 'grey.600', opacity: 1 },
+              '& .MuiInputAdornment-root': { color: 'grey.500' },
+            }),
           }}
         />
       )}
@@ -229,7 +255,12 @@ export const FormSelect = ({
       name={name}
       control={control}
       render={({ field, fieldState: { error } }) => (
-        <FormControl fullWidth error={!!error} disabled={disabled}>
+        <FormControl fullWidth error={!!error} disabled={disabled}
+          sx={darkMode ? {
+            '& .MuiInputLabel-root': { color: 'grey.400' },
+            '& .MuiInputLabel-root.Mui-focused': { color: 'primary.light' },
+          } : {}}
+        >
           <InputLabel>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               {label}
@@ -242,6 +273,13 @@ export const FormSelect = ({
             value={field.value ?? ''}
             sx={{
               backgroundColor: darkMode ? 'grey.900' : 'white',
+              ...(darkMode && {
+                color: 'grey.100',
+                '& fieldset': { borderColor: 'grey.700' },
+                '&:hover fieldset': { borderColor: 'grey.500' },
+                '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+                '& .MuiSvgIcon-root': { color: 'grey.400' },
+              }),
             }}
           >
             {placeholder && (
@@ -345,7 +383,18 @@ export const FormMultiSelect = ({
             sx={{
               '& .MuiOutlinedInput-root': {
                 backgroundColor: darkMode ? 'grey.900' : 'white',
+                ...(darkMode && {
+                  color: 'grey.100',
+                  '& fieldset': { borderColor: 'grey.700' },
+                  '&:hover fieldset': { borderColor: 'grey.500' },
+                  '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+                }),
               },
+              ...(darkMode && {
+                '& .MuiInputLabel-root': { color: 'grey.400' },
+                '& .MuiInputLabel-root.Mui-focused': { color: 'primary.light' },
+                '& .MuiInputBase-input': { color: 'grey.100' },
+              }),
             }}
           />
         </FormControl>
@@ -470,7 +519,18 @@ export const FormTagInput = ({
               sx={{
                 '& .MuiOutlinedInput-root': {
                   backgroundColor: darkMode ? 'grey.900' : 'white',
+                  ...(darkMode && {
+                    color: 'grey.100',
+                    '& fieldset': { borderColor: 'grey.700' },
+                    '&:hover fieldset': { borderColor: 'grey.500' },
+                    '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+                  }),
                 },
+                ...(darkMode && {
+                  '& .MuiInputLabel-root': { color: 'grey.400' },
+                  '& .MuiInputLabel-root.Mui-focused': { color: 'primary.light' },
+                  '& .MuiInputBase-input': { color: 'grey.100' },
+                }),
               }}
             />
           )}
