@@ -27,6 +27,7 @@ import {
   Tooltip,
   Divider,
   Alert,
+  useTheme,
 } from '@mui/material';
 import {
   Cake,
@@ -92,6 +93,9 @@ interface ReminderCardProps {
 }
 
 function ReminderCard({ reminder, onDismiss, onAction, onViewCustomer }: ReminderCardProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
   const config = REMINDER_CONFIGS[reminder.type];
   const daysAway = daysUntil(reminder.dueDate);
@@ -99,7 +103,7 @@ function ReminderCard({ reminder, onDismiss, onAction, onViewCustomer }: Reminde
   return (
     <Card
       sx={{
-        bgcolor: '#1a1a2e',
+        bgcolor: dk ? '#1a1a2e' : '#fff',
         border: `1px solid ${PRIORITY_COLORS[reminder.priority]}20`,
         borderLeft: `4px solid ${PRIORITY_COLORS[reminder.priority]}`,
         opacity: reminder.dismissed ? 0.5 : 1,
@@ -250,11 +254,14 @@ interface StatsCardProps {
 }
 
 function StatsCard({ icon, label, value, color, onClick }: StatsCardProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   return (
     <Paper
       sx={{
         p: 2,
-        bgcolor: '#1a1a2e',
+        bgcolor: dk ? '#1a1a2e' : '#fff',
         cursor: onClick ? 'pointer' : 'default',
         transition: 'transform 0.2s',
         '&:hover': onClick ? { transform: 'translateY(-2px)' } : {},
@@ -287,6 +294,9 @@ interface SmartReminderDashboardProps {
 }
 
 export default function SmartReminderDashboard({ onViewCustomer }: SmartReminderDashboardProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   const [tabValue, setTabValue] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<ReminderType | 'ALL'>('ALL');
@@ -356,11 +366,11 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
   };
 
   return (
-    <Box sx={{ p: 3, bgcolor: '#0f0f0f', minHeight: '100vh' }}>
+    <Box sx={{ p: 3, bgcolor: dk ? '#0f0f0f' : '#f8f9fa', minHeight: '100vh' }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Box>
-          <Typography variant="h5" fontWeight={600} sx={{ color: '#fff' }}>
+          <Typography variant="h5" fontWeight={600}>
             Smart Reminders
           </Typography>
           <Typography variant="body2" sx={{ opacity: 0.7 }}>
@@ -409,7 +419,7 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
       </Grid>
 
       {/* Filters */}
-      <Paper sx={{ bgcolor: '#1a1a2e', mb: 3 }}>
+      <Paper sx={{ bgcolor: dk ? '#1a1a2e' : '#fff', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', p: 2, gap: 2 }}>
           <TextField
             size="small"
@@ -526,12 +536,15 @@ interface ReminderWidgetProps {
 }
 
 export function ReminderWidget({ maxItems = 5, onViewAll, onViewCustomer }: ReminderWidgetProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   const urgentReminders = MOCK_REMINDERS
     .filter((r) => !r.dismissed && (r.priority === 'HIGH' || r.priority === 'URGENT'))
     .slice(0, maxItems);
 
   return (
-    <Paper sx={{ p: 2, bgcolor: '#1a1a2e' }}>
+    <Paper sx={{ p: 2, bgcolor: dk ? '#1a1a2e' : '#fff' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <NotificationsActive sx={{ color: '#fdd835' }} />

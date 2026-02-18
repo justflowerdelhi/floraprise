@@ -120,8 +120,15 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
         )}
 
         {/* Mobile Logo */}
-        <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1 }}>
-          <LocalFlorist sx={{ color: '#fdd835', fontSize: 28 }} />
+        <Box 
+          sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', cursor: 'pointer' }}
+          onClick={() => window.location.href = '/dashboard'}
+        >
+          <img 
+            src="/assets/logo/floraedge-icon.svg"
+            alt="FloraEdge"
+            style={{ height: '28px', width: '28px' }}
+          />
         </Box>
 
         {/* Global Search (in header) */}

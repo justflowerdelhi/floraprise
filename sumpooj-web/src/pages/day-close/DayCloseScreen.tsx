@@ -23,6 +23,7 @@ import {
   TableRow,
   alpha,
   Paper,
+  useTheme,
 } from '@mui/material';
 import {
   Lock,
@@ -93,8 +94,11 @@ interface StatCardProps {
 }
 
 function StatCard({ title, value, subtitle, icon, color = '#fdd835', trend, trendValue }: StatCardProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   return (
-    <Card sx={{ bgcolor: '#1a1a2e', height: '100%' }}>
+    <Card sx={{ bgcolor: dk ? '#1a1a2e' : '#fff', height: '100%' }}>
       <CardContent>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
           <Box
@@ -148,6 +152,8 @@ function StatCard({ title, value, subtitle, icon, color = '#fdd835', trend, tren
 // -----------------------------------------------------------------------------
 
 export default function DayCloseScreen() {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
   const { requestConfirmation } = useSensitiveAction();
   const [summary, setSummary] = useState<DayCloseSummary>(MOCK_DAY_SUMMARY);
   const [countedCash, setCountedCash] = useState<string>('');
@@ -310,7 +316,7 @@ export default function DayCloseScreen() {
       <Grid container spacing={3}>
         {/* Payment Breakdown */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <Card sx={{ bgcolor: '#1a1a2e', height: '100%' }}>
+          <Card sx={{ bgcolor: dk ? '#1a1a2e' : '#fff', height: '100%' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" fontWeight={600} mb={3}>
                 Payment Breakdown
@@ -393,7 +399,7 @@ export default function DayCloseScreen() {
         
         {/* Cash Reconciliation */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <Card sx={{ bgcolor: '#1a1a2e', height: '100%' }}>
+          <Card sx={{ bgcolor: dk ? '#1a1a2e' : '#fff', height: '100%' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" fontWeight={600} mb={3}>
                 Cash Reconciliation
@@ -533,7 +539,7 @@ export default function DayCloseScreen() {
       </Grid>
       
       {/* Daily Summary Breakdown */}
-      <Card sx={{ bgcolor: '#1a1a2e', mt: 3 }}>
+      <Card sx={{ bgcolor: dk ? '#1a1a2e' : '#fff', mt: 3 }}>
         <CardContent sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={600} mb={3}>
             Day Summary
@@ -544,7 +550,7 @@ export default function DayCloseScreen() {
               <Box
                 sx={{
                   p: 2,
-                  bgcolor: '#0f0f0f',
+                  bgcolor: dk ? '#0f0f0f' : '#f5f5f5',
                   borderRadius: 2,
                 }}
               >
@@ -577,7 +583,7 @@ export default function DayCloseScreen() {
               <Box
                 sx={{
                   p: 2,
-                  bgcolor: '#0f0f0f',
+                  bgcolor: dk ? '#0f0f0f' : '#f5f5f5',
                   borderRadius: 2,
                 }}
               >
@@ -609,7 +615,7 @@ export default function DayCloseScreen() {
               <Box
                 sx={{
                   p: 2,
-                  bgcolor: '#0f0f0f',
+                  bgcolor: dk ? '#0f0f0f' : '#f5f5f5',
                   borderRadius: 2,
                 }}
               >

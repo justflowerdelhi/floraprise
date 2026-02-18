@@ -8,6 +8,8 @@
  * Payment model is SEPARATE — see PaymentTypes.ts
  */
 
+import type { DeliveryAddress, FulfillmentType } from './DeliveryZoneTypes';
+
 // ─── Order Source & Statuses ────────────────────────────────
 
 export type OrderSource = 'WALK_IN' | 'PHONE' | 'WEBSITE' | 'BLOOMNATION' | 'FTD';
@@ -131,11 +133,24 @@ export interface Order {
   recipientName?: string;
   recipientPhone?: string;
 
-  // Delivery
+  // Fulfillment (NEW: Pickup vs Delivery)
+  fulfillmentType?: FulfillmentType;  // 'PICKUP' | 'DELIVERY'
+  
+  // Pickup details
+  pickupDate?: string;
+  pickupTimeSlot?: TimeSlot;
+  
+  // Delivery (legacy single-string field for backward compatibility)
   deliveryDate?: string;
   deliveryTime?: string;
-  deliveryAddress?: string;
+  deliveryAddress?: string;  // Legacy string address
   deliveryInstructions?: string;
+  
+  // Delivery (NEW: structured address with zone info)
+  structuredDeliveryAddress?: DeliveryAddress;
+  deliveryTimeSlot?: TimeSlot;
+  
+  // Message & occasion
   cardMessage?: string;
   occasion?: string;
 
@@ -222,23 +237,23 @@ export interface DeliveryEntry {
 
 export interface StatusConfig {
   label: string;
-  color: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
+  color: string;
 }
 
 export const FULFILLMENT_STATUS_CONFIG: Record<FulfillmentStatus, StatusConfig> = {
-  DRAFT:            { label: 'Draft',            color: 'default' },
-  CONFIRMED:        { label: 'Confirmed',        color: 'primary' },
-  IN_DESIGN:        { label: 'In Design',        color: 'secondary' },
-  READY:            { label: 'Ready',            color: 'info' },
-  OUT_FOR_DELIVERY: { label: 'Out for Delivery', color: 'warning' },
-  COMPLETED:        { label: 'Completed',        color: 'success' },
-  CANCELLED:        { label: 'Cancelled',        color: 'error' },
+  DRAFT:            { label: 'Draft',            color: '#9e9e9e' },
+  CONFIRMED:        { label: 'Confirmed',        color: '#2196f3' },
+  IN_DESIGN:        { label: 'In Design',        color: '#9c27b0' },
+  READY:            { label: 'Ready',            color: '#00bcd4' },
+  OUT_FOR_DELIVERY: { label: 'Out for Delivery', color: '#ff9800' },
+  COMPLETED:        { label: 'Completed',        color: '#4caf50' },
+  CANCELLED:        { label: 'Cancelled',        color: '#f44336' },
 };
 
 export const PAYMENT_STATUS_CONFIG: Record<OrderPaymentStatus, StatusConfig> = {
-  PAID:   { label: 'Paid',   color: 'success' },
-  UNPAID: { label: 'Unpaid', color: 'error' },
-  PARTIAL:{ label: 'Partial',color: 'info' },
+  PAID:   { label: 'Paid',   color: '#4caf50' },
+  UNPAID: { label: 'Unpaid', color: '#f44336' },
+  PARTIAL:{ label: 'Partial',color: '#00bcd4' },
 };
 
 export const ORDER_SOURCE_CONFIG: Record<OrderSource, { label: string; color: string }> = {

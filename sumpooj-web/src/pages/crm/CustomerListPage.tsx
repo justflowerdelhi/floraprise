@@ -37,6 +37,7 @@ import {
   Select,
   FormControl,
   InputLabel,
+  useTheme,
 } from '@mui/material';
 import {
   Search,
@@ -86,6 +87,9 @@ interface FilterPanelProps {
 }
 
 function FilterPanel({ filters, onFilterChange, onClear }: FilterPanelProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   const hasActiveFilters = Boolean(
     filters.tags?.length ||
     filters.loyaltyTiers?.length ||
@@ -96,7 +100,7 @@ function FilterPanel({ filters, onFilterChange, onClear }: FilterPanelProps) {
   );
 
   return (
-    <Paper sx={{ p: 2, bgcolor: '#1a1a2e', mb: 2 }}>
+    <Paper sx={{ p: 2, bgcolor: dk ? '#1a1a2e' : '#fff', mb: 2 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="subtitle2">Filters</Typography>
         {hasActiveFilters && (
@@ -619,12 +623,15 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
     // TODO: API call
   };
 
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+
   return (
-    <Box sx={{ p: 3, bgcolor: '#0f0f0f', minHeight: '100vh' }}>
+    <Box sx={{ p: 3, bgcolor: dk ? '#0f0f0f' : '#f8f9fa', minHeight: '100vh' }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Box>
-          <Typography variant="h5" fontWeight={600} sx={{ color: '#fff' }}>
+          <Typography variant="h5" fontWeight={600}>
             Customers
           </Typography>
           <Typography variant="body2" sx={{ opacity: 0.7 }}>
@@ -659,9 +666,9 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
           <Paper
             sx={{
               p: 2,
-              bgcolor: '#1a1a2e',
+              bgcolor: dk ? '#1a1a2e' : '#fff',
               cursor: 'pointer',
-              '&:hover': { bgcolor: '#252542' },
+              '&:hover': { bgcolor: dk ? '#252542' : '#f5f5f5' },
             }}
             onClick={() => setFilters({})}
           >
@@ -673,9 +680,9 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
           <Paper
             sx={{
               p: 2,
-              bgcolor: '#1a1a2e',
+              bgcolor: dk ? '#1a1a2e' : '#fff',
               cursor: 'pointer',
-              '&:hover': { bgcolor: '#252542' },
+              '&:hover': { bgcolor: dk ? '#252542' : '#f5f5f5' },
             }}
             onClick={() => setFilters({ tags: ['VIP'] })}
           >
@@ -689,9 +696,9 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
           <Paper
             sx={{
               p: 2,
-              bgcolor: '#1a1a2e',
+              bgcolor: dk ? '#1a1a2e' : '#fff',
               cursor: 'pointer',
-              '&:hover': { bgcolor: '#252542' },
+              '&:hover': { bgcolor: dk ? '#252542' : '#f5f5f5' },
             }}
             onClick={() => setFilters({ daysSinceLastOrder: 60 })}
           >
@@ -705,9 +712,9 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
           <Paper
             sx={{
               p: 2,
-              bgcolor: '#1a1a2e',
+              bgcolor: dk ? '#1a1a2e' : '#fff',
               cursor: 'pointer',
-              '&:hover': { bgcolor: '#252542' },
+              '&:hover': { bgcolor: dk ? '#252542' : '#f5f5f5' },
             }}
             onClick={() => setFilters({ hasUpcomingBirthday: true })}
           >
@@ -729,7 +736,7 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
       )}
 
       {/* Search Bar */}
-      <Paper sx={{ bgcolor: '#1a1a2e', mb: 2 }}>
+      <Paper sx={{ bgcolor: dk ? '#1a1a2e' : '#fff', mb: 2 }}>
         <Box sx={{ p: 2 }}>
           <TextField
             fullWidth
@@ -740,7 +747,7 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ color: 'rgba(255,255,255,0.5)' }} />
+                  <Search sx={{ color: dk ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }} />
                 </InputAdornment>
               ),
             }}

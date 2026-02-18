@@ -73,15 +73,15 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 // ─── Section Colors ─────────────────────────────────────────
 
 const SECTION_COLORS: Record<string, string> = {
-  sales: '#4caf50',
+  sales: '#2E7D32',      // Flora Green
   orders: '#2196f3',
   events: '#e91e63',
   inventory: '#ff9800',
-  reports: '#9c27b0',
+  reports: '#5B2E91',    // FloraEdge Purple
   catalog: '#00bcd4',
-  crm: '#9c27b0',
+  crm: '#5B2E91',        // FloraEdge Purple
   staff: '#ff5722',
-  settings: '#fdd835',
+  settings: '#F4C430',   // Accent Yellow
 };
 
 // ─── Sidebar Props ──────────────────────────────────────────
@@ -310,23 +310,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
           py: 2,
           minHeight: 64,
           borderBottom: `1px solid ${dk ? 'rgba(255,255,255,0.06)' : '#e0e0e0'}`,
+          cursor: 'pointer',
         }}
+        onClick={() => window.location.href = '/dashboard'}
       >
         {!collapsed && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <LocalFlorist sx={{ fontSize: 32, color: '#fdd835' }} />
-            <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
-                Florist ERP
-              </Typography>
-              <Typography variant="caption" sx={{ color: dk ? 'rgba(255,255,255,0.4)' : 'text.disabled', fontSize: '0.65rem' }}>
-                Enterprise Platform
-              </Typography>
-            </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', height: 32 }}>
+            <img 
+              src={dk ? '/assets/logo/floraedge-logo-light.svg' : '/assets/logo/floraedge-logo.svg'}
+              alt="FloraEdge"
+              style={{ height: '32px', display: 'block' }}
+            />
           </Box>
         )}
 
-        {collapsed && <LocalFlorist sx={{ fontSize: 28, color: '#fdd835' }} />}
+        {collapsed && (
+          <img 
+            src="/assets/logo/floraedge-icon.svg"
+            alt="FloraEdge"
+            style={{ height: '32px', width: '32px', display: 'block' }}
+          />
+        )}
 
         {/* Collapse Toggle (non-mobile only) */}
         {!mobile && onToggleCollapse && (
@@ -400,7 +404,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               textAlign: 'center',
             }}
           >
-            v1.0.0 • Sumpooj
+            v1.0.0 • FloraEdge
           </Typography>
         </Box>
       )}

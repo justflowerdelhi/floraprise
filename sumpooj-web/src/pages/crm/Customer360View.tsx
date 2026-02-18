@@ -33,6 +33,7 @@ import {
   DialogActions,
   Tooltip,
   Alert,
+  useTheme,
 } from '@mui/material';
 import {
   Person,
@@ -186,8 +187,11 @@ interface MetricCardProps {
 }
 
 function MetricCard({ icon, label, value, subValue, color = '#fdd835' }: MetricCardProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   return (
-    <Paper sx={{ p: 2, bgcolor: '#1a1a2e' }}>
+    <Paper sx={{ p: 2, bgcolor: dk ? '#1a1a2e' : '#fff' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <Box sx={{ color, opacity: 0.9 }}>{icon}</Box>
         <Box>
@@ -217,8 +221,11 @@ interface OrdersTabProps {
 }
 
 function OrdersTab({ orders }: OrdersTabProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   return (
-    <TableContainer component={Paper} sx={{ bgcolor: '#1a1a2e' }}>
+    <TableContainer component={Paper} sx={{ bgcolor: dk ? '#1a1a2e' : '#fff' }}>
       <Table>
         <TableHead>
           <TableRow>
@@ -291,8 +298,11 @@ interface EventsTabProps {
 }
 
 function EventsTab({ events }: EventsTabProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   return (
-    <TableContainer component={Paper} sx={{ bgcolor: '#1a1a2e' }}>
+    <TableContainer component={Paper} sx={{ bgcolor: dk ? '#1a1a2e' : '#fff' }}>
       <Table>
         <TableHead>
           <TableRow>
@@ -354,8 +364,11 @@ interface LoyaltyTabProps {
 }
 
 function LoyaltyTab({ transactions }: LoyaltyTabProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   return (
-    <TableContainer component={Paper} sx={{ bgcolor: '#1a1a2e' }}>
+    <TableContainer component={Paper} sx={{ bgcolor: dk ? '#1a1a2e' : '#fff' }}>
       <Table>
         <TableHead>
           <TableRow>
@@ -468,6 +481,9 @@ interface Customer360ViewProps {
 }
 
 export default function Customer360View({ customerId, onBack }: Customer360ViewProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   const [tabValue, setTabValue] = useState(0);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
 
@@ -486,15 +502,15 @@ export default function Customer360View({ customerId, onBack }: Customer360ViewP
   };
 
   return (
-    <Box sx={{ p: 3, bgcolor: '#0f0f0f', minHeight: '100vh' }}>
+    <Box sx={{ p: 3, bgcolor: dk ? '#0f0f0f' : '#f8f9fa', minHeight: '100vh' }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
         {onBack && (
-          <IconButton onClick={onBack} sx={{ color: '#fff' }}>
+          <IconButton onClick={onBack}>
             <ArrowBack />
           </IconButton>
         )}
-        <Typography variant="h5" fontWeight={600} sx={{ color: '#fff' }}>
+        <Typography variant="h5" fontWeight={600}>
           Customer Profile
         </Typography>
       </Box>
@@ -502,7 +518,7 @@ export default function Customer360View({ customerId, onBack }: Customer360ViewP
       <Grid container spacing={3}>
         {/* Left Column - Profile Info */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Paper sx={{ p: 3, bgcolor: '#1a1a2e', mb: 3 }}>
+          <Paper sx={{ p: 3, bgcolor: dk ? '#1a1a2e' : '#fff', mb: 3 }}>
             {/* Avatar & Basic Info */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
               <Avatar
@@ -692,13 +708,13 @@ export default function Customer360View({ customerId, onBack }: Customer360ViewP
           </Grid>
 
           {/* Tabs for History */}
-          <Paper sx={{ bgcolor: '#1a1a2e' }}>
+          <Paper sx={{ bgcolor: dk ? '#1a1a2e' : '#fff' }}>
             <Tabs
               value={tabValue}
               onChange={(_, v) => setTabValue(v)}
               sx={{
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-                '& .MuiTab-root': { color: 'rgba(255,255,255,0.7)' },
+                borderBottom: dk ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)',
+                '& .MuiTab-root': { color: dk ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)' },
                 '& .Mui-selected': { color: '#fdd835' },
                 '& .MuiTabs-indicator': { bgcolor: '#fdd835' },
               }}

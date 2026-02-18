@@ -29,6 +29,7 @@ import {
   ListItemIcon,
   ListItemText,
   Alert,
+  useTheme,
 } from '@mui/material';
 import {
   EmojiEvents,
@@ -266,11 +267,14 @@ interface PointsEarningPreviewProps {
 }
 
 export function PointsEarningPreview({ amount, tier }: PointsEarningPreviewProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   const points = calculatePointsEarned(amount, tier);
   const tierConfig = LOYALTY_TIER_CONFIGS[tier];
 
   return (
-    <Paper sx={{ p: 2, bgcolor: '#1a1a2e', border: '1px solid rgba(253,216,53,0.2)' }}>
+    <Paper sx={{ p: 2, bgcolor: dk ? '#1a1a2e' : '#fff', border: `1px solid rgba(253,216,53,${dk ? 0.2 : 0.3})` }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         <Star sx={{ color: '#fdd835', fontSize: 28 }} />
         <Box>
@@ -310,6 +314,9 @@ export function PointsRedemptionDialog({
   onRedeem,
   maxRedeemable,
 }: PointsRedemptionDialogProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   const [pointsToRedeem, setPointsToRedeem] = useState(100);
   const availablePoints = customer.loyaltyPoints;
   const maxPoints = maxRedeemable ?? availablePoints;
@@ -329,7 +336,7 @@ export function PointsRedemptionDialog({
       <DialogContent>
         <Box sx={{ py: 2 }}>
           {/* Available Points */}
-          <Paper sx={{ p: 2, bgcolor: '#1a1a2e', mb: 3 }}>
+          <Paper sx={{ p: 2, bgcolor: dk ? '#1a1a2e' : '#fff', mb: 3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="body2" sx={{ opacity: 0.7 }}>
                 Available Points
@@ -503,8 +510,11 @@ export function LoyaltyTransactionItem({ transaction }: LoyaltyTransactionItemPr
 // -----------------------------------------------------------------------------
 
 export function TierComparisonCard() {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   return (
-    <Paper sx={{ p: 3, bgcolor: '#1a1a2e' }}>
+    <Paper sx={{ p: 3, bgcolor: dk ? '#1a1a2e' : '#fff' }}>
       <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
         Loyalty Tiers
       </Typography>
@@ -578,11 +588,14 @@ interface PointsSummaryWidgetProps {
 }
 
 export function PointsSummaryWidget({ customer, orderAmount, onRedeem }: PointsSummaryWidgetProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   const pointsToEarn = calculatePointsEarned(orderAmount, customer.loyaltyTier);
   const tierConfig = LOYALTY_TIER_CONFIGS[customer.loyaltyTier];
 
   return (
-    <Paper sx={{ p: 2, bgcolor: '#1a1a2e', border: '1px solid rgba(253,216,53,0.2)' }}>
+    <Paper sx={{ p: 2, bgcolor: dk ? '#1a1a2e' : '#fff', border: `1px solid rgba(253,216,53,${dk ? 0.2 : 0.3})` }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Star sx={{ color: '#fdd835' }} />
