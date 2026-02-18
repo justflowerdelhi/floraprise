@@ -121,13 +121,14 @@ public class PurchaseOrder : BaseEntity
         MarkUpdated();
     }
 
-    public void Cancel(string? reason)
+    public void Cancel(string? reason = null)
     {
         if (Status == PurchaseOrderStatus.Completed || Status == PurchaseOrderStatus.Cancelled)
             throw new InvalidOperationException("Cannot cancel completed or already cancelled purchase orders");
 
         Status = PurchaseOrderStatus.Cancelled;
-        Notes = reason;
+        if (!string.IsNullOrEmpty(reason))
+            Notes = reason;
         MarkUpdated();
     }
 
@@ -159,6 +160,36 @@ public class PurchaseOrderItem
     public decimal UnitPrice { get; private set; }
     public decimal TotalPrice { get; private set; }
     public int ReceivedQuantity { get; private set; }
+    public string? Sku { get; private set; }
+    public string? Unit { get; private set; }
+    public bool IsPerishable { get; private set; }
+    public int ShelfLifeDays { get; private set; }
+    public string? BatchNumber { get; private set; }
+    public DateTime? ExpiryDate { get; private set; }
+    public string? StorageLocation { get; private set; }
+
+    public void SetProductDetails(string? sku, string? unit, bool isPerishable, int shelfLifeDays)
+    {
+        Sku = sku;
+        Unit = unit;
+        IsPerishable = isPerishable;
+        ShelfLifeDays = shelfLifeDays;
+    }
+
+    public void SetBatchInfo(string batchNumber, DateTime? expiryDate, string? storageLocation)
+    {
+        BatchNumber = batchNumber;
+        ExpiryDate = expiryDate;
+        StorageLocation = storageLocation;
+    }
+
+    public void UpdateReceivedQuantity(int receivedQuantity)
+    {
+        if (receivedQuantity < 0)
+            throw new ArgumentException("Received quantity cannot be negative");
+
+        ReceivedQuantity = receivedQuantity;
+    }
 
     public void MarkReceived(int quantity)
     {

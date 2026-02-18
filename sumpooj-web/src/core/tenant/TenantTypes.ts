@@ -10,6 +10,67 @@ export type TenantPlan = 'STARTER' | 'GROWTH' | 'PRO' | 'ENTERPRISE';
 
 export type SubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED';
 
+export type TenantCountry = 'US' | 'IN' | 'AE' | 'GB' | 'CA' | 'AU';
+
+export type TaxSystemType = 'SALES_TAX' | 'GST' | 'VAT';
+
+export type TimeFormat = '12H' | '24H';
+
+export type DateFormat = 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
+
+export interface CountryDefaults {
+  currency: string;
+  taxSystem: TaxSystemType;
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
+  locale: string;
+}
+
+export const COUNTRY_DEFAULTS: Record<TenantCountry, CountryDefaults> = {
+  US: {
+    currency: 'USD',
+    taxSystem: 'SALES_TAX',
+    dateFormat: 'MM/DD/YYYY',
+    timeFormat: '12H',
+    locale: 'en-US',
+  },
+  IN: {
+    currency: 'INR',
+    taxSystem: 'GST',
+    dateFormat: 'DD/MM/YYYY',
+    timeFormat: '12H',
+    locale: 'en-IN',
+  },
+  AE: {
+    currency: 'AED',
+    taxSystem: 'VAT',
+    dateFormat: 'DD/MM/YYYY',
+    timeFormat: '12H',
+    locale: 'en-AE',
+  },
+  GB: {
+    currency: 'GBP',
+    taxSystem: 'VAT',
+    dateFormat: 'DD/MM/YYYY',
+    timeFormat: '24H',
+    locale: 'en-GB',
+  },
+  CA: {
+    currency: 'CAD',
+    taxSystem: 'SALES_TAX',
+    dateFormat: 'YYYY-MM-DD',
+    timeFormat: '12H',
+    locale: 'en-CA',
+  },
+  AU: {
+    currency: 'AUD',
+    taxSystem: 'GST',
+    dateFormat: 'DD/MM/YYYY',
+    timeFormat: '12H',
+    locale: 'en-AU',
+  },
+};
+
 // -----------------------------------------------------------------------------
 // Tenant Model
 // -----------------------------------------------------------------------------
@@ -20,6 +81,12 @@ export interface Tenant {
   slug: string;
   plan: TenantPlan;
   subscriptionStatus: SubscriptionStatus;
+  country: TenantCountry;
+  currency: string;
+  taxSystem: TaxSystemType;
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
+  locale: string;
   trialEndsAt?: string;
   subscriptionEndsAt?: string;
   isActive: boolean;
