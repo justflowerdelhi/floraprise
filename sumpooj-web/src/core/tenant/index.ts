@@ -9,10 +9,15 @@ export type {
   Tenant,
   TenantUsageStats,
   PlanConfig,
+  TenantCountry,
+  TaxSystemType,
+  TimeFormat,
+  CountryDefaults,
 } from './TenantTypes';
 export {
   PLAN_CONFIGS,
   MOCK_TENANT,
+  COUNTRY_DEFAULTS,
   getPlanConfig,
   isPlanHigherThan,
   isPlanAtLeast,
@@ -20,6 +25,7 @@ export {
   isSubscriptionActive,
   getUsagePercentage,
   formatPlanPrice,
+  resolveTenantDefaults,
 } from './TenantTypes';
 
 export type { FeatureFlag, FeatureMetadata } from './FeatureFlags';

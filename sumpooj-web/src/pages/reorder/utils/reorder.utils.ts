@@ -78,16 +78,11 @@ export const computeSummary = (products: ReorderProduct[]): ReorderSummary => ({
   totalProducts: products.length,
 });
 
-// ─── Formatters ─────────────────────────────────────────────
+// ─── Formatters (tenant-aware) ───────────────────────────────
 
-const INR = new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
+import { formatCurrency } from '../../../core/i18n';
 
-export const fmtCurrency = (v: number): string => INR.format(v);
+export const fmtCurrency = (v: number): string => formatCurrency(v);
 
 export const fmtDays = (d: number): string =>
   d >= 999 ? '∞' : `${d.toFixed(1)} days`;

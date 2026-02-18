@@ -77,6 +77,22 @@ export const approveGiftCardPayment = (payment: Payment): Payment => ({
   transactionId: `GC-${Date.now()}`,
 });
 
+// ─── UPI payment — auto-approve ─────────────────────────────
+
+export const approveUPIPayment = (payment: Payment): Payment => ({
+  ...payment,
+  status: 'APPROVED',
+  transactionId: `UPI-${Date.now()}`,
+});
+
+// ─── Bank transfer payment — auto-approve ───────────────────
+
+export const approveBankTransferPayment = (payment: Payment): Payment => ({
+  ...payment,
+  status: 'APPROVED',
+  transactionId: `BT-${Date.now()}`,
+});
+
 // ─── Void a payment ─────────────────────────────────────────
 
 export const voidPayment = (payment: Payment): Payment => ({
@@ -139,11 +155,8 @@ export const getRemainingBalance = (payments: Payment[], grandTotal: number): nu
   return Math.max(0, grandTotal - paid);
 };
 
-// ─── Formatters ─────────────────────────────────────────────
+// ─── Formatters (tenant-aware) ───────────────────────────────
 
-const INR = new Intl.NumberFormat('en-IN', {
-  style: 'currency', currency: 'INR',
-  minimumFractionDigits: 0, maximumFractionDigits: 2,
-});
+import { formatCurrency } from '../../core/i18n';
 
-export const fmtPaymentAmount = (v: number): string => INR.format(v);
+export const fmtPaymentAmount = (v: number): string => formatCurrency(v);

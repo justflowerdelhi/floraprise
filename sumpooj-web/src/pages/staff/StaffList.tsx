@@ -31,10 +31,11 @@ import type { Staff, StaffRole } from './StaffTypes';
 import { STAFF_ROLES, STAFF_ROLE_CONFIG } from './StaffTypes';
 import { getAllStaff, getTeamSummary, getStaffPerformance } from './StaffMockData';
 
-// ─── Currency Formatter ─────────────────────────────────────
+// ─── Currency Formatter (tenant-aware) ───────────────────────
 
-const fmtCurrency = (value: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value);
+import { formatCurrency } from '../../core/i18n';
+
+const fmtCurrency = (value: number) => formatCurrency(value);
 
 // ─── Stats Card Component ───────────────────────────────────
 

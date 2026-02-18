@@ -21,12 +21,12 @@ interface Props {
   data: PlatformCommission[];
 }
 
-// ─── Formatters ─────────────────────────────────────────────
+// ─── Formatters (tenant-aware) ───────────────────────────────
 
-const fmtCurrency = (v: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
+import { formatCurrency, formatPercent } from '../../core/i18n';
 
-const fmtPercent = (v: number) => `${v.toFixed(1)}%`;
+const fmtCurrency = (v: number) => formatCurrency(v);
+const fmtPercent = (v: number) => formatPercent(v);
 
 // ─── Platform Card Component ────────────────────────────────
 

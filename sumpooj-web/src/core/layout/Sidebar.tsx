@@ -43,6 +43,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRBAC } from '../rbac/RBACContext';
 import type { MenuSection, MenuItem as MenuItemType } from '../rbac/RBACTypes';
+import { useTenant } from '../tenant/TenantContext';
 
 // ─── Icon Mapping ───────────────────────────────────────────
 
@@ -284,8 +285,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const { getFilteredMenu } = useRBAC();
+  const { hasFeature } = useTenant();
 
-  const menuSections = getFilteredMenu();
+  const wireRoutes = new Set(['/wire-vendors', '/wire-settlements']);
+
+  const menuSections = getFilteredMenu()
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (item.path && wireRoutes.has(item.path)) {
+          return hasFeature('WIRE_MANAGEMENT');
+        }
+        return true;
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <Box

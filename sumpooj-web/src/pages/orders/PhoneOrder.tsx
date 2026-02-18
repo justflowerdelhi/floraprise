@@ -114,6 +114,10 @@ const PhoneOrder: React.FC = () => {
     deliveryDate;
   
   const isFormValid = fulfillmentType === 'PICKUP' ? isPickupValid : isDeliveryValid;
+  const deliveryFee = fulfillmentType === 'DELIVERY'
+    ? (deliveryAddress?.deliveryZone?.deliveryFee ?? 0)
+    : 0;
+  const grandTotalWithDelivery = state.totals.grandTotal + deliveryFee;
 
   const resetForm = useCallback(() => {
     clearCart();
@@ -155,7 +159,7 @@ const PhoneOrder: React.FC = () => {
       totals: state.totals,
     });
     
-    setSnackMsg(`Phone order created — ${fmtCurrency(state.totals.grandTotal)}`);
+    setSnackMsg(`Phone order created — ${fmtCurrency(grandTotalWithDelivery)}`);
     resetForm();
   };
 
@@ -167,9 +171,9 @@ const PhoneOrder: React.FC = () => {
 
   const handleFullyPaid = useCallback(() => {
     setPayModalOpen(false);
-    setSnackMsg(`Phone order paid — ${fmtCurrency(state.totals.grandTotal)}`);
+    setSnackMsg(`Phone order paid — ${fmtCurrency(grandTotalWithDelivery)}`);
     resetForm();
-  }, [resetForm, state.totals.grandTotal]);
+  }, [resetForm, grandTotalWithDelivery]);
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', bgcolor: bgColor, overflow: 'hidden' }}>
@@ -566,6 +570,7 @@ const PhoneOrder: React.FC = () => {
             onUpdateQty={updateQty}
             onRemove={removeItem}
             onSetDiscount={setDiscount}
+            deliveryFee={deliveryFee}
           />
         </Box>
       </Box>
@@ -582,7 +587,7 @@ const PhoneOrder: React.FC = () => {
           gap: 2,
         }}
       >
-        <CartSummaryPanel totals={state.totals} orderSource="PHONE" />
+        <CartSummaryPanel totals={state.totals} orderSource="PHONE" deliveryFee={deliveryFee} />
 
         {/* Validation warnings */}
         {state.items.length > 0 && !isFormValid && (
@@ -644,21 +649,6 @@ const PhoneOrder: React.FC = () => {
           </Card>
         )}
 
-        {/* Zone warning (non-blocking) */}
-        {fulfillmentType === 'DELIVERY' && deliveryAddress?.fullAddress && !deliveryAddress?.deliveryZone && (
-          <Alert
-            severity="warning"
-            icon={<MessageIcon />}
-            sx={{
-              py: 0.5,
-              fontSize: '0.75rem',
-              '& .MuiAlert-icon': { fontSize: 16 },
-            }}
-          >
-            Address zone not detected. Delivery fee may be added manually.
-          </Alert>
-        )}
-
         <Button
           variant="contained"
           size="large"
@@ -682,7 +672,7 @@ const PhoneOrder: React.FC = () => {
         onClose={() => setPayModalOpen(false)}
         orderId={paymentOrderId}
         orderSource={'PHONE'}
-        grandTotal={state.totals.grandTotal}
+        grandTotal={grandTotalWithDelivery}
         onFullyPaid={handleFullyPaid}
       />
 

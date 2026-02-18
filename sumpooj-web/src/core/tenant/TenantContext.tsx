@@ -2,7 +2,7 @@
 // TENANT CONTEXT - SaaS Tenant State Management
 // =============================================================================
 
-import React, { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from 'react';
 import type {
   Tenant,
   TenantPlan,
@@ -23,6 +23,7 @@ import {
   getRequiredPlanForFeature,
   getUpgradePathForFeature,
 } from './FeatureFlags';
+import { setCurrentCurrency } from '../i18n/currency';
 
 // -----------------------------------------------------------------------------
 // Context Types
@@ -97,6 +98,13 @@ export function TenantProvider({ children }: TenantProviderProps) {
   const isActive = isSubscriptionActive(subscriptionStatus);
   const isPastDue = subscriptionStatus === 'PAST_DUE';
   const isCancelled = subscriptionStatus === 'CANCELLED';
+
+  // Sync module-level currency formatter whenever tenant changes
+  useEffect(() => {
+    if (tenant.currency) {
+      setCurrentCurrency(tenant.currency);
+    }
+  }, [tenant.currency]);
   
   // Feature access
   const checkFeature = useCallback(

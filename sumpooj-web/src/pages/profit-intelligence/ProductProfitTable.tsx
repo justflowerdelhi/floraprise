@@ -27,12 +27,12 @@ interface Props {
 type SortField = 'productName' | 'quantitySold' | 'grossRevenue' | 'netProfit' | 'effectiveMarginPercent';
 type SortDirection = 'asc' | 'desc';
 
-// ─── Formatters ─────────────────────────────────────────────
+// ─── Formatters (tenant-aware) ───────────────────────────────
 
-const fmtCurrency = (v: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
+import { formatCurrency, formatPercent } from '../../core/i18n';
 
-const fmtPercent = (v: number) => `${v.toFixed(1)}%`;
+const fmtCurrency = (v: number) => formatCurrency(v);
+const fmtPercent = (v: number) => formatPercent(v);
 
 // ─── Row Component ──────────────────────────────────────────
 

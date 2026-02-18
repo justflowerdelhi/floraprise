@@ -138,6 +138,13 @@ const AddProductForm = ({
     }
   }, [isFreshFlower, setValue]);
 
+  useEffect(() => {
+    if (isPerishable) {
+      setValue('barcode', '');
+      setValue('trackBatch', true);
+    }
+  }, [isPerishable, setValue]);
+
   // Load suppliers on mount
   useEffect(() => {
     const loadSuppliers = async () => {

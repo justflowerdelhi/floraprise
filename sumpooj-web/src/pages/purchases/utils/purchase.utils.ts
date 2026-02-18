@@ -133,13 +133,17 @@ export const calcOrderSummary = (
   };
 };
 
+const batchSequence: Record<string, number> = {};
+
 /**
- * Generate batch number
+ * Generate batch code: {ProductCode}-{YYYYMMDD}-{Sequence}
  */
 export const generateBatchNumber = (sku: string): string => {
   const date = new Date().toISOString().split('T')[0].replace(/-/g, '');
-  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `${sku}-${date}-${rand}`;
+  const key = `${sku}-${date}`;
+  batchSequence[key] = (batchSequence[key] ?? 0) + 1;
+  const seq = String(batchSequence[key]).padStart(3, '0');
+  return `${sku}-${date}-${seq}`;
 };
 
 /**

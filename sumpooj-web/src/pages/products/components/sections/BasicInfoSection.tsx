@@ -21,7 +21,7 @@ interface BasicInfoSectionProps extends FormSectionProps {
 
 const BasicInfoSection = ({
   control,
-  errors,
+  errors: _errors,
   watch,
   setValue,
   darkMode = false,
@@ -29,6 +29,7 @@ const BasicInfoSection = ({
   const productType = watch('productType');
   const productName = watch('productName');
   const status = watch('status');
+  const isPerishable = watch('isPerishable');
 
   const handleGenerateSku = () => {
     if (productName && productType) {
@@ -130,9 +131,15 @@ const BasicInfoSection = ({
             control={control}
             label="Barcode"
             placeholder="e.g., 123456789012"
-            tooltip="UPC, EAN, or other barcode format"
+            tooltip={isPerishable ? 'Disabled for perishables (use batch QR instead)' : 'UPC, EAN, or other barcode format'}
+            disabled={isPerishable}
             darkMode={darkMode}
           />
+          {isPerishable && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Barcode is disabled for perishables. Use batch labels instead.
+            </Typography>
+          )}
         </Grid>
 
         {/* Brand */}

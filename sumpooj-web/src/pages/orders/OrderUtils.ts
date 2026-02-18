@@ -95,6 +95,7 @@ export interface CreateOrderParams {
   orderSource: OrderSource;
   items: CartItem[];
   totals: CartSummary;
+  orderType?: Order['orderType'];
   customerName?: string;
   customerPhone?: string;
   senderName?: string;
@@ -106,6 +107,15 @@ export interface CreateOrderParams {
   cardMessage?: string;
   occasion?: string;
   notes?: string;
+  // Wire management fields
+  vendorFloristId?: string;
+  vendorFloristName?: string;
+  vendorAmount?: number;
+  wireFee?: number;
+  sourceNetwork?: string;
+  commissionPercent?: number;
+  netReceived?: number;
+  settlementStatus?: Order['settlementStatus'];
   // External platform fields
   externalOrderId?: string;
   externalPlatform?: string;
@@ -122,6 +132,7 @@ export const createOrder = (params: CreateOrderParams): Order => {
     id: nextOrderId(),
     orderNumber: nextOrderNumber(),
     orderSource: params.orderSource,
+    orderType: params.orderType ?? 'LOCAL',
 
     externalOrderId: params.externalOrderId,
     externalPlatform: params.externalPlatform,
@@ -145,6 +156,15 @@ export const createOrder = (params: CreateOrderParams): Order => {
     externalFees: params.externalFees,
     netPayout: params.netPayout,
 
+    vendorFloristId: params.vendorFloristId,
+    vendorFloristName: params.vendorFloristName,
+    vendorAmount: params.vendorAmount,
+    wireFee: params.wireFee,
+    sourceNetwork: params.sourceNetwork,
+    commissionPercent: params.commissionPercent,
+    netReceived: params.netReceived,
+    settlementStatus: params.settlementStatus,
+
     fulfillmentStatus: 'DRAFT',
     paymentStatus: isExternal ? 'PAID' : 'UNPAID',
 
@@ -167,6 +187,7 @@ export const acceptExternalOrder = (ext: ExternalOrder): Order => {
     id: nextOrderId(),
     orderNumber: nextOrderNumber(),
     orderSource: platform,
+    orderType: 'LOCAL',
 
     externalOrderId: ext.externalOrderId,
     externalPlatform: platform,

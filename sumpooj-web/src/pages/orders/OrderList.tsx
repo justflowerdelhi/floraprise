@@ -17,9 +17,10 @@ import {
   LocalShipping as FTDIcon,
   LocalFlorist as BloomIcon,
 } from '@mui/icons-material';
-import type { Order, OrderSource, FulfillmentStatus, OrderPaymentStatus } from './OrderTypes';
+import type { Order, OrderSource, FulfillmentStatus, OrderPaymentStatus, OrderType } from './OrderTypes';
 import { ORDER_SOURCE_CONFIG, FULFILLMENT_STATUS_CONFIG, PAYMENT_STATUS_CONFIG } from './OrderTypes';
 import { MOCK_ORDERS } from './OrderMockData';
+import { useTenant } from '../../core/tenant/TenantContext';
 
 const fmtCurrency = (v: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
@@ -34,21 +35,33 @@ const SOURCE_ICONS: Record<OrderSource, React.ReactElement> = {
   BLOOMNATION: <BloomIcon sx={{ fontSize: 16 }} />,
 };
 
+const ORDER_TYPE_CONFIG: Record<OrderType, { label: string; color: string }> = {
+  LOCAL: { label: 'Local', color: '#4caf50' },
+  OUTGOING_NETWORK: { label: 'Outgoing Network', color: '#ff9800' },
+  INCOMING_NETWORK: { label: 'Incoming Network', color: '#2196f3' },
+};
+
 const OrderList: React.FC = () => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const bg = dk ? '#0f0f0f' : '#f8f9fa';
+  const { hasFeature } = useTenant();
+  const wireEnabled = hasFeature('WIRE_MANAGEMENT');
 
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState<OrderSource | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<FulfillmentStatus | 'ALL'>('ALL');
   const [payStatus, setPayStatus] = useState<OrderPaymentStatus | 'ALL'>('ALL');
+  const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | 'ALL'>('ALL');
 
   const filtered = useMemo(() => {
     let list: Order[] = [...MOCK_ORDERS];
     if (sourceFilter !== 'ALL') list = list.filter((o) => o.orderSource === sourceFilter);
     if (statusFilter !== 'ALL') list = list.filter((o) => o.fulfillmentStatus === statusFilter);
     if (payStatus !== 'ALL') list = list.filter((o) => o.paymentStatus === payStatus);
+    if (wireEnabled && orderTypeFilter !== 'ALL') {
+      list = list.filter((o) => (o.orderType ?? 'LOCAL') === orderTypeFilter);
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -59,7 +72,7 @@ const OrderList: React.FC = () => {
       );
     }
     return list;
-  }, [search, sourceFilter, statusFilter, payStatus]);
+  }, [search, sourceFilter, statusFilter, payStatus, orderTypeFilter, wireEnabled]);
 
   const headerSx = {
     fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase' as const,
@@ -122,6 +135,21 @@ const OrderList: React.FC = () => {
             ))}
           </Select>
         </FormControl>
+        {wireEnabled && (
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel>Order Type</InputLabel>
+            <Select
+              value={orderTypeFilter}
+              label="Order Type"
+              onChange={(e: SelectChangeEvent) => setOrderTypeFilter(e.target.value as OrderType | 'ALL')}
+            >
+              <MenuItem value="ALL">All Types</MenuItem>
+              {(Object.keys(ORDER_TYPE_CONFIG) as OrderType[]).map((ot) => (
+                <MenuItem key={ot} value={ot}>{ORDER_TYPE_CONFIG[ot].label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
       </Paper>
 
       {/* Stats bar */}
@@ -169,6 +197,7 @@ const OrderList: React.FC = () => {
             <TableRow>
               <TableCell sx={headerSx}>Order #</TableCell>
               <TableCell sx={headerSx}>Source</TableCell>
+              {wireEnabled && <TableCell sx={headerSx}>Order Type</TableCell>}
               <TableCell sx={headerSx}>Customer</TableCell>
               <TableCell sx={headerSx}>Created</TableCell>
               <TableCell sx={headerSx} align="right">Total</TableCell>
@@ -181,7 +210,7 @@ const OrderList: React.FC = () => {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={wireEnabled ? 10 : 9} align="center" sx={{ py: 6 }}>
                   <Typography color="text.disabled">No orders match the current filters</Typography>
                 </TableCell>
               </TableRow>
@@ -191,6 +220,8 @@ const OrderList: React.FC = () => {
                 const fCfg = FULFILLMENT_STATUS_CONFIG[o.fulfillmentStatus];
                 const pCfg = PAYMENT_STATUS_CONFIG[o.paymentStatus];
                 const hasCommission = o.netPayout != null;
+                const orderType = o.orderType ?? 'LOCAL';
+                const typeCfg = ORDER_TYPE_CONFIG[orderType];
                 return (
                   <TableRow key={o.id} hover sx={{ '&:hover': { bgcolor: dk ? alpha('#fff', 0.03) : alpha('#000', 0.02) } }}>
                     <TableCell>
@@ -212,6 +243,20 @@ const OrderList: React.FC = () => {
                         }}
                       />
                     </TableCell>
+                    {wireEnabled && (
+                      <TableCell>
+                        <Chip
+                          label={typeCfg.label}
+                          size="small"
+                          sx={{
+                            bgcolor: alpha(typeCfg.color, dk ? 0.25 : 0.12),
+                            color: typeCfg.color,
+                            fontWeight: 700,
+                            fontSize: '0.7rem',
+                          }}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>{o.customerName}</Typography>
                       {o.recipientName && o.recipientName !== o.customerName && (

@@ -14,6 +14,14 @@ import type { DeliveryAddress, FulfillmentType } from './DeliveryZoneTypes';
 
 export type OrderSource = 'WALK_IN' | 'PHONE' | 'WEBSITE' | 'BLOOMNATION' | 'FTD';
 
+export type OrderType = 'LOCAL' | 'OUTGOING_NETWORK' | 'INCOMING_NETWORK';
+
+/** @deprecated Use OUTGOING_NETWORK / INCOMING_NETWORK instead */
+export const LEGACY_ORDER_TYPE_MAP: Record<string, OrderType> = {
+  OUTGOING_WIRE: 'OUTGOING_NETWORK',
+  INCOMING_WIRE: 'INCOMING_NETWORK',
+};
+
 export type FulfillmentStatus =
   | 'DRAFT'
   | 'CONFIRMED'
@@ -28,6 +36,19 @@ export type FulfillmentStatus =
  * See PaymentUtils.deriveOrderPaymentStatus().
  */
 export type OrderPaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID';
+
+export type SettlementStatus = 'PENDING' | 'SENT' | 'CLEARED';
+
+export interface VendorFlorist {
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+  phone?: string;
+  email?: string;
+  defaultCommissionRate?: number;
+  isActive: boolean;
+}
 
 // ─── Inventory Batch (FIFO Integration) ─────────────────────
 
@@ -57,13 +78,14 @@ export interface Product {
   id: string;
   name: string;
   sku: string;
-  barcode: string;
+  barcode?: string;
   category: ProductCategory;
   sellingPrice: number;
   costPrice: number;       // weighted avg FIFO cost
   taxRate: number;         // e.g. 0.05 = 5%
   availableStock: number;
   isPerishable: boolean;
+  trackBatch: boolean;
   imageUrl?: string;
   batches: InventoryBatch[];
 }
@@ -118,6 +140,8 @@ export interface Order {
   orderSource: OrderSource;
   locationId?: string; // Multi-location support
 
+  orderType?: OrderType;
+
   // External platform metadata
   externalOrderId?: string;
   externalPlatform?: string;
@@ -158,6 +182,16 @@ export interface Order {
   externalCommission?: number;
   externalFees?: number;
   netPayout?: number;
+
+  // Wire management
+  vendorFloristId?: string;
+  vendorFloristName?: string;
+  vendorAmount?: number;
+  wireFee?: number;
+  sourceNetwork?: string;
+  commissionPercent?: number;
+  netReceived?: number;
+  settlementStatus?: SettlementStatus;
 
   // Status
   fulfillmentStatus: FulfillmentStatus;
@@ -210,6 +244,15 @@ export interface ExternalOrder {
   status: ExternalOrderStatus;
   receivedAt: string;
   isExternallyPaid: boolean;
+}
+
+// ─── Wire Settlement ───────────────────────────────────────
+
+export interface WireSettlement {
+  orderNumber: string;
+  vendorName: string;
+  amount: number;
+  status: SettlementStatus;
 }
 
 // ─── Delivery Slot ──────────────────────────────────────────

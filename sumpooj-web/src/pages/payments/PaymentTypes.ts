@@ -11,7 +11,9 @@ export type PaymentMethod =
   | 'CASH'
   | 'CARD'
   | 'GIFT_CARD'
-  | 'EXTERNAL_TERMINAL';
+  | 'EXTERNAL_TERMINAL'
+  | 'UPI'
+  | 'BANK_TRANSFER';
 
 // ─── Payment Status ─────────────────────────────────────────
 
@@ -62,6 +64,8 @@ export const PAYMENT_METHOD_CONFIG: Record<PaymentMethod, PaymentMethodConfig> =
   CARD:              { label: 'Credit/Debit Card', icon: 'CreditCard',    color: '#2196f3' },
   GIFT_CARD:         { label: 'Gift Card',         icon: 'CardGiftcard',  color: '#9c27b0' },
   EXTERNAL_TERMINAL: { label: 'External Terminal', icon: 'PointOfSale',   color: '#ff9800' },
+  UPI:               { label: 'UPI',               icon: 'QrCode',        color: '#00897b' },
+  BANK_TRANSFER:     { label: 'Bank Transfer',     icon: 'AccountBalance',color: '#546e7a' },
 };
 
 export interface PaymentStatusConfig {

@@ -227,6 +227,20 @@ export const MENU_SECTIONS: MenuSection[] = [
         path: '/delivery-scheduler',
         permissions: ['delivery:view'],
       },
+      {
+        id: 'wire-vendors',
+        label: 'Wire Vendors',
+        icon: 'LocalFlorist',
+        path: '/wire-vendors',
+        permissions: ['orders:edit'],
+      },
+      {
+        id: 'wire-settlements',
+        label: 'Wire Settlements',
+        icon: 'CreditCard',
+        path: '/wire-settlements',
+        permissions: ['orders:view'],
+      },
     ],
   },
   {

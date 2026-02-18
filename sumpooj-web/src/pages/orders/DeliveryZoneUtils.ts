@@ -8,21 +8,42 @@
 
 import type { DeliveryZone, DeliveryAddress } from './DeliveryZoneTypes';
 import { MOCK_DELIVERY_ZONES } from './DeliveryZoneTypes';
+import { formatCurrency } from '../../core/i18n';
 
 // ─── Zone Matching ─────────────────────────────────────────
 
 /**
- * Find delivery zone by ZIP code
- * Returns the highest priority zone if multiple zones service the same ZIP
+ * Find delivery zone by value (ZIP code, area name, or city name).
+ * Supports matchType: ZIP, AREA, CITY.
+ * Falls back to legacy zipCodes field for backward compatibility.
+ * Returns the highest priority zone if multiple zones match.
  */
-export const findDeliveryZone = (zipCode: string): DeliveryZone | null => {
-  if (!zipCode) return null;
+export const findDeliveryZone = (
+  value: string,
+  matchType?: 'ZIP' | 'AREA' | 'CITY',
+): DeliveryZone | null => {
+  if (!value) return null;
   
-  const normalizedZip = zipCode.trim();
+  const normalized = value.trim().toLowerCase();
   
-  const matchingZones = MOCK_DELIVERY_ZONES.filter((zone) =>
-    zone.zipCodes.includes(normalizedZip) && zone.isServiceable
-  );
+  const matchingZones = MOCK_DELIVERY_ZONES.filter((zone) => {
+    if (!zone.isServiceable) return false;
+
+    // If caller specifies matchType, only check zones of that type
+    if (matchType && zone.matchType !== matchType) return false;
+
+    // Use matchValues if available, fall back to zipCodes for backward compat
+    const values = zone.matchValues?.length ? zone.matchValues : zone.zipCodes;
+
+    switch (zone.matchType ?? 'ZIP') {
+      case 'AREA':
+      case 'CITY':
+        return values.some((v) => v.toLowerCase() === normalized);
+      case 'ZIP':
+      default:
+        return values.includes(value.trim());
+    }
+  });
   
   if (matchingZones.length === 0) return null;
   
@@ -118,7 +139,7 @@ export const extractZipFromString = (address: string): string => {
  * Format delivery zone message for UI
  */
 export const formatZoneMessage = (zone: DeliveryZone): string => {
-  return `${zone.name} – ₹${zone.deliveryFee} (${zone.estimatedMinutes} mins)`;
+  return `${zone.name} – ${formatCurrency(zone.deliveryFee)} (${zone.estimatedMinutes} mins)`;
 };
 
 /**
@@ -128,12 +149,6 @@ export const validateDeliveryAddress = (address: Partial<DeliveryAddress>): stri
   const errors: string[] = [];
   
   if (!address.fullAddress) errors.push('Address is required');
-  if (!address.zipCode) errors.push('ZIP code is required');
-  if (!address.city) errors.push('City is required');
-  
-  if (address.zipCode && !isZipServiceable(address.zipCode)) {
-    errors.push('This area is not serviceable');
-  }
   
   return errors;
 };

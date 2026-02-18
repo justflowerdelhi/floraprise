@@ -9,7 +9,7 @@ import {
   Box, Typography, TextField, InputAdornment, Button, Chip,
   Card, CardContent, Grid, IconButton, Snackbar, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  useTheme, Divider,
+  useTheme, Divider, FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -19,18 +19,23 @@ import {
   Payment as PayIcon,
   ShoppingCart as CartIcon,
 } from '@mui/icons-material';
-import type { Product, ProductCategory } from './OrderTypes';
+import type { Product, ProductCategory, OrderType } from './OrderTypes';
 import { MOCK_PRODUCTS, PRODUCT_CATEGORIES } from './OrderMockData';
 import { useCart } from '../cart/CartContext';
 import CartTable from '../cart/CartTable';
 import CartSummaryPanel from '../cart/CartSummaryPanel';
 import { fmtCurrency } from '../cart/CartUtils';
 import PaymentModal from '../payments/PaymentModal';
+import { useTenant } from '../../core/tenant/TenantContext';
+import { MOCK_VENDOR_FLORISTS } from './WireMockData';
 
 const WalkInPOS: React.FC = () => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const bgColor = dk ? '#0f0f0f' : '#f8f9fa';
+
+  const { hasFeature } = useTenant();
+  const wireEnabled = hasFeature('WIRE_MANAGEMENT');
 
   const { state, addProduct, removeItem, updateQty, setDiscount, clearCart, holdOrder, resumeOrder, removeHeld, setOrderSource } = useCart();
 
@@ -43,10 +48,23 @@ const WalkInPOS: React.FC = () => {
   const [paymentOrderId, setPaymentOrderId] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
 
+  const [orderType, setOrderType] = useState<OrderType>('LOCAL');
+  const [vendorId, setVendorId] = useState('');
+  const [vendorAmount, setVendorAmount] = useState(0);
+  const [wireFee, setWireFee] = useState(0);
+  const [sourceNetwork, setSourceNetwork] = useState('');
+  const [commissionPercent, setCommissionPercent] = useState(10);
+
   // Set order source on mount
   useEffect(() => { setOrderSource('WALK_IN'); }, [setOrderSource]);
 
-  // Product search (name, SKU, barcode)
+  useEffect(() => {
+    if (!wireEnabled && orderType !== 'LOCAL') {
+      setOrderType('LOCAL');
+    }
+  }, [wireEnabled, orderType]);
+
+  // Product search (name, SKU, barcode for non-perishables)
   const filteredProducts = useMemo(() => {
     let list = MOCK_PRODUCTS;
     if (categoryFilter) list = list.filter((p) => p.category === categoryFilter);
@@ -56,14 +74,14 @@ const WalkInPOS: React.FC = () => {
         (p) =>
           p.name.toLowerCase().includes(q) ||
           p.sku.toLowerCase().includes(q) ||
-          p.barcode.includes(q),
+          (!!p.barcode && !p.isPerishable && p.barcode.includes(q)),
       );
     }
     return list;
   }, [search, categoryFilter]);
 
   const handleBarcodeSubmit = () => {
-    const product = MOCK_PRODUCTS.find((p) => p.barcode === search.trim());
+    const product = MOCK_PRODUCTS.find((p) => !p.isPerishable && p.barcode === search.trim());
     if (product) {
       addProduct(product);
       setSearch('');
@@ -84,16 +102,29 @@ const WalkInPOS: React.FC = () => {
   };
 
   const handleOpenPay = useCallback(() => {
+    if (orderType === 'INCOMING_NETWORK') return;
     // Generate a temporary order ID for the payment session
     setPaymentOrderId(`pos_${Date.now()}`);
     setPayModalOpen(true);
-  }, []);
+  }, [orderType]);
 
   const handleFullyPaid = useCallback(() => {
     setPayModalOpen(false);
     setSnackMsg(`Order completed — ${fmtCurrency(state.totals.grandTotal)}`);
     clearCart();
   }, [clearCart, state.totals.grandTotal]);
+
+  const selectedVendor = useMemo(
+    () => MOCK_VENDOR_FLORISTS.find((vendor) => vendor.id === vendorId) ?? null,
+    [vendorId],
+  );
+
+  const customerPaid = state.totals.grandTotal;
+  const outgoingProfit = customerPaid - vendorAmount - wireFee;
+  const netReceived = Math.round((customerPaid * (1 - commissionPercent / 100)) * 100) / 100;
+  const incomingProfit = netReceived - state.totals.totalCost;
+  const localProfit = customerPaid - state.totals.totalCost;
+  const showPayment = orderType !== 'INCOMING_NETWORK';
 
   const ProductCard = ({ p }: { p: Product }) => (
     <Card
@@ -289,30 +320,207 @@ const WalkInPOS: React.FC = () => {
         borderLeft: `1px solid ${dk ? 'rgba(255,255,255,0.06)' : '#e0e0e0'}`,
         display: 'flex', flexDirection: 'column', p: 2, gap: 2,
       }}>
+        {wireEnabled && (
+          <Card
+            elevation={dk ? 0 : 1}
+            sx={{
+              bgcolor: dk ? '#1a1a2e' : '#fff',
+              border: dk ? '1px solid rgba(255,255,255,0.08)' : 'none',
+              borderRadius: 2,
+            }}
+          >
+            <CardContent sx={{ pb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                Order Type
+              </Typography>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Order Type</InputLabel>
+                <Select
+                  value={orderType}
+                  label="Order Type"
+                  onChange={(e) => setOrderType(e.target.value as OrderType)}
+                >
+                  <MenuItem value="LOCAL">Local</MenuItem>
+                  <MenuItem value="OUTGOING_NETWORK">Outgoing Network</MenuItem>
+                  <MenuItem value="INCOMING_NETWORK">Incoming Network</MenuItem>
+                </Select>
+              </FormControl>
+            </CardContent>
+          </Card>
+        )}
+
+        {wireEnabled && orderType === 'OUTGOING_NETWORK' && (
+          <Card
+            elevation={dk ? 0 : 1}
+            sx={{
+              bgcolor: dk ? '#1a1a2e' : '#fff',
+              border: dk ? '1px solid rgba(255,255,255,0.08)' : 'none',
+              borderRadius: 2,
+            }}
+          >
+            <CardContent sx={{ pb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                Outgoing Network Details
+              </Typography>
+              <FormControl size="small" fullWidth sx={{ mb: 1 }}>
+                <InputLabel>Vendor Florist</InputLabel>
+                <Select
+                  value={vendorId}
+                  label="Vendor Florist"
+                  onChange={(e) => setVendorId(e.target.value)}
+                >
+                  {MOCK_VENDOR_FLORISTS.filter((v) => v.isActive).map((vendor) => (
+                    <MenuItem key={vendor.id} value={vendor.id}>
+                      {vendor.name} ({vendor.city})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                size="small"
+                fullWidth
+                type="number"
+                label="Amount Sent to Vendor"
+                value={vendorAmount}
+                onChange={(e) => setVendorAmount(Number(e.target.value))}
+                sx={{ mb: 1 }}
+              />
+              <TextField
+                size="small"
+                fullWidth
+                type="number"
+                label="Wire Fee"
+                value={wireFee}
+                onChange={(e) => setWireFee(Number(e.target.value))}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                Inventory will not be deducted for outgoing network orders.
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
+
+        {wireEnabled && orderType === 'INCOMING_NETWORK' && (
+          <Card
+            elevation={dk ? 0 : 1}
+            sx={{
+              bgcolor: dk ? '#1a1a2e' : '#fff',
+              border: dk ? '1px solid rgba(255,255,255,0.08)' : 'none',
+              borderRadius: 2,
+            }}
+          >
+            <CardContent sx={{ pb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                Incoming Network Details
+              </Typography>
+              <TextField
+                size="small"
+                fullWidth
+                label="Source Network"
+                value={sourceNetwork}
+                onChange={(e) => setSourceNetwork(e.target.value)}
+                sx={{ mb: 1 }}
+              />
+              <TextField
+                size="small"
+                fullWidth
+                type="number"
+                label="Commission %"
+                value={commissionPercent}
+                onChange={(e) => setCommissionPercent(Number(e.target.value))}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                Customer payment is handled by the network.
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
+
         <CartSummaryPanel totals={state.totals} orderSource="WALK_IN" />
+
+        <Card
+          elevation={dk ? 0 : 1}
+          sx={{
+            bgcolor: dk ? '#1a1a2e' : '#fff',
+            border: dk ? '1px solid rgba(255,255,255,0.08)' : 'none',
+            borderRadius: 2,
+          }}
+        >
+          <CardContent sx={{ pb: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+              Profit Summary
+            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography variant="body2" color="text.secondary">Customer Paid</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>{fmtCurrency(customerPaid)}</Typography>
+            </Box>
+            {orderType === 'OUTGOING_NETWORK' && (
+              <>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Typography variant="body2" color="text.secondary">Vendor Amount</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{fmtCurrency(vendorAmount)}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Typography variant="body2" color="text.secondary">Wire Fee</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{fmtCurrency(wireFee)}</Typography>
+                </Box>
+              </>
+            )}
+            {orderType === 'INCOMING_NETWORK' && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">Net Received</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>{fmtCurrency(netReceived)}</Typography>
+              </Box>
+            )}
+            <Divider sx={{ my: 1, borderColor: dk ? 'rgba(255,255,255,0.08)' : undefined }} />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography variant="body2" color="text.secondary">Estimated Profit</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: theme.palette.success.main }}>
+                {fmtCurrency(
+                  orderType === 'OUTGOING_NETWORK'
+                    ? outgoingProfit
+                    : orderType === 'INCOMING_NETWORK'
+                      ? incomingProfit
+                      : localProfit
+                )}
+              </Typography>
+            </Box>
+            {orderType === 'OUTGOING_NETWORK' && selectedVendor && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                Vendor: {selectedVendor.name}
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
 
         <Divider sx={{ borderColor: dk ? 'rgba(255,255,255,0.06)' : undefined }} />
 
-        <Button
-          variant="contained"
-          size="large"
-          fullWidth
-          startIcon={<PayIcon />}
-          disabled={state.items.length === 0}
-          onClick={handleOpenPay}
-          sx={{
-            py: 1.5, fontWeight: 800, fontSize: '1rem',
-            bgcolor: dk ? '#fdd835' : undefined,
-            color: dk ? '#000' : undefined,
-            '&:hover': { bgcolor: dk ? '#fbc02d' : undefined },
-            '&.Mui-disabled': {
-              bgcolor: dk ? 'rgba(255,255,255,0.08)' : undefined,
-              color: dk ? 'rgba(255,255,255,0.3)' : undefined,
-            },
-          }}
-        >
-          Pay {state.totals.grandTotal > 0 ? fmtCurrency(state.totals.grandTotal) : ''}
-        </Button>
+        {showPayment ? (
+          <Button
+            variant="contained"
+            size="large"
+            fullWidth
+            startIcon={<PayIcon />}
+            disabled={state.items.length === 0}
+            onClick={handleOpenPay}
+            sx={{
+              py: 1.5, fontWeight: 800, fontSize: '1rem',
+              bgcolor: dk ? '#fdd835' : undefined,
+              color: dk ? '#000' : undefined,
+              '&:hover': { bgcolor: dk ? '#fbc02d' : undefined },
+              '&.Mui-disabled': {
+                bgcolor: dk ? 'rgba(255,255,255,0.08)' : undefined,
+                color: dk ? 'rgba(255,255,255,0.3)' : undefined,
+              },
+            }}
+          >
+            Pay {state.totals.grandTotal > 0 ? fmtCurrency(state.totals.grandTotal) : ''}
+          </Button>
+        ) : (
+          <Alert severity="info" sx={{ fontSize: '0.85rem' }}>
+            Customer payment is handled by the wire network.
+          </Alert>
+        )}
 
         <Button
           variant="outlined"
@@ -344,13 +552,15 @@ const WalkInPOS: React.FC = () => {
       </Dialog>
 
       {/* ─── Payment Modal (terminal-ready) ──────────── */}
-      <PaymentModal
-        open={payModalOpen}
-        onClose={() => setPayModalOpen(false)}
-        orderId={paymentOrderId}
-        grandTotal={state.totals.grandTotal}
-        onFullyPaid={handleFullyPaid}
-      />
+      {showPayment && (
+        <PaymentModal
+          open={payModalOpen}
+          onClose={() => setPayModalOpen(false)}
+          orderId={paymentOrderId}
+          grandTotal={state.totals.grandTotal}
+          onFullyPaid={handleFullyPaid}
+        />
+      )}
 
       {/* ─── Snackbar ───────────────────────────────────── */}
       <Snackbar

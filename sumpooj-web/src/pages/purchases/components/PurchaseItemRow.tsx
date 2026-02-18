@@ -246,11 +246,10 @@ const PurchaseItemRow = ({
           >
             {fmt(total)}
           </Typography>
-          {/* Delete */}
-          <Tooltip title={canRemove ? 'Remove item' : 'At least one item required'}>
+          {/* Remove */}
+          <Tooltip title={canRemove ? 'Remove item' : 'Cannot remove last item'}>
             <span>
               <IconButton
-                size="small"
                 onClick={onRemove}
                 disabled={!canRemove}
                 sx={{ color: 'error.main' }}
@@ -454,7 +453,7 @@ const PurchaseItemRow = ({
               render={({ field }) => (
                 <TextField
                   {...field}
-                  label="Batch # *"
+                  label="Batch Code *"
                   size="small"
                   error={!!err('batchNumber')}
                   helperText={err('batchNumber')}

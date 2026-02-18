@@ -6,7 +6,7 @@
 import { Grid, Alert, Collapse } from '@mui/material';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import SectionCard from '../SectionCard';
-import { FormTextField } from '../FormFields';
+import { FormTextField, FormSwitch } from '../FormFields';
 import type { FormSectionProps } from '../../types/product.types';
 
 interface InventorySectionProps extends FormSectionProps {
@@ -15,14 +15,15 @@ interface InventorySectionProps extends FormSectionProps {
 
 const InventorySection = ({
   control,
-  errors,
+  errors: _errors,
   watch,
-  setValue,
+  setValue: _setValue,
   darkMode = false,
   isEnabled,
 }: InventorySectionProps) => {
   const openingStock = watch('openingStock');
   const reorderLevel = watch('reorderLevel');
+  const isPerishable = watch('isPerishable');
 
   const isLowStock = openingStock !== undefined && 
     reorderLevel !== undefined && 
@@ -62,6 +63,21 @@ const InventorySection = ({
               required={isEnabled}
               placeholder="e.g., 25"
               tooltip="Alert when stock falls below this level"
+              darkMode={darkMode}
+            />
+          </Grid>
+
+          {/* Track Batch */}
+          <Grid size={{ xs: 12 }}>
+            <FormSwitch
+              name="trackBatch"
+              control={control}
+              label="Track Batches"
+              disabled={isPerishable}
+              helperText={isPerishable
+                ? 'Perishable items always use batch tracking.'
+                : 'Enable batch labels and QR scans for hard goods.'
+              }
               darkMode={darkMode}
             />
           </Grid>

@@ -24,12 +24,15 @@ interface Props {
   isFTD?: boolean;
   orderSource?: OrderSource;
   commissionData?: CommissionData;
+  deliveryFee?: number;
 }
 
-const CartSummaryPanel: React.FC<Props> = ({ totals, isFTD, orderSource, commissionData }) => {
+const CartSummaryPanel: React.FC<Props> = ({ totals, isFTD, orderSource, commissionData, deliveryFee }) => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const external = orderSource ? isExternalSource(orderSource) : !!isFTD;
+  const appliedDeliveryFee = deliveryFee ?? 0;
+  const displayGrandTotal = totals.grandTotal + appliedDeliveryFee;
 
   // Auto-compute commission if not provided but order is external
   const commission: CommissionData | null = commissionData ?? (
@@ -92,10 +95,13 @@ const CartSummaryPanel: React.FC<Props> = ({ totals, isFTD, orderSource, commiss
           <Row label="Discount" value={`-${fmtCurrency(totals.discountTotal)}`} color={theme.palette.success.main} />
         )}
         <Row label="Tax" value={fmtCurrency(totals.taxTotal)} />
+        {appliedDeliveryFee > 0 && (
+          <Row label="Delivery Fee" value={fmtCurrency(appliedDeliveryFee)} />
+        )}
 
         <Divider sx={{ my: 1, borderColor: dk ? 'rgba(255,255,255,0.08)' : undefined }} />
 
-        <Row label="Grand Total" value={fmtCurrency(totals.grandTotal)} bold />
+        <Row label="Grand Total" value={fmtCurrency(displayGrandTotal)} bold />
 
         {/* ── Commission Breakdown for external orders ── */}
         {commission && (

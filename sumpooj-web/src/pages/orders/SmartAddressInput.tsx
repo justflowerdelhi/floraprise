@@ -10,7 +10,7 @@
  * Minimal clicks, maximum intelligence.
  */
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   TextField,
   Box,
@@ -18,17 +18,19 @@ import {
   Chip,
   CircularProgress,
   IconButton,
+  MenuItem,
   useTheme,
   alpha,
 } from '@mui/material';
 import {
   LocationOn as LocationIcon,
   CheckCircle as CheckIcon,
-  Error as ErrorIcon,
   Map as MapIcon,
 } from '@mui/icons-material';
-import type { DeliveryAddress } from './DeliveryZoneTypes';
-import { parseGooglePlaceResult, formatZoneMessage, validateDeliveryAddress, extractZipFromString, findDeliveryZone } from './DeliveryZoneUtils';
+import type { DeliveryAddress, DeliveryZone } from './DeliveryZoneTypes';
+import { MOCK_DELIVERY_ZONES } from './DeliveryZoneTypes';
+import { fmtCurrency } from '../cart/CartUtils';
+import { parseGooglePlaceResult, validateDeliveryAddress, extractZipFromString, findDeliveryZone } from './DeliveryZoneUtils';
 
 // ─── Component Props ────────────────────────────────────────
 
@@ -64,6 +66,11 @@ export default function SmartAddressInput({
   const [inputValue, setInputValue] = useState(value?.fullAddress || '');
   const [isLoading, setIsLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  const zones = useMemo(
+    () => MOCK_DELIVERY_ZONES.filter((zone) => zone.isServiceable),
+    [],
+  );
   
   // Initialize Google Places Autocomplete
   useEffect(() => {
@@ -157,11 +164,14 @@ export default function SmartAddressInput({
         longitude: 0,
         deliveryZone: zone || undefined,
       };
+
+      const errors = validateDeliveryAddress(basicAddress);
+      setValidationErrors(errors);
       
       onChange(basicAddress);
       
       if (onValidationChange) {
-        onValidationChange(!!trimmedValue, trimmedValue ? [] : ['Address is required']);
+        onValidationChange(errors.length === 0, errors);
       }
     }
   }, [inputValue, value, onChange, onValidationChange]);
@@ -178,7 +188,21 @@ export default function SmartAddressInput({
   const hasAddress = !!value?.fullAddress;
   const hasZone = !!value?.deliveryZone;
   const isValid = hasAddress && hasZone && validationErrors.length === 0;
-  const showError = hasAddress && validationErrors.length > 0;  // Only show error if there are validation errors, not just missing zone
+  const showZoneSelect = hasAddress && !hasZone && zones.length > 0;
+
+  const handleZoneSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!value?.fullAddress) return;
+    const zone = zones.find((z) => z.id === event.target.value) as DeliveryZone | undefined;
+    if (!zone) return;
+    onChange({
+      ...value,
+      deliveryZone: zone,
+    });
+    setValidationErrors([]);
+    if (onValidationChange) {
+      onValidationChange(true, []);
+    }
+  };
   
   return (
     <Box>
@@ -192,7 +216,7 @@ export default function SmartAddressInput({
         onChange={handleInputChange}
         onBlur={handleBlur}
         placeholder="Start typing address..."
-        error={error || showError}
+        error={error}
         helperText={helperText}
         slotProps={{
           input: {
@@ -239,7 +263,9 @@ export default function SmartAddressInput({
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-            <strong>{formatZoneMessage(value.deliveryZone)}</strong>
+            <strong>
+              Delivery Zone: {value.deliveryZone.name} - {fmtCurrency(value.deliveryZone.deliveryFee)}
+            </strong>
             {value.city && (
               <Chip
                 label={`${value.city}, ${value.state}`}
@@ -255,43 +281,41 @@ export default function SmartAddressInput({
           </Box>
         </Alert>
       )}
-      
-      {/* Not Serviceable Warning */}
-      {hasAddress && !hasZone && value?.zipCode && (
+
+      {/* Zone Selection (fallback) */}
+      {showZoneSelect && (
+        <TextField
+          select
+          fullWidth
+          size="small"
+          label="Select Delivery Zone"
+          value={value?.deliveryZone?.id ?? ''}
+          onChange={handleZoneSelect}
+          sx={{ mt: 1.5 }}
+          SelectProps={{ displayEmpty: true }}
+        >
+          <MenuItem value="">Select Delivery Zone</MenuItem>
+          {zones.map((zone) => (
+            <MenuItem key={zone.id} value={zone.id}>
+              {zone.name} - {fmtCurrency(zone.deliveryFee)}
+            </MenuItem>
+          ))}
+        </TextField>
+      )}
+
+      {/* No Zones Configured */}
+      {hasAddress && zones.length === 0 && (
         <Alert
-          icon={<ErrorIcon />}
-          severity="error"
+          severity="info"
           sx={{
             mt: 1.5,
             py: 0.5,
-            bgcolor: alpha(theme.palette.error.main, dk ? 0.15 : 0.1),
+            bgcolor: alpha(theme.palette.info.main, dk ? 0.15 : 0.1),
             '& .MuiAlert-icon': { fontSize: 18 },
           }}
         >
-          <strong>Not Serviceable:</strong> {value.city || value.zipCode} is outside our delivery area.
+          No delivery zones configured for this location
         </Alert>
-      )}
-      
-      {/* Validation Errors */}
-      {validationErrors.length > 0 && hasAddress && (
-        <Box sx={{ mt: 1 }}>
-          {validationErrors.map((err, idx) => (
-            <Box
-              key={idx}
-              sx={{
-                fontSize: '0.75rem',
-                color: theme.palette.error.main,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-                mb: 0.5,
-              }}
-            >
-              <ErrorIcon sx={{ fontSize: 14 }} />
-              {err}
-            </Box>
-          ))}
-        </Box>
       )}
       
       {/* Address Components (for debugging - can be hidden in production) */}

@@ -39,18 +39,13 @@ import CommissionReport from './CommissionReport';
 import InventoryImpactReport from './InventoryImpactReport';
 import PaymentAnalysis from './PaymentAnalysis';
 
-// ─── Formatters ─────────────────────────────────────────────
+// ─── Formatters (tenant-aware) ───────────────────────────────
 
-const fmtCurrency = (v: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
+import { formatCurrency, formatCurrencyCompact, formatPercent } from '../../core/i18n';
 
-const fmtPercent = (v: number) => `${v.toFixed(1)}%`;
-
-const fmtCompact = (v: number) => {
-  if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`;
-  if (v >= 1000) return `₹${(v / 1000).toFixed(1)}K`;
-  return `₹${v.toFixed(0)}`;
-};
+const fmtCurrency = (v: number) => formatCurrency(v);
+const fmtPercent = (v: number) => formatPercent(v);
+const fmtCompact = (v: number) => formatCurrencyCompact(v);
 
 // ─── Summary Card Component ─────────────────────────────────
 

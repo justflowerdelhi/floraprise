@@ -24,4 +24,4 @@ export * from './schemas/product.schema';
 export * from './api/product.api';
 
 // Utilities
-export * from './utils/product.utils';
+export { generateSku, calculateExpiryDate, formatDate, formatCurrency, isPerishableType, isLowShelfLife, getProductTypeLabel } from './utils/product.utils';

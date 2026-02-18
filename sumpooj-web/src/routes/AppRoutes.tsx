@@ -24,6 +24,8 @@ import PhoneOrder from '../pages/orders/PhoneOrder';
 import ExternalOrdersInbox from '../pages/orders/ExternalOrdersInbox';
 import DeliveryScheduler from '../pages/orders/DeliveryScheduler';
 import OrderList from '../pages/orders/OrderList';
+import WireVendorsPage from '../pages/orders/WireVendorsPage';
+import WireSettlementsPage from '../pages/orders/WireSettlementsPage';
 
 // Event Module
 import EventList from '../pages/events/EventList';
@@ -49,6 +51,7 @@ import { CustomerListPage, Customer360View, SmartReminderDashboard, LoyaltyProgr
 // Production-Ready SaaS Infrastructure
 import { RBACProvider } from '../core/rbac/RBACContext';
 import { MasterLayout } from '../core/layout/MasterLayout';
+import { FeatureGate } from '../core/tenant';
 
 export default function AppRoutes() {
   return (
@@ -93,6 +96,22 @@ export default function AppRoutes() {
           <Route path="/order-list" element={<OrderProvider><OrderList /></OrderProvider>} />
           <Route path="/orders/new" element={<OrderForm />} />
           <Route path="/delivery-scheduler" element={<DeliveryScheduler />} />
+          <Route
+            path="/wire-vendors"
+            element={
+              <FeatureGate feature="WIRE_MANAGEMENT" fallback={<Navigate to="/pos" replace />}>
+                <WireVendorsPage />
+              </FeatureGate>
+            }
+          />
+          <Route
+            path="/wire-settlements"
+            element={
+              <FeatureGate feature="WIRE_MANAGEMENT" fallback={<Navigate to="/pos" replace />}>
+                <WireSettlementsPage />
+              </FeatureGate>
+            }
+          />
 
           {/* ─── Inventory ──────────────────────────────── */}
           <Route path="/inventory" element={<InventoryBatchDashboard />} />

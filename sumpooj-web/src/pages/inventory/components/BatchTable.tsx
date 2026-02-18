@@ -7,10 +7,10 @@ import { useMemo } from 'react';
 import {
   Box,
   Table,
+  TableHead,
   TableBody,
   TableCell,
   TableContainer,
-  TableHead,
   TableRow,
   Paper,
   Typography,
@@ -19,10 +19,12 @@ import {
   Tooltip,
   Skeleton,
   TablePagination,
+  IconButton,
   useTheme,
   alpha,
 } from '@mui/material';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import PrintIcon from '@mui/icons-material/Print';
 import type { InventoryBatch } from '../data/inventory.data';
 import {
   getDaysLeft,
@@ -32,6 +34,7 @@ import {
   getExpiryProgress,
   fmt,
   fmtDate,
+  printBatchLabel,
 } from '../utils/inventory.utils';
 
 interface BatchTableProps {
@@ -127,17 +130,18 @@ const BatchTable = ({
             <TableRow>
               {[
                 'Product Name',
-                'Batch #',
+                'Batch Code',
                 'Supplier',
                 'Location',
-                'Purchase Date',
+                'Received Date',
                 'Expiry Date',
                 'Days Left',
                 'Qty Remaining',
-                'Original Qty',
+                'Received Qty',
                 'Remaining Value',
                 'Expiry Life',
                 'Status',
+                'Label',
               ].map((col) => (
                 <TableCell
                   key={col}
@@ -163,7 +167,7 @@ const BatchTable = ({
             {loading
               ? Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={`skel-${i}`}>
-                    {Array.from({ length: 12 }).map((_, j) => (
+                    {Array.from({ length: 13 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton variant="text" width={j === 0 ? 140 : 70} />
                       </TableCell>
@@ -221,7 +225,7 @@ const BatchTable = ({
                         </Typography>
                       </TableCell>
 
-                      {/* Batch # */}
+                      {/* Batch Code */}
                       <TableCell>
                         <Typography
                           variant="caption"
@@ -231,18 +235,18 @@ const BatchTable = ({
                             color: darkMode ? 'grey.400' : 'grey.600',
                           }}
                         >
-                          {batch.batchNumber}
+                          {batch.batchCode}
                         </Typography>
                       </TableCell>
 
                       {/* Supplier */}
-                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{batch.supplier}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{batch.supplier ?? '—'}</TableCell>
 
                       {/* Storage Location */}
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>{batch.storageLocation}</TableCell>
 
-                      {/* Purchase Date */}
-                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{fmtDate(batch.purchaseDate)}</TableCell>
+                      {/* Received Date */}
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{fmtDate(batch.receivedDate)}</TableCell>
 
                       {/* Expiry Date */}
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>
@@ -276,10 +280,10 @@ const BatchTable = ({
                         </Typography>
                       </TableCell>
 
-                      {/* Original Qty */}
+                      {/* Received Qty */}
                       <TableCell align="right">
                         <Typography variant="body2" sx={{ color: darkMode ? 'grey.500' : 'grey.500' }}>
-                          {batch.quantityOriginal}
+                          {batch.quantityReceived}
                         </Typography>
                       </TableCell>
 
@@ -333,6 +337,17 @@ const BatchTable = ({
                             border: `1px solid ${darkMode ? alpha(cfg.color, 0.3) : alpha(cfg.color, 0.2)}`,
                           }}
                         />
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="Print Batch Label" arrow>
+                          <IconButton
+                            size="small"
+                            onClick={() => printBatchLabel(batch)}
+                            sx={{ color: darkMode ? 'grey.300' : 'text.secondary' }}
+                          >
+                            <PrintIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   );
