@@ -1,4 +1,4 @@
-# 🌸 Sumpooj - Florist ERP System
+# 🌸 FloraEdge  - Florist ERP System
 
 **Enterprise-level SaaS software for florist businesses**
 
