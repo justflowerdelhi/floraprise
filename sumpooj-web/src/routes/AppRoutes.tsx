@@ -38,6 +38,10 @@ import EventProductionPage from '../pages/events/EventProductionPage';
 // Staff & Performance
 import StaffList from '../pages/staff/StaffList';
 import StaffPerformancePage from '../pages/staff/StaffPerformancePage';
+import StaffForm from '../pages/staff/StaffForm';
+
+// Tasks
+import { MyTasksPage } from '../pages/tasks';
 
 // Subscription
 import { SubscriptionPage } from '../pages/subscription';
@@ -147,7 +151,12 @@ export default function AppRoutes() {
 
           {/* ─── Staff & Performance ────────────────────── */}
           <Route path="/staff" element={<StaffList />} />
+          <Route path="/staff/new" element={<StaffForm />} />
+          <Route path="/staff/:staffId/edit" element={<StaffForm />} />
           <Route path="/staff/:staffId" element={<StaffPerformancePage />} />
+
+          {/* ─── Tasks ──────────────────────────────────── */}
+          <Route path="/tasks" element={<MyTasksPage />} />
 
           {/* ─── Settings / Subscription ────────────────── */}
           <Route path="/subscription" element={<SubscriptionPage />} />

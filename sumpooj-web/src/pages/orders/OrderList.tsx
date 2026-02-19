@@ -6,7 +6,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Box, Typography, Paper, Chip, TextField, FormControl, InputLabel, Select, MenuItem,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  InputAdornment, useTheme, alpha,
+  InputAdornment, useTheme, alpha, Button,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import {
@@ -16,11 +16,14 @@ import {
   Public as WebIcon,
   LocalShipping as FTDIcon,
   LocalFlorist as BloomIcon,
+  AddTask as AddTaskIcon,
 } from '@mui/icons-material';
 import type { Order, OrderSource, FulfillmentStatus, OrderPaymentStatus, OrderType } from './OrderTypes';
 import { ORDER_SOURCE_CONFIG, FULFILLMENT_STATUS_CONFIG, PAYMENT_STATUS_CONFIG } from './OrderTypes';
 import { MOCK_ORDERS } from './OrderMockData';
 import { useTenant } from '../../core/tenant/TenantContext';
+import { PermissionGate } from '../../core/rbac/RBACContext';
+import CreateTaskDialog from '../tasks/CreateTaskDialog';
 
 const fmtCurrency = (v: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
@@ -53,6 +56,7 @@ const OrderList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<FulfillmentStatus | 'ALL'>('ALL');
   const [payStatus, setPayStatus] = useState<OrderPaymentStatus | 'ALL'>('ALL');
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | 'ALL'>('ALL');
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
 
   const filtered = useMemo(() => {
     let list: Order[] = [...MOCK_ORDERS];
@@ -85,7 +89,20 @@ const OrderList: React.FC = () => {
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: bg, minHeight: '100vh' }}>
       {/* Title */}
-      <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>All Orders</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+        <Typography variant="h4" sx={{ fontWeight: 800 }}>All Orders</Typography>
+        <PermissionGate permission="tasks:manage">
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<AddTaskIcon />}
+            onClick={() => setTaskDialogOpen(true)}
+            sx={{ fontWeight: 600, textTransform: 'none' }}
+          >
+            Create Task
+          </Button>
+        </PermissionGate>
+      </Box>
       <Typography variant="body2" sx={{ color: dk ? 'rgba(255,255,255,0.5)' : 'text.secondary', mb: 3 }}>
         Unified view of every order across all channels
       </Typography>
@@ -317,6 +334,13 @@ const OrderList: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
+        open={taskDialogOpen}
+        onClose={() => setTaskDialogOpen(false)}
+        defaults={{ relatedEntityType: 'ORDER' }}
+      />
     </Box>
   );
 };

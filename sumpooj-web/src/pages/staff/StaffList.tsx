@@ -30,6 +30,8 @@ import { useNavigate } from 'react-router-dom';
 import type { Staff, StaffRole } from './StaffTypes';
 import { STAFF_ROLES, STAFF_ROLE_CONFIG } from './StaffTypes';
 import { getAllStaff, getTeamSummary, getStaffPerformance } from './StaffMockData';
+import { PermissionGate } from '../../core/rbac/RBACContext';
+import { MOCK_LOCATIONS } from '../../core/location/LocationTypes';
 
 // ─── Currency Formatter (tenant-aware) ───────────────────────
 
@@ -209,19 +211,21 @@ const StaffList: React.FC = () => {
             Manage team members and track performance metrics
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => navigate('/staff/new')}
-          sx={{
-            bgcolor: '#7c4dff',
-            '&:hover': { bgcolor: '#651fff' },
-            fontWeight: 700,
-            px: 3,
-          }}
-        >
-          Add Staff
-        </Button>
+        <PermissionGate permission="users:manage">
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/staff/new')}
+            sx={{
+              bgcolor: '#7c4dff',
+              '&:hover': { bgcolor: '#651fff' },
+              fontWeight: 700,
+              px: 3,
+            }}
+          >
+            Add Staff
+          </Button>
+        </PermissionGate>
       </Box>
 
       {/* Stats Row */}
@@ -367,6 +371,7 @@ const StaffList: React.FC = () => {
               <TableRow sx={{ bgcolor: dk ? 'rgba(255,255,255,0.03)' : '#f5f5f5' }}>
                 <TableCell sx={{ fontWeight: 700 }}>Staff Member</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Contact</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Commission</TableCell>
                 <TableCell sx={{ fontWeight: 700 }} align="right">Monthly Revenue</TableCell>
@@ -377,7 +382,7 @@ const StaffList: React.FC = () => {
             <TableBody>
               {paginatedStaff.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                     <Typography variant="body1" sx={{ color: 'text.secondary' }}>
                       No staff found
                     </Typography>
@@ -425,6 +430,13 @@ const StaffList: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <RoleChip role={staffMember.role} />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {staffMember.locationId
+                            ? MOCK_LOCATIONS.find((l) => l.id === staffMember.locationId)?.name ?? '-'
+                            : '-'}
+                        </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">{staffMember.email || '-'}</Typography>
@@ -479,21 +491,23 @@ const StaffList: React.FC = () => {
                               <TrendingUpIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Edit Staff">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/staff/${staffMember.id}/edit`);
-                              }}
-                              sx={{
-                                color: '#ff9800',
-                                '&:hover': { bgcolor: alpha('#ff9800', 0.1) },
-                              }}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          <PermissionGate permission="staff:manage">
+                            <Tooltip title="Edit Staff">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/staff/${staffMember.id}/edit`);
+                                }}
+                                sx={{
+                                  color: '#ff9800',
+                                  '&:hover': { bgcolor: alpha('#ff9800', 0.1) },
+                                }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </PermissionGate>
                         </Box>
                       </TableCell>
                     </TableRow>

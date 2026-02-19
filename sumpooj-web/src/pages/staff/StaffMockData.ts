@@ -24,6 +24,7 @@ export const MOCK_STAFF: Staff[] = [
     id: 'staff-001',
     name: 'Raj Kumar',
     role: 'ADMIN',
+    locationId: 'loc-001',
     phone: '+91 98765 43210',
     email: 'raj@florist.com',
     commissionType: 'PROFIT',
@@ -37,6 +38,8 @@ export const MOCK_STAFF: Staff[] = [
     id: 'staff-002',
     name: 'Priya Sharma',
     role: 'MANAGER',
+    locationId: 'loc-001',
+    locationIds: ['loc-001', 'loc-002'],
     phone: '+91 87654 32109',
     email: 'priya@florist.com',
     commissionType: 'PROFIT',
@@ -50,6 +53,7 @@ export const MOCK_STAFF: Staff[] = [
     id: 'staff-003',
     name: 'Amit Singh',
     role: 'CASHIER',
+    locationId: 'loc-001',
     phone: '+91 76543 21098',
     email: 'amit@florist.com',
     commissionType: 'REVENUE',
@@ -64,6 +68,7 @@ export const MOCK_STAFF: Staff[] = [
     id: 'staff-004',
     name: 'Meera Patel',
     role: 'DESIGNER',
+    locationId: 'loc-001',
     phone: '+91 65432 10987',
     email: 'meera@florist.com',
     commissionType: 'PROFIT',
@@ -78,6 +83,7 @@ export const MOCK_STAFF: Staff[] = [
     id: 'staff-005',
     name: 'Ananya Sharma',
     role: 'DESIGNER',
+    locationId: 'loc-002',
     phone: '+91 54321 09876',
     email: 'ananya@florist.com',
     commissionType: 'PROFIT',
@@ -92,6 +98,7 @@ export const MOCK_STAFF: Staff[] = [
     id: 'staff-006',
     name: 'Priya Gupta',
     role: 'DESIGNER',
+    locationId: 'loc-003',
     phone: '+91 43210 98765',
     email: 'priyag@florist.com',
     commissionType: 'PROFIT',
@@ -106,6 +113,7 @@ export const MOCK_STAFF: Staff[] = [
     id: 'staff-007',
     name: 'Kavita Reddy',
     role: 'DESIGNER',
+    locationId: 'loc-001',
     phone: '+91 32109 87654',
     email: 'kavita@florist.com',
     commissionType: 'PROFIT',
@@ -120,6 +128,7 @@ export const MOCK_STAFF: Staff[] = [
     id: 'staff-008',
     name: 'Vikram Rao',
     role: 'DRIVER',
+    locationId: 'loc-001',
     phone: '+91 21098 76543',
     email: 'vikram@florist.com',
     hourlyRate: 100,
@@ -132,6 +141,7 @@ export const MOCK_STAFF: Staff[] = [
     id: 'staff-009',
     name: 'Rajan Kumar',
     role: 'DRIVER',
+    locationId: 'loc-002',
     phone: '+91 10987 65432',
     email: 'rajan@florist.com',
     hourlyRate: 100,
@@ -144,6 +154,7 @@ export const MOCK_STAFF: Staff[] = [
     id: 'staff-010',
     name: 'Neha Verma',
     role: 'CASHIER',
+    locationId: 'loc-004',
     phone: '+91 09876 54321',
     email: 'neha@florist.com',
     commissionType: 'REVENUE',
@@ -543,3 +554,18 @@ export const searchStaff = (query: string): Staff[] => {
       s.phone?.includes(query)
   );
 };
+
+// ─── Staff Order History Check ──────────────────────────────
+
+/** IDs of staff members who have historical orders (mock) */
+const STAFF_WITH_ORDERS = new Set([
+  'staff-001', 'staff-002', 'staff-003', 'staff-004',
+  'staff-005', 'staff-007', 'staff-008', 'staff-010',
+]);
+
+/**
+ * Check if a staff member has historical orders.
+ * If true, the staff member cannot be permanently deleted (use deactivation).
+ */
+export const staffHasOrders = (staffId: string): boolean =>
+  STAFF_WITH_ORDERS.has(staffId);

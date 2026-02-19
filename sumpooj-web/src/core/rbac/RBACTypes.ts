@@ -62,6 +62,8 @@ export type Permission =
   | 'payments:schedule:manage'
   | 'staff:view'
   | 'staff:manage'
+  | 'tasks:view'
+  | 'tasks:manage'
   | 'settings:view'
   | 'settings:edit'
   | 'settings:billing'
@@ -83,6 +85,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'proposals:view', 'proposals:create', 'proposals:edit',
     'payments:schedule:view', 'payments:schedule:manage',
     'staff:view', 'staff:manage',
+    'tasks:view', 'tasks:manage',
     'settings:view', 'settings:edit', 'settings:billing', 'users:manage',
   ],
 
@@ -99,6 +102,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'proposals:view', 'proposals:create', 'proposals:edit',
     'payments:schedule:view', 'payments:schedule:manage',
     'staff:view', 'staff:manage',
+    'tasks:view', 'tasks:manage',
   ],
 
   CASHIER: [
@@ -107,6 +111,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'customers:view', 'customers:create',
     'products:view',
     'delivery:view',
+    'tasks:view',
   ],
 
   DESIGNER: [
@@ -116,11 +121,13 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'events:view',
     'proposals:view',
     'payments:schedule:view',
+    'tasks:view',
   ],
 
   DRIVER: [
     'orders:view',
     'delivery:view', 'delivery:update',
+    'tasks:view',
   ],
 };
 
@@ -349,6 +356,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         path: '/staff',
         permissions: ['staff:view'],
       },
+      {
+        id: 'tasks',
+        label: 'Tasks',
+        icon: 'Assignment',
+        path: '/tasks',
+        permissions: ['tasks:view'],
+      },
     ],
   },
   {
@@ -432,6 +446,7 @@ export const ROUTE_ACCESS: RouteConfig[] = [
   { path: '/stock-ledger', permissions: ['reports:inventory'] },
   { path: '/reorder', permissions: ['inventory:view'] },
   { path: '/staff', permissions: ['staff:view'] },
+  { path: '/tasks', permissions: ['tasks:view'] },
   { path: '/products/new', permissions: ['products:view'] },
   { path: '/customers', permissions: ['customers:view'] },
   { path: '/crm/customers', permissions: ['crm:view'] },

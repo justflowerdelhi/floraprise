@@ -7,14 +7,14 @@ import {
 } from "@mui/material";
 import { useAuth } from "../auth/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { useRoles } from "../auth/useRoles";
+import { useRBAC } from "../core/rbac/RBACContext";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const navigate = useNavigate();
-  const roles = useRoles();
-  const isAdmin = roles.includes("CompanyAdmin");
+  const { can } = useRBAC();
+  const isAdmin = can('settings:edit'); // Admin-level check replaces decoded JWT role
 
   const logout = () => {
     auth.logout();

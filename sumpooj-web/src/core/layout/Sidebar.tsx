@@ -37,6 +37,7 @@ import {
   Lock,
   Loyalty,
   RequestQuote,
+  Assignment,
   ChevronLeft as CollapseMenuIcon,
   ChevronRight as ExpandMenuIcon,
 } from '@mui/icons-material';
@@ -69,6 +70,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Lock: <Lock />,
   Loyalty: <Loyalty />,
   RequestQuote: <RequestQuote />,
+  Assignment: <Assignment />,
 };
 
 // ─── Section Colors ─────────────────────────────────────────

@@ -7,6 +7,7 @@ import {
   TextField,
   Typography,
   Alert,
+  CircularProgress,
   useTheme
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
@@ -20,6 +21,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const auth = useAuth();
   const navigate = useNavigate();
@@ -32,12 +34,16 @@ export default function Login() {
       return;
     }
 
+    setLoading(true);
     try {
       const res = await loginApi(email, password);
-      auth.login(res.access_token);
-      navigate("/customers");
+      // login() stores token and calls /auth/me to resolve identity
+      await auth.login(res.access_token);
+      navigate("/pos");
     } catch {
       setError("Invalid email or password");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -106,8 +112,10 @@ export default function Login() {
             fullWidth
             sx={{ mt: 2 }}
             onClick={submit}
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={18} color="inherit" /> : undefined}
           >
-            Login
+            {loading ? 'Signing in…' : 'Login'}
           </Button>
         </CardContent>
       </Card>
