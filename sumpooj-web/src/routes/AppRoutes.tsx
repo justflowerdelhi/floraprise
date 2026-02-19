@@ -46,6 +46,16 @@ import { DayCloseScreen } from '../pages/day-close';
 // CRM & Customer Intelligence
 import { CustomerListPage, Customer360View, SmartReminderDashboard, LoyaltyProgramPage } from '../pages/crm';
 
+// Floral Production Engine
+import {
+  FloralRecipeList,
+  FloralRecipeForm,
+  ProductionScreen,
+  FinishedGoodsInventory,
+  CustomBouquetBuilder,
+  WastageLogPage,
+} from '../pages/production';
+
 // Production-Ready SaaS Infrastructure
 import { RBACProvider } from '../core/rbac/RBACContext';
 import { MasterLayout } from '../core/layout/MasterLayout';
@@ -139,6 +149,15 @@ export default function AppRoutes() {
           <Route path="/crm/customers/:customerId" element={<Customer360View />} />
           <Route path="/crm/reminders" element={<SmartReminderDashboard />} />
           <Route path="/crm/loyalty" element={<LoyaltyProgramPage />} />
+
+          {/* ─── Floral Production Engine ───────────────── */}
+          <Route path="/production/recipes" element={<FloralRecipeList />} />
+          <Route path="/production/recipes/new" element={<FloralRecipeForm />} />
+          <Route path="/production/recipes/:id/edit" element={<FloralRecipeForm />} />
+          <Route path="/production/produce" element={<ProductionScreen />} />
+          <Route path="/production/finished-goods" element={<FinishedGoodsInventory />} />
+          <Route path="/production/custom-builder" element={<CustomBouquetBuilder />} />
+          <Route path="/production/wastage" element={<WastageLogPage />} />
         </Route>
       </Routes>
     </RBACProvider>

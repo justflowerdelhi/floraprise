@@ -289,7 +289,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip label={sCfg.label} color={sCfg.color} size="small" variant={dk ? 'outlined' : 'filled'} sx={{ fontWeight: 700, fontSize: '0.68rem' }} />
+                          <Chip label={sCfg.label} size="small" variant={dk ? 'outlined' : 'filled'} sx={{ bgcolor: alpha(sCfg.color, dk ? 0.25 : 0.12), color: sCfg.color, fontWeight: 700, fontSize: '0.68rem' }} />
                         </TableCell>
                         <TableCell>
                           {p.cardBrand && (

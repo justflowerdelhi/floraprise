@@ -26,6 +26,7 @@ import {
   DialogActions,
   Alert,
   Stack,
+  useTheme,
 } from '@mui/material';
 import {
   CheckCircle,
@@ -52,6 +53,8 @@ import { FEATURE_METADATA, hasFeature } from '../../core/tenant/FeatureFlags';
 // -----------------------------------------------------------------------------
 
 export default function SubscriptionPage() {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
   const {
     tenant,
     plan,
@@ -123,7 +126,7 @@ export default function SubscriptionPage() {
       <Grid container spacing={3}>
         {/* Current Plan Card */}
         <Grid size={{ xs: 12, lg: 4 }}>
-          <Card sx={{ bgcolor: '#1a1a2e', height: '100%' }}>
+          <Card sx={{ bgcolor: dk ? '#1a1a2e' : '#fff', height: '100%' }}>
             <CardContent sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
                 <Box
@@ -174,7 +177,7 @@ export default function SubscriptionPage() {
                 <Box
                   sx={{
                     p: 2,
-                    bgcolor: '#0f0f0f',
+                    bgcolor: dk ? '#0f0f0f' : '#f5f5f5',
                     borderRadius: 2,
                     mb: 3,
                   }}
@@ -205,7 +208,7 @@ export default function SubscriptionPage() {
               <Typography variant="subtitle2" color="text.secondary" mb={1.5}>
                 Current Plan Features
               </Typography>
-              <List dense sx={{ bgcolor: '#0f0f0f', borderRadius: 2, mb: 2 }}>
+              <List dense sx={{ bgcolor: dk ? '#0f0f0f' : '#f5f5f5', borderRadius: 2, mb: 2 }}>
                 {planConfig.features.slice(0, 6).map((feature, index) => (
                   <ListItem key={index} sx={{ py: 0.5 }}>
                     <ListItemIcon sx={{ minWidth: 32 }}>
@@ -233,7 +236,7 @@ export default function SubscriptionPage() {
         
         {/* Usage Overview */}
         <Grid size={{ xs: 12, lg: 8 }}>
-          <Card sx={{ bgcolor: '#1a1a2e', mb: 3 }}>
+          <Card sx={{ bgcolor: dk ? '#1a1a2e' : '#fff', mb: 3 }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" fontWeight={600} mb={3}>
                 Usage Overview
@@ -278,7 +281,7 @@ export default function SubscriptionPage() {
           </Card>
           
           {/* Feature Access Matrix */}
-          <Card sx={{ bgcolor: '#1a1a2e' }}>
+          <Card sx={{ bgcolor: dk ? '#1a1a2e' : '#fff' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" fontWeight={600} mb={3}>
                 Feature Access
@@ -295,7 +298,7 @@ export default function SubscriptionPage() {
                         sx={{
                           p: 2,
                           borderRadius: 2,
-                          bgcolor: isAvailable ? alpha('#4caf50', 0.1) : '#0f0f0f',
+                          bgcolor: isAvailable ? alpha('#4caf50', 0.1) : dk ? '#0f0f0f' : '#f5f5f5',
                           border: 1,
                           borderColor: isAvailable ? alpha('#4caf50', 0.3) : 'transparent',
                         }}
@@ -393,7 +396,7 @@ export default function SubscriptionPage() {
         open={showUpgradeDialog}
         onClose={() => setShowUpgradeDialog(false)}
         PaperProps={{
-          sx: { bgcolor: '#1a1a2e' },
+          sx: { bgcolor: dk ? '#1a1a2e' : '#fff' },
         }}
       >
         <DialogTitle>
@@ -417,9 +420,9 @@ export default function SubscriptionPage() {
             variant="contained"
             onClick={handleConfirmUpgrade}
             sx={{
-              bgcolor: '#fdd835',
-              color: '#0f0f0f',
-              '&:hover': { bgcolor: '#ffeb3b' },
+              bgcolor: '#e91e63',
+              color: '#fff',
+              '&:hover': { bgcolor: '#c2185b' },
             }}
           >
             Confirm Upgrade
@@ -443,6 +446,8 @@ interface UsageCardProps {
 }
 
 function UsageCard({ icon, label, used, limit, unit }: UsageCardProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
   const percentage = getUsagePercentage(used, limit);
   const isUnlimited = limit === -1;
   const isWarning = percentage >= 80;
@@ -456,7 +461,7 @@ function UsageCard({ icon, label, used, limit, unit }: UsageCardProps) {
     <Box
       sx={{
         p: 2,
-        bgcolor: '#0f0f0f',
+        bgcolor: dk ? '#0f0f0f' : '#f5f5f5',
         borderRadius: 2,
       }}
     >
@@ -546,6 +551,8 @@ interface PlanCardProps {
 }
 
 function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
   const config = PLAN_CONFIGS[plan];
   const isCurrent = plan === currentPlan;
   const planOrder: TenantPlan[] = ['STARTER', 'GROWTH', 'PRO', 'ENTERPRISE'];
@@ -558,13 +565,13 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
   return (
     <Card
       sx={{
-        bgcolor: '#1a1a2e',
+        bgcolor: dk ? '#1a1a2e' : '#fff',
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
         border: isCurrent || isRecommended ? 2 : 1,
-        borderColor: isCurrent ? '#fdd835' : isRecommended ? alpha('#fdd835', 0.5) : 'transparent',
+        borderColor: isCurrent ? '#e91e63' : isRecommended ? alpha('#e91e63', 0.5) : dk ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
       }}
     >
       {isRecommended && !isCurrent && (
@@ -576,8 +583,8 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
             transform: 'translateX(-50%)',
             px: 2,
             py: 0.5,
-            bgcolor: '#fdd835',
-            color: '#0f0f0f',
+            bgcolor: '#e91e63',
+            color: '#fff',
             borderRadius: 1,
             fontSize: '0.7rem',
             fontWeight: 700,
@@ -586,7 +593,8 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
         >
           Most Popular
         </Box>
-      )}
+      )
+      }
       
       {isCurrent && (
         <Box
@@ -597,8 +605,8 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
             transform: 'translateX(-50%)',
             px: 2,
             py: 0.5,
-            bgcolor: '#fdd835',
-            color: '#0f0f0f',
+            bgcolor: '#e91e63',
+            color: '#fff',
             borderRadius: 1,
             fontSize: '0.7rem',
             fontWeight: 700,
@@ -654,7 +662,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
             ))}
           </List>
           
-          <Box sx={{ mt: 2, p: 1.5, bgcolor: '#0f0f0f', borderRadius: 1 }}>
+          <Box sx={{ mt: 2, p: 1.5, bgcolor: dk ? '#0f0f0f' : '#f5f5f5', borderRadius: 1 }}>
             <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
               Limits:
             </Typography>
@@ -695,9 +703,9 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
               startIcon={<ArrowUpward />}
               onClick={onUpgrade}
               sx={{
-                bgcolor: '#fdd835',
-                color: '#0f0f0f',
-                '&:hover': { bgcolor: '#ffeb3b' },
+                bgcolor: '#e91e63',
+                color: '#fff',
+                '&:hover': { bgcolor: '#c2185b' },
               }}
             >
               Upgrade

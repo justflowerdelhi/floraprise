@@ -222,23 +222,23 @@ export interface DeliveryEntry {
 
 export interface StatusConfig {
   label: string;
-  color: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
+  color: string;
 }
 
 export const FULFILLMENT_STATUS_CONFIG: Record<FulfillmentStatus, StatusConfig> = {
-  DRAFT:            { label: 'Draft',            color: 'default' },
-  CONFIRMED:        { label: 'Confirmed',        color: 'primary' },
-  IN_DESIGN:        { label: 'In Design',        color: 'secondary' },
-  READY:            { label: 'Ready',            color: 'info' },
-  OUT_FOR_DELIVERY: { label: 'Out for Delivery', color: 'warning' },
-  COMPLETED:        { label: 'Completed',        color: 'success' },
-  CANCELLED:        { label: 'Cancelled',        color: 'error' },
+  DRAFT:            { label: 'Draft',            color: '#9e9e9e' },
+  CONFIRMED:        { label: 'Confirmed',        color: '#1976d2' },
+  IN_DESIGN:        { label: 'In Design',        color: '#9c27b0' },
+  READY:            { label: 'Ready',            color: '#0288d1' },
+  OUT_FOR_DELIVERY: { label: 'Out for Delivery', color: '#ed6c02' },
+  COMPLETED:        { label: 'Completed',        color: '#2e7d32' },
+  CANCELLED:        { label: 'Cancelled',        color: '#d32f2f' },
 };
 
 export const PAYMENT_STATUS_CONFIG: Record<OrderPaymentStatus, StatusConfig> = {
-  PAID:   { label: 'Paid',   color: 'success' },
-  UNPAID: { label: 'Unpaid', color: 'error' },
-  PARTIAL:{ label: 'Partial',color: 'info' },
+  PAID:   { label: 'Paid',   color: '#2e7d32' },
+  UNPAID: { label: 'Unpaid', color: '#d32f2f' },
+  PARTIAL:{ label: 'Partial',color: '#0288d1' },
 };
 
 export const ORDER_SOURCE_CONFIG: Record<OrderSource, { label: string; color: string }> = {

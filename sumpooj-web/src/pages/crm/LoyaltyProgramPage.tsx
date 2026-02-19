@@ -3,7 +3,7 @@
 // Florist ERP SaaS — CRM & Customer Retention
 // =============================================================================
 
-import { Box, Typography, Grid, Paper } from '@mui/material';
+import { Box, Typography, Grid, Paper, useTheme } from '@mui/material';
 import { TierComparisonCard, PointsDisplay } from './LoyaltyComponents';
 import {
   DEFAULT_LOYALTY_CONFIG,
@@ -11,11 +11,13 @@ import {
 } from './CRMTypes';
 
 export default function LoyaltyProgramPage() {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
   return (
-    <Box sx={{ p: 3, bgcolor: '#0f0f0f', minHeight: '100vh' }}>
+    <Box sx={{ p: 3, bgcolor: dk ? '#0f0f0f' : '#f5f5f5', minHeight: '100vh' }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" fontWeight={600} sx={{ color: '#fff' }}>
+        <Typography variant="h5" fontWeight={600} sx={{ color: dk ? '#fff' : 'text.primary' }}>
           Loyalty Program
         </Typography>
         <Typography variant="body2" sx={{ opacity: 0.7 }}>
@@ -24,14 +26,14 @@ export default function LoyaltyProgramPage() {
       </Box>
 
       {/* Program Overview */}
-      <Paper sx={{ p: 3, bgcolor: '#1a1a2e', mb: 3 }}>
+      <Paper sx={{ p: 3, bgcolor: dk ? '#1a1a2e' : '#fff', mb: 3 }}>
         <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
           Program Configuration
         </Typography>
         <Grid container spacing={3}>
           <Grid size={{ xs: 6, sm: 3 }}>
             <Typography variant="caption" sx={{ opacity: 0.7 }}>Points per ₹100</Typography>
-            <Typography variant="h5" fontWeight={600} sx={{ color: '#fdd835' }}>
+            <Typography variant="h5" fontWeight={600} sx={{ color: '#e91e63' }}>
               {DEFAULT_LOYALTY_CONFIG.pointsPerCurrency}
             </Typography>
           </Grid>

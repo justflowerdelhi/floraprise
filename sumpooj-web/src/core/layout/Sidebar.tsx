@@ -37,6 +37,9 @@ import {
   Lock,
   Loyalty,
   RequestQuote,
+  PlayArrow,
+  Palette,
+  DeleteSweep,
   ChevronLeft as CollapseMenuIcon,
   ChevronRight as ExpandMenuIcon,
 } from '@mui/icons-material';
@@ -68,6 +71,9 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Lock: <Lock />,
   Loyalty: <Loyalty />,
   RequestQuote: <RequestQuote />,
+  PlayArrow: <PlayArrow />,
+  Palette: <Palette />,
+  DeleteSweep: <DeleteSweep />,
 };
 
 // ─── Section Colors ─────────────────────────────────────────
@@ -81,6 +87,7 @@ const SECTION_COLORS: Record<string, string> = {
   catalog: '#00bcd4',
   crm: '#9c27b0',
   staff: '#ff5722',
+  production: '#e91e63',
   settings: '#fdd835',
 };
 

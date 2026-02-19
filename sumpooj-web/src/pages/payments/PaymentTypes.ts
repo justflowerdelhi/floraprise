@@ -66,15 +66,15 @@ export const PAYMENT_METHOD_CONFIG: Record<PaymentMethod, PaymentMethodConfig> =
 
 export interface PaymentStatusConfig {
   label: string;
-  color: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
+  color: string;
 }
 
 export const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, PaymentStatusConfig> = {
-  PENDING:  { label: 'Pending',  color: 'warning' },
-  APPROVED: { label: 'Approved', color: 'success' },
-  DECLINED: { label: 'Declined', color: 'error' },
-  VOIDED:   { label: 'Voided',   color: 'default' },
-  REFUNDED: { label: 'Refunded', color: 'info' },
+  PENDING:  { label: 'Pending',  color: '#ed6c02' },
+  APPROVED: { label: 'Approved', color: '#2e7d32' },
+  DECLINED: { label: 'Declined', color: '#d32f2f' },
+  VOIDED:   { label: 'Voided',   color: '#9e9e9e' },
+  REFUNDED: { label: 'Refunded', color: '#0288d1' },
 };
 
 // ─── API Payload examples (documentation) ───────────────────

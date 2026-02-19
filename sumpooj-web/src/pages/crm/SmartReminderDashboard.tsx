@@ -27,6 +27,7 @@ import {
   Tooltip,
   Divider,
   Alert,
+  useTheme,
 } from '@mui/material';
 import {
   Cake,
@@ -92,6 +93,8 @@ interface ReminderCardProps {
 }
 
 function ReminderCard({ reminder, onDismiss, onAction, onViewCustomer }: ReminderCardProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
   const config = REMINDER_CONFIGS[reminder.type];
   const daysAway = daysUntil(reminder.dueDate);
@@ -99,7 +102,7 @@ function ReminderCard({ reminder, onDismiss, onAction, onViewCustomer }: Reminde
   return (
     <Card
       sx={{
-        bgcolor: '#1a1a2e',
+        bgcolor: dk ? '#1a1a2e' : '#fff',
         border: `1px solid ${PRIORITY_COLORS[reminder.priority]}20`,
         borderLeft: `4px solid ${PRIORITY_COLORS[reminder.priority]}`,
         opacity: reminder.dismissed ? 0.5 : 1,
@@ -195,7 +198,7 @@ function ReminderCard({ reminder, onDismiss, onAction, onViewCustomer }: Reminde
         <IconButton
           size="small"
           onClick={() => onDismiss(reminder.id)}
-          sx={{ color: 'rgba(255,255,255,0.5)' }}
+          sx={{ color: dk ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }}
         >
           <Close sx={{ fontSize: 18 }} />
         </IconButton>
@@ -250,11 +253,13 @@ interface StatsCardProps {
 }
 
 function StatsCard({ icon, label, value, color, onClick }: StatsCardProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
   return (
     <Paper
       sx={{
         p: 2,
-        bgcolor: '#1a1a2e',
+        bgcolor: dk ? '#1a1a2e' : '#fff',
         cursor: onClick ? 'pointer' : 'default',
         transition: 'transform 0.2s',
         '&:hover': onClick ? { transform: 'translateY(-2px)' } : {},
@@ -287,6 +292,8 @@ interface SmartReminderDashboardProps {
 }
 
 export default function SmartReminderDashboard({ onViewCustomer }: SmartReminderDashboardProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
   const [tabValue, setTabValue] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<ReminderType | 'ALL'>('ALL');
@@ -356,11 +363,11 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
   };
 
   return (
-    <Box sx={{ p: 3, bgcolor: '#0f0f0f', minHeight: '100vh' }}>
+    <Box sx={{ p: 3, bgcolor: dk ? '#0f0f0f' : '#f5f5f5', minHeight: '100vh' }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Box>
-          <Typography variant="h5" fontWeight={600} sx={{ color: '#fff' }}>
+          <Typography variant="h5" fontWeight={600} sx={{ color: dk ? '#fff' : 'text.primary' }}>
             Smart Reminders
           </Typography>
           <Typography variant="body2" sx={{ opacity: 0.7 }}>
@@ -368,7 +375,7 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
           </Typography>
         </Box>
         <Badge badgeContent={stats.urgent} color="error">
-          <NotificationsActive sx={{ fontSize: 28, color: '#fdd835' }} />
+          <NotificationsActive sx={{ fontSize: 28, color: '#e91e63' }} />
         </Badge>
       </Box>
 
@@ -379,7 +386,7 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
             icon={<NotificationsActive />}
             label="Total Reminders"
             value={stats.total}
-            color="#fdd835"
+            color="#e91e63"
           />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
@@ -409,7 +416,7 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
       </Grid>
 
       {/* Filters */}
-      <Paper sx={{ bgcolor: '#1a1a2e', mb: 3 }}>
+      <Paper sx={{ bgcolor: dk ? '#1a1a2e' : '#fff', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', p: 2, gap: 2 }}>
           <TextField
             size="small"
@@ -419,7 +426,7 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ color: 'rgba(255,255,255,0.5)' }} />
+                  <Search sx={{ color: dk ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} />
                 </InputAdornment>
               ),
             }}
@@ -429,7 +436,7 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
           <Button
             startIcon={<FilterList />}
             onClick={(e) => setFilterAnchor(e.currentTarget)}
-            sx={{ color: filterType !== 'ALL' ? '#fdd835' : 'inherit' }}
+            sx={{ color: filterType !== 'ALL' ? '#e91e63' : 'inherit' }}
           >
             {filterType === 'ALL' ? 'All Types' : REMINDER_CONFIGS[filterType].label}
           </Button>
@@ -466,10 +473,10 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
           value={tabValue}
           onChange={(_, v) => setTabValue(v)}
           sx={{
-            borderTop: '1px solid rgba(255,255,255,0.1)',
-            '& .MuiTab-root': { color: 'rgba(255,255,255,0.7)', minHeight: 48 },
-            '& .Mui-selected': { color: '#fdd835' },
-            '& .MuiTabs-indicator': { bgcolor: '#fdd835' },
+            borderTop: `1px solid ${dk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.12)'}`,
+            '& .MuiTab-root': { color: dk ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)', minHeight: 48 },
+            '& .Mui-selected': { color: '#e91e63' },
+            '& .MuiTabs-indicator': { bgcolor: '#e91e63' },
           }}
         >
           <Tab label={`All (${categorizedReminders.all.length})`} />
@@ -526,21 +533,23 @@ interface ReminderWidgetProps {
 }
 
 export function ReminderWidget({ maxItems = 5, onViewAll, onViewCustomer }: ReminderWidgetProps) {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
   const urgentReminders = MOCK_REMINDERS
     .filter((r) => !r.dismissed && (r.priority === 'HIGH' || r.priority === 'URGENT'))
     .slice(0, maxItems);
 
   return (
-    <Paper sx={{ p: 2, bgcolor: '#1a1a2e' }}>
+    <Paper sx={{ p: 2, bgcolor: dk ? '#1a1a2e' : '#fff' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <NotificationsActive sx={{ color: '#fdd835' }} />
+          <NotificationsActive sx={{ color: '#e91e63' }} />
           <Typography variant="subtitle1" fontWeight={600}>
             Reminders
           </Typography>
         </Box>
         {onViewAll && (
-          <Button size="small" onClick={onViewAll} sx={{ color: '#fdd835' }}>
+          <Button size="small" onClick={onViewAll} sx={{ color: '#e91e63' }}>
             View All
           </Button>
         )}

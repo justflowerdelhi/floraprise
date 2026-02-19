@@ -65,7 +65,11 @@ export type Permission =
   | 'settings:view'
   | 'settings:edit'
   | 'settings:billing'
-  | 'users:manage';
+  | 'users:manage'
+  | 'production:view'
+  | 'production:produce'
+  | 'production:recipes'
+  | 'production:wastage';
 
 // ─── Role Permission Mapping ────────────────────────────────
 
@@ -84,6 +88,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'payments:schedule:view', 'payments:schedule:manage',
     'staff:view', 'staff:manage',
     'settings:view', 'settings:edit', 'settings:billing', 'users:manage',
+    'production:view', 'production:produce', 'production:recipes', 'production:wastage',
   ],
 
   MANAGER: [
@@ -99,6 +104,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'proposals:view', 'proposals:create', 'proposals:edit',
     'payments:schedule:view', 'payments:schedule:manage',
     'staff:view', 'staff:manage',
+    'production:view', 'production:produce', 'production:recipes', 'production:wastage',
   ],
 
   CASHIER: [
@@ -116,6 +122,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'events:view',
     'proposals:view',
     'payments:schedule:view',
+    'production:view', 'production:produce', 'production:recipes', 'production:wastage',
   ],
 
   DRIVER: [
@@ -378,6 +385,47 @@ export const MENU_SECTIONS: MenuSection[] = [
     ],
   },
   {
+    id: 'production',
+    title: 'Production',
+    items: [
+      {
+        id: 'recipes',
+        label: 'Floral Recipes',
+        icon: 'LocalFlorist',
+        path: '/production/recipes',
+        permissions: ['production:recipes'],
+      },
+      {
+        id: 'produce',
+        label: 'Produce',
+        icon: 'PlayArrow',
+        path: '/production/produce',
+        permissions: ['production:produce'],
+      },
+      {
+        id: 'finished-goods',
+        label: 'Finished Goods',
+        icon: 'Inventory2',
+        path: '/production/finished-goods',
+        permissions: ['production:view'],
+      },
+      {
+        id: 'custom-builder',
+        label: 'Custom Builder',
+        icon: 'Palette',
+        path: '/production/custom-builder',
+        permissions: ['production:produce'],
+      },
+      {
+        id: 'wastage-log',
+        label: 'Wastage Log',
+        icon: 'DeleteSweep',
+        path: '/production/wastage',
+        permissions: ['production:wastage'],
+      },
+    ],
+  },
+  {
     id: 'settings',
     title: 'Settings',
     items: [
@@ -425,6 +473,11 @@ export const ROUTE_ACCESS: RouteConfig[] = [
   { path: '/crm/loyalty', permissions: ['crm:loyalty'] },
   { path: '/subscription', permissions: ['settings:billing'] },
   { path: '/day-close', permissions: ['pos:day_close'] },
+  { path: '/production/recipes', permissions: ['production:recipes'] },
+  { path: '/production/produce', permissions: ['production:produce'] },
+  { path: '/production/finished-goods', permissions: ['production:view'] },
+  { path: '/production/custom-builder', permissions: ['production:produce'] },
+  { path: '/production/wastage', permissions: ['production:wastage'] },
 ];
 
 // ─── Quick Actions Configuration ────────────────────────────
