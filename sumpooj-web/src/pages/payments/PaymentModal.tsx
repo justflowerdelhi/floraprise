@@ -118,6 +118,26 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      {/* Loading Overlay */}
+      {processing && (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            bgcolor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10,
+            borderRadius: 'inherit',
+          }}
+        >
+          <CircularProgress size={48} sx={{ color: '#fff' }} />
+          <Typography sx={{ color: '#fff', mt: 2, fontWeight: 600 }}>Processing payment...</Typography>
+        </Box>
+      )}
+
       <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6" sx={{ fontWeight: 800 }}>Process Payment</Typography>
@@ -131,18 +151,40 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       </DialogTitle>
 
       <DialogContent dividers>
+        {/* ─── Total at Top - Prominent Display ──────── */}
+        <Box
+          sx={{
+            textAlign: 'center',
+            py: 2,
+            mb: 3,
+            borderRadius: 2,
+            bgcolor: dk ? alpha('#fff', 0.04) : alpha('#000', 0.02),
+          }}
+        >
+          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1.5 }}>
+            Order Total
+          </Typography>
+          <Typography
+            sx={{
+              fontWeight: 800,
+              fontSize: '2.5rem',
+              letterSpacing: '-0.02em',
+              color: dk ? '#fdd835' : theme.palette.primary.main,
+              lineHeight: 1.2,
+            }}
+          >
+            {fmtPaymentAmount(grandTotal)}
+          </Typography>
+        </Box>
+
         {/* ─── Balance Summary ──────────────────────────── */}
         <Box
           sx={{
-            display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2, mb: 3,
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3,
             p: 2, borderRadius: 2,
             bgcolor: dk ? alpha('#fff', 0.03) : alpha('#000', 0.02),
           }}
         >
-          <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="caption" color="text.secondary">Order Total</Typography>
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>{fmtPaymentAmount(grandTotal)}</Typography>
-          </Box>
           <Box sx={{ textAlign: 'center' }}>
             <Typography variant="caption" color="text.secondary">Paid</Typography>
             <Typography variant="h6" sx={{ fontWeight: 800, color: theme.palette.success.main }}>
@@ -170,7 +212,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
               exclusive
               onChange={(_, val: PaymentMethod | null) => val && setMethod(val)}
               fullWidth
-              size="small"
+              size="large"
               sx={{ mb: 2 }}
             >
               {(Object.keys(PAYMENT_METHOD_CONFIG) as PaymentMethod[]).map((m) => (
@@ -178,12 +220,17 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                   key={m}
                   value={m}
                   sx={{
-                    textTransform: 'none', fontWeight: 600, fontSize: '0.78rem',
-                    gap: 0.5, py: 1,
+                    textTransform: 'none', fontWeight: 700, fontSize: '0.85rem',
+                    gap: 0.75, py: 1.75, minHeight: 56,
+                    transition: 'all 0.15s',
                     '&.Mui-selected': {
-                      bgcolor: alpha(PAYMENT_METHOD_CONFIG[m].color, dk ? 0.2 : 0.1),
+                      bgcolor: alpha(PAYMENT_METHOD_CONFIG[m].color, dk ? 0.25 : 0.15),
                       color: PAYMENT_METHOD_CONFIG[m].color,
                       borderColor: PAYMENT_METHOD_CONFIG[m].color,
+                      transform: 'scale(1.02)',
+                    },
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
                     },
                   }}
                 >
@@ -198,30 +245,46 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
               <TextField
                 label="Amount"
                 type="number"
-                size="small"
+                size="medium"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder={remaining.toString()}
                 fullWidth
                 slotProps={{
                   input: {
-                    sx: { fontWeight: 700, fontSize: '1.1rem' },
+                    sx: { fontWeight: 700, fontSize: '1.25rem', py: 0.5 },
                   },
                 }}
                 helperText={`Remaining: ${fmtPaymentAmount(remaining)}`}
-                sx={dk ? { '& .MuiOutlinedInput-root': { color: '#e0e0e0', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' } } } : {}}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    minHeight: 56,
+                    ...(dk ? { color: '#e0e0e0', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' } } : {}),
+                  },
+                }}
               />
               <Button
                 variant="contained"
                 onClick={handleProcess}
                 disabled={processing || effectiveAmount <= 0}
                 sx={{
-                  minWidth: 140, py: 1.2, fontWeight: 700,
+                  minWidth: 160, py: 1.5, minHeight: 52, fontWeight: 800, fontSize: '1rem',
                   bgcolor: PAYMENT_METHOD_CONFIG[method].color,
-                  '&:hover': { bgcolor: alpha(PAYMENT_METHOD_CONFIG[method].color, 0.85) },
+                  transition: 'all 0.15s',
+                  '&:hover': {
+                    bgcolor: alpha(PAYMENT_METHOD_CONFIG[method].color, 0.85),
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+                  },
+                  '&:active': {
+                    transform: 'scale(0.98)',
+                  },
+                  '&.Mui-disabled': {
+                    bgcolor: dk ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
+                  },
                 }}
               >
-                {processing ? <CircularProgress size={20} color="inherit" /> : 'Process'}
+                {processing ? <CircularProgress size={24} color="inherit" /> : 'Process'}
               </Button>
             </Box>
 

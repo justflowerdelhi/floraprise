@@ -125,7 +125,7 @@ export const MOCK_ORDERS: Order[] = [
     orderType: 'LOCAL',
     isPriceEditable: true, customerName: 'Meera Joshi', customerPhone: '9876543210',
     fulfillmentStatus: 'COMPLETED', paymentStatus: 'PAID',
-    items: [], totals: { subtotal: 1130, taxTotal: 56.5, discountTotal: 0, grandTotal: 1186.5, totalCost: 500, marginPercent: 57.9, marginWarning: false, itemCount: 4, lineCount: 2 },
+    items: [], totals: { subtotal: 1130, taxTotal: 56.5, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 1186.5, totalCost: 500, marginPercent: 57.9, marginWarning: false, itemCount: 4, lineCount: 2 },
     createdAt: daysAgo(5), updatedAt: daysAgo(5),
   },
   {
@@ -136,7 +136,7 @@ export const MOCK_ORDERS: Order[] = [
     deliveryDate: daysFrom(1), deliveryAddress: '45 MG Road, Pune 411001',
     cardMessage: 'Happy Anniversary!', occasion: 'Anniversary',
     fulfillmentStatus: 'IN_DESIGN', paymentStatus: 'UNPAID',
-    items: [], totals: { subtotal: 2050, taxTotal: 246, discountTotal: 100, grandTotal: 2196, totalCost: 900, marginPercent: 59, marginWarning: false, itemCount: 3, lineCount: 2 },
+    items: [], totals: { subtotal: 2050, taxTotal: 246, discountTotal: 100, orderDiscountAmount: 0, grandTotal: 2196, totalCost: 900, marginPercent: 59, marginWarning: false, itemCount: 3, lineCount: 2 },
     createdAt: daysAgo(1), updatedAt: daysAgo(1),
   },
   {
@@ -150,7 +150,7 @@ export const MOCK_ORDERS: Order[] = [
     cardMessage: 'Get well soon!', occasion: 'Get Well',
     externalCommission: 945, externalFees: 0, netPayout: 2555,
     fulfillmentStatus: 'CONFIRMED', paymentStatus: 'PAID',
-    items: [], totals: { subtotal: 3500, taxTotal: 0, discountTotal: 0, grandTotal: 3500, totalCost: 1500, marginPercent: 57.1, marginWarning: false, itemCount: 5, lineCount: 3 },
+    items: [], totals: { subtotal: 3500, taxTotal: 0, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 3500, totalCost: 1500, marginPercent: 57.1, marginWarning: false, itemCount: 5, lineCount: 3 },
     createdAt: daysAgo(0), updatedAt: daysAgo(0),
   },
   {
@@ -160,7 +160,7 @@ export const MOCK_ORDERS: Order[] = [
     recipientName: 'Deepa Patil',
     deliveryDate: daysFrom(3), deliveryAddress: '78 Shivaji Nagar, Pune 411005',
     fulfillmentStatus: 'READY', paymentStatus: 'PAID',
-    items: [], totals: { subtotal: 850, taxTotal: 102, discountTotal: 50, grandTotal: 902, totalCost: 380, marginPercent: 57.9, marginWarning: false, itemCount: 1, lineCount: 1 },
+    items: [], totals: { subtotal: 850, taxTotal: 102, discountTotal: 50, orderDiscountAmount: 0, grandTotal: 902, totalCost: 380, marginPercent: 57.9, marginWarning: false, itemCount: 1, lineCount: 1 },
     createdAt: daysAgo(2), updatedAt: daysAgo(0),
   },
   {
@@ -168,7 +168,7 @@ export const MOCK_ORDERS: Order[] = [
     orderType: 'LOCAL',
     isPriceEditable: true, customerName: 'Amit Deshmukh',
     fulfillmentStatus: 'DRAFT', paymentStatus: 'UNPAID',
-    items: [], totals: { subtotal: 560, taxTotal: 28, discountTotal: 0, grandTotal: 588, totalCost: 220, marginPercent: 62.6, marginWarning: false, itemCount: 3, lineCount: 2 },
+    items: [], totals: { subtotal: 560, taxTotal: 28, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 588, totalCost: 220, marginPercent: 62.6, marginWarning: false, itemCount: 3, lineCount: 2 },
     createdAt: daysAgo(0), updatedAt: daysAgo(0),
   },
   {
@@ -182,7 +182,7 @@ export const MOCK_ORDERS: Order[] = [
     cardMessage: 'Wishing you all the best!', occasion: 'Congratulations',
     externalCommission: 250, externalFees: 0, netPayout: 2250,
     fulfillmentStatus: 'IN_DESIGN', paymentStatus: 'PAID',
-    items: [], totals: { subtotal: 2500, taxTotal: 0, discountTotal: 0, grandTotal: 2500, totalCost: 980, marginPercent: 60.8, marginWarning: false, itemCount: 3, lineCount: 2 },
+    items: [], totals: { subtotal: 2500, taxTotal: 0, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 2500, totalCost: 980, marginPercent: 60.8, marginWarning: false, itemCount: 3, lineCount: 2 },
     createdAt: daysAgo(0), updatedAt: daysAgo(0),
   },
   {
@@ -193,7 +193,7 @@ export const MOCK_ORDERS: Order[] = [
     deliveryDate: daysFrom(0), deliveryAddress: '88 Baner Road, Pune 411045',
     cardMessage: 'Happy Birthday sweetheart!', occasion: 'Birthday',
     fulfillmentStatus: 'READY', paymentStatus: 'PARTIAL',
-    items: [], totals: { subtotal: 1800, taxTotal: 216, discountTotal: 0, grandTotal: 2016, totalCost: 720, marginPercent: 60, marginWarning: false, itemCount: 2, lineCount: 2 },
+    items: [], totals: { subtotal: 1800, taxTotal: 216, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 2016, totalCost: 720, marginPercent: 60, marginWarning: false, itemCount: 2, lineCount: 2 },
     createdAt: daysAgo(1), updatedAt: daysAgo(0),
   },
 ];

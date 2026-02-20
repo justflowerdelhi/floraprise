@@ -56,10 +56,38 @@ export const allocateFIFO = (
 
 // ─── Line Total Calculations ────────────────────────────────
 
+import type { LineItemDiscount } from '../orders/OrderTypes';
+
+/**
+ * Calculate line discount amount from LineItemDiscount.
+ * Supports PERCENT and FLAT types. Ensures discount cannot exceed gross.
+ */
+export const calcLineDiscountAmount = (
+  gross: number,
+  lineDiscount: LineItemDiscount | null | undefined,
+): { discountAmount: number; discountPercent: number } => {
+  if (!lineDiscount || gross <= 0) {
+    return { discountAmount: 0, discountPercent: 0 };
+  }
+
+  if (lineDiscount.type === 'PERCENT') {
+    const discountAmount = Math.round(gross * (lineDiscount.value / 100) * 100) / 100;
+    return {
+      discountAmount: Math.min(discountAmount, gross),
+      discountPercent: lineDiscount.value,
+    };
+  }
+
+  // FLAT discount
+  const discountAmount = Math.min(lineDiscount.value, gross);
+  const discountPercent = gross > 0 ? Math.round((discountAmount / gross) * 1000) / 10 : 0;
+  return { discountAmount, discountPercent };
+};
+
 export const calcLineItem = (
   product: Product,
   qty: number,
-  discountPercent: number,
+  discountPercentOrLineDiscount: number | LineItemDiscount | null,
   manualBatchAllocations?: BatchAllocation[],
 ): CartItem => {
   // Batch allocation
@@ -69,8 +97,28 @@ export const calcLineItem = (
 
   const unitPrice = product.sellingPrice;
   const gross = unitPrice * qty;
-  const discountAmount = Math.round(gross * discountPercent / 100 * 100) / 100;
-  const lineTotal = gross - discountAmount;
+
+  // Support both legacy discountPercent (number) and new LineItemDiscount object
+  let lineDiscount: LineItemDiscount | null = null;
+  let discountAmount: number;
+  let discountPercent: number;
+
+  if (typeof discountPercentOrLineDiscount === 'number') {
+    // Legacy: percentage-based discount
+    discountPercent = discountPercentOrLineDiscount;
+    discountAmount = Math.round(gross * discountPercent / 100 * 100) / 100;
+    if (discountPercent > 0) {
+      lineDiscount = { type: 'PERCENT', value: discountPercent };
+    }
+  } else {
+    // New: LineItemDiscount object
+    lineDiscount = discountPercentOrLineDiscount;
+    const calc = calcLineDiscountAmount(gross, lineDiscount);
+    discountAmount = calc.discountAmount;
+    discountPercent = calc.discountPercent;
+  }
+
+  const lineTotal = Math.max(0, gross - discountAmount);
   const taxAmount = Math.round(lineTotal * product.taxRate * 100) / 100;
 
   // FIFO cost
@@ -100,31 +148,64 @@ export const calcLineItem = (
     batchAllocations: allocations,
     expiryWarning,
     stockWarning,
+    lineDiscount,
   };
 };
 
 // ─── Cart Summary ───────────────────────────────────────────
 
-export const calcCartSummary = (items: CartItem[]): CartSummary => {
+import type { OrderDiscount } from '../orders/OrderTypes';
+
+/**
+ * Calculate order-level discount amount.
+ * Ensures discount cannot exceed subtotal.
+ */
+export const calcOrderDiscountAmount = (
+  subtotal: number,
+  orderDiscount: OrderDiscount | null,
+): number => {
+  if (!orderDiscount || subtotal <= 0) return 0;
+
+  if (orderDiscount.type === 'PERCENT') {
+    const amount = Math.round(subtotal * (orderDiscount.value / 100) * 100) / 100;
+    return Math.min(amount, subtotal); // Cannot exceed subtotal
+  }
+
+  // FLAT discount
+  return Math.min(orderDiscount.value, subtotal); // Cannot exceed subtotal
+};
+
+export const calcCartSummary = (
+  items: CartItem[],
+  orderDiscount: OrderDiscount | null = null,
+): CartSummary => {
   const subtotal      = items.reduce((s, i) => s + i.lineTotal, 0);
   const taxTotal      = items.reduce((s, i) => s + i.taxAmount, 0);
   const discountTotal = items.reduce((s, i) => s + i.discountAmount, 0);
-  const grandTotal    = Math.round((subtotal + taxTotal) * 100) / 100;
+
+  // Order-level discount calculation
+  const orderDiscountAmount = calcOrderDiscountAmount(subtotal, orderDiscount);
+
+  // New calculation order: Subtotal - Discount = Discounted Subtotal, then + Tax = Final Total
+  const discountedSubtotal = subtotal - orderDiscountAmount;
+  const grandTotal = Math.round((discountedSubtotal + taxTotal) * 100) / 100;
+
   const totalCost     = items.reduce((s, i) => s + i.lineCost, 0);
-  const marginPercent = subtotal > 0
-    ? Math.round((1 - totalCost / subtotal) * 1000) / 10
+  const marginPercent = discountedSubtotal > 0
+    ? Math.round((1 - totalCost / discountedSubtotal) * 1000) / 10
     : 0;
 
   return {
-    subtotal:      Math.round(subtotal * 100) / 100,
-    taxTotal:      Math.round(taxTotal * 100) / 100,
-    discountTotal: Math.round(discountTotal * 100) / 100,
-    grandTotal,
-    totalCost:     Math.round(totalCost * 100) / 100,
+    subtotal:           Math.round(subtotal * 100) / 100,
+    taxTotal:           Math.round(taxTotal * 100) / 100,
+    discountTotal:      Math.round(discountTotal * 100) / 100,
+    orderDiscountAmount: Math.round(orderDiscountAmount * 100) / 100,
+    grandTotal:         Math.max(0, grandTotal), // Ensure non-negative
+    totalCost:          Math.round(totalCost * 100) / 100,
     marginPercent,
-    marginWarning: marginPercent < 20,
-    itemCount:     items.reduce((s, i) => s + i.quantity, 0),
-    lineCount:     items.length,
+    marginWarning:      marginPercent < 20,
+    itemCount:          items.reduce((s, i) => s + i.quantity, 0),
+    lineCount:          items.length,
   };
 };
 

@@ -45,7 +45,7 @@ export default function DesignerDashboard({ data }: DesignerDashboardProps) {
   return (
     <div>
       {/* Quick stat cards — 4-col grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
         <StatCard
           label="Maintenance Required"
           value={data.maintenanceRequired}
@@ -64,15 +64,20 @@ export default function DesignerDashboard({ data }: DesignerDashboardProps) {
         />
       </div>
 
+      {/* Subtle divider */}
+      <div className="border-t border-gray-100 my-8" />
+
       {/* Today's production tasks */}
-      <div className="mb-8">
+      <div className="mb-10">
         <div className="mb-4">
           <SectionHeading title="Today's Production" count={tasks.length} />
         </div>
         {tasks.length === 0 ? (
-          <p className="text-sm text-slate-400 py-4 text-center">No production tasks today</p>
+          <div className="text-center py-12 text-gray-400">
+            <p className="text-sm">No production tasks today</p>
+          </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {tasks.map((t) => (
               <TaskItem key={t.id} task={t} onToggle={(id) => setTasks((p) => cycleStatus(p, id))} />
             ))}
@@ -82,30 +87,38 @@ export default function DesignerDashboard({ data }: DesignerDashboardProps) {
 
       {/* Wedding prep */}
       {weddingTasks.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-4">
-            <SectionHeading title="Wedding Prep" count={weddingTasks.length} />
+        <>
+          {/* Subtle divider */}
+          <div className="border-t border-gray-100 my-8" />
+          <div className="mb-10">
+            <div className="mb-4">
+              <SectionHeading title="Wedding Prep" count={weddingTasks.length} />
+            </div>
+            <div className="space-y-3">
+              {weddingTasks.map((t) => (
+                <TaskItem key={t.id} task={t} onToggle={(id) => setWeddingTasks((p) => cycleStatus(p, id))} />
+              ))}
+            </div>
           </div>
-          <div className="space-y-2">
-            {weddingTasks.map((t) => (
-              <TaskItem key={t.id} task={t} onToggle={(id) => setWeddingTasks((p) => cycleStatus(p, id))} />
-            ))}
-          </div>
-        </div>
+        </>
       )}
 
       {/* Custom orders */}
       {customOrders.length > 0 && (
-        <div>
-          <div className="mb-4">
-            <SectionHeading title="Custom Orders" count={customOrders.length} />
+        <>
+          {/* Subtle divider */}
+          <div className="border-t border-gray-100 my-8" />
+          <div>
+            <div className="mb-4">
+              <SectionHeading title="Custom Orders" count={customOrders.length} />
+            </div>
+            <div className="space-y-3">
+              {customOrders.map((t) => (
+                <TaskItem key={t.id} task={t} onToggle={(id) => setCustomOrders((p) => cycleStatus(p, id))} />
+              ))}
+            </div>
           </div>
-          <div className="space-y-2">
-            {customOrders.map((t) => (
-              <TaskItem key={t.id} task={t} onToggle={(id) => setCustomOrders((p) => cycleStatus(p, id))} />
-            ))}
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

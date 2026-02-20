@@ -215,6 +215,7 @@ export const acceptExternalOrder = (ext: ExternalOrder): Order => {
       subtotal: ext.grossAmount,
       taxTotal: 0,
       discountTotal: 0,
+      orderDiscountAmount: 0,
       grandTotal: ext.grossAmount,
       totalCost: 0,
       marginPercent: 0,

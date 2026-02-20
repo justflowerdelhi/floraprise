@@ -65,7 +65,7 @@ export default function AdminDashboard({ data }: AdminDashboardProps) {
   return (
     <div>
       {/* Metric cards — 4-col grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
         <StatCard label="Today's Sales" value={fmt(data.todaySales)} icon={Icons.sales} iconBg="bg-emerald-50" iconColor="text-emerald-600" href="/order-list" />
         <StatCard label="Month Revenue" value={fmt(data.monthRevenue)} icon={Icons.revenue} iconBg="bg-blue-50" iconColor="text-blue-600" href="/profit-intelligence" />
         <StatCard label="Gross Profit" value={fmt(data.grossProfitToday)} icon={Icons.profit} iconBg="bg-violet-50" iconColor="text-violet-600" href="/profit-intelligence" subtitle="Today" />
@@ -75,6 +75,9 @@ export default function AdminDashboard({ data }: AdminDashboardProps) {
         <StatCard label="Expiring Bouquets" value={data.expiringBouquets} icon={Icons.expiring} iconBg="bg-orange-50" iconColor="text-orange-500" href="/expiry-alerts" />
         <StatCard label="Upcoming Weddings" value={data.upcomingWeddings} icon={Icons.wedding} iconBg="bg-pink-50" iconColor="text-pink-500" subtitle="Next 7 days" href="/events" />
       </div>
+
+      {/* Subtle divider */}
+      <div className="border-t border-gray-100 my-8" />
 
       {/* Sales trend chart */}
       <MiniChart data={data.salesTrend} />

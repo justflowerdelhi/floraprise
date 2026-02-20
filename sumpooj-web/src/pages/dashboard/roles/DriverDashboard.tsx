@@ -42,7 +42,7 @@ function DeliveryCard({ item, index, onStatusToggle }: DeliveryCardProps) {
     <div
       className={`
         bg-white rounded-xl border border-slate-100 shadow-sm
-        transition-all duration-200 hover:shadow-md
+        transition-all duration-200 hover:shadow-md hover:-translate-y-1
         ${done ? 'opacity-60' : ''}
       `}
     >
@@ -130,65 +130,70 @@ export default function DriverDashboard({ data }: DriverDashboardProps) {
   return (
     <div>
       {/* Summary cards — standard card treatment in 4-col grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col justify-between">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-md hover:-translate-y-1">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25m-6.75 0V7.5A2.25 2.25 0 019.75 5.25h1.5" />
               </svg>
             </div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total</p>
+            <p className="text-sm text-gray-500 font-medium">Total</p>
           </div>
-          <p className="text-2xl font-bold text-slate-800">{deliveries.length}</p>
+          <p className="text-2xl font-semibold text-gray-900">{deliveries.length}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col justify-between">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-md hover:-translate-y-1">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Pending</p>
+            <p className="text-sm text-gray-500 font-medium">Pending</p>
           </div>
-          <p className="text-2xl font-bold text-amber-700">{pending}</p>
+          <p className="text-2xl font-semibold text-amber-700">{pending}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col justify-between">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-md hover:-translate-y-1">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Delivered</p>
+            <p className="text-sm text-gray-500 font-medium">Delivered</p>
           </div>
-          <p className="text-2xl font-bold text-emerald-700">{delivered}</p>
+          <p className="text-2xl font-semibold text-emerald-700">{delivered}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col justify-between">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-md hover:-translate-y-1">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
               </svg>
             </div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Failed</p>
+            <p className="text-sm text-gray-500 font-medium">Failed</p>
           </div>
-          <p className="text-2xl font-bold text-rose-700">{failed}</p>
+          <p className="text-2xl font-semibold text-rose-700">{failed}</p>
         </div>
       </div>
+
+      {/* Subtle divider */}
+      <div className="border-t border-gray-100 my-8" />
 
       {/* Delivery list */}
       <div className="mb-4">
         <SectionHeading title="Today's Deliveries" count={deliveries.length} />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {deliveries.map((d, i) => (
-          <DeliveryCard key={d.id} item={d} index={i} onStatusToggle={toggleStatus} />
-        ))}
-      </div>
-
-      {deliveries.length === 0 && (
-        <p className="text-sm text-slate-400 py-8 text-center">No deliveries scheduled today</p>
+      {deliveries.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {deliveries.map((d, i) => (
+            <DeliveryCard key={d.id} item={d} index={i} onStatusToggle={toggleStatus} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12 text-gray-400">
+          <p className="text-sm">No deliveries scheduled today</p>
+        </div>
       )}
     </div>
   );

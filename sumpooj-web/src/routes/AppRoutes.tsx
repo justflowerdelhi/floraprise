@@ -69,10 +69,12 @@ import { DashboardPage } from '../pages/dashboard';
 import { RBACProvider } from '../core/rbac/RBACContext';
 import { MasterLayout } from '../core/layout/MasterLayout';
 import { FeatureGate } from '../core/tenant';
+import { DiscountApprovalProvider } from '../core/rbac/DiscountApprovalModal';
 
 export default function AppRoutes() {
   return (
     <RBACProvider>
+      <DiscountApprovalProvider>
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -194,6 +196,7 @@ export default function AppRoutes() {
           <Route path="/production/wastage" element={<WastageLogPage />} />
         </Route>
       </Routes>
+      </DiscountApprovalProvider>
     </RBACProvider>
   );
 }

@@ -47,8 +47,8 @@ export default function CashierDashboard({ data }: CashierDashboardProps) {
         onClick={() => navigate('/pos')}
         className="
           bg-white rounded-xl shadow-sm border border-slate-100
-          p-5 flex items-center gap-4 mb-8
-          cursor-pointer hover:shadow-md hover:-translate-y-0.5
+          p-5 flex items-center gap-4 mb-10
+          cursor-pointer hover:shadow-md hover:-translate-y-1
           transition-all duration-200 active:scale-[0.99]
         "
       >
