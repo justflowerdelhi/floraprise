@@ -67,10 +67,12 @@ import { MOCK_PROPOSALS, getProposalStats } from './ProposalMockData';
 
 // ─── Styling Constants ──────────────────────────────────────
 
-const cardBg = '#1a1a2e';
-const borderColor = '#2d2d44';
-const yellowAccent = '#fdd835';
-const pageBg = '#0f0f0f';
+const cardBg = '#ffffff';
+const borderColor = '#e0e0e0';
+const primaryAccent = '#5B2E91';
+const pageBg = '#F9FAFB';
+const textPrimary = '#1F2937';
+const textSecondary = '#6B7280';
 
 // ─── Format Functions ───────────────────────────────────────
 
@@ -101,7 +103,7 @@ interface StatsCardProps {
   color?: string;
 }
 
-const StatsCard: React.FC<StatsCardProps> = ({ title, value, subtitle, icon, color = yellowAccent }) => (
+const StatsCard: React.FC<StatsCardProps> = ({ title, value, subtitle, icon, color = primaryAccent }) => (
   <Paper
     sx={{
       backgroundColor: cardBg,
@@ -113,14 +115,14 @@ const StatsCard: React.FC<StatsCardProps> = ({ title, value, subtitle, icon, col
   >
     <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
       <Box>
-        <Typography variant="caption" sx={{ color: '#888', textTransform: 'uppercase' }}>
+        <Typography variant="caption" sx={{ color: textSecondary, textTransform: 'uppercase' }}>
           {title}
         </Typography>
-        <Typography variant="h5" sx={{ color: '#fff', fontWeight: 700, my: 0.5 }}>
+        <Typography variant="h5" sx={{ color: textPrimary, fontWeight: 700, my: 0.5 }}>
           {value}
         </Typography>
         {subtitle && (
-          <Typography variant="caption" sx={{ color: '#666' }}>
+          <Typography variant="caption" sx={{ color: textSecondary }}>
             {subtitle}
           </Typography>
         )}
@@ -160,17 +162,17 @@ const ProposalRow: React.FC<ProposalRowProps> = ({
     <TableRow
       sx={{
         '& td': { borderColor, py: 1.5 },
-        '&:hover': { backgroundColor: 'rgba(253, 216, 53, 0.03)' },
+        '&:hover': { backgroundColor: 'rgba(91, 46, 145, 0.04)' },
         cursor: 'pointer',
       }}
       onClick={onView}
     >
       {/* Event & Version */}
       <TableCell>
-        <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600 }}>
+        <Typography variant="body2" sx={{ color: textPrimary, fontWeight: 600 }}>
           {proposal.eventName}
         </Typography>
-        <Typography variant="caption" sx={{ color: '#888' }}>
+        <Typography variant="caption" sx={{ color: textSecondary }}>
           {proposal.versionName}
         </Typography>
       </TableCell>
@@ -192,7 +194,7 @@ const ProposalRow: React.FC<ProposalRowProps> = ({
       {/* Total */}
       <TableCell align="right">
         <Typography
-          sx={{ color: '#fff', fontFamily: 'monospace', fontWeight: 600 }}
+          sx={{ color: textPrimary, fontFamily: 'monospace', fontWeight: 600 }}
         >
           {formatCurrency(proposal.grandTotal)}
         </Typography>
@@ -221,23 +223,23 @@ const ProposalRow: React.FC<ProposalRowProps> = ({
             {proposal.marginPercentage.toFixed(1)}%
           </Typography>
         </Box>
-        <Typography variant="caption" sx={{ color: '#888' }}>
+        <Typography variant="caption" sx={{ color: textSecondary }}>
           {formatCurrency(proposal.grossProfit)} profit
         </Typography>
       </TableCell>
 
       {/* Items */}
       <TableCell align="center">
-        <Typography sx={{ color: '#fff' }}>{proposal.items.length}</Typography>
+        <Typography sx={{ color: textPrimary }}>{proposal.items.length}</Typography>
       </TableCell>
 
       {/* Date */}
       <TableCell>
-        <Typography variant="body2" sx={{ color: '#888' }}>
+        <Typography variant="body2" sx={{ color: textSecondary }}>
           {formatDate(proposal.updatedAt)}
         </Typography>
         {proposal.validUntil && (
-          <Typography variant="caption" sx={{ color: '#666' }}>
+          <Typography variant="caption" sx={{ color: textSecondary }}>
             Valid: {formatDate(proposal.validUntil)}
           </Typography>
         )}
@@ -246,14 +248,14 @@ const ProposalRow: React.FC<ProposalRowProps> = ({
       {/* Actions */}
       <TableCell align="right" onClick={(e) => e.stopPropagation()}>
         <Tooltip title="Edit">
-          <IconButton size="small" onClick={onEdit} sx={{ color: '#888', '&:hover': { color: yellowAccent } }}>
+          <IconButton size="small" onClick={onEdit} sx={{ color: textSecondary, '&:hover': { color: primaryAccent } }}>
             <EditIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         <IconButton
           size="small"
           onClick={(e) => setAnchorEl(e.currentTarget)}
-          sx={{ color: '#888' }}
+          sx={{ color: textSecondary }}
         >
           <MoreIcon fontSize="small" />
         </IconButton>
@@ -267,12 +269,12 @@ const ProposalRow: React.FC<ProposalRowProps> = ({
           }}
         >
           <MenuItem onClick={() => { onView(); setAnchorEl(null); }}>
-            <ListItemIcon><ViewIcon fontSize="small" sx={{ color: '#888' }} /></ListItemIcon>
-            <ListItemText sx={{ '& .MuiTypography-root': { color: '#fff' } }}>View</ListItemText>
+            <ListItemIcon><ViewIcon fontSize="small" sx={{ color: textSecondary }} /></ListItemIcon>
+            <ListItemText>View</ListItemText>
           </MenuItem>
           <MenuItem onClick={() => { onDuplicate(); setAnchorEl(null); }}>
-            <ListItemIcon><DuplicateIcon fontSize="small" sx={{ color: '#888' }} /></ListItemIcon>
-            <ListItemText sx={{ '& .MuiTypography-root': { color: '#fff' } }}>Duplicate</ListItemText>
+            <ListItemIcon><DuplicateIcon fontSize="small" sx={{ color: textSecondary }} /></ListItemIcon>
+            <ListItemText>Duplicate</ListItemText>
           </MenuItem>
           {proposal.status === 'DRAFT' && (
             <MenuItem onClick={() => { onSend(); setAnchorEl(null); }}>
@@ -364,10 +366,10 @@ const ProposalList: React.FC = () => {
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: '#fff', fontWeight: 600 }}>
+          <Typography variant="h5" sx={{ color: textPrimary, fontWeight: 600 }}>
             Proposals
           </Typography>
-          <Typography variant="body2" sx={{ color: '#888' }}>
+          <Typography variant="body2" sx={{ color: textSecondary }}>
             Manage quotes and proposals for events
           </Typography>
         </Box>
@@ -376,10 +378,10 @@ const ProposalList: React.FC = () => {
           startIcon={<AddIcon />}
           onClick={handleNewProposal}
           sx={{
-            backgroundColor: yellowAccent,
-            color: '#000',
+            backgroundColor: primaryAccent,
+            color: '#fff',
             fontWeight: 600,
-            '&:hover': { backgroundColor: '#fbc02d' },
+            '&:hover': { backgroundColor: '#3B1E71' },
           }}
         >
           New Proposal
@@ -445,22 +447,22 @@ const ProposalList: React.FC = () => {
               flex: 1,
               maxWidth: 400,
               '& .MuiOutlinedInput-root': {
-                backgroundColor: '#0f0f0f',
+                backgroundColor: '#fff',
                 '& fieldset': { borderColor },
               },
-              '& .MuiInputBase-input': { color: '#fff' },
+              '& .MuiInputBase-input': { color: textPrimary },
             }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon sx={{ color: '#666' }} />
+                  <SearchIcon sx={{ color: textSecondary }} />
                 </InputAdornment>
               ),
             }}
           />
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FilterIcon sx={{ color: '#666' }} />
+            <FilterIcon sx={{ color: textSecondary }} />
             <ToggleButtonGroup
               value={statusFilter}
               exclusive
@@ -468,11 +470,11 @@ const ProposalList: React.FC = () => {
               size="small"
               sx={{
                 '& .MuiToggleButton-root': {
-                  color: '#888',
+                  color: textSecondary,
                   borderColor,
                   '&.Mui-selected': {
-                    backgroundColor: `${yellowAccent}20`,
-                    color: yellowAccent,
+                    backgroundColor: `${primaryAccent}15`,
+                    color: primaryAccent,
                   },
                 },
               }}
@@ -499,7 +501,7 @@ const ProposalList: React.FC = () => {
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ '& th': { backgroundColor: '#252540', color: '#888', borderColor } }}>
+              <TableRow sx={{ '& th': { backgroundColor: '#f5f5f5', color: textSecondary, borderColor } }}>
                 <TableCell>Event / Version</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Total</TableCell>
@@ -512,7 +514,7 @@ const ProposalList: React.FC = () => {
             <TableBody>
               {paginatedProposals.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} sx={{ textAlign: 'center', py: 6, color: '#666' }}>
+                  <TableCell colSpan={7} sx={{ textAlign: 'center', py: 6, color: textSecondary }}>
                     {searchQuery || statusFilter !== 'ALL'
                       ? 'No proposals match your filters'
                       : 'No proposals yet. Create your first proposal!'}
@@ -547,8 +549,8 @@ const ProposalList: React.FC = () => {
           }}
           sx={{
             borderTop: `1px solid ${borderColor}`,
-            color: '#888',
-            '& .MuiTablePagination-selectIcon': { color: '#888' },
+            color: textSecondary,
+            '& .MuiTablePagination-selectIcon': { color: textSecondary },
           }}
         />
       </Paper>
