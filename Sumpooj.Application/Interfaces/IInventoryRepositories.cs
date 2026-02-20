@@ -1,3 +1,4 @@
+using Sumpooj.Application.Inventory;
 using Sumpooj.Domain.Entities;
 
 namespace Sumpooj.Application.Interfaces;
@@ -23,6 +24,7 @@ public interface IProductBatchRepository
     Task<List<ProductBatch>> GetExpiringBatchesAsync(int daysThreshold);
     Task<List<ProductBatch>> GetExpiredBatchesAsync();
     Task<string> GenerateBatchNumberAsync(Guid productId);
+    Task<List<ExpiryAlertDto>> GetExpiryAlertsAsync(Guid companyId, int daysThreshold);
 }
 
 public interface IInventoryAdjustmentRepository

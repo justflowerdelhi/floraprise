@@ -6,9 +6,6 @@
   <Project Path="Sumpooj.Application/Sumpooj.Application.csproj" Id="ffc88706-18e9-4d55-aef4-fde1c8d0933c">
     <BuildDependency Project="Sumpooj.Domain/Sumpooj.Domain.csproj" />
   </Project>
-  <Project Path="Sumpooj.Blazor/Sumpooj.Blazor.csproj" Id="fb65d36b-bbf5-4e6b-b661-0ae34c499d0e">
-    <BuildDependency Project="Sumpooj.Application/Sumpooj.Application.csproj" />
-  </Project>
   <Project Path="Sumpooj.Domain/Sumpooj.Domain.csproj" />
   <Project Path="Sumpooj.Infrastructure/Sumpooj.Infrastructure.csproj" Id="f2e28da7-e6f3-4010-b2c4-7695694188e6">
     <BuildDependency Project="Sumpooj.Application/Sumpooj.Application.csproj" />

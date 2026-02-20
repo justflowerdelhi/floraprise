@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Sumpooj.Application.Interfaces;
+using Sumpooj.Application.Inventory;
 using Sumpooj.Domain.Entities;
 using Sumpooj.Infrastructure.Persistence;
 
@@ -129,12 +130,47 @@ public class ProductBatchRepository : IProductBatchRepository
     {
         var today = DateTime.UtcNow;
         var datePrefix = today.ToString("yyyyMMdd");
-        
+
         // Count existing batches for this product today
         var count = await _db.ProductBatches
             .CountAsync(b => b.ProductId == productId && 
                             b.BatchNumber.StartsWith($"BT-{datePrefix}"));
 
         return $"BT-{datePrefix}-{(count + 1):D3}";
+    }
+
+    public async Task<List<ExpiryAlertDto>> GetExpiryAlertsAsync(Guid companyId, int daysThreshold)
+    {
+        var threshold = DateTime.UtcNow.AddDays(daysThreshold).Date;
+        var today = DateTime.UtcNow.Date;
+
+        var batches = await _db.ProductBatches
+            .AsNoTracking()
+            .Where(b => b.CompanyId == companyId &&
+                        b.IsActive && 
+                        b.QuantityRemaining > 0 && 
+                        b.ExpiryDate.HasValue && 
+                        b.ExpiryDate.Value.Date <= threshold)
+            .OrderBy(b => b.ExpiryDate)
+            .ToListAsync();
+
+        var productIds = batches.Select(b => b.ProductId).Distinct().ToList();
+        var products = await _db.Products
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.Name);
+
+        return batches.Select(b => new ExpiryAlertDto
+        {
+            BatchId = b.Id,
+            ProductId = b.ProductId,
+            ProductName = products.GetValueOrDefault(b.ProductId, "Unknown"),
+            BatchNumber = b.BatchNumber,
+            QuantityRemaining = b.QuantityRemaining,
+            ExpiryDate = b.ExpiryDate!.Value,
+            DaysUntilExpiry = (int)(b.ExpiryDate!.Value.Date - today).TotalDays,
+            AlertLevel = b.ExpiryDate!.Value.Date <= today ? "EXPIRED" :
+                        (b.ExpiryDate!.Value.Date - today).TotalDays <= 2 ? "CRITICAL" :
+                        (b.ExpiryDate!.Value.Date - today).TotalDays <= 5 ? "WARNING" : "UPCOMING"
+        }).ToList();
     }
 }

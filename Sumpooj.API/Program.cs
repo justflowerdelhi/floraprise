@@ -172,6 +172,37 @@ builder.Services.AddScoped<PurchaseOrderService>();
 builder.Services.AddScoped<ILocationRepository, LocationRepository>();
 builder.Services.AddScoped<LocationService>();
 
+// New Services
+builder.Services.AddScoped<IStaffRepository, StaffRepository>();
+builder.Services.AddScoped<StaffService>();
+
+builder.Services.AddScoped<IEventRepository, EventRepository>();
+builder.Services.AddScoped<EventService>();
+
+builder.Services.AddScoped<IGiftCardRepository, GiftCardRepository>();
+builder.Services.AddScoped<GiftCardService>();
+
+builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<TaskService>();
+
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<OrderService>();
+
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<PaymentService>();
+
+builder.Services.AddScoped<IRefundRepository, RefundRepository>();
+builder.Services.AddScoped<RefundService>();
+
+builder.Services.AddScoped<IDayCloseRepository, DayCloseRepository>();
+builder.Services.AddScoped<DayCloseService>();
+
+builder.Services.AddScoped<DashboardService>();
+
+// Audit Logging
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<AuditLogService>();
+
 #endregion
 
 #region Controllers & OpenAPI

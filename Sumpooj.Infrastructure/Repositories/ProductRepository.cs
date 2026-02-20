@@ -116,12 +116,21 @@ public class ProductRepository : IProductRepository
     public async Task<bool> SkuExistsAsync(string sku, Guid? excludeProductId = null)
     {
         var query = _db.Products.Where(p => p.Sku == sku);
-        
+
         if (excludeProductId.HasValue)
         {
             query = query.Where(p => p.Id != excludeProductId.Value);
         }
 
         return await query.AnyAsync();
+    }
+
+    public async Task<int> GetLowStockCountAsync(Guid companyId)
+    {
+        return await _db.Products
+            .CountAsync(p => p.CompanyId == companyId && 
+                            p.IsActive && 
+                            p.TrackInventory && 
+                            p.StockQuantity <= p.MinimumStockLevel);
     }
 }
