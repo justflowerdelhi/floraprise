@@ -40,6 +40,10 @@ import {
   Assignment,
   ChevronLeft as CollapseMenuIcon,
   ChevronRight as ExpandMenuIcon,
+  MenuBook,
+  Blender,
+  AutoAwesome,
+  DeleteSweep,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRBAC } from '../rbac/RBACContext';
@@ -71,6 +75,10 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Loyalty: <Loyalty />,
   RequestQuote: <RequestQuote />,
   Assignment: <Assignment />,
+  MenuBook: <MenuBook />,
+  Blender: <Blender />,
+  AutoAwesome: <AutoAwesome />,
+  DeleteSweep: <DeleteSweep />,
 };
 
 // ─── Section Colors ─────────────────────────────────────────
@@ -83,6 +91,7 @@ const SECTION_COLORS: Record<string, string> = {
   reports: '#5B2E91',    // FloraEdge Purple
   catalog: '#00bcd4',
   crm: '#5B2E91',        // FloraEdge Purple
+  production: '#00897b', // Teal
   staff: '#ff5722',
   settings: '#F4C430',   // Accent Yellow
 };

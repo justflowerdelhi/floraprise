@@ -64,6 +64,8 @@ export type Permission =
   | 'staff:manage'
   | 'tasks:view'
   | 'tasks:manage'
+  | 'production:view'
+  | 'production:manage'
   | 'settings:view'
   | 'settings:edit'
   | 'settings:billing'
@@ -86,6 +88,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'payments:schedule:view', 'payments:schedule:manage',
     'staff:view', 'staff:manage',
     'tasks:view', 'tasks:manage',
+    'production:view', 'production:manage',
     'settings:view', 'settings:edit', 'settings:billing', 'users:manage',
   ],
 
@@ -103,6 +106,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'payments:schedule:view', 'payments:schedule:manage',
     'staff:view', 'staff:manage',
     'tasks:view', 'tasks:manage',
+    'production:view', 'production:manage',
   ],
 
   CASHIER: [
@@ -122,6 +126,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'proposals:view',
     'payments:schedule:view',
     'tasks:view',
+    'production:view', 'production:manage',
   ],
 
   DRIVER: [
@@ -402,6 +407,47 @@ export const MENU_SECTIONS: MenuSection[] = [
         icon: 'Loyalty',
         path: '/crm/loyalty',
         permissions: ['crm:loyalty'],
+      },
+    ],
+  },
+  {
+    id: 'production',
+    title: 'Production',
+    items: [
+      {
+        id: 'production-recipes',
+        label: 'Recipes',
+        icon: 'MenuBook',
+        path: '/production/recipes',
+        permissions: ['production:view'],
+      },
+      {
+        id: 'production-produce',
+        label: 'Produce',
+        icon: 'Blender',
+        path: '/production/produce',
+        permissions: ['production:manage'],
+      },
+      {
+        id: 'production-finished-goods',
+        label: 'Finished Goods',
+        icon: 'Inventory2',
+        path: '/production/finished-goods',
+        permissions: ['production:view'],
+      },
+      {
+        id: 'production-custom-builder',
+        label: 'Custom Builder',
+        icon: 'AutoAwesome',
+        path: '/production/custom-builder',
+        permissions: ['production:manage'],
+      },
+      {
+        id: 'production-wastage',
+        label: 'Wastage Log',
+        icon: 'DeleteSweep',
+        path: '/production/wastage',
+        permissions: ['production:view'],
       },
     ],
   },
