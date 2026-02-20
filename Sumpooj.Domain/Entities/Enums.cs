@@ -108,3 +108,61 @@ public enum StockMovementType
     Expired,
     Return
 }
+
+public enum AdjustmentType
+{
+    Damaged,
+    Spoiled,
+    Expired,
+    UsedForEvent,
+    UsedForSample,
+    Lost,
+    Found,
+    Theft,
+    TransferOut,
+    TransferIn,
+    Correction,
+    Other
+}
+
+public enum LocationType
+{
+    Store,
+    Warehouse,
+    ColdRoom,
+    DisplayCooler,
+    DryStorage,
+    Workshop
+}
+
+public enum UnitOfMeasure
+{
+    Stem,
+    Bunch,
+    Box,
+    Piece,
+    Kilogram,
+    Gram,
+    Liter,
+    Milliliter,
+    Roll,
+    Pack,
+    Set,
+    Meter
+}
+
+public enum TaxCategory
+{
+    None,
+    Standard,
+    Reduced,
+    Zero
+}
+
+public enum FlowerGrade
+{
+    Standard,
+    Select,
+    Premium,
+    Luxury
+}

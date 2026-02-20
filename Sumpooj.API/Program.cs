@@ -156,6 +156,22 @@ builder.Services.AddScoped<CustomerService>();
 
 builder.Services.AddScoped<ICompanyService, CompanyService>();
 
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<ProductService>();
+
+builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
+builder.Services.AddScoped<SupplierService>();
+
+builder.Services.AddScoped<IProductBatchRepository, ProductBatchRepository>();
+builder.Services.AddScoped<IInventoryAdjustmentRepository, InventoryAdjustmentRepository>();
+builder.Services.AddScoped<InventoryService>();
+
+builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
+builder.Services.AddScoped<PurchaseOrderService>();
+
+builder.Services.AddScoped<ILocationRepository, LocationRepository>();
+builder.Services.AddScoped<LocationService>();
+
 #endregion
 
 #region Controllers & OpenAPI

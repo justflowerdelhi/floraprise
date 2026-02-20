@@ -27,13 +27,16 @@ interface Props {
   onUpdateQty: (lineId: string, qty: number, product: Product) => void;
   onRemove: (lineId: string) => void;
   onSetDiscount: (lineId: string, pct: number, product: Product) => void;
+  deliveryFee?: number;
 }
 
 const CartTable: React.FC<Props> = ({
-  items, products, isPriceEditable, onUpdateQty, onRemove, onSetDiscount,
+  items, products, isPriceEditable, onUpdateQty, onRemove, onSetDiscount, deliveryFee,
 }) => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  const deliveryFeeAmount = deliveryFee ?? 0;
+  const showDeliveryFee = deliveryFeeAmount > 0;
 
   const findProduct = (pid: string) => products.find((p) => p.id === pid);
 
@@ -197,6 +200,40 @@ const CartTable: React.FC<Props> = ({
               </TableRow>
             );
           })}
+          {showDeliveryFee && (
+            <TableRow
+              sx={{
+                bgcolor: dk ? alpha(theme.palette.primary.main, 0.08) : alpha(theme.palette.primary.main, 0.04),
+              }}
+            >
+              <TableCell>
+                <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                  Delivery Fee
+                </Typography>
+              </TableCell>
+              <TableCell align="center">
+                <Typography variant="body2" color="text.secondary">-</Typography>
+              </TableCell>
+              <TableCell align="right">
+                <Typography variant="body2" color="text.secondary">-</Typography>
+              </TableCell>
+              <TableCell align="right">
+                <Typography variant="body2" color="text.secondary">-</Typography>
+              </TableCell>
+              <TableCell align="right">
+                <Typography variant="body2" color="text.secondary">-</Typography>
+              </TableCell>
+              <TableCell align="right">
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  {fmtCurrency(deliveryFeeAmount)}
+                </Typography>
+              </TableCell>
+              <TableCell align="right">
+                <Typography variant="body2" color="text.secondary">-</Typography>
+              </TableCell>
+              <TableCell align="center"></TableCell>
+            </TableRow>
+          )}
         </TableBody>
       </Table>
     </TableContainer>

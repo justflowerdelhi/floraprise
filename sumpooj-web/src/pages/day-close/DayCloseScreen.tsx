@@ -96,6 +96,7 @@ interface StatCardProps {
 function StatCard({ title, value, subtitle, icon, color = '#fdd835', trend, trendValue }: StatCardProps) {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  
   return (
     <Card sx={{ bgcolor: dk ? '#1a1a2e' : '#fff', height: '100%' }}>
       <CardContent>
@@ -515,9 +516,9 @@ export default function DayCloseScreen() {
                     disabled={!countedCash || isClosing}
                     startIcon={isClosing ? null : <Lock />}
                     sx={{
-                      bgcolor: '#e91e63',
-                      color: '#fff',
-                      '&:hover': { bgcolor: '#c2185b' },
+                      bgcolor: '#fdd835',
+                      color: '#0f0f0f',
+                      '&:hover': { bgcolor: '#ffeb3b' },
                       py: 1.5,
                     }}
                   >

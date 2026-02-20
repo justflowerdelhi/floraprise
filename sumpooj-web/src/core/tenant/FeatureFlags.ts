@@ -15,6 +15,7 @@ export type FeatureFlag =
   | 'CUSTOMER_DATABASE'
   | 'BASIC_REPORTS'
   | 'WEDDING_MODULE'
+  | 'WIRE_MANAGEMENT'
   | 'PROFIT_INTELLIGENCE'
   | 'ADVANCED_INVENTORY'
   | 'MULTI_LOCATION'
@@ -77,6 +78,13 @@ export const FEATURE_METADATA: Record<FeatureFlag, FeatureMetadata> = {
     id: 'WEDDING_MODULE',
     name: 'Wedding & Events',
     description: 'Manage wedding consultations, proposals, and event timelines',
+    requiredPlan: 'GROWTH',
+    category: 'growth',
+  },
+  WIRE_MANAGEMENT: {
+    id: 'WIRE_MANAGEMENT',
+    name: 'Wire Management',
+    description: 'Handle outgoing and incoming wire orders with vendor settlements',
     requiredPlan: 'GROWTH',
     category: 'growth',
   },
@@ -157,6 +165,7 @@ export const PLAN_FEATURES: Record<TenantPlan, FeatureFlag[]> = {
     'CUSTOMER_DATABASE',
     'BASIC_REPORTS',
     'WEDDING_MODULE',
+    'WIRE_MANAGEMENT',
     'PROFIT_INTELLIGENCE',
     'ADVANCED_INVENTORY',
   ],
@@ -167,6 +176,7 @@ export const PLAN_FEATURES: Record<TenantPlan, FeatureFlag[]> = {
     'CUSTOMER_DATABASE',
     'BASIC_REPORTS',
     'WEDDING_MODULE',
+    'WIRE_MANAGEMENT',
     'PROFIT_INTELLIGENCE',
     'ADVANCED_INVENTORY',
     'MULTI_LOCATION',
@@ -182,6 +192,7 @@ export const PLAN_FEATURES: Record<TenantPlan, FeatureFlag[]> = {
     'CUSTOMER_DATABASE',
     'BASIC_REPORTS',
     'WEDDING_MODULE',
+    'WIRE_MANAGEMENT',
     'PROFIT_INTELLIGENCE',
     'ADVANCED_INVENTORY',
     'MULTI_LOCATION',
@@ -255,6 +266,10 @@ export const ROUTE_FEATURE_MAP: Record<string, FeatureFlag> = {
   '/staff': 'STAFF_ANALYTICS',
   '/staff/performance': 'STAFF_ANALYTICS',
   '/integrations': 'EXTERNAL_INTEGRATION',
+
+  // Wire management routes
+  '/wire-vendors': 'WIRE_MANAGEMENT',
+  '/wire-settlements': 'WIRE_MANAGEMENT',
 };
 
 export function getRequiredFeatureForRoute(route: string): FeatureFlag | null {

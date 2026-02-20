@@ -1,8 +1,8 @@
 // =============================================================================
-// TENANT CONTEXT - SaaS Tenant State Management
+// TENANT CONTEXT - SaaS Tenant State Management (Backend-Authoritative)
 // =============================================================================
 
-import React, { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from 'react';
 import type {
   Tenant,
   TenantPlan,
@@ -23,13 +23,15 @@ import {
   getRequiredPlanForFeature,
   getUpgradePathForFeature,
 } from './FeatureFlags';
+import { setCurrentCurrency } from '../i18n/currency';
+import { useAuth } from '../../auth/AuthContext';
 
 // -----------------------------------------------------------------------------
 // Context Types
 // -----------------------------------------------------------------------------
 
 interface TenantContextValue {
-  // Tenant data
+  // Tenant data (read-only from backend via AuthContext)
   tenant: Tenant;
   plan: TenantPlan;
   planConfig: PlanConfig;
@@ -50,8 +52,8 @@ interface TenantContextValue {
   unavailableFeatures: FeatureFlag[];
   getUpgradePlan: (feature: FeatureFlag) => TenantPlan | null;
   getFeatureRequiredPlan: (feature: FeatureFlag) => TenantPlan;
-  
-  // Actions (mock for demo)
+
+  // Subscription actions (API-backed stubs — TODO: wire to real endpoints)
   upgradePlan: (newPlan: TenantPlan) => void;
   cancelSubscription: () => void;
   resumeSubscription: () => void;
@@ -78,8 +80,12 @@ interface TenantProviderProps {
 }
 
 export function TenantProvider({ children }: TenantProviderProps) {
-  // State
-  const [tenant, setTenant] = useState<Tenant>(MOCK_TENANT);
+  // Tenant now comes from AuthContext (backend-authoritative).
+  // Falls back to MOCK_TENANT only when auth hasn't resolved yet (boot guard should prevent this).
+  const auth = useAuth();
+  const tenant: Tenant = auth.tenant ?? MOCK_TENANT;
+
+  // UI state
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState<FeatureFlag | null>(null);
   
@@ -97,6 +103,13 @@ export function TenantProvider({ children }: TenantProviderProps) {
   const isActive = isSubscriptionActive(subscriptionStatus);
   const isPastDue = subscriptionStatus === 'PAST_DUE';
   const isCancelled = subscriptionStatus === 'CANCELLED';
+
+  // Sync module-level currency formatter whenever tenant changes
+  useEffect(() => {
+    if (tenant.currency) {
+      setCurrentCurrency(tenant.currency);
+    }
+  }, [tenant.currency]);
   
   // Feature access
   const checkFeature = useCallback(
@@ -117,35 +130,29 @@ export function TenantProvider({ children }: TenantProviderProps) {
     []
   );
   
-  // Actions
-  const upgradePlan = useCallback((newPlan: TenantPlan) => {
-    setTenant((prev) => ({
-      ...prev,
-      plan: newPlan,
-      subscriptionStatus: 'ACTIVE',
-      trialEndsAt: undefined,
-    }));
-    setShowUpgradeModal(false);
-    setUpgradeFeature(null);
-  }, []);
-  
-  const cancelSubscription = useCallback(() => {
-    setTenant((prev) => ({
-      ...prev,
-      subscriptionStatus: 'CANCELLED',
-    }));
-  }, []);
-  
-  const resumeSubscription = useCallback(() => {
-    setTenant((prev) => ({
-      ...prev,
-      subscriptionStatus: 'ACTIVE',
-    }));
-  }, []);
-  
   const promptUpgrade = useCallback((feature: FeatureFlag) => {
     setUpgradeFeature(feature);
     setShowUpgradeModal(true);
+  }, []);
+
+  // Subscription mutation stubs — these will call real API endpoints.
+  // For now they are no-ops; the backend must be the authority.
+  const upgradePlan = useCallback((_newPlan: TenantPlan) => {
+    // TODO: POST /api/subscription/upgrade { plan: newPlan }
+    // After success, re-fetch /auth/me to get updated tenant
+    console.warn('[TenantContext] upgradePlan called — wire to API');
+    setShowUpgradeModal(false);
+    setUpgradeFeature(null);
+  }, []);
+
+  const cancelSubscription = useCallback(() => {
+    // TODO: POST /api/subscription/cancel
+    console.warn('[TenantContext] cancelSubscription called — wire to API');
+  }, []);
+
+  const resumeSubscription = useCallback(() => {
+    // TODO: POST /api/subscription/resume
+    console.warn('[TenantContext] resumeSubscription called — wire to API');
   }, []);
   
   // Context value

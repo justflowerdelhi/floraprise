@@ -6,16 +6,22 @@ import {
   CardContent,
   TextField,
   Typography,
-  Alert
+  Alert,
+  CircularProgress,
+  useTheme
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { login as loginApi } from "../../api/auth.api";
 import { useAuth } from "../../auth/AuthContext";
 
 export default function Login() {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const auth = useAuth();
   const navigate = useNavigate();
@@ -28,12 +34,16 @@ export default function Login() {
       return;
     }
 
+    setLoading(true);
     try {
       const res = await loginApi(email, password);
-      auth.login(res.access_token);
-      navigate("/customers");
+      // login() stores token and calls /auth/me to resolve identity
+      await auth.login(res.access_token);
+      navigate("/pos");
     } catch {
       setError("Invalid email or password");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -42,15 +52,36 @@ export default function Login() {
       sx={{
         minHeight: "100vh",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#f5f5f5"
+        backgroundColor: dk ? "#1F2937" : "#F9FAFB",
+        gap: 3
       }}
     >
-      <Card sx={{ width: 380 }}>
-        <CardContent>
-          <Typography variant="h5" textAlign="center" mb={2}>
-            Florist ERP Login
+      {/* Logo */}
+      <Box sx={{ textAlign: 'center' }}>
+        <img 
+          src={dk ? '/assets/logo/floraedge-logo-light.svg' : '/assets/logo/floraedge-logo.svg'}
+          alt="FloraEdge"
+          style={{ height: '48px', marginBottom: '16px' }}
+        />
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: dk ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+            fontWeight: 500,
+            letterSpacing: 0.5
+          }}
+        >
+          Floral Intelligence for Modern Florists
+        </Typography>
+      </Box>
+
+      <Card sx={{ width: 380, boxShadow: 3 }}>
+        <CardContent sx={{ p: 4 }}>
+          <Typography variant="h5" textAlign="center" mb={3} fontWeight={600}>
+            Welcome Back
           </Typography>
 
           {error && (
@@ -81,8 +112,10 @@ export default function Login() {
             fullWidth
             sx={{ mt: 2 }}
             onClick={submit}
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={18} color="inherit" /> : undefined}
           >
-            Login
+            {loading ? 'Signing in…' : 'Login'}
           </Button>
         </CardContent>
       </Card>

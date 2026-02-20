@@ -10,6 +10,67 @@ export type TenantPlan = 'STARTER' | 'GROWTH' | 'PRO' | 'ENTERPRISE';
 
 export type SubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED';
 
+export type TenantCountry = 'US' | 'IN' | 'AE' | 'GB' | 'CA' | 'AU';
+
+export type TaxSystemType = 'SALES_TAX' | 'GST' | 'VAT';
+
+export type TimeFormat = '12H' | '24H';
+
+export type DateFormat = 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
+
+export interface CountryDefaults {
+  currency: string;
+  taxSystem: TaxSystemType;
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
+  locale: string;
+}
+
+export const COUNTRY_DEFAULTS: Record<TenantCountry, CountryDefaults> = {
+  US: {
+    currency: 'USD',
+    taxSystem: 'SALES_TAX',
+    dateFormat: 'MM/DD/YYYY',
+    timeFormat: '12H',
+    locale: 'en-US',
+  },
+  IN: {
+    currency: 'INR',
+    taxSystem: 'GST',
+    dateFormat: 'DD/MM/YYYY',
+    timeFormat: '12H',
+    locale: 'en-IN',
+  },
+  AE: {
+    currency: 'AED',
+    taxSystem: 'VAT',
+    dateFormat: 'DD/MM/YYYY',
+    timeFormat: '12H',
+    locale: 'en-AE',
+  },
+  GB: {
+    currency: 'GBP',
+    taxSystem: 'VAT',
+    dateFormat: 'DD/MM/YYYY',
+    timeFormat: '24H',
+    locale: 'en-GB',
+  },
+  CA: {
+    currency: 'CAD',
+    taxSystem: 'SALES_TAX',
+    dateFormat: 'YYYY-MM-DD',
+    timeFormat: '12H',
+    locale: 'en-CA',
+  },
+  AU: {
+    currency: 'AUD',
+    taxSystem: 'GST',
+    dateFormat: 'DD/MM/YYYY',
+    timeFormat: '12H',
+    locale: 'en-AU',
+  },
+};
+
 // -----------------------------------------------------------------------------
 // Tenant Model
 // -----------------------------------------------------------------------------
@@ -20,6 +81,12 @@ export interface Tenant {
   slug: string;
   plan: TenantPlan;
   subscriptionStatus: SubscriptionStatus;
+  country: TenantCountry;
+  currency: string;
+  taxSystem: TaxSystemType;
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
+  locale: string;
   trialEndsAt?: string;
   subscriptionEndsAt?: string;
   isActive: boolean;
@@ -163,6 +230,12 @@ export const MOCK_TENANT: Tenant = {
   trialEndsAt: '2026-03-04T23:59:59Z', // 14 days from now
   isActive: true,
   createdAt: '2026-02-18T10:00:00Z',
+  country: 'IN',
+  currency: 'INR',
+  taxSystem: 'GST',
+  dateFormat: 'DD/MM/YYYY',
+  timeFormat: '12H',
+  locale: 'en-IN',
   usageStats: {
     ordersThisMonth: 127,
     ordersLimit: 2000,
@@ -211,8 +284,27 @@ export function getUsagePercentage(used: number, limit: number): number {
   return Math.min(100, Math.round((used / limit) * 100));
 }
 
-export function formatPlanPrice(plan: TenantPlan, yearly: boolean = false): string {
+export function formatPlanPrice(plan: TenantPlan, yearly: boolean = false, currencySymbol: string = '$'): string {
   const config = PLAN_CONFIGS[plan];
   const price = yearly ? config.yearlyPrice : config.monthlyPrice;
-  return `$${price}`;
+  return `${currencySymbol}${price}`;
+}
+
+// -----------------------------------------------------------------------------
+// Tenant Factory (backward-compatible)
+// -----------------------------------------------------------------------------
+
+/** Resolve a partial tenant config into full tenant with country defaults */
+export function resolveTenantDefaults(partial: Partial<Tenant> & Pick<Tenant, 'id' | 'name' | 'slug' | 'plan' | 'subscriptionStatus' | 'isActive' | 'createdAt'>): Tenant {
+  const country: TenantCountry = partial.country ?? 'US';
+  const defaults = COUNTRY_DEFAULTS[country];
+  return {
+    ...partial,
+    country,
+    currency: partial.currency ?? defaults.currency,
+    taxSystem: partial.taxSystem ?? defaults.taxSystem,
+    dateFormat: partial.dateFormat ?? defaults.dateFormat,
+    timeFormat: partial.timeFormat ?? defaults.timeFormat,
+    locale: partial.locale ?? defaults.locale,
+  } as Tenant;
 }

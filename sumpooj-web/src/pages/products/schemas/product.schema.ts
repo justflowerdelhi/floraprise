@@ -67,6 +67,7 @@ export const productFormSchema = z.object({
     .min(0, 'Cost price cannot be negative'),
 
   trackInventory: z.boolean().default(true),
+  trackBatch: z.boolean().default(false),
 
   status: z.enum(['active', 'inactive'], {
     required_error: 'Status is required',

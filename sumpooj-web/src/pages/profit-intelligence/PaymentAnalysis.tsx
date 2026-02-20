@@ -17,6 +17,8 @@ import {
   LocalAtm as CashIcon,
   CardGiftcard as GiftIcon,
   PointOfSale as TerminalIcon,
+  QrCode as UPIIcon,
+  AccountBalance as BankIcon,
 } from '@mui/icons-material';
 import {
   PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis,
@@ -29,12 +31,12 @@ interface Props {
   data: PaymentAnalysisSummary;
 }
 
-// ─── Formatters ─────────────────────────────────────────────
+// ─── Formatters (tenant-aware) ───────────────────────────────
 
-const fmtCurrency = (v: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
+import { formatCurrency, formatPercent } from '../../core/i18n';
 
-const fmtPercent = (v: number) => `${v.toFixed(2)}%`;
+const fmtCurrency = (v: number) => formatCurrency(v);
+const fmtPercent = (v: number) => formatPercent(v);
 
 // ─── Payment Method Config ──────────────────────────────────
 
@@ -43,6 +45,8 @@ const PAYMENT_CONFIG: Record<PaymentMethod, { label: string; color: string; icon
   CARD: { label: 'Card', color: '#2196f3', icon: <CardIcon fontSize="small" /> },
   GIFT_CARD: { label: 'Gift Card', color: '#9c27b0', icon: <GiftIcon fontSize="small" /> },
   EXTERNAL_TERMINAL: { label: 'External Terminal', color: '#ff9800', icon: <TerminalIcon fontSize="small" /> },
+  UPI: { label: 'UPI', color: '#00897b', icon: <UPIIcon fontSize="small" /> },
+  BANK_TRANSFER: { label: 'Bank Transfer', color: '#546e7a', icon: <BankIcon fontSize="small" /> },
 };
 
 // ─── Method Card Component ──────────────────────────────────

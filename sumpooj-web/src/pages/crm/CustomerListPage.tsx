@@ -89,6 +89,7 @@ interface FilterPanelProps {
 function FilterPanel({ filters, onFilterChange, onClear }: FilterPanelProps) {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  
   const hasActiveFilters = Boolean(
     filters.tags?.length ||
     filters.loyaltyTiers?.length ||
@@ -131,8 +132,7 @@ function FilterPanel({ filters, onFilterChange, onClear }: FilterPanelProps) {
                 sx={{
                   bgcolor: filters.tags?.includes(tag.type) ? `${tag.color}30` : 'transparent',
                   color: filters.tags?.includes(tag.type) ? tag.color : 'inherit',
-                  border: `1px solid ${filters.tags?.includes(tag.type) ? tag.color : (dk ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.23)')}`,
-
+                  border: `1px solid ${filters.tags?.includes(tag.type) ? tag.color : 'rgba(255,255,255,0.2)'}`,
                 }}
               />
             ))}
@@ -162,8 +162,7 @@ function FilterPanel({ filters, onFilterChange, onClear }: FilterPanelProps) {
                   sx={{
                     bgcolor: filters.loyaltyTiers?.includes(tier) ? config.backgroundColor : 'transparent',
                     color: filters.loyaltyTiers?.includes(tier) ? config.color : 'inherit',
-                    border: `1px solid ${filters.loyaltyTiers?.includes(tier) ? config.color : (dk ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.23)')}`,
-
+                    border: `1px solid ${filters.loyaltyTiers?.includes(tier) ? config.color : 'rgba(255,255,255,0.2)'}`,
                   }}
                 />
               );
@@ -185,8 +184,7 @@ function FilterPanel({ filters, onFilterChange, onClear }: FilterPanelProps) {
               sx={{
                 bgcolor: filters.hasUpcomingBirthday ? 'rgba(233,30,99,0.2)' : 'transparent',
                 color: filters.hasUpcomingBirthday ? '#e91e63' : 'inherit',
-                border: `1px solid ${filters.hasUpcomingBirthday ? '#e91e63' : (dk ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.23)')}`,
-
+                border: `1px solid ${filters.hasUpcomingBirthday ? '#e91e63' : 'rgba(255,255,255,0.2)'}`,
               }}
             />
             <Chip
@@ -200,8 +198,7 @@ function FilterPanel({ filters, onFilterChange, onClear }: FilterPanelProps) {
               sx={{
                 bgcolor: filters.daysSinceLastOrder ? 'rgba(255,152,0,0.2)' : 'transparent',
                 color: filters.daysSinceLastOrder ? '#ff9800' : 'inherit',
-                border: `1px solid ${filters.daysSinceLastOrder ? '#ff9800' : (dk ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.23)')}`,
-
+                border: `1px solid ${filters.daysSinceLastOrder ? '#ff9800' : 'rgba(255,255,255,0.2)'}`,
               }}
             />
           </Stack>
@@ -523,7 +520,7 @@ function CreateCustomerDialog({ open, onClose, onSave }: CreateCustomerDialogPro
           variant="contained"
           onClick={handleSave}
           disabled={!formData.name || !formData.phone}
-          sx={{ bgcolor: '#e91e63', color: '#fff' }}
+          sx={{ bgcolor: '#fdd835', color: '#000' }}
         >
           Add Customer
         </Button>
@@ -541,8 +538,6 @@ interface CustomerListPageProps {
 }
 
 export default function CustomerListPage({ onViewCustomer }: CustomerListPageProps) {
-  const theme = useTheme();
-  const dk = theme.palette.mode === 'dark';
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<CustomerSearchFilters>({});
   const [showFilters, setShowFilters] = useState(false);
@@ -628,12 +623,15 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
     // TODO: API call
   };
 
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+
   return (
-    <Box sx={{ p: 3, bgcolor: dk ? '#0f0f0f' : '#f5f5f5', minHeight: '100vh' }}>
+    <Box sx={{ p: 3, bgcolor: dk ? '#0f0f0f' : '#f8f9fa', minHeight: '100vh' }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Box>
-          <Typography variant="h5" fontWeight={600} sx={{ color: dk ? '#fff' : 'text.primary' }}>
+          <Typography variant="h5" fontWeight={600}>
             Customers
           </Typography>
           <Typography variant="body2" sx={{ opacity: 0.7 }}>
@@ -644,7 +642,7 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
           <Button
             startIcon={<FilterList />}
             onClick={() => setShowFilters(!showFilters)}
-            sx={{ color: showFilters ? '#e91e63' : 'inherit' }}
+            sx={{ color: showFilters ? '#fdd835' : 'inherit' }}
           >
             Filters
           </Button>
@@ -655,7 +653,7 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
             variant="contained"
             startIcon={<Add />}
             onClick={() => setCreateDialogOpen(true)}
-            sx={{ bgcolor: '#e91e63', color: '#fff' }}
+            sx={{ bgcolor: '#fdd835', color: '#000' }}
           >
             Add Customer
           </Button>
@@ -670,7 +668,7 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
               p: 2,
               bgcolor: dk ? '#1a1a2e' : '#fff',
               cursor: 'pointer',
-              '&:hover': { bgcolor: dk ? '#252542' : 'rgba(0,0,0,0.04)' },
+              '&:hover': { bgcolor: dk ? '#252542' : '#f5f5f5' },
             }}
             onClick={() => setFilters({})}
           >
@@ -684,7 +682,7 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
               p: 2,
               bgcolor: dk ? '#1a1a2e' : '#fff',
               cursor: 'pointer',
-              '&:hover': { bgcolor: dk ? '#252542' : 'rgba(0,0,0,0.04)' },
+              '&:hover': { bgcolor: dk ? '#252542' : '#f5f5f5' },
             }}
             onClick={() => setFilters({ tags: ['VIP'] })}
           >
@@ -700,7 +698,7 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
               p: 2,
               bgcolor: dk ? '#1a1a2e' : '#fff',
               cursor: 'pointer',
-              '&:hover': { bgcolor: dk ? '#252542' : 'rgba(0,0,0,0.04)' },
+              '&:hover': { bgcolor: dk ? '#252542' : '#f5f5f5' },
             }}
             onClick={() => setFilters({ daysSinceLastOrder: 60 })}
           >
@@ -716,7 +714,7 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
               p: 2,
               bgcolor: dk ? '#1a1a2e' : '#fff',
               cursor: 'pointer',
-              '&:hover': { bgcolor: dk ? '#252542' : 'rgba(0,0,0,0.04)' },
+              '&:hover': { bgcolor: dk ? '#252542' : '#f5f5f5' },
             }}
             onClick={() => setFilters({ hasUpcomingBirthday: true })}
           >
@@ -749,7 +747,7 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ color: dk ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} />
+                  <Search sx={{ color: dk ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }} />
                 </InputAdornment>
               ),
             }}

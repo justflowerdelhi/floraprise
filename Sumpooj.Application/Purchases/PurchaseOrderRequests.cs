@@ -1,0 +1,57 @@
+namespace Sumpooj.Application.Purchases;
+
+public class CreatePurchaseOrderRequest
+{
+    public Guid SupplierId { get; set; }
+    public string? InvoiceNumber { get; set; }
+    public DateTime PurchaseDate { get; set; } = DateTime.UtcNow;
+    public DateTime ExpectedDeliveryDate { get; set; }
+    public string? PaymentTerms { get; set; }
+    public string? Location { get; set; }
+    public decimal ShippingCost { get; set; }
+    public decimal TaxRate { get; set; }
+    public string? Notes { get; set; }
+    public List<PurchaseOrderItemRequest> Items { get; set; } = new();
+}
+
+public class PurchaseOrderItemRequest
+{
+    public Guid ProductId { get; set; }
+    public string ProductName { get; set; } = default!;
+    public string? Sku { get; set; }
+    public string? Unit { get; set; }
+    public int Quantity { get; set; }
+    public decimal CostPerUnit { get; set; }
+    public bool IsPerishable { get; set; }
+    public int ShelfLifeDays { get; set; }
+    public string? BatchNumber { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+    public string? StorageLocation { get; set; }
+    public decimal? SellingPrice { get; set; }
+}
+
+public class ReceivePurchaseOrderRequest
+{
+    public DateTime ActualDeliveryDate { get; set; } = DateTime.UtcNow;
+    public List<ReceiveItemRequest> Items { get; set; } = new();
+}
+
+public class ReceiveItemRequest
+{
+    public Guid ProductId { get; set; }
+    public int ReceivedQuantity { get; set; }
+    public string? BatchNumber { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+    public string? StorageLocation { get; set; }
+}
+
+public class PurchaseOrderSearchRequest
+{
+    public string? Query { get; set; }
+    public Guid? SupplierId { get; set; }
+    public string? Status { get; set; }
+    public DateTime? FromDate { get; set; }
+    public DateTime? ToDate { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+}

@@ -27,6 +27,7 @@ import {
   ArrowBack as BackIcon,
   Warning as WarningIcon,
   Celebration as EventIcon,
+  AddTask as AddTaskIcon,
 } from '@mui/icons-material';
 import { useNavigate, useParams, Link as RouterLink } from 'react-router-dom';
 import { useRBAC } from '../../core/rbac/RBACContext';
@@ -35,6 +36,8 @@ import type { EventProductionData } from './ProductionTypes';
 import { getProductionForEvent } from './ProductionMockData';
 import { MOCK_EVENTS } from './EventMockData';
 import { MOCK_PROPOSALS } from './ProposalMockData';
+import { PermissionGate } from '../../core/rbac/RBACContext';
+import CreateTaskDialog from '../tasks/CreateTaskDialog';
 
 // ─── Loading Skeleton ───────────────────────────────────────
 
@@ -66,6 +69,7 @@ const EventProductionPage: React.FC = () => {
 
   // State
   const [loading] = useState(false);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
 
   // Get event data
   const event = useMemo(() => {
@@ -269,6 +273,21 @@ const EventProductionPage: React.FC = () => {
         <Typography sx={{ color: dk ? '#fff' : 'text.primary' }}>Production</Typography>
       </Breadcrumbs>
 
+      {/* Action bar */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <PermissionGate permission="tasks:manage">
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<AddTaskIcon />}
+            onClick={() => setTaskDialogOpen(true)}
+            sx={{ fontWeight: 600, textTransform: 'none' }}
+          >
+            Create Task
+          </Button>
+        </PermissionGate>
+      </Box>
+
       {/* Production Panel */}
       <EventProductionPanel
         eventId={eventId!}
@@ -320,6 +339,16 @@ const EventProductionPage: React.FC = () => {
           </Typography>
         </Box>
       )}
+
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
+        open={taskDialogOpen}
+        onClose={() => setTaskDialogOpen(false)}
+        defaults={{
+          relatedEntityType: 'EVENT',
+          relatedEntityId: eventId ?? '',
+        }}
+      />
     </Box>
   );
 };

@@ -128,12 +128,9 @@ export const calcCartSummary = (items: CartItem[]): CartSummary => {
   };
 };
 
-// ─── Formatters ─────────────────────────────────────────────
+// ─── Formatters (tenant-aware) ───────────────────────────────
 
-const INR = new Intl.NumberFormat('en-IN', {
-  style: 'currency', currency: 'INR',
-  minimumFractionDigits: 0, maximumFractionDigits: 2,
-});
+import { formatCurrency, formatPercent } from '../../core/i18n';
 
-export const fmtCurrency = (v: number): string => INR.format(v);
-export const fmtPercent  = (v: number): string => `${v.toFixed(1)}%`;
+export const fmtCurrency = (v: number): string => formatCurrency(v);
+export const fmtPercent  = (v: number): string => formatPercent(v);

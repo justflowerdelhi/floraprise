@@ -10,6 +10,7 @@ import type {
   BatchStatus,
 } from '../data/inventory.data';
 import { LOW_STOCK_THRESHOLD } from '../data/inventory.data';
+import QRCode from 'qrcode';
 
 // ─── Date Helpers ─────────────────────────────────────────────
 
@@ -52,7 +53,7 @@ export const getRemainingValue = (b: InventoryBatch): number =>
 
 export const getExpiryProgress = (b: InventoryBatch): number => {
   if (!b.isPerishable || !b.expiryDate) return 100;
-  const purchase = new Date(b.purchaseDate).getTime();
+  const purchase = new Date(b.receivedDate).getTime();
   const expiry = new Date(b.expiryDate).getTime();
   const now = Date.now();
   const totalLife = expiry - purchase;
@@ -62,13 +63,13 @@ export const getExpiryProgress = (b: InventoryBatch): number => {
 };
 
 export const getStockPercent = (b: InventoryBatch): number =>
-  b.quantityOriginal > 0
-    ? (b.quantityRemaining / b.quantityOriginal) * 100
+  b.quantityReceived > 0
+    ? (b.quantityRemaining / b.quantityReceived) * 100
     : 0;
 
 export const isLowStock = (b: InventoryBatch): boolean =>
-  b.quantityOriginal > 0 &&
-  b.quantityRemaining / b.quantityOriginal <= LOW_STOCK_THRESHOLD;
+  b.quantityReceived > 0 &&
+  b.quantityRemaining / b.quantityReceived <= LOW_STOCK_THRESHOLD;
 
 // ─── Dashboard Summary ───────────────────────────────────────
 
@@ -137,8 +138,8 @@ export const filterAndSort = (
     result = result.filter(
       (b) =>
         b.productName.toLowerCase().includes(q) ||
-        b.batchNumber.toLowerCase().includes(q) ||
-        b.supplier.toLowerCase().includes(q),
+        b.batchCode.toLowerCase().includes(q) ||
+        (b.supplier ?? '').toLowerCase().includes(q),
     );
   }
 
@@ -148,8 +149,8 @@ export const filterAndSort = (
   }
 
   // Location
-  if (filters.location) {
-    result = result.filter((b) => b.location === filters.location);
+  if (filters.storageLocation) {
+    result = result.filter((b) => b.storageLocation === filters.storageLocation);
   }
 
   // Supplier
@@ -201,14 +202,14 @@ export const filterAndSort = (
 export const exportCSV = (batches: InventoryBatch[]): void => {
   const header = [
     'Product Name',
-    'Batch Number',
+    'Batch Code',
     'Supplier',
     'Location',
-    'Purchase Date',
+    'Received Date',
     'Expiry Date',
     'Days Left',
     'Qty Remaining',
-    'Original Qty',
+    'Received Qty',
     'Remaining Value',
     'Status',
   ].join(',');
@@ -217,14 +218,14 @@ export const exportCSV = (batches: InventoryBatch[]): void => {
     const days = getDaysLeft(b.expiryDate);
     return [
       `"${b.productName}"`,
-      b.batchNumber,
-      `"${b.supplier}"`,
-      `"${b.location}"`,
-      b.purchaseDate,
+      b.batchCode,
+      `"${b.supplier ?? ''}"`,
+      `"${b.storageLocation}"`,
+      b.receivedDate,
       b.expiryDate ?? 'N/A',
       days !== null ? days : 'N/A',
       b.quantityRemaining,
-      b.quantityOriginal,
+      b.quantityReceived,
       getRemainingValue(b).toFixed(2),
       getBatchStatus(b),
     ].join(',');
@@ -238,6 +239,50 @@ export const exportCSV = (batches: InventoryBatch[]): void => {
   a.download = `inventory-batches-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+};
+
+// ─── Batch Label Print ──────────────────────────────────────
+
+export const printBatchLabel = async (batch: InventoryBatch): Promise<void> => {
+  const qrDataUrl = await QRCode.toDataURL(batch.batchCode, { margin: 1, width: 180 });
+  const received = fmtDate(batch.receivedDate);
+  const expiry = batch.expiryDate ? fmtDate(batch.expiryDate) : 'N/A';
+  const qty = batch.quantityReceived;
+
+  const html = `
+    <html>
+      <head>
+        <title>Batch Label</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+          .label { border: 1px solid #ddd; padding: 16px; border-radius: 8px; width: 320px; }
+          .title { font-weight: 700; font-size: 16px; margin-bottom: 8px; }
+          .row { font-size: 12px; margin: 4px 0; }
+          .code { font-family: monospace; font-size: 12px; font-weight: 700; }
+          .qr { margin-top: 12px; text-align: center; }
+          img { width: 180px; height: 180px; }
+          @media print { body { margin: 0; } .label { border: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="label">
+          <div class="title">${batch.productName}</div>
+          <div class="row">Batch Code: <span class="code">${batch.batchCode}</span></div>
+          <div class="row">Received: ${received}</div>
+          <div class="row">Expiry: ${expiry}</div>
+          <div class="row">Quantity: ${qty}</div>
+          <div class="qr"><img src="${qrDataUrl}" alt="QR" /></div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const w = window.open('', '_blank', 'width=420,height=560');
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 300);
 };
 
 // ─── Formatters ──────────────────────────────────────────────

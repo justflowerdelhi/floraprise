@@ -13,11 +13,12 @@ import {
 export default function LoyaltyProgramPage() {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  
   return (
-    <Box sx={{ p: 3, bgcolor: dk ? '#0f0f0f' : '#f5f5f5', minHeight: '100vh' }}>
+    <Box sx={{ p: 3, bgcolor: dk ? '#0f0f0f' : '#f8f9fa', minHeight: '100vh' }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" fontWeight={600} sx={{ color: dk ? '#fff' : 'text.primary' }}>
+        <Typography variant="h5" fontWeight={600}>
           Loyalty Program
         </Typography>
         <Typography variant="body2" sx={{ opacity: 0.7 }}>
@@ -33,7 +34,7 @@ export default function LoyaltyProgramPage() {
         <Grid container spacing={3}>
           <Grid size={{ xs: 6, sm: 3 }}>
             <Typography variant="caption" sx={{ opacity: 0.7 }}>Points per ₹100</Typography>
-            <Typography variant="h5" fontWeight={600} sx={{ color: '#e91e63' }}>
+            <Typography variant="h5" fontWeight={600} sx={{ color: '#fdd835' }}>
               {DEFAULT_LOYALTY_CONFIG.pointsPerCurrency}
             </Typography>
           </Grid>

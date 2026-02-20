@@ -8,17 +8,20 @@ import React, { useState, useMemo } from 'react';
 import {
   Box, Typography, Paper, Chip, Select, MenuItem, FormControl,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Tabs, Tab, Badge, useTheme, alpha,
+  Tabs, Tab, Badge, useTheme, alpha, Button,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import {
   LocalShipping as TruckIcon,
   Schedule as ClockIcon,
   Place as PinIcon,
+  AddTask as AddTaskIcon,
 } from '@mui/icons-material';
 import type { DeliveryEntry, FulfillmentStatus } from './OrderTypes';
 import { FULFILLMENT_STATUS_CONFIG, TIME_SLOTS, DRIVERS } from './OrderTypes';
 import { MOCK_DELIVERIES } from './OrderMockData';
+import { PermissionGate } from '../../core/rbac/RBACContext';
+import CreateTaskDialog from '../tasks/CreateTaskDialog';
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' });
@@ -30,6 +33,7 @@ const DeliveryScheduler: React.FC = () => {
 
   const [deliveries, setDeliveries] = useState<DeliveryEntry[]>([...MOCK_DELIVERIES]);
   const [tabIdx, setTabIdx] = useState(0);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
 
   /* unique sorted dates */
   const dates = useMemo(() => {
@@ -77,12 +81,23 @@ const DeliveryScheduler: React.FC = () => {
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
         <TruckIcon sx={{ fontSize: 32, color: dk ? '#fdd835' : '#1976d2' }} />
-        <Box>
+        <Box sx={{ flex: 1 }}>
           <Typography variant="h4" sx={{ fontWeight: 800 }}>Delivery Scheduler</Typography>
           <Typography variant="body2" sx={{ color: dk ? 'rgba(255,255,255,0.5)' : 'text.secondary' }}>
             Manage deliveries, assign drivers, and track fulfillment
           </Typography>
         </Box>
+        <PermissionGate permission="tasks:manage">
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<AddTaskIcon />}
+            onClick={() => setTaskDialogOpen(true)}
+            sx={{ fontWeight: 600, textTransform: 'none' }}
+          >
+            Create Task
+          </Button>
+        </PermissionGate>
       </Box>
 
       {/* Date Tabs */}
@@ -256,6 +271,13 @@ const DeliveryScheduler: React.FC = () => {
           )}
         </Paper>
       ))}
+
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
+        open={taskDialogOpen}
+        onClose={() => setTaskDialogOpen(false)}
+        defaults={{ relatedEntityType: 'DELIVERY' }}
+      />
     </Box>
   );
 };

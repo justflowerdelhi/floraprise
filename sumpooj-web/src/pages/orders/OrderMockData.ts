@@ -38,13 +38,22 @@ const mkBatch = (
 // ─── Products + Batches ─────────────────────────────────────
 
 const P = (
-  id: string, name: string, sku: string, barcode: string,
+  id: string, name: string, sku: string, barcode: string | undefined,
   cat: ProductCategory, sell: number, cost: number, tax: number,
   stock: number, perishable: boolean, batches: InventoryBatch[],
 ): Product => ({
-  id, name, sku, barcode, category: cat,
-  sellingPrice: sell, costPrice: cost, taxRate: tax,
-  availableStock: stock, isPerishable: perishable, batches,
+  id,
+  name,
+  sku,
+  barcode: perishable ? undefined : barcode,
+  category: cat,
+  sellingPrice: sell,
+  costPrice: cost,
+  taxRate: tax,
+  availableStock: stock,
+  isPerishable: perishable,
+  trackBatch: perishable,
+  batches,
 });
 
 export const MOCK_PRODUCTS: Product[] = [
@@ -113,6 +122,7 @@ export const MOCK_PRODUCTS: Product[] = [
 export const MOCK_ORDERS: Order[] = [
   {
     id: 'ord_001', orderNumber: 'ORD-2026-0001', orderSource: 'WALK_IN',
+    orderType: 'LOCAL',
     isPriceEditable: true, customerName: 'Meera Joshi', customerPhone: '9876543210',
     fulfillmentStatus: 'COMPLETED', paymentStatus: 'PAID',
     items: [], totals: { subtotal: 1130, taxTotal: 56.5, discountTotal: 0, grandTotal: 1186.5, totalCost: 500, marginPercent: 57.9, marginWarning: false, itemCount: 4, lineCount: 2 },
@@ -120,6 +130,7 @@ export const MOCK_ORDERS: Order[] = [
   },
   {
     id: 'ord_002', orderNumber: 'ORD-2026-0002', orderSource: 'PHONE',
+    orderType: 'LOCAL',
     isPriceEditable: true, customerName: 'Raj Kapoor', customerPhone: '9988776655',
     recipientName: 'Priya Kapoor', recipientPhone: '9988776600',
     deliveryDate: daysFrom(1), deliveryAddress: '45 MG Road, Pune 411001',
@@ -130,6 +141,7 @@ export const MOCK_ORDERS: Order[] = [
   },
   {
     id: 'ord_003', orderNumber: 'ORD-2026-0003', orderSource: 'FTD',
+    orderType: 'LOCAL',
     externalOrderId: 'FTD-98765', externalPlatform: 'FTD',
     isExternallyPaid: true, isPriceEditable: false,
     senderName: 'David Johnson', recipientName: 'Jennifer Smith', recipientPhone: '555-0123',
@@ -143,6 +155,7 @@ export const MOCK_ORDERS: Order[] = [
   },
   {
     id: 'ord_004', orderNumber: 'ORD-2026-0004', orderSource: 'WEBSITE',
+    orderType: 'LOCAL',
     isPriceEditable: true, customerName: 'Sneha Patil', customerPhone: '8877665544',
     recipientName: 'Deepa Patil',
     deliveryDate: daysFrom(3), deliveryAddress: '78 Shivaji Nagar, Pune 411005',
@@ -152,6 +165,7 @@ export const MOCK_ORDERS: Order[] = [
   },
   {
     id: 'ord_005', orderNumber: 'ORD-2026-0005', orderSource: 'WALK_IN',
+    orderType: 'LOCAL',
     isPriceEditable: true, customerName: 'Amit Deshmukh',
     fulfillmentStatus: 'DRAFT', paymentStatus: 'UNPAID',
     items: [], totals: { subtotal: 560, taxTotal: 28, discountTotal: 0, grandTotal: 588, totalCost: 220, marginPercent: 62.6, marginWarning: false, itemCount: 3, lineCount: 2 },
@@ -159,6 +173,7 @@ export const MOCK_ORDERS: Order[] = [
   },
   {
     id: 'ord_006', orderNumber: 'ORD-2026-0006', orderSource: 'BLOOMNATION',
+    orderType: 'LOCAL',
     externalOrderId: 'BN-20260215-001', externalPlatform: 'BLOOMNATION',
     isExternallyPaid: true, isPriceEditable: false,
     senderName: 'Michael Carter', recipientName: 'Lakshmi Nair', recipientPhone: '9900112233',
@@ -172,6 +187,7 @@ export const MOCK_ORDERS: Order[] = [
   },
   {
     id: 'ord_007', orderNumber: 'ORD-2026-0007', orderSource: 'PHONE',
+    orderType: 'LOCAL',
     isPriceEditable: true, customerName: 'Arjun Mehta', customerPhone: '7766554433',
     recipientName: 'Sanya Mehta',
     deliveryDate: daysFrom(0), deliveryAddress: '88 Baner Road, Pune 411045',

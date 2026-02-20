@@ -2,12 +2,12 @@
  * RBACContext.tsx — Role-Based Access Control Provider
  *
  * Provides:
- * - Current user state with role
+ * - Current user state derived from AuthContext (backend-authoritative)
  * - Permission checking hooks
- * - Mock role simulation for development
  * - Route protection utilities
+ * - Dev-only RolePicker (gated behind import.meta.env.DEV)
  */
-import React, { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
+import React, { createContext, useContext, useCallback, useMemo, type ReactNode } from 'react';
 import type { User, UserRole, Permission, MenuItem, MenuSection } from './RBACTypes';
 import {
   ROLE_PERMISSIONS,
@@ -17,11 +17,12 @@ import {
   hasAllPermissions,
   canAccessRoute,
 } from './RBACTypes';
+import { useAuth } from '../../auth/AuthContext';
 
 // ─── Context Types ──────────────────────────────────────────
 
 interface RBACContextValue {
-  // User state
+  // User state (read-only, from AuthContext)
   user: User | null;
   isAuthenticated: boolean;
   role: UserRole | null;
@@ -36,62 +37,7 @@ interface RBACContextValue {
   // Navigation
   getFilteredMenu: () => MenuSection[];
   getDefaultLanding: () => string;
-
-  // Actions
-  login: (user: User) => void;
-  logout: () => void;
-  switchRole: (role: UserRole) => void; // Dev/demo only
 }
-
-// ─── Mock Users for Development ─────────────────────────────
-
-const MOCK_USERS: Record<UserRole, User> = {
-  ADMIN: {
-    id: 'user-admin',
-    name: 'Raj Kumar',
-    email: 'raj@florist.com',
-    role: 'ADMIN',
-    avatar: undefined,
-    primaryLocationId: 'loc-001',
-    assignedLocationIds: ['loc-001', 'loc-002', 'loc-003', 'loc-004'], // All locations
-  },
-  MANAGER: {
-    id: 'user-manager',
-    name: 'Priya Sharma',
-    email: 'priya@florist.com',
-    role: 'MANAGER',
-    avatar: undefined,
-    primaryLocationId: 'loc-001',
-    assignedLocationIds: ['loc-001', 'loc-002'], // Bandra & Andheri
-  },
-  CASHIER: {
-    id: 'user-cashier',
-    name: 'Amit Singh',
-    email: 'amit@florist.com',
-    role: 'CASHIER',
-    avatar: undefined,
-    primaryLocationId: 'loc-001',
-    assignedLocationIds: ['loc-001'], // Bandra only
-  },
-  DESIGNER: {
-    id: 'user-designer',
-    name: 'Meera Patel',
-    email: 'meera@florist.com',
-    role: 'DESIGNER',
-    avatar: undefined,
-    primaryLocationId: 'loc-001',
-    assignedLocationIds: ['loc-001'], // Bandra only
-  },
-  DRIVER: {
-    id: 'user-driver',
-    name: 'Ravi Kumar',
-    email: 'ravi@florist.com',
-    role: 'DRIVER',
-    avatar: undefined,
-    primaryLocationId: 'loc-001',
-    assignedLocationIds: ['loc-001', 'loc-002'], // Bandra & Andheri routes
-  },
-};
 
 // ─── Context Creation ───────────────────────────────────────
 
@@ -101,15 +47,12 @@ const RBACContext = createContext<RBACContextValue | null>(null);
 
 interface RBACProviderProps {
   children: ReactNode;
-  initialRole?: UserRole;
 }
 
-export const RBACProvider: React.FC<RBACProviderProps> = ({
-  children,
-  initialRole = 'ADMIN',
-}) => {
-  // Start with mock user in development
-  const [user, setUser] = useState<User | null>(() => MOCK_USERS[initialRole]);
+export const RBACProvider: React.FC<RBACProviderProps> = ({ children }) => {
+  // User comes from AuthContext — single source of truth
+  const auth = useAuth();
+  const user = auth.user;
 
   // Derived state
   const role = user?.role ?? null;
@@ -162,26 +105,9 @@ export const RBACProvider: React.FC<RBACProviderProps> = ({
     return DEFAULT_LANDING[role] ?? '/';
   }, [role]);
 
-  // Login action
-  const login = useCallback((newUser: User) => {
-    setUser(newUser);
-    // In real app: store token, sync with backend
-  }, []);
-
-  // Logout action
-  const logout = useCallback(() => {
-    setUser(null);
-    // In real app: clear token, redirect
-  }, []);
-
-  // Switch role (development/demo only)
-  const switchRole = useCallback((newRole: UserRole) => {
-    setUser(MOCK_USERS[newRole]);
-  }, []);
-
   const value: RBACContextValue = {
     user,
-    isAuthenticated: user !== null,
+    isAuthenticated: auth.isAuthenticated,
     role,
     permissions,
     can,
@@ -190,9 +116,6 @@ export const RBACProvider: React.FC<RBACProviderProps> = ({
     canAccessPath,
     getFilteredMenu,
     getDefaultLanding,
-    login,
-    logout,
-    switchRole,
   };
 
   return <RBACContext.Provider value={value}>{children}</RBACContext.Provider>;
@@ -242,14 +165,13 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({
   return <>{children}</>;
 };
 
-// ─── Role Picker Component (Dev/Demo only) ──────────────────
+// ─── Role Picker Component (Dev-only — for local testing) ───
 
 import {
   Box, Typography, Avatar, Menu, MenuItem as MuiMenuItem, ListItemIcon,
-  ListItemText, Chip, useTheme, alpha, IconButton, Divider,
+  ListItemText, Chip, useTheme, alpha, Divider,
 } from '@mui/material';
 import {
-  Person as PersonIcon,
   ExpandMore as ExpandIcon,
   AdminPanelSettings as AdminIcon,
   SupervisorAccount as ManagerIcon,
@@ -258,6 +180,7 @@ import {
   LocalShipping as DriverIcon,
 } from '@mui/icons-material';
 import { ROLE_CONFIG } from './RBACTypes';
+import { useState } from 'react';
 
 const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
   ADMIN: <AdminIcon />,
@@ -267,10 +190,23 @@ const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
   DRIVER: <DriverIcon />,
 };
 
+/**
+ * Dev-only role picker.
+ * In production builds this renders nothing.
+ * It does NOT grant real permissions — it only changes the
+ * RBAC-level mock for UI preview purposes during development.
+ */
 export const RolePicker: React.FC = () => {
+  // Only render in development builds
+  if (!import.meta.env.DEV) return null;
+
+  return <RolePickerInner />;
+};
+
+const RolePickerInner: React.FC = () => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
-  const { user, role, switchRole } = useRBAC();
+  const { user, role } = useRBAC();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 
@@ -280,11 +216,6 @@ export const RolePicker: React.FC = () => {
 
   const handleClose = () => {
     setAnchorEl(null);
-  };
-
-  const handleSelectRole = (newRole: UserRole) => {
-    switchRole(newRole);
-    handleClose();
   };
 
   if (!role) return null;
@@ -298,54 +229,37 @@ export const RolePicker: React.FC = () => {
         sx={{
           display: 'flex',
           alignItems: 'center',
-          gap: 1.5,
-          px: 1.5,
-          py: 1,
+          gap: 1,
+          px: 1,
+          py: 0.5,
           borderRadius: 2,
           cursor: 'pointer',
+          border: '1px dashed',
+          borderColor: 'warning.main',
+          opacity: 0.7,
           transition: 'all 0.2s',
           '&:hover': {
+            opacity: 1,
             bgcolor: dk ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
           },
         }}
       >
         <Avatar
           sx={{
-            width: 36,
-            height: 36,
+            width: 28,
+            height: 28,
             bgcolor: alpha(config.color, 0.15),
             color: config.color,
-            fontSize: '0.9rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
           }}
         >
           {user?.name?.charAt(0) ?? 'U'}
         </Avatar>
-        <Box sx={{ display: { xs: 'none', md: 'block' }, minWidth: 100 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-            {user?.name}
-          </Typography>
-          <Chip
-            size="small"
-            label={config.label}
-            sx={{
-              height: 18,
-              fontSize: '0.65rem',
-              fontWeight: 600,
-              bgcolor: alpha(config.color, 0.15),
-              color: config.color,
-              mt: 0.25,
-            }}
-          />
-        </Box>
-        <ExpandIcon
-          sx={{
-            fontSize: 20,
-            color: dk ? 'rgba(255,255,255,0.5)' : 'text.secondary',
-            transition: 'transform 0.2s',
-            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-          }}
-        />
+        <Typography variant="caption" sx={{ fontWeight: 600, color: 'warning.main' }}>
+          DEV: {config.label}
+        </Typography>
+        <ExpandIcon sx={{ fontSize: 16, color: 'warning.main' }} />
       </Box>
 
       <Menu
@@ -367,8 +281,8 @@ export const RolePicker: React.FC = () => {
         }}
       >
         <Box sx={{ px: 2, py: 1 }}>
-          <Typography variant="caption" sx={{ fontWeight: 600, textTransform: 'uppercase', color: dk ? 'rgba(255,255,255,0.5)' : 'text.secondary' }}>
-            Switch Role (Demo)
+          <Typography variant="caption" sx={{ fontWeight: 600, textTransform: 'uppercase', color: 'warning.main' }}>
+            Dev Role Picker (read-only preview)
           </Typography>
         </Box>
         <Divider sx={{ borderColor: dk ? 'rgba(255,255,255,0.08)' : 'divider' }} />
@@ -379,8 +293,8 @@ export const RolePicker: React.FC = () => {
           return (
             <MuiMenuItem
               key={r}
-              onClick={() => handleSelectRole(r)}
               selected={isActive}
+              disabled
               sx={{
                 py: 1.5,
                 '&.Mui-selected': {

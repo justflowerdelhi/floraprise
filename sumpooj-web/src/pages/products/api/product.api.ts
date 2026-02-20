@@ -46,6 +46,7 @@ export const transformToApiPayload = (formData: ProductFormData): ProductApiPayl
     
     // Inventory
     trackInventory: formData.trackInventory,
+    trackBatch: formData.trackBatch,
     openingStock: formData.trackInventory ? formData.openingStock : undefined,
     reorderLevel: formData.trackInventory ? formData.reorderLevel : undefined,
     
@@ -236,7 +237,6 @@ export const uploadImage = async (
 export const examplePayload: ProductApiPayload = {
   productName: 'Red Freedom Rose',
   sku: 'ROSE-RED-001',
-  barcode: '123456789012',
   productType: 'fresh_flower',
   brand: 'Ecuador Premium',
   description: 'Beautiful long-stem red roses, perfect for arrangements',
@@ -248,6 +248,7 @@ export const examplePayload: ProductApiPayload = {
   weddingEventPrice: 4.50,
   taxCategory: 'standard',
   trackInventory: true,
+  trackBatch: true,
   openingStock: 100,
   reorderLevel: 25,
   isPerishable: true,

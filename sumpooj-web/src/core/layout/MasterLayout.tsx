@@ -58,7 +58,8 @@ import {
   LightMode,
   LocalFlorist,
 } from '@mui/icons-material';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext';
 import { Sidebar } from './Sidebar';
 import { GlobalSearchDialog } from './GlobalSearch';
 import { QuickActionButton } from './QuickActionButton';
@@ -86,6 +87,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const { user } = useRBAC();
+  const auth = useAuth();
+  const navigate = useNavigate();
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
 
   // Fallback for when user is null
@@ -120,8 +123,15 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
         )}
 
         {/* Mobile Logo */}
-        <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1 }}>
-          <LocalFlorist sx={{ color: '#fdd835', fontSize: 28 }} />
+        <Box 
+          sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', cursor: 'pointer' }}
+          onClick={() => window.location.href = '/dashboard'}
+        >
+          <img 
+            src="/assets/logo/floraedge-icon.svg"
+            alt="FloraEdge"
+            style={{ height: '28px', width: '28px' }}
+          />
         </Box>
 
         {/* Global Search (in header) */}
@@ -219,7 +229,14 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
 
           <Divider />
 
-          <MenuItem onClick={() => setUserMenuAnchor(null)} sx={{ color: 'error.main' }}>
+          <MenuItem
+            onClick={() => {
+              setUserMenuAnchor(null);
+              auth.logout();
+              navigate('/auth/login');
+            }}
+            sx={{ color: 'error.main' }}
+          >
             <ListItemIcon><Logout fontSize="small" sx={{ color: 'error.main' }} /></ListItemIcon>
             <ListItemText>Sign Out</ListItemText>
           </MenuItem>

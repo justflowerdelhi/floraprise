@@ -24,6 +24,8 @@ import PhoneOrder from '../pages/orders/PhoneOrder';
 import ExternalOrdersInbox from '../pages/orders/ExternalOrdersInbox';
 import DeliveryScheduler from '../pages/orders/DeliveryScheduler';
 import OrderList from '../pages/orders/OrderList';
+import WireVendorsPage from '../pages/orders/WireVendorsPage';
+import WireSettlementsPage from '../pages/orders/WireSettlementsPage';
 
 // Event Module
 import EventList from '../pages/events/EventList';
@@ -36,6 +38,10 @@ import EventProductionPage from '../pages/events/EventProductionPage';
 // Staff & Performance
 import StaffList from '../pages/staff/StaffList';
 import StaffPerformancePage from '../pages/staff/StaffPerformancePage';
+import StaffForm from '../pages/staff/StaffForm';
+
+// Tasks
+import { MyTasksPage } from '../pages/tasks';
 
 // Subscription
 import { SubscriptionPage } from '../pages/subscription';
@@ -62,6 +68,7 @@ import { DashboardPage } from '../pages/dashboard';
 // Production-Ready SaaS Infrastructure
 import { RBACProvider } from '../core/rbac/RBACContext';
 import { MasterLayout } from '../core/layout/MasterLayout';
+import { FeatureGate } from '../core/tenant';
 
 export default function AppRoutes() {
   return (
@@ -109,6 +116,22 @@ export default function AppRoutes() {
           <Route path="/order-list" element={<OrderProvider><OrderList /></OrderProvider>} />
           <Route path="/orders/new" element={<OrderForm />} />
           <Route path="/delivery-scheduler" element={<DeliveryScheduler />} />
+          <Route
+            path="/wire-vendors"
+            element={
+              <FeatureGate feature="WIRE_MANAGEMENT" fallback={<Navigate to="/pos" replace />}>
+                <WireVendorsPage />
+              </FeatureGate>
+            }
+          />
+          <Route
+            path="/wire-settlements"
+            element={
+              <FeatureGate feature="WIRE_MANAGEMENT" fallback={<Navigate to="/pos" replace />}>
+                <WireSettlementsPage />
+              </FeatureGate>
+            }
+          />
 
           {/* ─── Inventory ──────────────────────────────── */}
           <Route path="/inventory" element={<InventoryBatchDashboard />} />
@@ -144,7 +167,12 @@ export default function AppRoutes() {
 
           {/* ─── Staff & Performance ────────────────────── */}
           <Route path="/staff" element={<StaffList />} />
+          <Route path="/staff/new" element={<StaffForm />} />
+          <Route path="/staff/:staffId/edit" element={<StaffForm />} />
           <Route path="/staff/:staffId" element={<StaffPerformancePage />} />
+
+          {/* ─── Tasks ──────────────────────────────────── */}
+          <Route path="/tasks" element={<MyTasksPage />} />
 
           {/* ─── Settings / Subscription ────────────────── */}
           <Route path="/subscription" element={<SubscriptionPage />} />

@@ -134,6 +134,7 @@ export interface ProductFormData {
   // Inventory Section
   openingStock?: number;
   reorderLevel?: number;
+  trackBatch: boolean;
 
   // Perishable Section
   isPerishable: boolean;
@@ -202,6 +203,7 @@ export interface ProductApiPayload {
   
   // Inventory
   trackInventory: boolean;
+  trackBatch: boolean;
   openingStock?: number;
   reorderLevel?: number;
   
@@ -268,6 +270,7 @@ export const defaultProductFormValues: ProductFormData = {
   retailPrice: 0,
   costPrice: 0,
   trackInventory: true,
+  trackBatch: false,
   status: 'active',
   isPerishable: false,
   taxCategory: 'standard',

@@ -55,6 +55,7 @@ import { FEATURE_METADATA, hasFeature } from '../../core/tenant/FeatureFlags';
 export default function SubscriptionPage() {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  
   const {
     tenant,
     plan,
@@ -134,13 +135,13 @@ export default function SubscriptionPage() {
                     width: 48,
                     height: 48,
                     borderRadius: 2,
-                    bgcolor: alpha('#fdd835', 0.15),
+                    bgcolor: alpha(theme.palette.warning.main, 0.15),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Star sx={{ color: '#fdd835', fontSize: 24 }} />
+                  <Star sx={{ color: theme.palette.warning.main, fontSize: 24 }} />
                 </Box>
                 <Box>
                   <Typography variant="h6" fontWeight={600}>
@@ -153,14 +154,14 @@ export default function SubscriptionPage() {
               <Box
                 sx={{
                   p: 2,
-                  bgcolor: alpha('#fdd835', 0.08),
+                  bgcolor: alpha(theme.palette.warning.main, 0.08),
                   borderRadius: 2,
                   border: 1,
-                  borderColor: alpha('#fdd835', 0.2),
+                  borderColor: alpha(theme.palette.warning.main, 0.2),
                   mb: 3,
                 }}
               >
-                <Typography variant="h4" fontWeight={700} color="#fdd835">
+                <Typography variant="h4" fontWeight={700} color={theme.palette.warning.main}>
                   {planConfig.name}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -177,7 +178,7 @@ export default function SubscriptionPage() {
                 <Box
                   sx={{
                     p: 2,
-                    bgcolor: dk ? '#0f0f0f' : '#f5f5f5',
+                    bgcolor: dk ? '#0f0f0f' : alpha(theme.palette.grey[500], 0.08),
                     borderRadius: 2,
                     mb: 3,
                   }}
@@ -186,7 +187,7 @@ export default function SubscriptionPage() {
                     <Typography variant="body2" color="text.secondary">
                       Trial Period
                     </Typography>
-                    <Typography variant="body2" fontWeight={600} color={trialDaysRemaining <= 3 ? '#f44336' : '#fdd835'}>
+                    <Typography variant="body2" fontWeight={600} color={trialDaysRemaining <= 3 ? '#f44336' : theme.palette.warning.main}>
                       {trialDaysRemaining} days left
                     </Typography>
                   </Box>
@@ -196,9 +197,9 @@ export default function SubscriptionPage() {
                     sx={{
                       height: 6,
                       borderRadius: 3,
-                      bgcolor: alpha('#fdd835', 0.2),
+                      bgcolor: alpha(theme.palette.warning.main, 0.2),
                       '& .MuiLinearProgress-bar': {
-                        bgcolor: trialDaysRemaining <= 3 ? '#f44336' : '#fdd835',
+                        bgcolor: trialDaysRemaining <= 3 ? '#f44336' : theme.palette.warning.main,
                       },
                     }}
                   />
@@ -208,7 +209,7 @@ export default function SubscriptionPage() {
               <Typography variant="subtitle2" color="text.secondary" mb={1.5}>
                 Current Plan Features
               </Typography>
-              <List dense sx={{ bgcolor: dk ? '#0f0f0f' : '#f5f5f5', borderRadius: 2, mb: 2 }}>
+              <List dense sx={{ bgcolor: dk ? '#0f0f0f' : alpha(theme.palette.grey[500], 0.08), borderRadius: 2, mb: 2 }}>
                 {planConfig.features.slice(0, 6).map((feature, index) => (
                   <ListItem key={index} sx={{ py: 0.5 }}>
                     <ListItemIcon sx={{ minWidth: 32 }}>
@@ -226,7 +227,7 @@ export default function SubscriptionPage() {
                 fullWidth
                 variant="outlined"
                 startIcon={<CreditCard />}
-                sx={{ borderColor: alpha('#fdd835', 0.3) }}
+                sx={{ borderColor: alpha(theme.palette.warning.main, 0.3) }}
               >
                 Manage Billing
               </Button>
@@ -298,7 +299,7 @@ export default function SubscriptionPage() {
                         sx={{
                           p: 2,
                           borderRadius: 2,
-                          bgcolor: isAvailable ? alpha('#4caf50', 0.1) : dk ? '#0f0f0f' : '#f5f5f5',
+                          bgcolor: isAvailable ? alpha('#4caf50', 0.1) : (dk ? '#0f0f0f' : alpha(theme.palette.grey[500], 0.08)),
                           border: 1,
                           borderColor: isAvailable ? alpha('#4caf50', 0.3) : 'transparent',
                         }}
@@ -349,14 +350,7 @@ export default function SubscriptionPage() {
               <Switch
                 checked={yearlyBilling}
                 onChange={(e) => setYearlyBilling(e.target.checked)}
-                sx={{
-                  '& .MuiSwitch-switchBase.Mui-checked': {
-                    color: '#fdd835',
-                  },
-                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                    bgcolor: alpha('#fdd835', 0.5),
-                  },
-                }}
+                color="warning"
               />
             }
             label={
@@ -401,7 +395,7 @@ export default function SubscriptionPage() {
       >
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Celebration sx={{ color: '#fdd835' }} />
+            <Celebration sx={{ color: theme.palette.warning.main }} />
             Confirm Plan Upgrade
           </Box>
         </DialogTitle>
@@ -419,11 +413,7 @@ export default function SubscriptionPage() {
           <Button
             variant="contained"
             onClick={handleConfirmUpgrade}
-            sx={{
-              bgcolor: '#e91e63',
-              color: '#fff',
-              '&:hover': { bgcolor: '#c2185b' },
-            }}
+            color="warning"
           >
             Confirm Upgrade
           </Button>
@@ -448,6 +438,7 @@ interface UsageCardProps {
 function UsageCard({ icon, label, used, limit, unit }: UsageCardProps) {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  
   const percentage = getUsagePercentage(used, limit);
   const isUnlimited = limit === -1;
   const isWarning = percentage >= 80;
@@ -461,7 +452,7 @@ function UsageCard({ icon, label, used, limit, unit }: UsageCardProps) {
     <Box
       sx={{
         p: 2,
-        bgcolor: dk ? '#0f0f0f' : '#f5f5f5',
+        bgcolor: dk ? '#0f0f0f' : alpha(theme.palette.grey[500], 0.08),
         borderRadius: 2,
       }}
     >
@@ -553,6 +544,7 @@ interface PlanCardProps {
 function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps) {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  
   const config = PLAN_CONFIGS[plan];
   const isCurrent = plan === currentPlan;
   const planOrder: TenantPlan[] = ['STARTER', 'GROWTH', 'PRO', 'ENTERPRISE'];
@@ -571,7 +563,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
         flexDirection: 'column',
         position: 'relative',
         border: isCurrent || isRecommended ? 2 : 1,
-        borderColor: isCurrent ? '#e91e63' : isRecommended ? alpha('#e91e63', 0.5) : dk ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+        borderColor: isCurrent ? theme.palette.warning.main : isRecommended ? alpha(theme.palette.warning.main, 0.5) : 'transparent',
       }}
     >
       {isRecommended && !isCurrent && (
@@ -583,8 +575,8 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
             transform: 'translateX(-50%)',
             px: 2,
             py: 0.5,
-            bgcolor: '#e91e63',
-            color: '#fff',
+            bgcolor: theme.palette.warning.main,
+            color: dk ? '#0f0f0f' : '#fff',
             borderRadius: 1,
             fontSize: '0.7rem',
             fontWeight: 700,
@@ -593,8 +585,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
         >
           Most Popular
         </Box>
-      )
-      }
+      )}
       
       {isCurrent && (
         <Box
@@ -605,8 +596,8 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
             transform: 'translateX(-50%)',
             px: 2,
             py: 0.5,
-            bgcolor: '#e91e63',
-            color: '#fff',
+            bgcolor: theme.palette.warning.main,
+            color: dk ? '#0f0f0f' : '#fff',
             borderRadius: 1,
             fontSize: '0.7rem',
             fontWeight: 700,
@@ -662,7 +653,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
             ))}
           </List>
           
-          <Box sx={{ mt: 2, p: 1.5, bgcolor: dk ? '#0f0f0f' : '#f5f5f5', borderRadius: 1 }}>
+          <Box sx={{ mt: 2, p: 1.5, bgcolor: dk ? '#0f0f0f' : alpha(theme.palette.grey[500], 0.08), borderRadius: 1 }}>
             <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
               Limits:
             </Typography>
@@ -684,7 +675,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
               fullWidth
               variant="outlined"
               disabled
-              sx={{ borderColor: alpha('#fdd835', 0.3) }}
+              sx={{ borderColor: alpha(theme.palette.warning.main, 0.3) }}
             >
               Current Plan
             </Button>
@@ -702,11 +693,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
               variant="contained"
               startIcon={<ArrowUpward />}
               onClick={onUpgrade}
-              sx={{
-                bgcolor: '#e91e63',
-                color: '#fff',
-                '&:hover': { bgcolor: '#c2185b' },
-              }}
+              color="warning"
             >
               Upgrade
             </Button>

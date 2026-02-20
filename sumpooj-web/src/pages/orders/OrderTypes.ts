@@ -8,9 +8,19 @@
  * Payment model is SEPARATE — see PaymentTypes.ts
  */
 
+import type { DeliveryAddress, FulfillmentType } from './DeliveryZoneTypes';
+
 // ─── Order Source & Statuses ────────────────────────────────
 
 export type OrderSource = 'WALK_IN' | 'PHONE' | 'WEBSITE' | 'BLOOMNATION' | 'FTD';
+
+export type OrderType = 'LOCAL' | 'OUTGOING_NETWORK' | 'INCOMING_NETWORK';
+
+/** @deprecated Use OUTGOING_NETWORK / INCOMING_NETWORK instead */
+export const LEGACY_ORDER_TYPE_MAP: Record<string, OrderType> = {
+  OUTGOING_WIRE: 'OUTGOING_NETWORK',
+  INCOMING_WIRE: 'INCOMING_NETWORK',
+};
 
 export type FulfillmentStatus =
   | 'DRAFT'
@@ -26,6 +36,19 @@ export type FulfillmentStatus =
  * See PaymentUtils.deriveOrderPaymentStatus().
  */
 export type OrderPaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID';
+
+export type SettlementStatus = 'PENDING' | 'SENT' | 'CLEARED';
+
+export interface VendorFlorist {
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+  phone?: string;
+  email?: string;
+  defaultCommissionRate?: number;
+  isActive: boolean;
+}
 
 // ─── Inventory Batch (FIFO Integration) ─────────────────────
 
@@ -55,13 +78,14 @@ export interface Product {
   id: string;
   name: string;
   sku: string;
-  barcode: string;
+  barcode?: string;
   category: ProductCategory;
   sellingPrice: number;
   costPrice: number;       // weighted avg FIFO cost
   taxRate: number;         // e.g. 0.05 = 5%
   availableStock: number;
   isPerishable: boolean;
+  trackBatch: boolean;
   imageUrl?: string;
   batches: InventoryBatch[];
 }
@@ -116,6 +140,8 @@ export interface Order {
   orderSource: OrderSource;
   locationId?: string; // Multi-location support
 
+  orderType?: OrderType;
+
   // External platform metadata
   externalOrderId?: string;
   externalPlatform?: string;
@@ -131,11 +157,24 @@ export interface Order {
   recipientName?: string;
   recipientPhone?: string;
 
-  // Delivery
+  // Fulfillment (NEW: Pickup vs Delivery)
+  fulfillmentType?: FulfillmentType;  // 'PICKUP' | 'DELIVERY'
+  
+  // Pickup details
+  pickupDate?: string;
+  pickupTimeSlot?: TimeSlot;
+  
+  // Delivery (legacy single-string field for backward compatibility)
   deliveryDate?: string;
   deliveryTime?: string;
-  deliveryAddress?: string;
+  deliveryAddress?: string;  // Legacy string address
   deliveryInstructions?: string;
+  
+  // Delivery (NEW: structured address with zone info)
+  structuredDeliveryAddress?: DeliveryAddress;
+  deliveryTimeSlot?: TimeSlot;
+  
+  // Message & occasion
   cardMessage?: string;
   occasion?: string;
 
@@ -143,6 +182,16 @@ export interface Order {
   externalCommission?: number;
   externalFees?: number;
   netPayout?: number;
+
+  // Wire management
+  vendorFloristId?: string;
+  vendorFloristName?: string;
+  vendorAmount?: number;
+  wireFee?: number;
+  sourceNetwork?: string;
+  commissionPercent?: number;
+  netReceived?: number;
+  settlementStatus?: SettlementStatus;
 
   // Status
   fulfillmentStatus: FulfillmentStatus;
@@ -197,6 +246,15 @@ export interface ExternalOrder {
   isExternallyPaid: boolean;
 }
 
+// ─── Wire Settlement ───────────────────────────────────────
+
+export interface WireSettlement {
+  orderNumber: string;
+  vendorName: string;
+  amount: number;
+  status: SettlementStatus;
+}
+
 // ─── Delivery Slot ──────────────────────────────────────────
 
 export type TimeSlot =
@@ -227,18 +285,18 @@ export interface StatusConfig {
 
 export const FULFILLMENT_STATUS_CONFIG: Record<FulfillmentStatus, StatusConfig> = {
   DRAFT:            { label: 'Draft',            color: '#9e9e9e' },
-  CONFIRMED:        { label: 'Confirmed',        color: '#1976d2' },
+  CONFIRMED:        { label: 'Confirmed',        color: '#2196f3' },
   IN_DESIGN:        { label: 'In Design',        color: '#9c27b0' },
-  READY:            { label: 'Ready',            color: '#0288d1' },
-  OUT_FOR_DELIVERY: { label: 'Out for Delivery', color: '#ed6c02' },
-  COMPLETED:        { label: 'Completed',        color: '#2e7d32' },
-  CANCELLED:        { label: 'Cancelled',        color: '#d32f2f' },
+  READY:            { label: 'Ready',            color: '#00bcd4' },
+  OUT_FOR_DELIVERY: { label: 'Out for Delivery', color: '#ff9800' },
+  COMPLETED:        { label: 'Completed',        color: '#4caf50' },
+  CANCELLED:        { label: 'Cancelled',        color: '#f44336' },
 };
 
 export const PAYMENT_STATUS_CONFIG: Record<OrderPaymentStatus, StatusConfig> = {
-  PAID:   { label: 'Paid',   color: '#2e7d32' },
-  UNPAID: { label: 'Unpaid', color: '#d32f2f' },
-  PARTIAL:{ label: 'Partial',color: '#0288d1' },
+  PAID:   { label: 'Paid',   color: '#4caf50' },
+  UNPAID: { label: 'Unpaid', color: '#f44336' },
+  PARTIAL:{ label: 'Partial',color: '#00bcd4' },
 };
 
 export const ORDER_SOURCE_CONFIG: Record<OrderSource, { label: string; color: string }> = {

@@ -37,15 +37,14 @@ import {
   Lock,
   Loyalty,
   RequestQuote,
-  PlayArrow,
-  Palette,
-  DeleteSweep,
+  Assignment,
   ChevronLeft as CollapseMenuIcon,
   ChevronRight as ExpandMenuIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRBAC } from '../rbac/RBACContext';
 import type { MenuSection, MenuItem as MenuItemType } from '../rbac/RBACTypes';
+import { useTenant } from '../tenant/TenantContext';
 
 // ─── Icon Mapping ───────────────────────────────────────────
 
@@ -71,25 +70,21 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Lock: <Lock />,
   Loyalty: <Loyalty />,
   RequestQuote: <RequestQuote />,
-  PlayArrow: <PlayArrow />,
-  Palette: <Palette />,
-  DeleteSweep: <DeleteSweep />,
+  Assignment: <Assignment />,
 };
 
 // ─── Section Colors ─────────────────────────────────────────
 
 const SECTION_COLORS: Record<string, string> = {
-  home: '#16a34a',
-  sales: '#4caf50',
+  sales: '#2E7D32',      // Flora Green
   orders: '#2196f3',
   events: '#e91e63',
   inventory: '#ff9800',
-  reports: '#9c27b0',
+  reports: '#5B2E91',    // FloraEdge Purple
   catalog: '#00bcd4',
-  crm: '#9c27b0',
+  crm: '#5B2E91',        // FloraEdge Purple
   staff: '#ff5722',
-  production: '#e91e63',
-  settings: '#fdd835',
+  settings: '#F4C430',   // Accent Yellow
 };
 
 // ─── Sidebar Props ──────────────────────────────────────────
@@ -292,8 +287,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const { getFilteredMenu } = useRBAC();
+  const { hasFeature } = useTenant();
 
-  const menuSections = getFilteredMenu();
+  const wireRoutes = new Set(['/wire-vendors', '/wire-settlements']);
+
+  const menuSections = getFilteredMenu()
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (item.path && wireRoutes.has(item.path)) {
+          return hasFeature('WIRE_MANAGEMENT');
+        }
+        return true;
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <Box
@@ -318,23 +326,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
           py: 2,
           minHeight: 64,
           borderBottom: `1px solid ${dk ? 'rgba(255,255,255,0.06)' : '#e0e0e0'}`,
+          cursor: 'pointer',
         }}
+        onClick={() => window.location.href = '/dashboard'}
       >
         {!collapsed && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <LocalFlorist sx={{ fontSize: 32, color: '#fdd835' }} />
-            <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
-                Florist ERP
-              </Typography>
-              <Typography variant="caption" sx={{ color: dk ? 'rgba(255,255,255,0.4)' : 'text.disabled', fontSize: '0.65rem' }}>
-                Enterprise Platform
-              </Typography>
-            </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', height: 32 }}>
+            <img 
+              src={dk ? '/assets/logo/floraedge-logo-light.svg' : '/assets/logo/floraedge-logo.svg'}
+              alt="FloraEdge"
+              style={{ height: '32px', display: 'block' }}
+            />
           </Box>
         )}
 
-        {collapsed && <LocalFlorist sx={{ fontSize: 28, color: '#fdd835' }} />}
+        {collapsed && (
+          <img 
+            src="/assets/logo/floraedge-icon.svg"
+            alt="FloraEdge"
+            style={{ height: '32px', width: '32px', display: 'block' }}
+          />
+        )}
 
         {/* Collapse Toggle (non-mobile only) */}
         {!mobile && onToggleCollapse && (
@@ -408,7 +420,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               textAlign: 'center',
             }}
           >
-            v1.0.0 • Sumpooj
+            v1.0.0 • FloraEdge
           </Typography>
         </Box>
       )}

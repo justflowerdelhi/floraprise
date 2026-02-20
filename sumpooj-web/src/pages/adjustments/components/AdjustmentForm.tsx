@@ -15,11 +15,17 @@ import {
   Alert,
   Divider,
   Skeleton,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   useTheme,
   alpha,
 } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import { Controller } from 'react-hook-form';
 import type { Control, FieldErrors, UseFormWatch, UseFormSetValue } from 'react-hook-form';
 
@@ -56,6 +62,10 @@ const AdjustmentForm = ({
 }: AdjustmentFormProps) => {
   const theme = useTheme();
   const [batches, setBatches] = useState<ProductBatch[]>([]);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanValue, setScanValue] = useState('');
+  const [scanError, setScanError] = useState('');
+  const [pendingBatchId, setPendingBatchId] = useState<string | null>(null);
 
   const watchProductId = watch('productId');
   const watchBatchId = watch('batchId');
@@ -79,12 +89,38 @@ const AdjustmentForm = ({
     if (watchProductId) {
       const filtered = MOCK_BATCHES.filter((b) => b.productId === watchProductId);
       setBatches(filtered);
+      if (pendingBatchId) {
+        const match = filtered.find((b) => b.id === pendingBatchId);
+        if (match) {
+          setValue('batchId', pendingBatchId);
+          setPendingBatchId(null);
+          return;
+        }
+      }
       setValue('batchId', '');
     } else {
       setBatches([]);
       setValue('batchId', '');
     }
-  }, [watchProductId, setValue]);
+  }, [watchProductId, setValue, pendingBatchId]);
+
+  const handleScanSubmit = () => {
+    const code = scanValue.trim();
+    if (!code) {
+      setScanError('Enter a batch code to continue.');
+      return;
+    }
+    const match = MOCK_BATCHES.find((b) => b.batchNumber.toLowerCase() === code.toLowerCase());
+    if (!match) {
+      setScanError('Batch code not found.');
+      return;
+    }
+    setScanError('');
+    setScanOpen(false);
+    setScanValue('');
+    setValue('productId', match.productId);
+    setPendingBatchId(match.id);
+  };
 
   // Smart calculations
   const currentStock = selectedProduct?.currentStock ?? 0;
@@ -205,6 +241,20 @@ const AdjustmentForm = ({
         )}
       />
 
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<QrCodeScannerIcon />}
+          onClick={() => {
+            setScanError('');
+            setScanOpen(true);
+          }}
+        >
+          Scan Batch QR
+        </Button>
+      </Box>
+
       {/* ── Batch (show only if product selected & perishable) ── */}
       {selectedProduct && needsBatch && (
         <Controller
@@ -214,7 +264,7 @@ const AdjustmentForm = ({
             <TextField
               {...field}
               select
-              label="Batch *"
+              label="Batch Code *"
               size="small"
               fullWidth
               error={batchMissing && !!errors.productId}
@@ -246,6 +296,28 @@ const AdjustmentForm = ({
           Non-perishable product — batch selection not required.
         </Alert>
       )}
+
+      <Dialog open={scanOpen} onClose={() => setScanOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Scan Batch QR</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            size="small"
+            label="Batch Code"
+            placeholder="e.g., FLW-RR-001-20260213-001"
+            value={scanValue}
+            onChange={(e) => setScanValue(e.target.value)}
+            sx={{ mt: 1 }}
+            error={!!scanError}
+            helperText={scanError || 'Paste or scan the batch QR code'}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setScanOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleScanSubmit}>Load Batch</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── Adjustment Type ────────────────────────────── */}
       <Controller

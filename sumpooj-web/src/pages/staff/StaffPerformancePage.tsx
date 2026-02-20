@@ -59,12 +59,12 @@ import {
 } from './StaffTypes';
 import { getStaffById, getStaffPerformance } from './StaffMockData';
 
-// ─── Currency Formatter ─────────────────────────────────────
+// ─── Currency Formatter (tenant-aware) ───────────────────────
 
-const fmtCurrency = (value: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value);
+import { formatCurrency, formatPercent } from '../../core/i18n';
 
-const fmtPercent = (value: number) => `${value.toFixed(1)}%`;
+const fmtCurrency = (value: number) => formatCurrency(value);
+const fmtPercent = (value: number) => formatPercent(value);
 
 // ─── Metric Card Component ──────────────────────────────────
 

@@ -103,8 +103,6 @@ interface LoyaltyStatusCardProps {
 }
 
 function LoyaltyStatusCard({ customer }: LoyaltyStatusCardProps) {
-  const theme = useTheme();
-  const dk = theme.palette.mode === 'dark';
   const tierConfig = LOYALTY_TIER_CONFIGS[customer.loyaltyTier];
   const pointsToNext = getPointsToNextTier(customer.loyaltyPoints, customer.loyaltyTier);
   const nextTier = customer.loyaltyTier === 'SILVER' ? 'GOLD' : customer.loyaltyTier === 'GOLD' ? 'PLATINUM' : null;
@@ -145,7 +143,7 @@ function LoyaltyStatusCard({ customer }: LoyaltyStatusCardProps) {
               sx={{
                 height: 8,
                 borderRadius: 4,
-                bgcolor: dk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                bgcolor: 'rgba(255,255,255,0.1)',
                 '& .MuiLinearProgress-bar': { bgcolor: tierConfig.color },
               }}
             />
@@ -155,7 +153,7 @@ function LoyaltyStatusCard({ customer }: LoyaltyStatusCardProps) {
           </>
         )}
 
-        <Divider sx={{ my: 2, borderColor: dk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.12)' }} />
+        <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.1)' }} />
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 6 }}>
@@ -188,9 +186,10 @@ interface MetricCardProps {
   color?: string;
 }
 
-function MetricCard({ icon, label, value, subValue, color = '#e91e63' }: MetricCardProps) {
+function MetricCard({ icon, label, value, subValue, color = '#fdd835' }: MetricCardProps) {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  
   return (
     <Paper sx={{ p: 2, bgcolor: dk ? '#1a1a2e' : '#fff' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -224,6 +223,7 @@ interface OrdersTabProps {
 function OrdersTab({ orders }: OrdersTabProps) {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  
   return (
     <TableContainer component={Paper} sx={{ bgcolor: dk ? '#1a1a2e' : '#fff' }}>
       <Table>
@@ -300,6 +300,7 @@ interface EventsTabProps {
 function EventsTab({ events }: EventsTabProps) {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  
   return (
     <TableContainer component={Paper} sx={{ bgcolor: dk ? '#1a1a2e' : '#fff' }}>
       <Table>
@@ -365,6 +366,7 @@ interface LoyaltyTabProps {
 function LoyaltyTab({ transactions }: LoyaltyTabProps) {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  
   return (
     <TableContainer component={Paper} sx={{ bgcolor: dk ? '#1a1a2e' : '#fff' }}>
       <Table>
@@ -460,7 +462,7 @@ function NotesDialog({ open, onClose, notes, onSave }: NotesDialogProps) {
             onSave(editedNotes);
             onClose();
           }}
-          sx={{ bgcolor: '#e91e63', color: '#fff' }}
+          sx={{ bgcolor: '#fdd835', color: '#000' }}
         >
           Save Notes
         </Button>
@@ -481,6 +483,7 @@ interface Customer360ViewProps {
 export default function Customer360View({ customerId, onBack }: Customer360ViewProps) {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  
   const [tabValue, setTabValue] = useState(0);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
 
@@ -499,15 +502,15 @@ export default function Customer360View({ customerId, onBack }: Customer360ViewP
   };
 
   return (
-    <Box sx={{ p: 3, bgcolor: dk ? '#0f0f0f' : '#f5f5f5', minHeight: '100vh' }}>
+    <Box sx={{ p: 3, bgcolor: dk ? '#0f0f0f' : '#f8f9fa', minHeight: '100vh' }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
         {onBack && (
-          <IconButton onClick={onBack} sx={{ color: dk ? '#fff' : 'text.primary' }}>
+          <IconButton onClick={onBack}>
             <ArrowBack />
           </IconButton>
         )}
-        <Typography variant="h5" fontWeight={600} sx={{ color: dk ? '#fff' : 'text.primary' }}>
+        <Typography variant="h5" fontWeight={600}>
           Customer Profile
         </Typography>
       </Box>
@@ -597,7 +600,7 @@ export default function Customer360View({ customerId, onBack }: Customer360ViewP
               )}
             </Stack>
 
-            <Divider sx={{ my: 2, borderColor: dk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.12)' }} />
+            <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.1)' }} />
 
             {/* Tags */}
             <Typography variant="subtitle2" sx={{ mb: 1, opacity: 0.7 }}>
@@ -621,7 +624,7 @@ export default function Customer360View({ customerId, onBack }: Customer360ViewP
               })}
             </Box>
 
-            <Divider sx={{ my: 2, borderColor: dk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.12)' }} />
+            <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.1)' }} />
 
             {/* Notes */}
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
@@ -710,10 +713,10 @@ export default function Customer360View({ customerId, onBack }: Customer360ViewP
               value={tabValue}
               onChange={(_, v) => setTabValue(v)}
               sx={{
-                borderBottom: `1px solid ${dk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.12)'}`,
-                '& .MuiTab-root': { color: dk ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' },
-                '& .Mui-selected': { color: '#e91e63' },
-                '& .MuiTabs-indicator': { bgcolor: '#e91e63' },
+                borderBottom: dk ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)',
+                '& .MuiTab-root': { color: dk ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)' },
+                '& .Mui-selected': { color: '#fdd835' },
+                '& .MuiTabs-indicator': { bgcolor: '#fdd835' },
               }}
             >
               <Tab icon={<ShoppingCart sx={{ fontSize: 18 }} />} iconPosition="start" label="Orders" />
