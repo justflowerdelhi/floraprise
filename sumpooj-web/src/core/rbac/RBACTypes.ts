@@ -183,6 +183,19 @@ export interface MenuSection {
 
 export const MENU_SECTIONS: MenuSection[] = [
   {
+    id: 'home',
+    title: 'Home',
+    items: [
+      {
+        id: 'dashboard',
+        label: 'Dashboard',
+        icon: 'Dashboard',
+        path: '/dashboard',
+        permissions: ['orders:view'],
+      },
+    ],
+  },
+  {
     id: 'sales',
     title: 'Sales',
     items: [
@@ -521,11 +534,11 @@ export const QUICK_ACTIONS: QuickAction[] = [
 // ─── Default Landing Pages by Role ──────────────────────────
 
 export const DEFAULT_LANDING: Record<UserRole, string> = {
-  ADMIN: '/health-dashboard',
-  MANAGER: '/health-dashboard',
-  CASHIER: '/pos',
-  DESIGNER: '/order-list',
-  DRIVER: '/delivery-scheduler',
+  ADMIN: '/dashboard',
+  MANAGER: '/dashboard',
+  CASHIER: '/dashboard',
+  DESIGNER: '/dashboard',
+  DRIVER: '/dashboard',
 };
 
 // ─── Utility Type Guards ────────────────────────────────────

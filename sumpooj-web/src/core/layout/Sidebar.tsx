@@ -79,6 +79,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 // ─── Section Colors ─────────────────────────────────────────
 
 const SECTION_COLORS: Record<string, string> = {
+  home: '#16a34a',
   sales: '#4caf50',
   orders: '#2196f3',
   events: '#e91e63',

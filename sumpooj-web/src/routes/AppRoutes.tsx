@@ -56,6 +56,9 @@ import {
   WastageLogPage,
 } from '../pages/production';
 
+// Role-Based Dashboard
+import { DashboardPage } from '../pages/dashboard';
+
 // Production-Ready SaaS Infrastructure
 import { RBACProvider } from '../core/rbac/RBACContext';
 import { MasterLayout } from '../core/layout/MasterLayout';
@@ -65,7 +68,7 @@ export default function AppRoutes() {
     <RBACProvider>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<Navigate to="/pos" replace />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/auth/login" element={<Login />} />
 
         {/* Protected Routes with MasterLayout */}
@@ -76,6 +79,9 @@ export default function AppRoutes() {
             </RequireAuth>
           }
         >
+          {/* ─── Dashboard ───────────────────────────────── */}
+          <Route path="/dashboard" element={<DashboardPage />} />
+
           {/* ─── Sales / POS ────────────────────────────── */}
           <Route
             path="/pos"
