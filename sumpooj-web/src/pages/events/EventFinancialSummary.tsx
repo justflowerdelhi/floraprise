@@ -38,6 +38,7 @@ import type {
   PaymentWarning,
 } from './PaymentScheduleTypes';
 import { PAYMENT_SCHEDULE_STATUS_CONFIG } from './PaymentScheduleTypes';
+import { formatCurrency } from '../../core/i18n';
 
 // ─── Styling Constants ──────────────────────────────────────
 
@@ -46,14 +47,6 @@ const borderColor = '#2d2d44';
 const yellowAccent = '#fdd835';
 
 // ─── Format Functions ───────────────────────────────────────
-
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
 
 const formatDate = (dateString: string): string => {
   if (!dateString) return '-';
@@ -462,7 +455,7 @@ const EventFinancialSummary: React.FC<EventFinancialSummaryProps> = ({
         />
         <MetricCard
           label="Overdue"
-          value={overduePayments.length > 0 ? formatCurrency(overduePayments.reduce((sum, p) => sum + (p.amount - p.amountPaid), 0)) : '₹0'}
+          value={overduePayments.length > 0 ? formatCurrency(overduePayments.reduce((sum, p) => sum + (p.amount - p.amountPaid), 0)) : formatCurrency(0)}
           subValue={overduePayments.length > 0 ? `${overduePayments.length} overdue payment(s)` : 'No overdue'}
           icon={<OverdueIcon sx={{ fontSize: 24 }} />}
           color={overduePayments.length > 0 ? '#f44336' : '#4caf50'}

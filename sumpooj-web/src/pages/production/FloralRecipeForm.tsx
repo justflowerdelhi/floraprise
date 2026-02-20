@@ -28,6 +28,7 @@ import type { RecipeComponent, InventoryProduct } from './types/ProductionTypes'
 import { RECIPE_CATEGORIES } from './types/ProductionTypes';
 import { getRecipeById, createRecipe, updateRecipe, getInventoryProducts } from './api/production.api';
 import { calculateComponentCost, formatCurrency } from './utils/production.utils';
+import { getCurrencySymbol } from '../../core/i18n';
 
 interface ComponentRow extends RecipeComponent {
   _key: string; // for React key
@@ -222,7 +223,7 @@ const FloralRecipeForm = () => {
                   </Grid>
                   <Grid size={{ xs: 12, sm: 4 }}>
                     <TextField
-                      label="Selling Price (₹)"
+                      label={`Selling Price (${getCurrencySymbol()})`}
                       type="number"
                       value={sellingPrice || ''}
                       onChange={(e) => setSellingPrice(Number(e.target.value))}
@@ -233,7 +234,7 @@ const FloralRecipeForm = () => {
                   </Grid>
                   <Grid size={{ xs: 12, sm: 4 }}>
                     <TextField
-                      label="Labor Cost (₹)"
+                      label={`Labor Cost (${getCurrencySymbol()})`}
                       type="number"
                       value={laborCost || ''}
                       onChange={(e) => setLaborCost(Number(e.target.value))}

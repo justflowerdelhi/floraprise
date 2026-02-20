@@ -15,6 +15,7 @@ import { Card, CardContent, Typography, useTheme } from '@mui/material';
 import type { WastageTrendPoint } from '../data/health.data';
 import { CHART_COLORS } from '../data/health.data';
 import { fmtCurrency } from '../utils/health.utils';
+import { formatCurrencyCompact } from '../../../core/i18n';
 
 interface Props {
   data: WastageTrendPoint[];
@@ -83,7 +84,7 @@ const WastageTrendChart: React.FC<Props> = ({ data }) => {
               tick={{ fontSize: 11, fill: darkMode ? '#888' : '#666' }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v: number) => `₹${(v / 1000).toFixed(0)}K`}
+              tickFormatter={(v: number) => formatCurrencyCompact(v)}
             />
             <Tooltip content={<CustomTooltip />} />
             <Area

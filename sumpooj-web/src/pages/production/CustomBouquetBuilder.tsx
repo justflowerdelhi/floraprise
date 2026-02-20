@@ -33,6 +33,7 @@ import type { InventoryProduct, CustomBouquetComponent } from './types/Productio
 import { RECIPE_CATEGORIES } from './types/ProductionTypes';
 import { getInventoryProducts, createCustomBouquetAndSell, saveCustomBouquetAsRecipe } from './api/production.api';
 import { formatCurrency } from './utils/production.utils';
+import { getCurrencySymbol } from '../../core/i18n';
 
 interface ComponentRow extends CustomBouquetComponent {
   _key: string;
@@ -312,7 +313,7 @@ const CustomBouquetBuilder = () => {
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, sm: 4 }}>
                     <TextField
-                      label="Selling Price (₹)"
+                      label={`Selling Price (${getCurrencySymbol()})`}
                       type="number"
                       value={sellingPrice || ''}
                       onChange={(e) => setSellingPrice(Number(e.target.value))}
@@ -323,7 +324,7 @@ const CustomBouquetBuilder = () => {
                   </Grid>
                   <Grid size={{ xs: 12, sm: 4 }}>
                     <TextField
-                      label="Labor Cost (₹)"
+                      label={`Labor Cost (${getCurrencySymbol()})`}
                       type="number"
                       value={laborCost || ''}
                       onChange={(e) => setLaborCost(Number(e.target.value))}

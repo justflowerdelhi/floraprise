@@ -77,8 +77,9 @@ export const isBatchMaintainable = (batch: FinishedGoodsBatch): boolean =>
 
 // ─── Currency Formatter ─────────────────────────────────────
 
-export const formatCurrency = (amount: number): string =>
-  `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+import { formatCurrency as _coreFormatCurrency } from '../../../core/i18n';
+
+export const formatCurrency = (amount: number): string => _coreFormatCurrency(amount);
 
 // ─── Date Formatter ─────────────────────────────────────────
 

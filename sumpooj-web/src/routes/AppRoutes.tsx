@@ -26,6 +26,7 @@ import DeliveryScheduler from '../pages/orders/DeliveryScheduler';
 import OrderList from '../pages/orders/OrderList';
 import WireVendorsPage from '../pages/orders/WireVendorsPage';
 import WireSettlementsPage from '../pages/orders/WireSettlementsPage';
+import RefundScreen from '../pages/refunds/RefundScreen';
 
 // Event Module
 import EventList from '../pages/events/EventList';
@@ -46,11 +47,20 @@ import { MyTasksPage } from '../pages/tasks';
 // Subscription
 import { SubscriptionPage } from '../pages/subscription';
 
+// Settings
+import TenantSettingsPage from '../pages/settings/TenantSettingsPage';
+
+// Onboarding
+import OnboardingWizard from '../pages/onboarding/OnboardingWizard';
+
 // Day Close
 import { DayCloseScreen } from '../pages/day-close';
 
 // CRM & Customer Intelligence
 import { CustomerListPage, Customer360View, SmartReminderDashboard, LoyaltyProgramPage } from '../pages/crm';
+
+// Gift Cards
+import { GiftCardPage } from '../pages/gift-cards';
 
 // Floral Production Engine
 import {
@@ -78,11 +88,23 @@ export default function AppRoutes() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/auth/login" element={<Login />} />
 
+        {/* Onboarding (authenticated but before main layout) */}
+        <Route
+          path="/onboarding"
+          element={
+            <RequireAuth>
+              <OnboardingWizard />
+            </RequireAuth>
+          }
+        />
+
         {/* Protected Routes with MasterLayout */}
         <Route
           element={
             <RequireAuth>
-              <MasterLayout />
+              <OrderProvider>
+                <MasterLayout />
+              </OrderProvider>
             </RequireAuth>
           }
         >
@@ -112,8 +134,9 @@ export default function AppRoutes() {
           />
 
           {/* ─── Orders ─────────────────────────────────── */}
-          <Route path="/external-orders" element={<OrderProvider><ExternalOrdersInbox /></OrderProvider>} />
-          <Route path="/order-list" element={<OrderProvider><OrderList /></OrderProvider>} />
+          <Route path="/external-orders" element={<ExternalOrdersInbox />} />
+          <Route path="/order-list" element={<OrderList />} />
+          <Route path="/orders/:orderId/refund" element={<RefundScreen />} />
           <Route path="/orders/new" element={<OrderForm />} />
           <Route path="/delivery-scheduler" element={<DeliveryScheduler />} />
           <Route
@@ -176,6 +199,7 @@ export default function AppRoutes() {
 
           {/* ─── Settings / Subscription ────────────────── */}
           <Route path="/subscription" element={<SubscriptionPage />} />
+          <Route path="/settings/tenant" element={<TenantSettingsPage />} />
           <Route path="/day-close" element={<DayCloseScreen />} />
 
           {/* ─── CRM & Customer Intelligence ────────────── */}
@@ -183,6 +207,9 @@ export default function AppRoutes() {
           <Route path="/crm/customers/:customerId" element={<Customer360View />} />
           <Route path="/crm/reminders" element={<SmartReminderDashboard />} />
           <Route path="/crm/loyalty" element={<LoyaltyProgramPage />} />
+
+          {/* ─── Gift Cards ────────────────────────────── */}
+          <Route path="/gift-cards/designer" element={<GiftCardPage />} />
 
           {/* ─── Floral Production Engine ───────────────── */}
           <Route path="/production/recipes" element={<FloralRecipeList />} />

@@ -287,12 +287,9 @@ export const printBatchLabel = async (batch: InventoryBatch): Promise<void> => {
 
 // ─── Formatters ──────────────────────────────────────────────
 
-export const fmt = (n: number): string =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-  }).format(n);
+import { formatCurrency } from '../../../core/i18n';
+
+export const fmt = (n: number): string => formatCurrency(n);
 
 export const fmtDate = (d: string | null): string => {
   if (!d) return '—';

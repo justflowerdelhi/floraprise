@@ -7,15 +7,11 @@ import type {
   ValuationFilterState,
   ValuationSummary,
 } from '../data/valuation.data';
+import { formatCurrency } from '../../../core/i18n';
 
 // ─── Formatters ─────────────────────────────────────────────
 
-export const fmt = (n: number): string =>
-  '₹' +
-  n.toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+export const fmt = (n: number): string => formatCurrency(n);
 
 export const fmtPct = (n: number): string => `${n.toFixed(1)}%`;
 

@@ -67,6 +67,7 @@ import {
 import { PRODUCT_OPTIONS, MOCK_PROPOSALS, MOCK_VERSION_HISTORY } from './ProposalMockData';
 import { MOCK_EVENTS } from './EventMockData';
 import ProfitSummaryPanel from './ProfitSummaryPanel';
+import { formatCurrency } from '../../core/i18n';
 
 // ─── Styling Constants ──────────────────────────────────────
 
@@ -76,14 +77,6 @@ const yellowAccent = '#fdd835';
 const pageBg = '#0f0f0f';
 
 // ─── Format Currency ────────────────────────────────────────
-
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
 
 // ─── Version History Dialog ─────────────────────────────────
 

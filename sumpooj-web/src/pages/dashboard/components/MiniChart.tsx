@@ -10,6 +10,7 @@ import {
   Tooltip,
 } from 'recharts';
 import type { SalesTrendPoint } from '../api/dashboardApi';
+import { formatCurrency } from '../../../core/i18n';
 
 interface MiniChartProps {
   data: SalesTrendPoint[];
@@ -39,7 +40,7 @@ export default function MiniChart({ data }: MiniChartProps) {
                 fontSize: 12,
                 boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
               }}
-              formatter={(v: number | undefined) => [`₹${(v ?? 0).toLocaleString('en-IN')}`, 'Sales']}
+              formatter={(v: number | undefined) => [formatCurrency(v ?? 0), 'Sales']}
               cursor={{ fill: 'rgba(0,0,0,0.03)' }}
             />
             <Bar dataKey="sales" fill="#10b981" radius={[6, 6, 0, 0]} />

@@ -9,6 +9,7 @@ import {
   DEFAULT_LOYALTY_CONFIG,
   formatCurrency,
 } from './CRMTypes';
+import { getCurrencySymbol } from '../../core/i18n';
 
 export default function LoyaltyProgramPage() {
   const theme = useTheme();
@@ -33,7 +34,7 @@ export default function LoyaltyProgramPage() {
         </Typography>
         <Grid container spacing={3}>
           <Grid size={{ xs: 6, sm: 3 }}>
-            <Typography variant="caption" sx={{ opacity: 0.7 }}>Points per ₹100</Typography>
+            <Typography variant="caption" sx={{ opacity: 0.7 }}>Points per {getCurrencySymbol()}100</Typography>
             <Typography variant="h5" fontWeight={600} sx={{ color: '#fdd835' }}>
               {DEFAULT_LOYALTY_CONFIG.pointsPerCurrency}
             </Typography>
@@ -41,7 +42,7 @@ export default function LoyaltyProgramPage() {
           <Grid size={{ xs: 6, sm: 3 }}>
             <Typography variant="caption" sx={{ opacity: 0.7 }}>Point Value</Typography>
             <Typography variant="h5" fontWeight={600} sx={{ color: '#4caf50' }}>
-              ₹{DEFAULT_LOYALTY_CONFIG.currencyPerPoint}
+              {getCurrencySymbol()}{DEFAULT_LOYALTY_CONFIG.currencyPerPoint}
             </Typography>
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>

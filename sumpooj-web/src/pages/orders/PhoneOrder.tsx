@@ -13,7 +13,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Box, Typography, TextField, Button, Grid, Chip, Card, CardContent,
   InputAdornment, Snackbar, Alert, MenuItem, Divider, ToggleButton, ToggleButtonGroup,
-  useTheme, alpha,
+  useTheme, alpha, Autocomplete,
 } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material/styles';
 import {
@@ -33,6 +33,7 @@ import type { ProductCategory } from './OrderTypes';
 import { MOCK_PRODUCTS, PRODUCT_CATEGORIES } from './OrderMockData';
 import { OCCASIONS, TIME_SLOTS } from './OrderTypes';
 import type { TimeSlot } from './OrderTypes';
+import type { OrderPaymentEntry, Order } from './OrderTypes';
 import type { FulfillmentType, DeliveryAddress } from './DeliveryZoneTypes';
 import { useCart } from '../cart/CartContext';
 import CartTable from '../cart/CartTable';
@@ -40,6 +41,9 @@ import CartSummaryPanel from '../cart/CartSummaryPanel';
 import { fmtCurrency } from '../cart/CartUtils';
 import PaymentModal from '../payments/PaymentModal';
 import SmartAddressInput from './SmartAddressInput';
+import { MOCK_CUSTOMERS, type Customer } from '../crm/CRMTypes';
+import { useOrders } from './OrderContext';
+import { processOrderInventory, inferFulfillmentMode } from '../inventory/InventoryMovementService';
 
 const PhoneOrder: React.FC = () => {
   const theme = useTheme();
@@ -47,6 +51,7 @@ const PhoneOrder: React.FC = () => {
   const bgColor = dk ? '#0f0f0f' : '#f8f9fa';
 
   const { state, addProduct, removeItem, updateQty, setDiscount, clearCart, setOrderSource } = useCart();
+  const { addOrder } = useOrders();
 
   // ─── Fulfillment Type ───────────────────────────────────────
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('DELIVERY');
@@ -54,6 +59,7 @@ const PhoneOrder: React.FC = () => {
   // ─── Common Fields ──────────────────────────────────────────
   const [customerName, setCustomerName]   = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [occasion, setOccasion]           = useState('');
   
   // ─── Pickup Fields ──────────────────────────────────────────
@@ -76,6 +82,15 @@ const PhoneOrder: React.FC = () => {
   const [paymentOrderId, setPaymentOrderId] = useState('');
 
   useEffect(() => { setOrderSource('PHONE'); }, [setOrderSource]);
+
+  // Filtered customer suggestions based on name or phone input
+  const customerSuggestions = useMemo(() => {
+    const q = (customerName || customerPhone || '').toLowerCase().trim();
+    if (!q) return MOCK_CUSTOMERS;
+    return MOCK_CUSTOMERS.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.phone.replace(/\s/g, '').includes(q.replace(/\s/g, '')),
+    );
+  }, [customerName, customerPhone]);
 
   const filteredProducts = useMemo(() => {
     let list = MOCK_PRODUCTS;
@@ -123,6 +138,7 @@ const PhoneOrder: React.FC = () => {
     clearCart();
     setCustomerName('');
     setCustomerPhone('');
+    setSelectedCustomer(null);
     setRecipientName('');
     setRecipientPhone('');
     setPickupDate('');
@@ -135,29 +151,47 @@ const PhoneOrder: React.FC = () => {
   const handleSubmit = () => {
     if (!isFormValid || state.items.length === 0) return;
     
-    // In production, this would call an API to create the order
-    // with structured fulfillment data
-    console.log('Order Data:', {
-      fulfillmentType,
+    const now = new Date().toISOString();
+    const orderId = `phone_${Date.now()}`;
+    // Phone draft orders with a future date → SCHEDULED (reserve inventory)
+    const mode = inferFulfillmentMode({
+      orderSource: 'PHONE',
+      paymentStatus: 'UNPAID',
+      deliveryDate: fulfillmentType === 'DELIVERY' ? deliveryDate : undefined,
+      pickupDate: fulfillmentType === 'PICKUP' ? pickupDate : undefined,
+    });
+    const invResult = processOrderInventory(orderId, state.items, mode, 'loc_default');
+    const newOrder: Order = {
+      id: orderId,
+      orderNumber: `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+      orderSource: 'PHONE',
       customerName,
       customerPhone,
-      ...(fulfillmentType === 'PICKUP' && {
-        pickupDate,
-        pickupTimeSlot,
-      }),
+      fulfillmentType,
+      ...(fulfillmentType === 'PICKUP' && { pickupDate, pickupTimeSlot }),
       ...(fulfillmentType === 'DELIVERY' && {
         recipientName,
         recipientPhone,
-        structuredDeliveryAddress: deliveryAddress,
+        structuredDeliveryAddress: (deliveryAddress as DeliveryAddress) ?? undefined,
         deliveryDate,
         deliveryTimeSlot,
         cardMessage,
-        deliveryFee: deliveryAddress?.deliveryZone?.deliveryFee,
       }),
       occasion,
+      fulfillmentStatus: 'DRAFT',
+      paymentStatus: 'UNPAID',
+      orderStatus: 'DRAFT',
+      isPriceEditable: false,
+      totalAmount: grandTotalWithDelivery,
+      totalPaid: 0,
+      balanceDue: grandTotalWithDelivery,
       items: state.items,
-      totals: state.totals,
-    });
+      totals: { ...state.totals, grandTotal: grandTotalWithDelivery },
+      ...invResult,
+      createdAt: now,
+      updatedAt: now,
+    };
+    addOrder(newOrder);
     
     setSnackMsg(`Phone order created — ${fmtCurrency(grandTotalWithDelivery)}`);
     resetForm();
@@ -169,11 +203,72 @@ const PhoneOrder: React.FC = () => {
     setPayModalOpen(true);
   }, [isFormValid, state.items.length]);
 
-  const handleFullyPaid = useCallback(() => {
+  const handleFullyPaid = useCallback((payments: OrderPaymentEntry[]) => {
+    const now = new Date().toISOString();
+    const deliveryFee = fulfillmentType === 'DELIVERY' ? (deliveryAddress?.deliveryZone?.deliveryFee ?? 0) : 0;
+    // Phone paid order: check if it has a future date → SCHEDULED, else IMMEDIATE
+    const mode = inferFulfillmentMode({
+      orderSource: 'PHONE',
+      paymentStatus: 'PAID',
+      deliveryDate: fulfillmentType === 'DELIVERY' ? deliveryDate : undefined,
+      pickupDate: fulfillmentType === 'PICKUP' ? pickupDate : undefined,
+    });
+    const invResult = processOrderInventory(paymentOrderId, state.items, mode, 'loc_default');
+    const newOrder: Order = {
+      id: paymentOrderId,
+      orderNumber: `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+      orderSource: 'PHONE',
+      customerName,
+      customerPhone,
+      fulfillmentType,
+      ...(fulfillmentType === 'PICKUP' && { pickupDate, pickupTimeSlot }),
+      ...(fulfillmentType === 'DELIVERY' && {
+        recipientName,
+        recipientPhone,
+        structuredDeliveryAddress: (deliveryAddress as DeliveryAddress) ?? undefined,
+        deliveryDate,
+        deliveryTimeSlot,
+        cardMessage,
+      }),
+      occasion,
+      fulfillmentStatus: 'CONFIRMED',
+      paymentStatus: 'PAID',
+      orderStatus: 'PAID',
+      isPriceEditable: false,
+      totalAmount: grandTotalWithDelivery,
+      totalPaid: grandTotalWithDelivery,
+      balanceDue: 0,
+      payments,
+      items: state.items,
+      totals: { ...state.totals, grandTotal: grandTotalWithDelivery },
+      ...invResult,
+      createdAt: now,
+      updatedAt: now,
+    };
+    addOrder(newOrder);
     setPayModalOpen(false);
     setSnackMsg(`Phone order paid — ${fmtCurrency(grandTotalWithDelivery)}`);
     resetForm();
-  }, [resetForm, grandTotalWithDelivery]);
+  }, [
+    addOrder,
+    paymentOrderId,
+    fulfillmentType,
+    customerName,
+    customerPhone,
+    pickupDate,
+    pickupTimeSlot,
+    recipientName,
+    recipientPhone,
+    deliveryAddress,
+    deliveryDate,
+    deliveryTimeSlot,
+    cardMessage,
+    occasion,
+    state.items,
+    state.totals,
+    resetForm,
+    grandTotalWithDelivery,
+  ]);
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', bgcolor: bgColor, overflow: 'hidden' }}>
@@ -224,43 +319,103 @@ const PhoneOrder: React.FC = () => {
           {fulfillmentType === 'PICKUP' && (
             <Grid container spacing={2}>
               <Grid size={{ xs: 12 }}>
-                <TextField
-                  required
+                <Autocomplete
+                  freeSolo
                   size="small"
-                  fullWidth
-                  label="Customer Name"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <PersonIcon sx={{ fontSize: 18 }} />
-                        </InputAdornment>
-                      ),
-                    },
+                  options={customerSuggestions}
+                  getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.name}
+                  value={selectedCustomer}
+                  inputValue={customerName}
+                  onInputChange={(_e, val) => setCustomerName(val)}
+                  onChange={(_e, val) => {
+                    if (val && typeof val !== 'string') {
+                      setSelectedCustomer(val);
+                      setCustomerName(val.name);
+                      setCustomerPhone(val.phone);
+                    } else {
+                      setSelectedCustomer(null);
+                      if (typeof val === 'string') setCustomerName(val);
+                    }
                   }}
-                  sx={fieldSx}
+                  renderOption={(props, option) => (
+                    <li {...props} key={option.id}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">{option.phone}{option.email ? ` \u00b7 ${option.email}` : ''}</Typography>
+                      </Box>
+                    </li>
+                  )}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      required
+                      label="Customer Name"
+                      slotProps={{
+                        input: {
+                          ...params.InputProps,
+                          startAdornment: (
+                            <>
+                              <InputAdornment position="start">
+                                <PersonIcon sx={{ fontSize: 18 }} />
+                              </InputAdornment>
+                              {params.InputProps.startAdornment}
+                            </>
+                          ),
+                        },
+                      }}
+                      sx={fieldSx}
+                    />
+                  )}
                 />
               </Grid>
               <Grid size={{ xs: 12 }}>
-                <TextField
-                  required
+                <Autocomplete
+                  freeSolo
                   size="small"
-                  fullWidth
-                  label="Customer Phone"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <PhoneIcon sx={{ fontSize: 18 }} />
-                        </InputAdornment>
-                      ),
-                    },
+                  options={customerSuggestions}
+                  getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.phone}
+                  value={selectedCustomer}
+                  inputValue={customerPhone}
+                  onInputChange={(_e, val) => setCustomerPhone(val)}
+                  onChange={(_e, val) => {
+                    if (val && typeof val !== 'string') {
+                      setSelectedCustomer(val);
+                      setCustomerName(val.name);
+                      setCustomerPhone(val.phone);
+                    } else {
+                      setSelectedCustomer(null);
+                      if (typeof val === 'string') setCustomerPhone(val);
+                    }
                   }}
-                  sx={fieldSx}
+                  renderOption={(props, option) => (
+                    <li {...props} key={option.id}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.phone}</Typography>
+                        <Typography variant="caption" color="text.secondary">{option.name}</Typography>
+                      </Box>
+                    </li>
+                  )}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      required
+                      label="Customer Phone"
+                      slotProps={{
+                        input: {
+                          ...params.InputProps,
+                          startAdornment: (
+                            <>
+                              <InputAdornment position="start">
+                                <PhoneIcon sx={{ fontSize: 18 }} />
+                              </InputAdornment>
+                              {params.InputProps.startAdornment}
+                            </>
+                          ),
+                        },
+                      }}
+                      sx={fieldSx}
+                    />
+                  )}
                 />
               </Grid>
               <Grid size={{ xs: 7 }}>

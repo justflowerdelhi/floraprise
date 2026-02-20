@@ -88,3 +88,12 @@ export function formatCurrencyCompact(amount: number, currencyCode?: string): st
 export function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
+
+/**
+ * Get the currency symbol for the active (or specified) currency.
+ * e.g. getCurrencySymbol() → '₹' when tenant is INR, '$' for USD
+ */
+export function getCurrencySymbol(currencyCode?: string): string {
+  const code = currencyCode ?? _currentCurrency;
+  return getFormatter(code).formatToParts(0).find((p) => p.type === 'currency')?.value ?? code;
+}

@@ -2,11 +2,12 @@
  * OrderList.tsx — Unified order list with source badges, search & status filters
  * Supports: WALK_IN, PHONE, WEBSITE, FTD, BLOOMNATION
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Paper, Chip, TextField, FormControl, InputLabel, Select, MenuItem,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  InputAdornment, useTheme, alpha, Button,
+  InputAdornment, useTheme, alpha, Button, Snackbar, Alert,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import {
@@ -17,16 +18,20 @@ import {
   LocalShipping as FTDIcon,
   LocalFlorist as BloomIcon,
   AddTask as AddTaskIcon,
+  Payment as PayIcon,
+  MoneyOff as RefundIcon,
 } from '@mui/icons-material';
-import type { Order, OrderSource, FulfillmentStatus, OrderPaymentStatus, OrderType } from './OrderTypes';
-import { ORDER_SOURCE_CONFIG, FULFILLMENT_STATUS_CONFIG, PAYMENT_STATUS_CONFIG } from './OrderTypes';
-import { MOCK_ORDERS } from './OrderMockData';
+import type { Order, OrderSource, FulfillmentStatus, OrderPaymentStatus, OrderType, OrderPaymentEntry, OrderStatus, InventoryActionStatus } from './OrderTypes';
+import { ORDER_SOURCE_CONFIG, FULFILLMENT_STATUS_CONFIG, PAYMENT_STATUS_CONFIG, ORDER_STATUS_CONFIG, INVENTORY_STATUS_CONFIG, resolveOrderStatus } from './OrderTypes';
+import { useOrders } from './OrderContext';
+import { deductReservedOrder } from '../inventory/InventoryMovementService';
 import { useTenant } from '../../core/tenant/TenantContext';
 import { PermissionGate } from '../../core/rbac/RBACContext';
 import CreateTaskDialog from '../tasks/CreateTaskDialog';
+import PaymentModal from '../payments/PaymentModal';
+import { formatCurrency } from '../../core/i18n';
 
-const fmtCurrency = (v: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
+const fmtCurrency = (v: number) => formatCurrency(v);
 const fmtDateTime = (iso: string) =>
   new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -48,6 +53,8 @@ const OrderList: React.FC = () => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const bg = dk ? '#0f0f0f' : '#f8f9fa';
+  const navigate = useNavigate();
+  const { getAllOrders, updateOrder } = useOrders();
   const { hasFeature } = useTenant();
   const wireEnabled = hasFeature('WIRE_MANAGEMENT');
 
@@ -56,15 +63,27 @@ const OrderList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<FulfillmentStatus | 'ALL'>('ALL');
   const [payStatus, setPayStatus] = useState<OrderPaymentStatus | 'ALL'>('ALL');
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | 'ALL'>('ALL');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatus | 'ALL'>('ALL');
+  const [inventoryFilter, setInventoryFilter] = useState<InventoryActionStatus | 'ALL'>('ALL');
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
 
+  // ─── Balance Collection State ────────────────────────────
+  const [collectOrder, setCollectOrder] = useState<Order | null>(null);
+  const [snackMsg, setSnackMsg] = useState('');
+
   const filtered = useMemo(() => {
-    let list: Order[] = [...MOCK_ORDERS];
+    let list: Order[] = getAllOrders();
     if (sourceFilter !== 'ALL') list = list.filter((o) => o.orderSource === sourceFilter);
     if (statusFilter !== 'ALL') list = list.filter((o) => o.fulfillmentStatus === statusFilter);
     if (payStatus !== 'ALL') list = list.filter((o) => o.paymentStatus === payStatus);
     if (wireEnabled && orderTypeFilter !== 'ALL') {
       list = list.filter((o) => (o.orderType ?? 'LOCAL') === orderTypeFilter);
+    }
+    if (orderStatusFilter !== 'ALL') {
+      list = list.filter((o) => resolveOrderStatus(o) === orderStatusFilter);
+    }
+    if (inventoryFilter !== 'ALL') {
+      list = list.filter((o) => (o.inventoryStatus ?? 'NONE') === inventoryFilter);
     }
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -76,7 +95,45 @@ const OrderList: React.FC = () => {
       );
     }
     return list;
-  }, [search, sourceFilter, statusFilter, payStatus, orderTypeFilter, wireEnabled]);
+  }, [search, sourceFilter, statusFilter, payStatus, orderTypeFilter, orderStatusFilter, inventoryFilter, wireEnabled, getAllOrders]);
+
+  const handleDeductInventory = useCallback((order: Order) => {
+    const result = deductReservedOrder(order);
+    updateOrder({ ...order, ...result, updatedAt: new Date().toISOString() });
+    setSnackMsg(`${order.orderNumber} — inventory deducted`);
+  }, [updateOrder]);
+
+  const handleOpenCollect = useCallback((order: Order) => {
+    setCollectOrder(order);
+  }, []);
+
+  const handleCollectFullyPaid = useCallback((payments: OrderPaymentEntry[]) => {
+    if (!collectOrder) return;
+    console.log('Balance Collected — Order now PAID:', {
+      orderId: collectOrder.id,
+      payments,
+      orderStatus: 'PAID' as OrderStatus,
+      totalAmount: collectOrder.totals.grandTotal,
+      totalPaid: collectOrder.totals.grandTotal,
+      balanceDue: 0,
+    });
+    setCollectOrder(null);
+    setSnackMsg(`${collectOrder.orderNumber} fully paid!`);
+  }, [collectOrder]);
+
+  const handleCollectPartialSave = useCallback((payments: OrderPaymentEntry[], totalPaid: number, balanceDue: number) => {
+    if (!collectOrder) return;
+    console.log('Additional Payment Collected:', {
+      orderId: collectOrder.id,
+      payments,
+      orderStatus: 'PARTIALLY_PAID' as OrderStatus,
+      totalAmount: collectOrder.totals.grandTotal,
+      totalPaid,
+      balanceDue,
+    });
+    setCollectOrder(null);
+    setSnackMsg(`${collectOrder.orderNumber} — ${fmtCurrency(totalPaid)} paid, ${fmtCurrency(balanceDue)} still due`);
+  }, [collectOrder]);
 
   const headerSx = {
     fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase' as const,
@@ -167,6 +224,32 @@ const OrderList: React.FC = () => {
             </Select>
           </FormControl>
         )}
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Status</InputLabel>
+          <Select
+            value={orderStatusFilter}
+            label="Status"
+            onChange={(e: SelectChangeEvent) => setOrderStatusFilter(e.target.value as OrderStatus | 'ALL')}
+          >
+            <MenuItem value="ALL">All Statuses</MenuItem>
+            {(['PAID', 'PARTIALLY_PAID', 'DRAFT', 'CANCELLED', 'PARTIALLY_REFUNDED', 'REFUNDED'] as OrderStatus[]).map((os) => (
+              <MenuItem key={os} value={os}>{ORDER_STATUS_CONFIG[os].label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 140 }}>
+          <InputLabel>Inventory</InputLabel>
+          <Select
+            value={inventoryFilter}
+            label="Inventory"
+            onChange={(e: SelectChangeEvent) => setInventoryFilter(e.target.value as InventoryActionStatus | 'ALL')}
+          >
+            <MenuItem value="ALL">All</MenuItem>
+            {(Object.keys(INVENTORY_STATUS_CONFIG) as InventoryActionStatus[]).map((is) => (
+              <MenuItem key={is} value={is}>{INVENTORY_STATUS_CONFIG[is].label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </Paper>
 
       {/* Stats bar */}
@@ -199,6 +282,28 @@ const OrderList: React.FC = () => {
         />
       </Box>
 
+      {/* Status summary chips */}
+      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+        {(['PAID', 'PARTIALLY_PAID', 'DRAFT'] as OrderStatus[]).map((os) => {
+          const count = filtered.filter((o) => (o.orderStatus ?? 'PAID') === os).length;
+          if (!count) return null;
+          const cfg = ORDER_STATUS_CONFIG[os];
+          return (
+            <Chip
+              key={os}
+              label={`${cfg.label}: ${count}`}
+              size="small"
+              sx={{
+                bgcolor: alpha(cfg.color, dk ? 0.25 : 0.12),
+                color: cfg.color,
+                fontWeight: 700,
+                fontSize: '0.74rem',
+              }}
+            />
+          );
+        })}
+      </Box>
+
       {/* Table */}
       <TableContainer
         component={Paper}
@@ -221,13 +326,17 @@ const OrderList: React.FC = () => {
               <TableCell sx={headerSx} align="right">Net Payout</TableCell>
               <TableCell sx={headerSx}>Fulfillment</TableCell>
               <TableCell sx={headerSx}>Payment</TableCell>
+              <TableCell sx={headerSx}>Status</TableCell>
+              <TableCell sx={headerSx}>Inventory</TableCell>
+              <TableCell sx={headerSx} align="right">Balance Due</TableCell>
               <TableCell sx={headerSx} align="right">Items</TableCell>
+              <TableCell sx={headerSx} align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={wireEnabled ? 10 : 9} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={wireEnabled ? 14 : 13} align="center" sx={{ py: 6 }}>
                   <Typography color="text.disabled">No orders match the current filters</Typography>
                 </TableCell>
               </TableRow>
@@ -239,8 +348,23 @@ const OrderList: React.FC = () => {
                 const hasCommission = o.netPayout != null;
                 const orderType = o.orderType ?? 'LOCAL';
                 const typeCfg = ORDER_TYPE_CONFIG[orderType];
+                const isPartial = o.orderStatus === 'PARTIALLY_PAID' || (o.paymentStatus === 'PARTIAL' && (o.balanceDue ?? 0) > 0);
+                const resolvedStatus = resolveOrderStatus(o);
+                const osCfg = ORDER_STATUS_CONFIG[resolvedStatus];
+                const invStatus = o.inventoryStatus ?? 'NONE';
+                const invCfg = INVENTORY_STATUS_CONFIG[invStatus];
                 return (
-                  <TableRow key={o.id} hover sx={{ '&:hover': { bgcolor: dk ? alpha('#fff', 0.03) : alpha('#000', 0.02) } }}>
+                  <TableRow
+                    key={o.id}
+                    hover
+                    sx={{
+                      '&:hover': { bgcolor: dk ? alpha('#fff', 0.03) : alpha('#000', 0.02) },
+                      ...(isPartial && {
+                        bgcolor: dk ? alpha('#ff9800', 0.06) : alpha('#ff9800', 0.04),
+                        borderLeft: `3px solid #ff9800`,
+                      }),
+                    }}
+                  >
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '0.82rem' }}>
                         {o.orderNumber}
@@ -324,8 +448,81 @@ const OrderList: React.FC = () => {
                         }}
                       />
                     </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={osCfg.label}
+                        size="small"
+                        sx={{
+                          bgcolor: alpha(osCfg.color, dk ? 0.25 : 0.12),
+                          color: osCfg.color,
+                          fontWeight: 700,
+                          fontSize: '0.7rem',
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={invCfg.label}
+                        size="small"
+                        sx={{
+                          bgcolor: alpha(invCfg.color, dk ? 0.25 : 0.12),
+                          color: invCfg.color,
+                          fontWeight: 700,
+                          fontSize: '0.7rem',
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      {(o.balanceDue ?? 0) > 0 ? (
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#ff9800' }}>
+                          {fmtCurrency(o.balanceDue!)}
+                        </Typography>
+                      ) : (
+                        <Typography variant="caption" color="text.disabled">—</Typography>
+                      )}
+                    </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2">{o.items.length}</Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap' }}>
+                        {isPartial && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="warning"
+                            startIcon={<PayIcon />}
+                            onClick={() => handleOpenCollect(o)}
+                            sx={{ fontWeight: 700, fontSize: '0.72rem', textTransform: 'none', minHeight: 36 }}
+                          >
+                            Collect
+                          </Button>
+                        )}
+                        {invStatus === 'RESERVED' && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="success"
+                            onClick={() => handleDeductInventory(o)}
+                            sx={{ fontWeight: 700, fontSize: '0.72rem', textTransform: 'none', minHeight: 36 }}
+                          >
+                            Deduct Stock
+                          </Button>
+                        )}
+                        {(resolvedStatus === 'PAID' || resolvedStatus === 'PARTIALLY_PAID' || resolvedStatus === 'PARTIALLY_REFUNDED') &&
+                          ((o.totalPaid ?? o.totals.grandTotal) - (o.totalRefunded ?? 0)) > 0 && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="info"
+                            startIcon={<RefundIcon />}
+                            onClick={() => navigate(`/orders/${o.id}/refund`)}
+                            sx={{ fontWeight: 700, fontSize: '0.72rem', textTransform: 'none', minHeight: 36 }}
+                          >
+                            {resolvedStatus === 'PARTIALLY_PAID' ? 'Refund Paid' : 'Refund'}
+                          </Button>
+                        )}
+                      </Box>
                     </TableCell>
                   </TableRow>
                 );
@@ -341,6 +538,29 @@ const OrderList: React.FC = () => {
         onClose={() => setTaskDialogOpen(false)}
         defaults={{ relatedEntityType: 'ORDER' }}
       />
+
+      {/* Balance Collection Modal */}
+      {collectOrder && (
+        <PaymentModal
+          open={!!collectOrder}
+          onClose={() => setCollectOrder(null)}
+          orderId={collectOrder.id}
+          grandTotal={collectOrder.totals.grandTotal}
+          existingPayments={collectOrder.payments}
+          onFullyPaid={handleCollectFullyPaid}
+          onPartialSave={handleCollectPartialSave}
+        />
+      )}
+
+      {/* Snackbar */}
+      <Snackbar
+        open={!!snackMsg}
+        autoHideDuration={3000}
+        onClose={() => setSnackMsg('')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" variant="filled" onClose={() => setSnackMsg('')}>{snackMsg}</Alert>
+      </Snackbar>
     </Box>
   );
 };

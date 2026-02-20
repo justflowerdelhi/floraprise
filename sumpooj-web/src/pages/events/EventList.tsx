@@ -35,11 +35,11 @@ import {
   EVENT_TYPE_CONFIG,
 } from './EventTypes';
 import { MOCK_EVENTS, getEventStats } from './EventMockData';
+import { formatCurrency } from '../../core/i18n';
 
-// ─── Currency Formatter ─────────────────────────────────────
+// ─── Currency Formatter ───────────────────────────────────────
 
-const fmtCurrency = (value: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value);
+const fmtCurrency = (value: number) => formatCurrency(value);
 
 const fmtDate = (dateStr: string) =>
   new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });

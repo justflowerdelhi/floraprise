@@ -7,9 +7,10 @@
 import StatCard from '../components/StatCard';
 import MiniChart from '../components/MiniChart';
 import type { AdminDashboardData } from '../api/dashboardApi';
+import { formatCurrency } from '../../../core/i18n';
 
-// ─── Currency formatter ─────────────────────────────────────
-const fmt = (n: number) => '₹' + n.toLocaleString('en-IN');
+// ─── Currency formatter ───────────────────────────────────────
+const fmt = (n: number) => formatCurrency(n);
 
 // ─── Icons (w-5 h-5 standardised) ──────────────────────────
 const ic = 'w-5 h-5';

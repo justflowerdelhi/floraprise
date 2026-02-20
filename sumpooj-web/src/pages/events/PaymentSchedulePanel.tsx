@@ -63,6 +63,7 @@ import {
   calculateScheduleStatus,
 } from './PaymentScheduleTypes';
 import { getPaymentsForSchedule, type MockPaymentRecord } from './PaymentScheduleMockData';
+import { formatCurrency, getCurrencySymbol } from '../../core/i18n';
 
 // ─── Styling Constants ──────────────────────────────────────
 
@@ -71,14 +72,6 @@ const borderColor = '#2d2d44';
 const yellowAccent = '#fdd835';
 
 // ─── Format Functions ───────────────────────────────────────
-
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
 
 const formatDate = (dateString: string): string => {
   if (!dateString) return '-';
@@ -169,7 +162,7 @@ const AddMilestoneDialog: React.FC<AddMilestoneDialogProps> = ({ open, onClose, 
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             InputProps={{
-              startAdornment: <Typography sx={{ color: '#888', mr: 0.5 }}>₹</Typography>,
+              startAdornment: <Typography sx={{ color: '#888', mr: 0.5 }}>{getCurrencySymbol()}</Typography>,
             }}
             sx={{
               '& .MuiOutlinedInput-root': {
@@ -295,7 +288,7 @@ const RecordPaymentDialog: React.FC<RecordPaymentDialogProps> = ({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             InputProps={{
-              startAdornment: <Typography sx={{ color: '#888', mr: 0.5 }}>₹</Typography>,
+              startAdornment: <Typography sx={{ color: '#888', mr: 0.5 }}>{getCurrencySymbol()}</Typography>,
             }}
             helperText={Number(amount) > balanceDue ? 'Amount exceeds balance due' : ''}
             error={Number(amount) > balanceDue}

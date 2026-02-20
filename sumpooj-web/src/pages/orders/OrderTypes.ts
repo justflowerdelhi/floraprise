@@ -9,6 +9,7 @@
  */
 
 import type { DeliveryAddress, FulfillmentType } from './DeliveryZoneTypes';
+import type { RefundEntry } from '../refunds/RefundTypes';
 
 // ─── Order Source & Statuses ────────────────────────────────
 
@@ -37,7 +38,75 @@ export type FulfillmentStatus =
  */
 export type OrderPaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID';
 
+export type OrderPaymentMethod = 'CASH' | 'CARD' | 'UPI' | 'STORE_CREDIT';
+
+export type OrderStatus = 'DRAFT' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED' | 'PARTIALLY_REFUNDED' | 'REFUNDED';
+
+export interface OrderPaymentEntry {
+  method: OrderPaymentMethod;
+  amount: number;
+}
+
 export type SettlementStatus = 'PENDING' | 'SENT' | 'CLEARED';
+
+// ─── Order Fulfillment Mode (controls inventory timing) ────
+
+/**
+ * Controls WHEN inventory is deducted for an order.
+ * - IMMEDIATE: deduct on order save (walk-in, ready-made)
+ * - SCHEDULED: reserve on save, deduct at dispatch/production
+ * - EVENT:     reserve on save, deduct at production stage
+ */
+export type OrderFulfillmentMode = 'IMMEDIATE' | 'SCHEDULED' | 'EVENT';
+
+/**
+ * Tracks what happened to inventory for this order.
+ * - NONE:     no action taken yet
+ * - RESERVED: items reserved but inventory not deducted
+ * - DEDUCTED: inventory physically deducted
+ * - RELEASED: reservation cancelled (order cancelled/refunded)
+ */
+export type InventoryActionStatus = 'NONE' | 'RESERVED' | 'DEDUCTED' | 'RELEASED';
+
+/** A single inventory reservation for a line item */
+export interface InventoryReservation {
+  id: string;
+  orderId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  locationId: string;
+  batchAllocations: { batchId: string; quantity: number }[];
+  status: 'ACTIVE' | 'FULFILLED' | 'RELEASED';
+  reservedAt: string; // ISO timestamp
+  fulfilledAt?: string;
+  releasedAt?: string;
+}
+
+export const ORDER_FULFILLMENT_MODE_CONFIG: Record<OrderFulfillmentMode, { label: string; description: string; icon: string }> = {
+  IMMEDIATE: {
+    label: 'Immediate',
+    description: 'Inventory deducted immediately when order is saved',
+    icon: '⚡',
+  },
+  SCHEDULED: {
+    label: 'Scheduled',
+    description: 'Items reserved; deducted when dispatched or produced',
+    icon: '📅',
+  },
+  EVENT: {
+    label: 'Event',
+    description: 'Items reserved; deducted during event production stage',
+    icon: '🎉',
+  },
+};
+
+export const INVENTORY_STATUS_CONFIG: Record<InventoryActionStatus, { label: string; color: string }> = {
+  NONE:     { label: 'Pending',  color: '#9e9e9e' },
+  RESERVED: { label: 'Reserved', color: '#ff9800' },
+  DEDUCTED: { label: 'Deducted', color: '#4caf50' },
+  RELEASED: { label: 'Released', color: '#0288d1' },
+};
 
 export interface VendorFlorist {
   id: string;
@@ -197,6 +266,26 @@ export interface Order {
   fulfillmentStatus: FulfillmentStatus;
   paymentStatus: OrderPaymentStatus;
 
+  // Order-level payment status for advance / partial orders
+  orderStatus?: OrderStatus;
+
+  // Financial summary for advance / partial payments
+  totalAmount?: number;
+  totalPaid?: number;
+  balanceDue?: number;
+
+  // Split payments captured at checkout
+  payments?: OrderPaymentEntry[];
+
+  // Inventory movement
+  orderFulfillmentMode?: OrderFulfillmentMode;
+  inventoryStatus?: InventoryActionStatus;
+  reservations?: InventoryReservation[];
+
+  // Refund history
+  refunds?: RefundEntry[];
+  totalRefunded?: number;
+
   // Line items & totals
   items: CartItem[];
   totals: CartSummary;
@@ -298,6 +387,26 @@ export const PAYMENT_STATUS_CONFIG: Record<OrderPaymentStatus, StatusConfig> = {
   UNPAID: { label: 'Unpaid', color: '#f44336' },
   PARTIAL:{ label: 'Partial',color: '#00bcd4' },
 };
+
+export const ORDER_STATUS_CONFIG: Record<OrderStatus, StatusConfig> = {
+  DRAFT:              { label: 'Draft',              color: '#9e9e9e' },
+  PARTIALLY_PAID:     { label: 'Partially Paid',     color: '#ff9800' },
+  PAID:               { label: 'Paid',               color: '#4caf50' },
+  CANCELLED:          { label: 'Cancelled',          color: '#f44336' },
+  PARTIALLY_REFUNDED: { label: 'Partially Refunded', color: '#ff9800' },
+  REFUNDED:           { label: 'Refunded',           color: '#0288d1' },
+};
+
+/** Derive effective OrderStatus from an order, falling back to paymentStatus when orderStatus is unset. */
+export function resolveOrderStatus(order: { orderStatus?: OrderStatus; paymentStatus: OrderPaymentStatus }): OrderStatus {
+  if (order.orderStatus) return order.orderStatus;
+  switch (order.paymentStatus) {
+    case 'PAID':    return 'PAID';
+    case 'PARTIAL': return 'PARTIALLY_PAID';
+    case 'UNPAID':
+    default:        return 'DRAFT';
+  }
+}
 
 export const ORDER_SOURCE_CONFIG: Record<OrderSource, { label: string; color: string }> = {
   WALK_IN:     { label: 'Walk-In',      color: '#4caf50' },

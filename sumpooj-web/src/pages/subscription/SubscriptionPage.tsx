@@ -45,6 +45,7 @@ import {
 import { useTenant } from '../../core/tenant/TenantContext';
 import type { TenantPlan, PlanConfig } from '../../core/tenant/TenantTypes';
 import { PLAN_CONFIGS, formatPlanPrice, getUsagePercentage } from '../../core/tenant/TenantTypes';
+import { getCurrencySymbol } from '../../core/i18n';
 import type { FeatureFlag } from '../../core/tenant/FeatureFlags';
 import { FEATURE_METADATA, hasFeature } from '../../core/tenant/FeatureFlags';
 
@@ -619,7 +620,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
           
           <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.5 }}>
             <Typography variant="h3" fontWeight={700}>
-              ${monthlyEquivalent}
+              {getCurrencySymbol()}{monthlyEquivalent}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               /month
@@ -628,7 +629,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
           
           {yearlyBilling && (
             <Typography variant="caption" color="text.secondary">
-              ${price} billed annually
+              {getCurrencySymbol()}{price} billed annually
             </Typography>
           )}
         </Box>

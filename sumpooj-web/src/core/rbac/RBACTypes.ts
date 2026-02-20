@@ -452,9 +452,29 @@ export const MENU_SECTIONS: MenuSection[] = [
     ],
   },
   {
+    id: 'gift-cards',
+    title: 'Gift Cards',
+    items: [
+      {
+        id: 'gift-card-designer',
+        label: 'Card Designer',
+        icon: 'CardGiftcard',
+        path: '/gift-cards/designer',
+        permissions: ['orders:create'],
+      },
+    ],
+  },
+  {
     id: 'settings',
     title: 'Settings',
     items: [
+      {
+        id: 'tenant-settings',
+        label: 'Tenant Settings',
+        icon: 'Settings',
+        path: '/settings/tenant',
+        permissions: ['settings:edit'],
+      },
       {
         id: 'subscription',
         label: 'Subscription',
@@ -499,6 +519,7 @@ export const ROUTE_ACCESS: RouteConfig[] = [
   { path: '/crm/reminders', permissions: ['crm:reminders'] },
   { path: '/crm/loyalty', permissions: ['crm:loyalty'] },
   { path: '/subscription', permissions: ['settings:billing'] },
+  { path: '/settings/tenant', permissions: ['settings:edit'] },
   { path: '/day-close', permissions: ['pos:day_close'] },
 ];
 

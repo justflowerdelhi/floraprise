@@ -14,6 +14,7 @@ import {
   Box
 } from "@mui/material";
 import { useState } from "react";
+import { formatCurrency } from '../../core/i18n';
 
 const cities = [
   "Delhi",
@@ -198,7 +199,7 @@ export default function OrderForm() {
                   <FormControlLabel
                     value="midnight"
                     control={<Radio />}
-                    label="MIDNIGHT DELIVERY FROM 10PM to 12.30AM Rs. 250/($4)"
+                    label={`MIDNIGHT DELIVERY FROM 10PM to 12.30AM ${formatCurrency(250)}`}
                   />
                 </RadioGroup>
               </FormControl>

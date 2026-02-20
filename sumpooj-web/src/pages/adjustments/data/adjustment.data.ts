@@ -12,6 +12,7 @@ export const ADJUSTMENT_TYPES = [
   { value: 'used_for_event', label: 'Used for Event' },
   { value: 'sample', label: 'Sample' },
   { value: 'internal_use', label: 'Internal Use' },
+  { value: 'refund_restock', label: 'Refund Restock' },
 ] as const;
 
 export type AdjustmentType =
@@ -20,7 +21,8 @@ export type AdjustmentType =
   | 'count_correction'
   | 'used_for_event'
   | 'sample'
-  | 'internal_use';
+  | 'internal_use'
+  | 'refund_restock';
 
 // ─── Product / Batch ─────────────────────────────────────────
 

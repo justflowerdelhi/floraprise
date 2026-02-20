@@ -20,15 +20,45 @@ export type DateFormat = 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
 
 export interface CountryDefaults {
   currency: string;
+  currencySymbol: string;
   taxSystem: TaxSystemType;
   dateFormat: DateFormat;
   timeFormat: TimeFormat;
   locale: string;
 }
 
+/** Currency symbol lookup by code */
+export const CURRENCY_SYMBOL_MAP: Record<string, string> = {
+  USD: '$',
+  INR: '\u20b9',
+  AED: 'AED',
+  GBP: '\u00a3',
+  CAD: 'CA$',
+  AUD: 'A$',
+  EUR: '\u20ac',
+};
+
+/**
+ * Country → Currency + Locale map.
+ * Used during onboarding to auto-fill baseCurrency and locale
+ * when the florist selects their country.
+ */
+export const countryCurrencyMap: Record<
+  TenantCountry,
+  { currency: string; locale: string }
+> = {
+  US: { currency: 'USD', locale: 'en-US' },
+  IN: { currency: 'INR', locale: 'en-IN' },
+  AE: { currency: 'AED', locale: 'en-AE' },
+  GB: { currency: 'GBP', locale: 'en-GB' },
+  CA: { currency: 'CAD', locale: 'en-CA' },
+  AU: { currency: 'AUD', locale: 'en-AU' },
+};
+
 export const COUNTRY_DEFAULTS: Record<TenantCountry, CountryDefaults> = {
   US: {
     currency: 'USD',
+    currencySymbol: '$',
     taxSystem: 'SALES_TAX',
     dateFormat: 'MM/DD/YYYY',
     timeFormat: '12H',
@@ -36,6 +66,7 @@ export const COUNTRY_DEFAULTS: Record<TenantCountry, CountryDefaults> = {
   },
   IN: {
     currency: 'INR',
+    currencySymbol: '\u20b9',
     taxSystem: 'GST',
     dateFormat: 'DD/MM/YYYY',
     timeFormat: '12H',
@@ -43,6 +74,7 @@ export const COUNTRY_DEFAULTS: Record<TenantCountry, CountryDefaults> = {
   },
   AE: {
     currency: 'AED',
+    currencySymbol: 'AED',
     taxSystem: 'VAT',
     dateFormat: 'DD/MM/YYYY',
     timeFormat: '12H',
@@ -50,6 +82,7 @@ export const COUNTRY_DEFAULTS: Record<TenantCountry, CountryDefaults> = {
   },
   GB: {
     currency: 'GBP',
+    currencySymbol: '\u00a3',
     taxSystem: 'VAT',
     dateFormat: 'DD/MM/YYYY',
     timeFormat: '24H',
@@ -57,6 +90,7 @@ export const COUNTRY_DEFAULTS: Record<TenantCountry, CountryDefaults> = {
   },
   CA: {
     currency: 'CAD',
+    currencySymbol: 'CA$',
     taxSystem: 'SALES_TAX',
     dateFormat: 'YYYY-MM-DD',
     timeFormat: '12H',
@@ -64,12 +98,38 @@ export const COUNTRY_DEFAULTS: Record<TenantCountry, CountryDefaults> = {
   },
   AU: {
     currency: 'AUD',
+    currencySymbol: 'A$',
     taxSystem: 'GST',
     dateFormat: 'DD/MM/YYYY',
     timeFormat: '12H',
     locale: 'en-AU',
   },
 };
+
+// -----------------------------------------------------------------------------
+// Tenant Settings — Derived from Tenant for currency / locale consumers
+// -----------------------------------------------------------------------------
+
+export interface TenantSettings {
+  country: string;
+  baseCurrency: string;
+  currencySymbol: string;
+  locale: string;
+}
+
+/** Derive a TenantSettings view from a Tenant object. */
+export function deriveTenantSettings(tenant: {
+  country: string;
+  currency: string;
+  locale: string;
+}): TenantSettings {
+  return {
+    country: tenant.country,
+    baseCurrency: tenant.currency,
+    currencySymbol: CURRENCY_SYMBOL_MAP[tenant.currency] ?? tenant.currency,
+    locale: tenant.locale,
+  };
+}
 
 // -----------------------------------------------------------------------------
 // Tenant Model
@@ -284,10 +344,11 @@ export function getUsagePercentage(used: number, limit: number): number {
   return Math.min(100, Math.round((used / limit) * 100));
 }
 
-export function formatPlanPrice(plan: TenantPlan, yearly: boolean = false, currencySymbol: string = '$'): string {
+export function formatPlanPrice(plan: TenantPlan, yearly: boolean = false, currencySymbol?: string): string {
   const config = PLAN_CONFIGS[plan];
   const price = yearly ? config.yearlyPrice : config.monthlyPrice;
-  return `${currencySymbol}${price}`;
+  const sym = currencySymbol ?? CURRENCY_SYMBOL_MAP[MOCK_TENANT.currency] ?? '$';
+  return `${sym}${price}`;
 }
 
 // -----------------------------------------------------------------------------

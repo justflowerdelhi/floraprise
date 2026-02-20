@@ -149,12 +149,9 @@ export const generateBatchNumber = (sku: string): string => {
 /**
  * Format currency
  */
-export const fmt = (n: number): string =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(n);
+import { formatCurrency } from '../../../core/i18n';
+
+export const fmt = (n: number): string => formatCurrency(n);
 
 /**
  * Draft persistence
