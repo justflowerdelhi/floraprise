@@ -110,7 +110,7 @@ const AdjustmentForm = ({
       setScanError('Enter a batch code to continue.');
       return;
     }
-    const match = MOCK_BATCHES.find((b) => b.batchNumber.toLowerCase() === code.toLowerCase());
+    const match = MOCK_BATCHES.find((b) => b.batchCode.toLowerCase() === code.toLowerCase());
     if (!match) {
       setScanError('Batch code not found.');
       return;
@@ -282,7 +282,7 @@ const AdjustmentForm = ({
               </MenuItem>
               {batches.map((b) => (
                 <MenuItem key={b.id} value={b.id}>
-                  {b.batchNumber} — Qty: {b.quantityRemaining} · Exp: {fmtDate(b.expiryDate)}
+                  {b.batchCode} — Qty: {b.quantityRemaining} · Exp: {fmtDate(b.expiryDate)}
                 </MenuItem>
               ))}
             </TextField>

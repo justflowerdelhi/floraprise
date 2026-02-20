@@ -69,7 +69,7 @@ const ACTION_ICONS: Record<AuditAction, React.ReactNode> = {
   UNLOCK: <LockOpen fontSize="small" />,
 };
 
-const ENTITY_ICONS: Record<AuditEntityType, React.ReactNode> = {
+const ENTITY_ICONS: Record<AuditEntityType, React.ReactElement<unknown>> = {
   ORDER: <Receipt fontSize="small" />,
   EVENT: <Event fontSize="small" />,
   PRODUCT: <LocalFlorist fontSize="small" />,

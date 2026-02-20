@@ -160,7 +160,7 @@ export const filterAndSort = (
 
   // Location
   if (filters.location) {
-    result = result.filter((b) => b.location === filters.location);
+    result = result.filter((b) => b.storageLocation === filters.location);
   }
 
   // Fresh flowers only
@@ -197,9 +197,9 @@ export const exportCSV = (batches: ExpiryAlertBatch[]): void => {
   const rows = batches.map((b) =>
     [
       `"${b.productName}"`,
-      b.batchNumber,
+      b.batchCode,
       `"${b.supplier}"`,
-      `"${b.location}"`,
+      `"${b.storageLocation}"`,
       b.quantityRemaining,
       b.expiryDate ?? 'N/A',
       b.daysLeft ?? 'N/A',

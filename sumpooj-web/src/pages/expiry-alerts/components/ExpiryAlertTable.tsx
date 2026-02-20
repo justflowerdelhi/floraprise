@@ -195,7 +195,7 @@ const ExpiryAlertTable = ({
                             color: darkMode ? 'grey.400' : 'grey.600',
                           }}
                         >
-                          {batch.batchNumber}
+                          {batch.batchCode}
                         </Typography>
                       </TableCell>
 

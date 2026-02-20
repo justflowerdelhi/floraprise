@@ -105,7 +105,8 @@ const InventoryImpactReport: React.FC<Props> = ({ data }) => {
 
   // Pie chart data
   const pieData = data.wastageByCategory.map((cat) => ({
-    ...cat,
+    name: cat.category,
+    value: cat.wastageValue,
     color: CATEGORY_COLORS[cat.category] ?? '#666',
   }));
 
@@ -191,35 +192,39 @@ const InventoryImpactReport: React.FC<Props> = ({ data }) => {
                 <Pie
                   data={pieData}
                   dataKey="value"
-                  nameKey="category"
+                  nameKey="name"
                   cx="50%"
                   cy="50%"
                   innerRadius={50}
                   outerRadius={90}
                   paddingAngle={2}
-                  label={({ category, percent }) => `${category}: ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, value }) => {
+                    const total = pieData.reduce((sum, item) => sum + item.value, 0);
+                    const percent = (value ?? 0) / (total || 1);
+                    return `${name ?? 'N/A'}: ${(percent * 100).toFixed(0)}%`;
+                  }}
                   labelLine={{ stroke: dk ? 'rgba(255,255,255,0.3)' : '#999', strokeWidth: 1 }}
                 >
                   {pieData.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => fmtCurrency(v)} />
+                <Tooltip formatter={(v: number | undefined) => fmtCurrency(v ?? 0)} />
               </PieChart>
             </ResponsiveContainer>
 
             {/* Category Legend */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2, justifyContent: 'center' }}>
-              {pieData.map((cat) => (
+              {data.wastageByCategory.map((cat) => (
                 <Chip
                   key={cat.category}
                   size="small"
-                  label={`${cat.category}: ${fmtCurrency(cat.value)}`}
+                  label={`${cat.category}: ${fmtCurrency(cat.wastageValue)}`}
                   sx={{
                     fontSize: '0.7rem',
                     height: 24,
-                    bgcolor: alpha(cat.color, dk ? 0.2 : 0.12),
-                    color: cat.color,
+                    bgcolor: alpha(CATEGORY_COLORS[cat.category] ?? '#666', dk ? 0.2 : 0.12),
+                    color: CATEGORY_COLORS[cat.category] ?? '#666',
                     fontWeight: 600,
                   }}
                 />
@@ -265,7 +270,7 @@ const InventoryImpactReport: React.FC<Props> = ({ data }) => {
                     border: dk ? '1px solid rgba(255,255,255,0.1)' : '1px solid #ddd',
                     borderRadius: 8,
                   }}
-                  formatter={(v: number) => fmtCurrency(v)}
+                  formatter={(v: number | undefined) => fmtCurrency(v ?? 0)}
                 />
                 <Area
                   type="monotone"

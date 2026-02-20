@@ -114,7 +114,7 @@ const AddProductForm = ({
     reset,
     formState: { errors, isValid, isDirty },
   } = useForm<ProductFormSchema>({
-    resolver: zodResolver(productFormSchema),
+    resolver: zodResolver(productFormSchema) as any,
     defaultValues: {
       ...defaultProductFormValues,
       ...initialData,
@@ -402,7 +402,7 @@ const AddProductForm = ({
 
       {/* Main Form Content */}
       <Container maxWidth="lg" sx={{ py: 3 }}>
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit as any)}>
           <Grid container spacing={3}>
             {/* Left Column - Main Sections */}
             <Grid size={{ xs: 12, lg: 8 }}>
@@ -588,7 +588,7 @@ const AddProductForm = ({
                 color="primary"
                 onClick={() => {
                   setSubmitAction('saveAndNew');
-                  handleSubmit(onSubmit)();
+                  handleSubmit(onSubmit as any)();
                 }}
                 disabled={!isValid || isSubmitting || isSavingDraft}
                 startIcon={isSubmitting && submitAction === 'saveAndNew' ? <CircularProgress size={18} /> : <AddIcon />}
@@ -602,7 +602,7 @@ const AddProductForm = ({
                 color="primary"
                 onClick={() => {
                   setSubmitAction('save');
-                  handleSubmit(onSubmit)();
+                  handleSubmit(onSubmit as any)();
                 }}
                 disabled={!isValid || isSubmitting || isSavingDraft}
                 startIcon={isSubmitting && submitAction === 'save' ? <CircularProgress size={18} /> : <SaveIcon />}

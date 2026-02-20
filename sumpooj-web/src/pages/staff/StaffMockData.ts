@@ -14,6 +14,7 @@ import type {
   ProductionMetrics,
   DeliveryMetrics,
   StaffRole,
+  StaffPerformance,
 } from './StaffTypes';
 import { calculateCommission } from './StaffTypes';
 

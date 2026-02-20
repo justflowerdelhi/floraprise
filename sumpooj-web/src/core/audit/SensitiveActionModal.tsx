@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import {
   Warning,
-  Error,
+  Error as ErrorIcon,
   Info,
   MoneyOff,
   Inventory,
@@ -173,7 +173,7 @@ export function SensitiveActionProvider({ children }: SensitiveActionProviderPro
   const getWarningIcon = (level: 'info' | 'warning' | 'danger'): React.ReactNode => {
     switch (level) {
       case 'danger':
-        return <Error />;
+        return <ErrorIcon />;
       case 'warning':
         return <Warning />;
       default:

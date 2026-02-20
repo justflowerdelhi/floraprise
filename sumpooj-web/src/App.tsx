@@ -7,7 +7,7 @@ export default function App() {
   return (
     <AuthProvider>
       <AppBootGuard>
-        <BrowserRouter>
+        <BrowserRouter basename="/floraedge">
           <AppRoutes />
         </BrowserRouter>
       </AppBootGuard>

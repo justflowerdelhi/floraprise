@@ -26,9 +26,7 @@ export const productFormSchema = z.object({
     'ribbon',
     'supply',
     'service',
-  ], {
-    required_error: 'Product type is required',
-  }),
+  ]),
 
   sku: z
     .string()
@@ -48,30 +46,20 @@ export const productFormSchema = z.object({
     'yard',
     'roll',
     'pack',
-  ], {
-    required_error: 'Unit of measure is required',
-  }),
+  ]),
 
   retailPrice: z
-    .number({
-      required_error: 'Retail price is required',
-      invalid_type_error: 'Retail price must be a number',
-    })
+    .number()
     .min(0, 'Retail price cannot be negative'),
 
   costPrice: z
-    .number({
-      required_error: 'Cost price is required',
-      invalid_type_error: 'Cost price must be a number',
-    })
+    .number()
     .min(0, 'Cost price cannot be negative'),
 
   trackInventory: z.boolean().default(true),
   trackBatch: z.boolean().default(false),
 
-  status: z.enum(['active', 'inactive'], {
-    required_error: 'Status is required',
-  }),
+  status: z.enum(['active', 'inactive']),
 
   // ========================================
   // BASIC INFO (Optional)
@@ -136,9 +124,7 @@ export const productFormSchema = z.object({
   // ========================================
   // PRICING SECTION
   // ========================================
-  taxCategory: z.enum(['standard', 'reduced', 'exempt', 'zero'], {
-    required_error: 'Tax category is required',
-  }),
+  taxCategory: z.enum(['standard', 'reduced', 'exempt', 'zero']),
 
   wholesalePrice: z
     .number()
@@ -202,13 +188,9 @@ export const productFormSchema = z.object({
   // ========================================
   // ACCOUNTING (Required)
   // ========================================
-  incomeAccount: z.enum(['4000', '4010', '4020', '4030', '4040', '4050'], {
-    required_error: 'Income account is required',
-  }),
+  incomeAccount: z.enum(['4000', '4010', '4020', '4030', '4040', '4050']),
 
-  expenseAccount: z.enum(['5000', '5010', '5020', '5030', '5040'], {
-    required_error: 'Expense account is required',
-  }),
+  expenseAccount: z.enum(['5000', '5010', '5020', '5030', '5040']),
 
   // ========================================
   // SETTINGS (Optional with defaults)

@@ -26,6 +26,8 @@ import {
   // Undo as RefundIcon,
   CheckCircle as ApprovedIcon,
   ErrorOutline as DeclinedIcon,
+  QrCode as UpiIcon,
+  AccountBalance as BankIcon,
 } from '@mui/icons-material';
 import type { PaymentMethod } from './PaymentTypes';
 import { PAYMENT_METHOD_CONFIG, PAYMENT_STATUS_CONFIG } from './PaymentTypes';
@@ -37,6 +39,7 @@ interface PaymentModalProps {
   onClose: () => void;
   orderId: string;
   grandTotal: number;
+  orderSource?: string;
   /** Called when order becomes fully paid */
   onFullyPaid?: () => void;
 }
@@ -46,6 +49,8 @@ const METHOD_ICONS: Record<PaymentMethod, React.ReactElement> = {
   CARD: <CardIcon />,
   GIFT_CARD: <GiftCardIcon />,
   EXTERNAL_TERMINAL: <TerminalIcon />,
+  UPI: <UpiIcon />,
+  BANK_TRANSFER: <BankIcon />,
 };
 
 const PaymentModal: React.FC<PaymentModalProps> = ({

@@ -10,6 +10,34 @@ import type { User, UserRole } from '../core/rbac/RBACTypes';
 import type { Tenant } from '../core/tenant/TenantTypes';
 import { fetchMe } from '../api/auth.api';
 
+// ─── Dev Bypass ─────────────────────────────────────────────
+const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true';
+
+const MOCK_USER: User = {
+  id: 'dev-user-1',
+  name: 'Dev Admin',
+  email: 'admin@floraedge.dev',
+  role: 'ADMIN',
+  primaryLocationId: 'loc-1',
+  assignedLocationIds: ['loc-1'],
+};
+
+const MOCK_TENANT: Tenant = {
+  id: 'dev-tenant-1',
+  name: 'Dev Flower Shop',
+  slug: 'dev-shop',
+  plan: 'PRO',
+  subscriptionStatus: 'ACTIVE',
+  country: 'US',
+  currency: 'USD',
+  taxSystem: 'SALES_TAX',
+  dateFormat: 'MM/DD/YYYY',
+  timeFormat: '12H',
+  locale: 'en-US',
+  isActive: true,
+  createdAt: '2025-01-01T00:00:00Z',
+};
+
 // ─── Types ──────────────────────────────────────────────────
 
 /** Shape returned by GET /auth/me */
@@ -57,6 +85,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
    * Returns true if the session is valid.
    */
   const resolveIdentity = useCallback(async (): Promise<boolean> => {
+    if (DEV_BYPASS_AUTH) {
+      setUser(MOCK_USER);
+      setTenant(MOCK_TENANT);
+      setStatus('authenticated');
+      return true;
+    }
     try {
       const data: AuthMeResponse = await fetchMe();
       setUser(data.user);
@@ -78,6 +112,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
    * If no token, go straight to unauthenticated.
    */
   useEffect(() => {
+    if (DEV_BYPASS_AUTH) {
+      resolveIdentity();
+      return;
+    }
     const token = localStorage.getItem('auth_token');
     if (token) {
       resolveIdentity();
@@ -90,7 +128,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   /** Store token then call /auth/me */
   const login = useCallback(
     async (token: string) => {
-      localStorage.setItem('auth_token', token);
+      if (!DEV_BYPASS_AUTH) {
+        localStorage.setItem('auth_token', token);
+      }
       setStatus('loading');
       await resolveIdentity();
     },

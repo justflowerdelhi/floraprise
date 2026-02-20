@@ -39,7 +39,7 @@ export default function MiniChart({ data }: MiniChartProps) {
                 fontSize: 12,
                 boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
               }}
-              formatter={(v: number) => [`₹${v.toLocaleString('en-IN')}`, 'Sales']}
+              formatter={(v: number | undefined) => [`₹${(v ?? 0).toLocaleString('en-IN')}`, 'Sales']}
               cursor={{ fill: 'rgba(0,0,0,0.03)' }}
             />
             <Bar dataKey="sales" fill="#10b981" radius={[6, 6, 0, 0]} />

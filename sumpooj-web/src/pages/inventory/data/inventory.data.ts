@@ -14,7 +14,7 @@ export interface InventoryBatch {
   productType: string;          // Fresh Flowers, Greens, Dried, Supplies, etc.
   batchCode: string;
   receivedDate: string;         // ISO date
-  expiryDate?: string | null;   // null = non-perishable
+  expiryDate: string | null;    // null = non-perishable
   quantityReceived: number;
   quantityRemaining: number;
   supplier?: string;

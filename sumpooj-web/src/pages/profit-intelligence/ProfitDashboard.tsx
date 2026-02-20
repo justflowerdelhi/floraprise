@@ -389,7 +389,7 @@ const ProfitDashboard: React.FC = () => {
                   border: dk ? '1px solid rgba(255,255,255,0.1)' : '1px solid #ddd',
                   borderRadius: 8,
                 }}
-                formatter={(v: number, name: string) => [fmtCurrency(v), name === 'grossRevenue' ? 'Gross Revenue' : 'Net Profit']}
+                formatter={(v: number | undefined, name: any) => [fmtCurrency(v ?? 0), name === 'grossRevenue' ? 'Gross Revenue' : 'Net Profit']}
                 labelFormatter={(v) => new Date(v).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' })}
               />
               <Legend />

@@ -186,6 +186,8 @@ export const PAYMENT_METHOD_PROCESSING_RATES: Record<PaymentMethod, number> = {
   CARD: 0.025,           // 2.5%
   GIFT_CARD: 0.01,       // 1%
   EXTERNAL_TERMINAL: 0,  // Already processed externally
+  UPI: 0.01,             // 1%
+  BANK_TRANSFER: 0,      // No processing cost
 };
 
 // ─── API Response Shapes ────────────────────────────────────

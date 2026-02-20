@@ -191,7 +191,7 @@ const ChannelProfitChart: React.FC<Props> = ({ data, trend }) => {
                   outerRadius={90}
                   paddingAngle={2}
                   label={({ name, value }) =>
-                    `${name.split(' ')[0]}: ${((value / (viewMode === 'revenue' ? totalRevenue : totalProfit)) * 100).toFixed(0)}%`
+                    `${(name ?? 'N/A').split(' ')[0]}: ${((value / (viewMode === 'revenue' ? totalRevenue : totalProfit)) * 100).toFixed(0)}%`
                   }
                   labelLine={{ stroke: dk ? 'rgba(255,255,255,0.3)' : '#999', strokeWidth: 1 }}
                 >
@@ -199,7 +199,7 @@ const ChannelProfitChart: React.FC<Props> = ({ data, trend }) => {
                     <Cell key={i} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => fmtCurrency(v)} />
+                <Tooltip formatter={(v: number | undefined) => fmtCurrency(v ?? 0)} />
               </PieChart>
             </ResponsiveContainer>
           </Card>

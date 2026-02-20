@@ -59,7 +59,7 @@ interface MethodCardProps {
 
 const MethodCard: React.FC<MethodCardProps> = ({ method, totalVolume, dk }) => {
   const config = PAYMENT_CONFIG[method.method];
-  const sharePercent = (method.volume / totalVolume) * 100;
+  const sharePercent = (method.totalAmount / totalVolume) * 100;
 
   return (
     <Card
@@ -88,7 +88,7 @@ const MethodCard: React.FC<MethodCardProps> = ({ method, totalVolume, dk }) => {
       </Box>
 
       <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
-        {fmtCurrency(method.volume)}
+        {fmtCurrency(method.totalAmount)}
       </Typography>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
@@ -111,15 +111,15 @@ const MethodCard: React.FC<MethodCardProps> = ({ method, totalVolume, dk }) => {
             Processing Rate
           </Typography>
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            {fmtPercent(method.processingRate * 100)}
+            {fmtPercent(method.estimatedProcessingRate * 100)}
           </Typography>
         </Box>
         <Box sx={{ textAlign: 'right' }}>
           <Typography variant="caption" sx={{ color: dk ? 'rgba(255,255,255,0.5)' : 'text.secondary' }}>
             Processing Cost
           </Typography>
-          <Typography variant="body2" sx={{ fontWeight: 600, color: method.processingCost > 0 ? '#f44336' : '#4caf50' }}>
-            {method.processingCost > 0 ? `-${fmtCurrency(method.processingCost)}` : fmtCurrency(0)}
+          <Typography variant="body2" sx={{ fontWeight: 600, color: method.estimatedProcessingCost > 0 ? '#f44336' : '#4caf50' }}>
+            {method.estimatedProcessingCost > 0 ? `-${fmtCurrency(method.estimatedProcessingCost)}` : fmtCurrency(0)}
           </Typography>
         </Box>
       </Box>
@@ -134,25 +134,25 @@ const PaymentAnalysis: React.FC<Props> = ({ data }) => {
   const dk = theme.palette.mode === 'dark';
 
   // Calculate totals
-  const totalVolume = data.byMethod.reduce((s, m) => s + m.volume, 0);
-  const totalProcessingCost = data.byMethod.reduce((s, m) => s + m.processingCost, 0);
-  const totalTransactions = data.byMethod.reduce((s, m) => s + m.transactionCount, 0);
+  const totalVolume = data.methodBreakdown.reduce((s, m) => s + m.totalAmount, 0);
+  const totalProcessingCost = data.methodBreakdown.reduce((s, m) => s + m.estimatedProcessingCost, 0);
+  const totalTransactions = data.methodBreakdown.reduce((s, m) => s + m.transactionCount, 0);
   const effectiveProcessingRate = (totalProcessingCost / totalVolume) * 100;
 
   // Pie chart data
-  const pieData = data.byMethod.map((m) => ({
+  const pieData = data.methodBreakdown.map((m) => ({
     name: PAYMENT_CONFIG[m.method].label,
-    value: m.volume,
+    value: m.totalAmount,
     color: PAYMENT_CONFIG[m.method].color,
   }));
 
   // Area chart data (stacked)
   const trendData = data.dailyTrend.map((day) => ({
     date: new Date(day.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
-    CASH: day.breakdown.CASH ?? 0,
-    CARD: day.breakdown.CARD ?? 0,
-    GIFT_CARD: day.breakdown.GIFT_CARD ?? 0,
-    EXTERNAL_TERMINAL: day.breakdown.EXTERNAL_TERMINAL ?? 0,
+    CASH: day.cash ?? 0,
+    CARD: day.card ?? 0,
+    GIFT_CARD: day.giftCard ?? 0,
+    EXTERNAL_TERMINAL: day.externalTerminal ?? 0,
   }));
 
   return (
@@ -190,7 +190,7 @@ const PaymentAnalysis: React.FC<Props> = ({ data }) => {
 
       {/* Method Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {data.byMethod.map((method) => (
+        {data.methodBreakdown.map((method: PaymentMethodAnalysis) => (
           <Grid key={method.method} size={{ xs: 12, sm: 6, lg: 3 }}>
             <MethodCard method={method} totalVolume={totalVolume} dk={dk} />
           </Grid>
@@ -224,14 +224,14 @@ const PaymentAnalysis: React.FC<Props> = ({ data }) => {
                   innerRadius={60}
                   outerRadius={100}
                   paddingAngle={2}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
                   labelLine={{ stroke: dk ? 'rgba(255,255,255,0.3)' : '#999', strokeWidth: 1 }}
                 >
                   {pieData.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => fmtCurrency(v)} />
+                <Tooltip formatter={(v: number | undefined) => fmtCurrency(v ?? 0)} />
               </PieChart>
             </ResponsiveContainer>
           </Card>
@@ -268,7 +268,7 @@ const PaymentAnalysis: React.FC<Props> = ({ data }) => {
                     border: dk ? '1px solid rgba(255,255,255,0.1)' : '1px solid #ddd',
                     borderRadius: 8,
                   }}
-                  formatter={(v: number) => fmtCurrency(v)}
+                  formatter={(v: number | undefined) => fmtCurrency(v ?? 0)}
                 />
                 <Legend />
                 <Area type="monotone" dataKey="CASH" name="Cash" stackId="1" stroke="#4caf50" fill="#4caf50" fillOpacity={0.7} />
@@ -304,11 +304,11 @@ const PaymentAnalysis: React.FC<Props> = ({ data }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {data.byMethod.map((method) => {
+            {data.methodBreakdown.map((method: PaymentMethodAnalysis) => {
               const config = PAYMENT_CONFIG[method.method];
-              const share = (method.volume / totalVolume) * 100;
-              const avgTxn = method.volume / method.transactionCount;
-              const netVolume = method.volume - method.processingCost;
+              const share = (method.totalAmount / totalVolume) * 100;
+              const avgTxn = method.totalAmount / method.transactionCount;
+              const netVolume = method.netRevenue;
 
               return (
                 <TableRow key={method.method} hover>
@@ -318,7 +318,7 @@ const PaymentAnalysis: React.FC<Props> = ({ data }) => {
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>{config.label}</Typography>
                     </Box>
                   </TableCell>
-                  <TableCell align="right">{fmtCurrency(method.volume)}</TableCell>
+                  <TableCell align="right">{fmtCurrency(method.totalAmount)}</TableCell>
                   <TableCell align="center">
                     <Chip
                       size="small"
@@ -335,12 +335,12 @@ const PaymentAnalysis: React.FC<Props> = ({ data }) => {
                   <TableCell align="right">{method.transactionCount}</TableCell>
                   <TableCell align="right">{fmtCurrency(avgTxn)}</TableCell>
                   <TableCell align="center">
-                    <Typography variant="body2" sx={{ color: method.processingRate > 0 ? '#ff9800' : '#4caf50' }}>
-                      {fmtPercent(method.processingRate * 100)}
+                    <Typography variant="body2" sx={{ color: method.estimatedProcessingRate > 0 ? '#ff9800' : '#4caf50' }}>
+                      {fmtPercent(method.estimatedProcessingRate * 100)}
                     </Typography>
                   </TableCell>
-                  <TableCell align="right" sx={{ color: method.processingCost > 0 ? '#f44336' : 'inherit' }}>
-                    {method.processingCost > 0 ? `-${fmtCurrency(method.processingCost)}` : '—'}
+                  <TableCell align="right" sx={{ color: method.estimatedProcessingCost > 0 ? '#f44336' : 'inherit' }}>
+                    {method.estimatedProcessingCost > 0 ? `-${fmtCurrency(method.estimatedProcessingCost)}` : '—'}
                   </TableCell>
                   <TableCell align="right" sx={{ fontWeight: 600 }}>{fmtCurrency(netVolume)}</TableCell>
                 </TableRow>

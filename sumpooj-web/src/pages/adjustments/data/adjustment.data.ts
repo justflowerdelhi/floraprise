@@ -38,10 +38,10 @@ export interface AdjustmentProduct {
 export interface ProductBatch {
   id: string;
   productId: string;
-  batchNumber: string;
+  batchCode: string;
   quantityRemaining: number;
   expiryDate: string | null;
-  location: string;
+  storageLocation: string;
   purchaseDate: string;
 }
 
@@ -227,24 +227,24 @@ const past = (offset: number): string => d(-offset);
 
 export const MOCK_BATCHES: ProductBatch[] = [
   // Red Roses
-  { id: 'bat_001', productId: 'prod_001', batchNumber: 'BT-2026-0201', quantityRemaining: 85, expiryDate: d(5), location: 'Walk-in Cooler A', purchaseDate: past(5) },
-  { id: 'bat_002', productId: 'prod_001', batchNumber: 'BT-2026-0215', quantityRemaining: 60, expiryDate: d(9), location: 'Walk-in Cooler A', purchaseDate: past(1) },
+  { id: 'bat_001', productId: 'prod_001', batchCode: 'BT-2026-0201', quantityRemaining: 85, expiryDate: d(5), storageLocation: 'Walk-in Cooler A', purchaseDate: past(5) },
+  { id: 'bat_002', productId: 'prod_001', batchCode: 'BT-2026-0215', quantityRemaining: 60, expiryDate: d(9), storageLocation: 'Walk-in Cooler A', purchaseDate: past(1) },
   // White Lilies
-  { id: 'bat_003', productId: 'prod_002', batchNumber: 'BT-2026-0202', quantityRemaining: 110, expiryDate: d(8), location: 'Walk-in Cooler A', purchaseDate: past(3) },
+  { id: 'bat_003', productId: 'prod_002', batchCode: 'BT-2026-0202', quantityRemaining: 110, expiryDate: d(8), storageLocation: 'Walk-in Cooler A', purchaseDate: past(3) },
   // Sunflowers
-  { id: 'bat_004', productId: 'prod_003', batchNumber: 'BT-2026-0203', quantityRemaining: 25, expiryDate: d(1), location: 'Display Cooler', purchaseDate: past(6) },
+  { id: 'bat_004', productId: 'prod_003', batchCode: 'BT-2026-0203', quantityRemaining: 25, expiryDate: d(1), storageLocation: 'Display Cooler', purchaseDate: past(6) },
   // Baby's Breath
-  { id: 'bat_005', productId: 'prod_004', batchNumber: 'BT-2026-0204', quantityRemaining: 290, expiryDate: d(12), location: 'Walk-in Cooler B', purchaseDate: past(2) },
+  { id: 'bat_005', productId: 'prod_004', batchCode: 'BT-2026-0204', quantityRemaining: 290, expiryDate: d(12), storageLocation: 'Walk-in Cooler B', purchaseDate: past(2) },
   // Pink Carnations
-  { id: 'bat_006', productId: 'prod_005', batchNumber: 'BT-2026-0205', quantityRemaining: 60, expiryDate: d(4), location: 'Walk-in Cooler A', purchaseDate: past(7) },
+  { id: 'bat_006', productId: 'prod_005', batchCode: 'BT-2026-0205', quantityRemaining: 60, expiryDate: d(4), storageLocation: 'Walk-in Cooler A', purchaseDate: past(7) },
   // Orchids
-  { id: 'bat_007', productId: 'prod_006', batchNumber: 'BT-2026-0206', quantityRemaining: 12, expiryDate: d(0), location: 'Display Cooler', purchaseDate: past(10) },
+  { id: 'bat_007', productId: 'prod_006', batchCode: 'BT-2026-0206', quantityRemaining: 12, expiryDate: d(0), storageLocation: 'Display Cooler', purchaseDate: past(10) },
   // Eucalyptus
-  { id: 'bat_008', productId: 'prod_007', batchNumber: 'BT-2026-0207', quantityRemaining: 85, expiryDate: d(10), location: 'Walk-in Cooler B', purchaseDate: past(4) },
+  { id: 'bat_008', productId: 'prod_007', batchCode: 'BT-2026-0207', quantityRemaining: 85, expiryDate: d(10), storageLocation: 'Walk-in Cooler B', purchaseDate: past(4) },
   // Peonies
-  { id: 'bat_009', productId: 'prod_010', batchNumber: 'BT-2026-0215', quantityRemaining: 42, expiryDate: d(2), location: 'Walk-in Cooler A', purchaseDate: past(4) },
+  { id: 'bat_009', productId: 'prod_010', batchCode: 'BT-2026-0215', quantityRemaining: 42, expiryDate: d(2), storageLocation: 'Walk-in Cooler A', purchaseDate: past(4) },
   // Hydrangeas
-  { id: 'bat_010', productId: 'prod_011', batchNumber: 'BT-2026-0214', quantityRemaining: 58, expiryDate: d(6), location: 'Walk-in Cooler B', purchaseDate: past(3) },
+  { id: 'bat_010', productId: 'prod_011', batchCode: 'BT-2026-0214', quantityRemaining: 58, expiryDate: d(6), storageLocation: 'Walk-in Cooler B', purchaseDate: past(3) },
 ];
 
 // ─── Mock Recent Adjustments (for summary) ───────────────────
