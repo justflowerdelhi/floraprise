@@ -5,6 +5,8 @@
  * Integrates with existing Payment model.
  */
 
+import { formatCurrency } from '../../core/i18n';
+
 // ─── Payment Schedule Status ────────────────────────────────
 
 export type PaymentScheduleStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'PARTIAL';
@@ -300,7 +302,7 @@ export const generatePaymentWarnings = (
     warnings.push({
       type: 'OVERDUE_PAYMENT',
       severity: 'error',
-      message: `${summary.overduePayments.length} overdue payment(s): ₹${totalOverdue.toLocaleString()}`,
+      message: `${summary.overduePayments.length} overdue payment(s): ${formatCurrency(totalOverdue)}`,
       actionLabel: 'View Overdue',
     });
   }
@@ -310,7 +312,7 @@ export const generatePaymentWarnings = (
     warnings.push({
       type: 'EVENT_NEAR_UNPAID',
       severity: 'error',
-      message: `Event in ${daysUntilEvent} days with ₹${summary.balanceRemaining.toLocaleString()} unpaid`,
+      message: `Event in ${daysUntilEvent} days with ${formatCurrency(summary.balanceRemaining)} unpaid`,
       actionLabel: 'Collect Balance',
     });
   }

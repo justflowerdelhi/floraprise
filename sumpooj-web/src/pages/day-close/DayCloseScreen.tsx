@@ -46,6 +46,7 @@ import {
 import type { DayCloseSummary, DayCloseStatus } from '../../core/audit/AuditTypes';
 import { MOCK_DAY_SUMMARY } from '../../core/audit/AuditTypes';
 import { useSensitiveAction } from '../../core/audit/SensitiveActionModal';
+import { formatCurrency, getCurrencySymbol } from '../../core/i18n';
 
 // -----------------------------------------------------------------------------
 // Status Badge
@@ -132,7 +133,7 @@ function StatCard({ title, value, subtitle, icon, color = '#fdd835', trend, tren
           )}
         </Box>
         <Typography variant="h4" fontWeight={700} mb={0.5}>
-          {typeof value === 'number' ? `₹${value.toLocaleString()}` : value}
+          {typeof value === 'number' ? formatCurrency(value) : value}
         </Typography>
         <Typography variant="body2" color="text.secondary">
           {title}
@@ -172,10 +173,10 @@ export default function DayCloseScreen() {
     const result = await requestConfirmation('DAY_CLOSE', {
       metadata: {
         date: summary.date,
-        total_sales: `₹${summary.totalSales.toLocaleString()}`,
-        expected_cash: `₹${summary.expectedCash.toLocaleString()}`,
-        counted_cash: `₹${parseFloat(countedCash).toLocaleString()}`,
-        variance: cashVariance ? `₹${cashVariance.toLocaleString()}` : '₹0',
+        total_sales: formatCurrency(summary.totalSales),
+        expected_cash: formatCurrency(summary.expectedCash),
+        counted_cash: formatCurrency(parseFloat(countedCash)),
+        variance: cashVariance ? formatCurrency(cashVariance) : formatCurrency(0),
       },
     });
     
@@ -339,7 +340,7 @@ export default function DayCloseScreen() {
                           Cash
                         </Box>
                       </TableCell>
-                      <TableCell align="right">₹{summary.cashSales.toLocaleString()}</TableCell>
+                      <TableCell align="right">{formatCurrency(summary.cashSales)}</TableCell>
                       <TableCell align="right">
                         {Math.round((summary.cashSales / summary.totalSales) * 100)}%
                       </TableCell>
@@ -351,7 +352,7 @@ export default function DayCloseScreen() {
                           Card
                         </Box>
                       </TableCell>
-                      <TableCell align="right">₹{summary.cardSales.toLocaleString()}</TableCell>
+                      <TableCell align="right">{formatCurrency(summary.cardSales)}</TableCell>
                       <TableCell align="right">
                         {Math.round((summary.cardSales / summary.totalSales) * 100)}%
                       </TableCell>
@@ -363,7 +364,7 @@ export default function DayCloseScreen() {
                           UPI
                         </Box>
                       </TableCell>
-                      <TableCell align="right">₹{summary.upiSales.toLocaleString()}</TableCell>
+                      <TableCell align="right">{formatCurrency(summary.upiSales)}</TableCell>
                       <TableCell align="right">
                         {Math.round((summary.upiSales / summary.totalSales) * 100)}%
                       </TableCell>
@@ -371,7 +372,7 @@ export default function DayCloseScreen() {
                     {summary.otherPayments > 0 && (
                       <TableRow>
                         <TableCell>Other</TableCell>
-                        <TableCell align="right">₹{summary.otherPayments.toLocaleString()}</TableCell>
+                        <TableCell align="right">{formatCurrency(summary.otherPayments)}</TableCell>
                         <TableCell align="right">
                           {Math.round((summary.otherPayments / summary.totalSales) * 100)}%
                         </TableCell>
@@ -390,7 +391,7 @@ export default function DayCloseScreen() {
                   <Typography variant="body2">Refunds ({summary.refundCount})</Typography>
                 </Box>
                 <Typography variant="body2" color="error">
-                  -₹{summary.totalRefunds.toLocaleString()}
+                  -{formatCurrency(summary.totalRefunds)}
                 </Typography>
               </Box>
             </CardContent>
@@ -411,7 +412,7 @@ export default function DayCloseScreen() {
                     Expected Cash in Drawer
                   </Typography>
                   <Typography variant="h5" fontWeight={700}>
-                    ₹{summary.expectedCash.toLocaleString()}
+                    {formatCurrency(summary.expectedCash)}
                   </Typography>
                 </Box>
                 <Typography variant="caption" color="text.disabled">
@@ -429,7 +430,7 @@ export default function DayCloseScreen() {
                       Cash Counted
                     </Typography>
                     <Typography variant="h5" fontWeight={700}>
-                      ₹{summary.countedCash?.toLocaleString()}
+                      {formatCurrency(summary.countedCash ?? 0)}
                     </Typography>
                   </Box>
                   
@@ -444,7 +445,7 @@ export default function DayCloseScreen() {
                       }}
                     >
                       Cash {summary.cashVariance > 0 ? 'Over' : 'Short'} by{' '}
-                      <strong>₹{Math.abs(summary.cashVariance).toLocaleString()}</strong>
+                      <strong>{formatCurrency(Math.abs(summary.cashVariance))}</strong>
                     </Alert>
                   )}
                   
@@ -473,7 +474,7 @@ export default function DayCloseScreen() {
                     onChange={(e) => setCountedCash(e.target.value)}
                     placeholder="Enter the amount in drawer"
                     InputProps={{
-                      startAdornment: <Typography sx={{ mr: 1 }}>₹</Typography>,
+                      startAdornment: <Typography sx={{ mr: 1 }}>{getCurrencySymbol()}</Typography>,
                     }}
                     sx={{ mb: 2 }}
                   />
@@ -490,9 +491,9 @@ export default function DayCloseScreen() {
                       {cashVariance === 0 ? (
                         'Cash drawer balanced!'
                       ) : cashVariance > 0 ? (
-                        <>Cash <strong>over</strong> by ₹{cashVariance.toLocaleString()}</>
+                        <>Cash <strong>over</strong> by {formatCurrency(cashVariance)}</>
                       ) : (
-                        <>Cash <strong>short</strong> by ₹{Math.abs(cashVariance).toLocaleString()}</>
+                        <>Cash <strong>short</strong> by {formatCurrency(Math.abs(cashVariance))}</>
                       )}
                     </Alert>
                   )}
@@ -560,20 +561,20 @@ export default function DayCloseScreen() {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2">Gross Sales</Typography>
                   <Typography variant="body2" fontWeight={600}>
-                    ₹{(summary.totalSales + summary.totalRefunds).toLocaleString()}
+                    {formatCurrency(summary.totalSales + summary.totalRefunds)}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2" color="error">Refunds</Typography>
                   <Typography variant="body2" color="error">
-                    -₹{summary.totalRefunds.toLocaleString()}
+                    -{formatCurrency(summary.totalRefunds)}
                   </Typography>
                 </Box>
                 <Divider sx={{ my: 1 }} />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography variant="body2" fontWeight={600}>Net Sales</Typography>
                   <Typography variant="body2" fontWeight={600} color="#4caf50">
-                    ₹{summary.totalSales.toLocaleString()}
+                    {formatCurrency(summary.totalSales)}
                   </Typography>
                 </Box>
               </Box>
@@ -599,7 +600,7 @@ export default function DayCloseScreen() {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2">Average Order Value</Typography>
                   <Typography variant="body2" fontWeight={600}>
-                    ₹{Math.round(summary.totalSales / summary.totalOrders).toLocaleString()}
+                    {formatCurrency(Math.round(summary.totalSales / summary.totalOrders))}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>

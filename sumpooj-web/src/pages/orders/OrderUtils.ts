@@ -9,6 +9,7 @@ import type {
   Order, OrderSource, CartItem, CartSummary, ExternalOrder,
 
 } from './OrderTypes';
+import { formatCurrency } from '../../core/i18n';
 
 let _orderSeq = 100;
 
@@ -236,9 +237,4 @@ export const isExternalSource = (source: OrderSource): boolean =>
 
 // ─── Formatters ─────────────────────────────────────────────
 
-const INR = new Intl.NumberFormat('en-IN', {
-  style: 'currency', currency: 'INR',
-  minimumFractionDigits: 0, maximumFractionDigits: 2,
-});
-
-export const fmtOrderCurrency = (v: number): string => INR.format(v);
+export const fmtOrderCurrency = (v: number): string => formatCurrency(v);

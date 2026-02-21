@@ -7,7 +7,7 @@
  * - updateFulfillmentStatus / updatePaymentStatus
  */
 import React, { createContext, useContext, useReducer, useCallback, type ReactNode } from 'react';
-import type { Order, FulfillmentStatus, OrderPaymentStatus } from './OrderTypes';
+import type { Order, FulfillmentStatus, OrderPaymentStatus, InventoryActionStatus, InventoryReservation } from './OrderTypes';
 import { MOCK_ORDERS } from './OrderMockData';
 
 // ─── State ──────────────────────────────────────────────────
@@ -27,7 +27,8 @@ type OrderAction =
   | { type: 'UPDATE_ORDER'; order: Order }
   | { type: 'REMOVE_ORDER'; orderId: string }
   | { type: 'SET_FULFILLMENT'; orderId: string; status: FulfillmentStatus }
-  | { type: 'SET_PAYMENT_STATUS'; orderId: string; status: OrderPaymentStatus };
+  | { type: 'SET_PAYMENT_STATUS'; orderId: string; status: OrderPaymentStatus }
+  | { type: 'SET_INVENTORY_STATUS'; orderId: string; inventoryStatus: InventoryActionStatus; reservations?: InventoryReservation[] };
 
 function orderReducer(state: OrderState, action: OrderAction): OrderState {
   switch (action.type) {
@@ -72,6 +73,23 @@ function orderReducer(state: OrderState, action: OrderAction): OrderState {
       };
     }
 
+    case 'SET_INVENTORY_STATUS': {
+      const existing = state.orders[action.orderId];
+      if (!existing) return state;
+      return {
+        ...state,
+        orders: {
+          ...state.orders,
+          [action.orderId]: {
+            ...existing,
+            inventoryStatus: action.inventoryStatus,
+            ...(action.reservations && { reservations: action.reservations }),
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      };
+    }
+
     default:
       return state;
   }
@@ -86,6 +104,7 @@ interface OrderContextValue {
   removeOrder: (orderId: string) => void;
   setFulfillment: (orderId: string, status: FulfillmentStatus) => void;
   setPaymentStatus: (orderId: string, status: OrderPaymentStatus) => void;
+  setInventoryStatus: (orderId: string, inventoryStatus: InventoryActionStatus, reservations?: InventoryReservation[]) => void;
   getOrder: (orderId: string) => Order | undefined;
   getAllOrders: () => Order[];
 }
@@ -100,6 +119,11 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const removeOrder     = useCallback((orderId: string) => dispatch({ type: 'REMOVE_ORDER', orderId }), []);
   const setFulfillment  = useCallback((orderId: string, status: FulfillmentStatus) => dispatch({ type: 'SET_FULFILLMENT', orderId, status }), []);
   const setPaymentStatus = useCallback((orderId: string, status: OrderPaymentStatus) => dispatch({ type: 'SET_PAYMENT_STATUS', orderId, status }), []);
+  const setInventoryStatus = useCallback(
+    (orderId: string, inventoryStatus: InventoryActionStatus, reservations?: InventoryReservation[]) =>
+      dispatch({ type: 'SET_INVENTORY_STATUS', orderId, inventoryStatus, reservations }),
+    [],
+  );
 
   const getOrder = useCallback(
     (orderId: string): Order | undefined => state.orders[orderId],
@@ -115,7 +139,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     <OrderContext.Provider
       value={{
         state, addOrder, updateOrder, removeOrder,
-        setFulfillment, setPaymentStatus, getOrder, getAllOrders,
+        setFulfillment, setPaymentStatus, setInventoryStatus, getOrder, getAllOrders,
       }}
     >
       {children}

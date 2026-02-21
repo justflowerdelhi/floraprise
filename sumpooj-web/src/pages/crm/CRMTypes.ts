@@ -32,7 +32,7 @@ export const LOYALTY_TIER_CONFIGS: Record<LoyaltyTier, LoyaltyTierConfig> = {
     pointsMultiplier: 1.0,
     description: 'Welcome to our loyalty program',
     benefits: [
-      'Earn 1 point per ₹100 spent',
+      'Earn 1 point per {symbol}100 spent',
       'Birthday discount (5%)',
       'Early access to sales',
     ],
@@ -46,9 +46,9 @@ export const LOYALTY_TIER_CONFIGS: Record<LoyaltyTier, LoyaltyTierConfig> = {
     pointsMultiplier: 1.5,
     description: 'Valued customer status',
     benefits: [
-      'Earn 1.5x points per ₹100 spent',
+      'Earn 1.5x points per {symbol}100 spent',
       'Birthday discount (10%)',
-      'Free delivery on orders over ₹2000',
+      'Free delivery on orders over {symbol}2000',
       'Priority customer support',
     ],
   },
@@ -61,7 +61,7 @@ export const LOYALTY_TIER_CONFIGS: Record<LoyaltyTier, LoyaltyTierConfig> = {
     pointsMultiplier: 2.0,
     description: 'VIP customer status',
     benefits: [
-      'Earn 2x points per ₹100 spent',
+      'Earn 2x points per {symbol}100 spent',
       'Birthday discount (15%)',
       'Free delivery on all orders',
       'Exclusive VIP events access',
@@ -465,13 +465,7 @@ export function calculatePointsEarned(amount: number, tier: LoyaltyTier): number
   return Math.floor(basePoints * multiplier);
 }
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+export { formatCurrency } from '../../core/i18n';
 
 export function daysSince(dateString?: string): number | null {
   if (!dateString) return null;

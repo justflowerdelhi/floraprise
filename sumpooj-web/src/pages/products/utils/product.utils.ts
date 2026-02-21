@@ -62,17 +62,12 @@ export const generateSequentialSku = (
 // FORMATTING UTILITIES
 // ============================================
 
+import { formatCurrency as _coreFormatCurrency } from '../../../core/i18n';
+
 /**
- * Format currency with USD
+ * Format currency using tenant settings
  */
-export const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-};
+export const formatCurrency = (value: number): string => _coreFormatCurrency(value);
 
 /**
  * Format percentage

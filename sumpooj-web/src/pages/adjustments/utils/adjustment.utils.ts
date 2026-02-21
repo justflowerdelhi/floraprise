@@ -7,15 +7,11 @@ import type {
   AdjustmentRecord,
   WastageSummary,
 } from '../data/adjustment.data';
+import { formatCurrency } from '../../../core/i18n';
 
 // ─── Formatters ──────────────────────────────────────────────
 
-export const fmt = (n: number): string =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-  }).format(n);
+export const fmt = (n: number): string => formatCurrency(n);
 
 export const fmtDate = (d: string | null): string => {
   if (!d) return '—';

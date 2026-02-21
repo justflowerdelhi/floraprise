@@ -33,7 +33,7 @@ interface Props {
 
 // ─── Formatters (tenant-aware) ───────────────────────────────
 
-import { formatCurrency, formatPercent } from '../../core/i18n';
+import { formatCurrency, formatCurrencyCompact, formatPercent } from '../../core/i18n';
 
 const fmtCurrency = (v: number) => formatCurrency(v);
 const fmtPercent = (v: number) => formatPercent(v);
@@ -260,7 +260,7 @@ const PaymentAnalysis: React.FC<Props> = ({ data }) => {
                 />
                 <YAxis
                   tick={{ fontSize: 10, fill: dk ? 'rgba(255,255,255,0.5)' : '#666' }}
-                  tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`}
+                  tickFormatter={(v) => formatCurrencyCompact(v)}
                 />
                 <Tooltip
                   contentStyle={{

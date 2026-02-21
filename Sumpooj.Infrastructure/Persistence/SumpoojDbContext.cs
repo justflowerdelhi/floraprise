@@ -36,6 +36,15 @@ public class SumpoojDbContext
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<Delivery> Deliveries => Set<Delivery>();
+    public DbSet<Staff> Staff => Set<Staff>();
+    public DbSet<Event> Events => Set<Event>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<StaffTask> Tasks => Set<StaffTask>();
+    public DbSet<Refund> Refunds => Set<Refund>();
+    public DbSet<RefundItem> RefundItems => Set<RefundItem>();
+    public DbSet<GiftCard> GiftCards => Set<GiftCard>();
+    public DbSet<DayClose> DayCloses => Set<DayClose>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

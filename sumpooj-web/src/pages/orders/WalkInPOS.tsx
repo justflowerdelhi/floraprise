@@ -10,6 +10,7 @@ import {
   Card, CardContent, Grid, IconButton, Snackbar, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions,
   useTheme, Divider, FormControl, InputLabel, Select, MenuItem,
+  Autocomplete,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -18,9 +19,13 @@ import {
   PlayCircle as ResumeIcon,
   Payment as PayIcon,
   ShoppingCart as CartIcon,
+  Person as PersonIcon,
+  Phone as PhoneIcon,
 } from '@mui/icons-material';
-import type { Product, ProductCategory, OrderType } from './OrderTypes';
+import { CardGiftcard as GiftCardIcon } from '@mui/icons-material';
+import type { Product, ProductCategory, OrderType, OrderPaymentEntry, Order } from './OrderTypes';
 import { MOCK_PRODUCTS, PRODUCT_CATEGORIES } from './OrderMockData';
+import { processOrderInventory, inferFulfillmentMode } from '../inventory/InventoryMovementService';
 import { useCart } from '../cart/CartContext';
 import CartTable from '../cart/CartTable';
 import CartSummaryPanel from '../cart/CartSummaryPanel';
@@ -28,8 +33,15 @@ import { fmtCurrency } from '../cart/CartUtils';
 import PaymentModal from '../payments/PaymentModal';
 import { useTenant } from '../../core/tenant/TenantContext';
 import { MOCK_VENDOR_FLORISTS } from './WireMockData';
+<<<<<<< HEAD
 import CustomerSearchBar, { type SelectedCustomer } from './CustomerSearchBar';
 import QuickCreateCustomerModal from './QuickCreateCustomerModal';
+=======
+import { MOCK_CUSTOMERS, type Customer } from '../crm/CRMTypes';
+import { useOrders } from './OrderContext';
+import { GiftCardBuilderModal } from '../gift-cards';
+import type { SavedGiftCard } from '../gift-cards';
+>>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
 
 const WalkInPOS: React.FC = () => {
   const theme = useTheme();
@@ -38,6 +50,7 @@ const WalkInPOS: React.FC = () => {
 
   const { hasFeature } = useTenant();
   const wireEnabled = hasFeature('WIRE_MANAGEMENT');
+  const { addOrder } = useOrders();
 
   const { state, addProduct, removeItem, updateQty, setDiscount, setLineDiscount, clearCart, holdOrder, resumeOrder, removeHeld, setOrderSource, setOrderDiscount, clearOrderDiscount } = useCart();
 
@@ -48,7 +61,27 @@ const WalkInPOS: React.FC = () => {
   const [holdLabel, setHoldLabel] = useState('');
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [paymentOrderId, setPaymentOrderId] = useState('');
+  const [giftCardOpen, setGiftCardOpen] = useState(false);
+  const [attachedGiftCard, setAttachedGiftCard] = useState<SavedGiftCard | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Customer info
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerError, setCustomerError] = useState(false);
+  const customerCardRef = useRef<HTMLDivElement>(null);
+
+  const isCustomerValid = Boolean(customerName.trim() && customerPhone.trim());
+
+  // Filtered customer suggestions based on name or phone input
+  const customerSuggestions = useMemo(() => {
+    const q = (customerName || customerPhone || '').toLowerCase().trim();
+    if (!q) return MOCK_CUSTOMERS;
+    return MOCK_CUSTOMERS.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.phone.replace(/\s/g, '').includes(q.replace(/\s/g, '')),
+    );
+  }, [customerName, customerPhone]);
 
   const [orderType, setOrderType] = useState<OrderType>('LOCAL');
   const [vendorId, setVendorId] = useState('');
@@ -115,7 +148,7 @@ const WalkInPOS: React.FC = () => {
 
   const handleHold = () => {
     if (state.items.length === 0) return;
-    holdOrder(holdLabel || `POS Hold`, undefined);
+    holdOrder(holdLabel || `POS Hold`, customerName || undefined);
     setHoldDialogOpen(false);
     setHoldLabel('');
     setSnackMsg('Order held');
@@ -128,11 +161,85 @@ const WalkInPOS: React.FC = () => {
     setPayModalOpen(true);
   }, [orderType]);
 
-  const handleFullyPaid = useCallback(() => {
+  const handleFullyPaid = useCallback((payments: OrderPaymentEntry[]) => {
+    const now = new Date().toISOString();
+    const orderId = paymentOrderId;
+    // Determine inventory mode: walk-in paid → IMMEDIATE (deduct now)
+    const mode = inferFulfillmentMode({ orderSource: 'WALK_IN', paymentStatus: 'PAID' });
+    const invResult = processOrderInventory(orderId, state.items, mode, 'loc_default');
+    const newOrder: Order = {
+      id: orderId,
+      orderNumber: `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+      orderSource: 'WALK_IN',
+      orderType,
+      customerName: customerName || 'Walk-in Customer',
+      customerPhone: customerPhone || undefined,
+      fulfillmentStatus: 'CONFIRMED',
+      paymentStatus: 'PAID',
+      orderStatus: 'PAID',
+      isPriceEditable: false,
+      totalAmount: state.totals.grandTotal,
+      totalPaid: state.totals.grandTotal,
+      balanceDue: 0,
+      payments,
+      items: state.items,
+      totals: state.totals,
+      ...invResult,
+      createdAt: now,
+      updatedAt: now,
+    };
+    addOrder(newOrder);
     setPayModalOpen(false);
     setSnackMsg(`Order completed — ${fmtCurrency(state.totals.grandTotal)}`);
+    setCustomerName('');
+    setCustomerPhone('');
+    setSelectedCustomer(null);
+    setCustomerError(false);
     clearCart();
-  }, [clearCart, state.totals.grandTotal]);
+  }, [clearCart, addOrder, paymentOrderId, orderType, customerName, customerPhone, state.items, state.totals]);
+
+  const handlePartialSave = useCallback((payments: OrderPaymentEntry[], totalPaid: number, balanceDue: number) => {
+    if (!isCustomerValid) {
+      setCustomerError(true);
+      setPayModalOpen(false);
+      customerCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    const now = new Date().toISOString();
+    const orderId = paymentOrderId;
+    // Walk-in partial → IMMEDIATE (customer takes items now)
+    const mode = inferFulfillmentMode({ orderSource: 'WALK_IN', paymentStatus: 'PARTIAL' });
+    const invResult = processOrderInventory(orderId, state.items, mode, 'loc_default');
+    const newOrder: Order = {
+      id: orderId,
+      orderNumber: `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+      orderSource: 'WALK_IN',
+      orderType,
+      customerName,
+      customerPhone,
+      fulfillmentStatus: 'CONFIRMED',
+      paymentStatus: 'PARTIAL',
+      orderStatus: 'PARTIALLY_PAID',
+      isPriceEditable: false,
+      totalAmount: state.totals.grandTotal,
+      totalPaid,
+      balanceDue,
+      payments,
+      items: state.items,
+      totals: state.totals,
+      ...invResult,
+      createdAt: now,
+      updatedAt: now,
+    };
+    addOrder(newOrder);
+    setPayModalOpen(false);
+    setSnackMsg(`Order saved — ${fmtCurrency(totalPaid)} paid, ${fmtCurrency(balanceDue)} due`);
+    setCustomerName('');
+    setCustomerPhone('');
+    setSelectedCustomer(null);
+    setCustomerError(false);
+    clearCart();
+  }, [clearCart, addOrder, paymentOrderId, orderType, customerName, customerPhone, state.items, state.totals]);
 
   const selectedVendor = useMemo(
     () => MOCK_VENDOR_FLORISTS.find((vendor) => vendor.id === vendorId) ?? null,
@@ -384,8 +491,135 @@ const WalkInPOS: React.FC = () => {
         borderLeft: `1px solid ${dk ? 'rgba(255,255,255,0.06)' : '#e0e0e0'}`,
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
+<<<<<<< HEAD
         {/* Scrollable content area */}
         <Box sx={{ flex: 1, overflow: 'auto', p: 2, pb: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+=======
+        {/* Customer Info */}
+        <Card
+          ref={customerCardRef}
+          elevation={dk ? 0 : 1}
+          sx={{
+            bgcolor: dk ? '#1a1a2e' : '#fff',
+            border: customerError
+              ? `2px solid ${dk ? '#f44336' : '#d32f2f'}`
+              : dk ? '1px solid rgba(255,255,255,0.08)' : 'none',
+            borderRadius: 2,
+          }}
+        >
+          <CardContent sx={{ pb: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+              Customer
+            </Typography>
+            <Autocomplete
+              freeSolo
+              size="small"
+              options={customerSuggestions}
+              getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.name}
+              value={selectedCustomer}
+              inputValue={customerName}
+              onInputChange={(_e, val) => { setCustomerName(val); if (val.trim()) setCustomerError(false); }}
+              onChange={(_e, val) => {
+                if (val && typeof val !== 'string') {
+                  setSelectedCustomer(val);
+                  setCustomerName(val.name);
+                  setCustomerPhone(val.phone);
+                  setCustomerError(false);
+                } else {
+                  setSelectedCustomer(null);
+                  if (typeof val === 'string') setCustomerName(val);
+                }
+              }}
+              renderOption={(props, option) => (
+                <li {...props} key={option.id}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{option.phone}{option.email ? ` · ${option.email}` : ''}</Typography>
+                  </Box>
+                </li>
+              )}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Name"
+                  placeholder="Walk-in customer"
+                  error={customerError && !customerName.trim()}
+                  slotProps={{
+                    input: {
+                      ...params.InputProps,
+                      startAdornment: (
+                        <>
+                          <InputAdornment position="start">
+                            <PersonIcon sx={{ fontSize: 18, color: dk ? 'rgba(255,255,255,0.4)' : undefined }} />
+                          </InputAdornment>
+                          {params.InputProps.startAdornment}
+                        </>
+                      ),
+                    },
+                  }}
+                />
+              )}
+              sx={{ mb: 1 }}
+            />
+            <Autocomplete
+              freeSolo
+              size="small"
+              options={customerSuggestions}
+              getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.phone}
+              value={selectedCustomer}
+              inputValue={customerPhone}
+              onInputChange={(_e, val) => { setCustomerPhone(val); if (val.trim()) setCustomerError(false); }}
+              onChange={(_e, val) => {
+                if (val && typeof val !== 'string') {
+                  setSelectedCustomer(val);
+                  setCustomerName(val.name);
+                  setCustomerPhone(val.phone);
+                  setCustomerError(false);
+                } else {
+                  setSelectedCustomer(null);
+                  if (typeof val === 'string') setCustomerPhone(val);
+                }
+              }}
+              renderOption={(props, option) => (
+                <li {...props} key={option.id}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.phone}</Typography>
+                    <Typography variant="caption" color="text.secondary">{option.name}</Typography>
+                  </Box>
+                </li>
+              )}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Phone"
+                  placeholder="Optional"
+                  error={customerError && !customerPhone.trim()}
+                  slotProps={{
+                    input: {
+                      ...params.InputProps,
+                      startAdornment: (
+                        <>
+                          <InputAdornment position="start">
+                            <PhoneIcon sx={{ fontSize: 18, color: dk ? 'rgba(255,255,255,0.4)' : undefined }} />
+                          </InputAdornment>
+                          {params.InputProps.startAdornment}
+                        </>
+                      ),
+                    },
+                  }}
+                />
+              )}
+            />
+          </CardContent>
+        </Card>
+
+        {customerError && (
+          <Typography variant="caption" sx={{ color: '#d32f2f', fontWeight: 600, mt: -1.5, px: 1 }}>
+            Customer Name and Phone are required for partial payment orders.
+          </Typography>
+        )}
+
+>>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
         {wireEnabled && (
           <Card
             elevation={dk ? 0 : 1}
@@ -602,6 +836,7 @@ const WalkInPOS: React.FC = () => {
             </Typography>
           </Box>
 
+<<<<<<< HEAD
           {showPayment ? (
             <Button
               variant="contained"
@@ -650,6 +885,36 @@ const WalkInPOS: React.FC = () => {
             Clear Cart
           </Button>
         </Box>
+=======
+        <Button
+          variant="outlined"
+          size="small"
+          fullWidth
+          startIcon={<GiftCardIcon />}
+          onClick={() => setGiftCardOpen(true)}
+          sx={{
+            borderColor: dk ? 'rgba(156,39,176,0.5)' : '#9c27b0',
+            color: dk ? '#ce93d8' : '#9c27b0',
+            '&:hover': {
+              borderColor: '#9c27b0',
+              bgcolor: dk ? 'rgba(156,39,176,0.08)' : 'rgba(156,39,176,0.04)',
+            },
+          }}
+        >
+          {attachedGiftCard ? 'Gift Card Attached ✓' : 'Add Gift Card'}
+        </Button>
+
+        <Button
+          variant="outlined"
+          size="small"
+          fullWidth
+          color="error"
+          disabled={state.items.length === 0}
+          onClick={() => { clearCart(); setCustomerName(''); setCustomerPhone(''); setSelectedCustomer(null); setCustomerError(false); setSnackMsg('Cart cleared'); }}
+        >
+          Clear Cart
+        </Button>
+>>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
       </Box>
 
       {/* ─── Hold Dialog ────────────────────────────────── */}
@@ -677,9 +942,12 @@ const WalkInPOS: React.FC = () => {
           orderId={paymentOrderId}
           grandTotal={state.totals.grandTotal}
           onFullyPaid={handleFullyPaid}
+          onPartialSave={handlePartialSave}
+          customerValid={isCustomerValid}
         />
       )}
 
+<<<<<<< HEAD
       {/* ─── Quick Create Customer Modal ────────────── */}
       <QuickCreateCustomerModal
         open={createCustomerOpen}
@@ -692,6 +960,13 @@ const WalkInPOS: React.FC = () => {
           // Return focus to product search after customer added
           searchRef.current?.focus();
         }}
+=======
+      {/* ─── Gift Card Builder Modal ───────────────── */}
+      <GiftCardBuilderModal
+        open={giftCardOpen}
+        onClose={() => setGiftCardOpen(false)}
+        onSave={(card) => { setAttachedGiftCard(card); setSnackMsg('Gift Card attached to order'); }}
+>>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
       />
 
       {/* ─── Snackbar ───────────────────────────────────── */}

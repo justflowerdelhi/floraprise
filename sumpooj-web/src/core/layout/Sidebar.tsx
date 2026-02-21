@@ -44,6 +44,7 @@ import {
   Blender,
   AutoAwesome,
   DeleteSweep,
+  CardGiftcard,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRBAC } from '../rbac/RBACContext';
@@ -79,6 +80,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Blender: <Blender />,
   AutoAwesome: <AutoAwesome />,
   DeleteSweep: <DeleteSweep />,
+  CardGiftcard: <CardGiftcard />,
 };
 
 // ─── Section Colors ─────────────────────────────────────────
@@ -92,6 +94,7 @@ const SECTION_COLORS: Record<string, string> = {
   catalog: '#00bcd4',
   crm: '#5B2E91',        // FloraEdge Purple
   production: '#00897b', // Teal
+  'gift-cards': '#9c27b0', // Purple accent
   staff: '#ff5722',
   settings: '#F4C430',   // Accent Yellow
 };

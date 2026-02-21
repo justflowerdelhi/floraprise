@@ -24,6 +24,7 @@ import {
   getUpgradePathForFeature,
 } from './FeatureFlags';
 import { setCurrentCurrency } from '../i18n/currency';
+import { CurrencyProvider } from '../i18n/CurrencyContext';
 import { useAuth } from '../../auth/AuthContext';
 
 // -----------------------------------------------------------------------------
@@ -206,7 +207,9 @@ export function TenantProvider({ children }: TenantProviderProps) {
   
   return (
     <TenantContext.Provider value={value}>
-      {children}
+      <CurrencyProvider currencyCode={tenant.currency}>
+        {children}
+      </CurrencyProvider>
     </TenantContext.Provider>
   );
 }

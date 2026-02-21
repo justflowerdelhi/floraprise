@@ -7,14 +7,14 @@ import type {
   LedgerFilterState,
   LedgerSummary,
 } from '../data/ledger.data';
+import { formatCurrency, getCurrencySymbol } from '../../../core/i18n';
 
 // ─── Formatters ─────────────────────────────────────────────
 
-export const fmt = (n: number): string =>
-  '₹' + Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const fmt = (n: number): string => formatCurrency(Math.abs(n));
 
 export const fmtSigned = (n: number): string =>
-  (n >= 0 ? '+' : '−') + '₹' + Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  (n >= 0 ? '+' : '−') + formatCurrency(Math.abs(n));
 
 export const fmtDate = (iso: string): string => {
   const d = new Date(iso);

@@ -1,25 +1,12 @@
 /**
  * Inventory Health Dashboard — Utility Functions
  */
-
-const INR = new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
-
-const INR_PRECISE = new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+import { formatCurrency, formatCurrencyCompact } from '../../../core/i18n';
 
 const NUM = new Intl.NumberFormat('en-IN');
 
-export const fmtCurrency     = (v: number): string => INR.format(v);
-export const fmtCurrencyFull = (v: number): string => INR_PRECISE.format(v);
+export const fmtCurrency     = (v: number): string => formatCurrency(v);
+export const fmtCurrencyFull = (v: number): string => formatCurrency(v);
 export const fmtNumber       = (v: number): string => NUM.format(v);
 export const fmtPercent      = (v: number): string => `${v.toFixed(1)}%`;
 export const fmtRatio        = (v: number): string => `${v.toFixed(1)}×`;
@@ -30,13 +17,9 @@ export const fmtDate = (iso: string): string => {
 };
 
 /**
- * Abbreviate large numbers:  1200 → "₹1.2K",  245800 → "₹2.5L"
+ * Abbreviate large numbers using tenant-aware compact format
  */
-export const fmtCompact = (v: number): string => {
-  if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`;
-  if (v >= 1000)   return `₹${(v / 1000).toFixed(1)}K`;
-  return `₹${v}`;
-};
+export const fmtCompact = (v: number): string => formatCurrencyCompact(v);
 
 /**
  * Recharts custom tooltip label formatter (short date)

@@ -1,592 +1,715 @@
-# 🌸 FloraEdge  - Florist ERP System
+﻿# Sumpooj Florist ERP
 
-**Enterprise-level SaaS software for florist businesses**
+A comprehensive, multi-tenant Enterprise Resource Planning (ERP) system designed specifically for florist businesses. Built with .NET 10, React 19, Clean Architecture, and PostgreSQL.
 
-A comprehensive ERP solution built with Clean Architecture, designed specifically for florist shops and flower businesses. Manage products, inventory, purchases, customers, orders, and deliveries - all in one platform.
+## Overview
 
-[![.NET](https://img.shields.io/badge/.NET-10.0-purple)](https://dotnet.microsoft.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-blue)](https://www.postgresql.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+Sumpooj Florist ERP is a full-featured business management system tailored for florist shops, wedding planners, and event decorators. It handles everything from inventory management with perishable tracking to order processing, staff management, and financial operations.
 
----
+### Key Highlights
 
-## 📋 Table of Contents
-
-- [Features](#-features)
-- [Architecture](#-architecture)
-- [Tech Stack](#-tech-stack)
-- [Getting Started](#-getting-started)
-- [API Endpoints](#-api-endpoints)
-- [Database Schema](#-database-schema)
-- [Flowcharts](#-flowcharts)
-- [Project Structure](#-project-structure)
+- **Multi-Tenant Architecture**: Support multiple companies/stores with complete data isolation
+- **Florist-Specific Features**: Flower grades, perishability tracking, batch expiry management
+- **Complete Order Lifecycle**: From walk-in to delivery with real-time status tracking
+- **Event Management**: Wedding and corporate event planning with budgets and timelines
+- **Comprehensive Audit Trail**: Track every user action for compliance and debugging
+- **Modern React Frontend**: Beautiful, responsive UI with Material UI and Tailwind CSS
 
 ---
 
-## ✨ Features
+## Features
 
-### 🛍️ Product Management
-- **Product Catalog** - Manage flowers, plants, arrangements, gifts, and accessories
-- **SKU Management** - Unique product identification with SKU validation
-- **Multi-tier Pricing** - Retail, wholesale, and wedding/event pricing
-- **Flower-specific Attributes** - Color, variety, grade, country of origin, seasonality
-- **Perishable Tracking** - Shelf life, expiry alerts, temperature notes
-- **Tax Categories** - Configurable tax rates per product
+### Core Business
+- **Multi-Company**: Support multiple stores/franchises with isolated data
+- **Locations**: Manage stores, warehouses, cold rooms, display areas
+- **Staff Management**: Roles, commissions, task assignments
+- **Customer CRM**: Customer profiles, order history, preferences
 
-### 📦 Inventory Management
-- **Batch Tracking** - FIFO inventory management with batch numbers
-- **Multi-location Support** - Track stock across stores, warehouses, cold rooms
-- **Expiry Management** - Automatic alerts for expiring products
-- **Stock Adjustments** - Track damaged, spoiled, samples, theft, corrections
-- **Low Stock Alerts** - Configurable reorder levels and minimum stock
-- **Real-time Stock Levels** - Accurate inventory counts across locations
+### Inventory Management
+- **Product Catalog**: Flowers, arrangements, supplies, services
+- **Batch Tracking**: FIFO-based inventory with expiry dates
+- **Perishable Alerts**: Automated expiry notifications
+- **Stock Adjustments**: Damage, waste, theft, corrections
+- **Low Stock Alerts**: Reorder level notifications
 
-### 🛒 Purchase Order Management
-- **Supplier Management** - Track suppliers, ratings, payment terms
-- **PO Workflow** - Draft → Submit → Approve → Receive → Complete
-- **Batch Creation on Receipt** - Automatic batch creation when receiving goods
-- **Cost Tracking** - Track purchase costs and margins
-- **Expected Delivery Dates** - Plan inventory arrivals
+### Order Processing
+- **Multi-Source Orders**: Walk-in, phone, website, BloomNation, FTD
+- **Delivery Management**: Time slots, driver assignments, proof of delivery
+- **Fulfillment Tracking**: Draft to Design to Ready to Delivered
+- **Card Messages**: Custom messages for recipients
 
-### 👥 Customer Relationship Management (CRM)
-- **Customer Database** - Store customer information and preferences
-- **Order History** - Track total orders per customer
-- **Default Card Messages** - Save customer preferences
-- **Soft Delete** - Deactivate customers without losing history
+### Financial Operations
+- **Multiple Payment Methods**: Cash, card, UPI, gift cards, bank transfer
+- **Terminal Integration**: External payment terminal support
+- **Refund Processing**: Full/partial refunds with restock option
+- **Day Close**: End-of-day cash reconciliation
+- **Gift Cards**: Issue, redeem, track balances
 
-### 📝 Order Management
-- **Order Processing** - Complete order lifecycle management
-- **Delivery Scheduling** - Schedule and track deliveries
-- **Payment Tracking** - Track payment status (unpaid, partial, paid)
-- **Priority Levels** - Standard, express, same-day delivery options
+### Event Management
+- **Event Types**: Weddings, corporate, funerals, parties
+- **Budget Tracking**: Proposals, costs, payments
+- **Designer Assignment**: Assign staff to events
+- **Mood Boards**: Color themes, style notes
 
-### 🏢 Multi-Tenant Architecture
-- **Company Isolation** - Complete data separation between tenants
-- **Role-based Access** - Platform admin, company admin, manager, staff roles
-- **Secure Authentication** - JWT-based authentication with refresh tokens
-
-### 📍 Multi-Location Support
-- **Location Types** - Store, warehouse, cold room, display cooler, dry storage
-- **Default Location** - Set primary location for operations
-- **Stock by Location** - Track inventory per location
+### Analytics and Reporting
+- **Dashboard**: Role-based metrics and KPIs
+- **Audit Logs**: Complete user activity tracking
+- **Profit Intelligence**: Revenue and cost analysis
+- **Stock Valuation**: Inventory value tracking
 
 ---
 
-## 🏗️ Architecture
+## Technology Stack
 
-### Clean Architecture Overview
+### Backend
+| Category | Technology |
+|----------|------------|
+| Framework | .NET 10 |
+| Database | PostgreSQL 15+ |
+| ORM | Entity Framework Core 10 |
+| Authentication | ASP.NET Identity + JWT |
+| API Documentation | OpenAPI (Scalar) |
+| Architecture | Clean Architecture / DDD |
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        PRESENTATION                              │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │   Sumpooj.API   │  │ Sumpooj.Blazor  │  │  sumpooj-web    │  │
-│  │   (REST API)    │  │  (Server UI)    │  │   (React SPA)   │  │
-│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘  │
-└───────────┼─────────────────────┼─────────────────────┼─────────┘
-            │                     │                     │
-            ▼                     ▼                     ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        APPLICATION                               │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                 Sumpooj.Application                      │    │
-│  │  • Use Cases (Services)    • DTOs                        │    │
-│  │  • Interfaces              • Validation                  │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-            │
-            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                          DOMAIN                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                   Sumpooj.Domain                         │    │
-│  │  • Entities        • Enums         • Value Objects       │    │
-│  │  • Business Rules  • Domain Events                       │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-            │
-            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       INFRASTRUCTURE                             │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                Sumpooj.Infrastructure                    │    │
-│  │  • Repositories    • DbContext     • Identity            │    │
-│  │  • Configurations  • Migrations    • External Services   │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-```
+### Frontend
+| Category | Technology |
+|----------|------------|
+| Framework | React 19 |
+| Language | TypeScript 5.9 |
+| Build Tool | Vite 7 |
+| UI Library | Material UI 7 |
+| Styling | Tailwind CSS 4 |
+| Forms | React Hook Form + Zod |
+| Charts | Recharts |
+| Routing | React Router 7 |
+| HTTP Client | Axios |
 
-### Dependency Flow
+---
+
+## Architecture
+
+### System Architecture Diagram
 
 ```mermaid
 graph TB
-    subgraph Presentation
-        API[Sumpooj.API]
-        Blazor[Sumpooj.Blazor]
-        Web[sumpooj-web]
+    subgraph "Frontend - sumpooj-web"
+        REACT[React 19 App<br/>TypeScript + Vite]
+        MUI[Material UI 7]
+        TAIL[Tailwind CSS]
+        PAGES[27 Page Modules]
     end
-    
-    subgraph Application
-        App[Sumpooj.Application]
+
+    subgraph "API Layer - Sumpooj.API"
+        AUTH[Auth Controller]
+        ORDERS[Orders Controller]
+        INV[Inventory Controller]
+        PAY[Payments Controller]
+        OTHER[19 Controllers Total]
     end
-    
-    subgraph Domain
-        Dom[Sumpooj.Domain]
+
+    subgraph "Application Layer - Sumpooj.Application"
+        SVC[16 Services]
+        DTO[DTOs]
+        INT[Interfaces]
     end
-    
-    subgraph Infrastructure
-        Infra[Sumpooj.Infrastructure]
+
+    subgraph "Infrastructure Layer - Sumpooj.Infrastructure"
+        REPO[15 Repositories]
+        IDENT[Identity]
+        DBCTX[DbContext]
     end
-    
-    API --> App
-    Blazor --> App
-    Web -.->|HTTP| API
-    App --> Dom
-    Infra --> App
-    Infra --> Dom
-    API --> Infra
-    Blazor --> Infra
+
+    subgraph "Domain Layer - Sumpooj.Domain"
+        ENT[17 Entities]
+        ENUM[Enums]
+    end
+
+    subgraph "Database"
+        PG[(PostgreSQL<br/>25 Tables)]
+    end
+
+    REACT --> AUTH
+    MUI --> REACT
+    TAIL --> REACT
+    PAGES --> REACT
+
+    AUTH --> SVC
+    ORDERS --> SVC
+    INV --> SVC
+    PAY --> SVC
+    OTHER --> SVC
+
+    SVC --> INT
+    INT -.-> REPO
+    REPO --> DBCTX
+    REPO --> ENT
+    DBCTX --> PG
+
+    style REACT fill:#61dafb
+    style PG fill:#336791
+    style MUI fill:#007fff
+```
+
+### Backend Architecture (Clean Architecture)
+
+| Layer | Project | Responsibility |
+|-------|---------|----------------|
+| Domain | Sumpooj.Domain | Core business entities, enums, domain logic |
+| Application | Sumpooj.Application | Use cases, DTOs, service interfaces |
+| Infrastructure | Sumpooj.Infrastructure | Data access, EF Core, Identity |
+| API | Sumpooj.API | HTTP endpoints, authentication |
+
+### Frontend Architecture
+
+```
+sumpooj-web/
+├── src/
+│   ├── api/            # API client and endpoints
+│   ├── auth/           # Authentication context and guards
+│   ├── components/     # Shared UI components
+│   ├── core/           # Core utilities and types
+│   ├── pages/          # Feature pages (27 modules)
+│   └── routes/         # Route definitions
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## Frontend Pages
 
-| Layer | Technology |
-|-------|------------|
-| **Backend API** | .NET 10, ASP.NET Core Web API |
-| **Frontend (Web)** | React, TypeScript, TailwindCSS |
-| **Frontend (Admin)** | Blazor Server |
-| **Database** | PostgreSQL |
-| **ORM** | Entity Framework Core |
-| **Authentication** | ASP.NET Identity + JWT |
-| **API Documentation** | OpenAPI (Scalar) |
-| **Architecture** | Clean Architecture, DDD |
+The React application includes 27 feature modules:
 
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- [PostgreSQL](https://www.postgresql.org/download/)
-- [Node.js](https://nodejs.org/) (for React frontend)
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/sumitkumarsingh88/FloristERP.git
-   cd FloristERP
-   ```
-
-2. **Configure the database connection**
-   
-   Update `Sumpooj.API/appsettings.json`:
-   ```json
-   {
-     "ConnectionStrings": {
-       "Default": "Host=localhost;Database=sumpooj;Username=postgres;Password=yourpassword"
-     }
-   }
-   ```
-
-3. **Run database migrations**
-   ```bash
-   dotnet ef database update --project Sumpooj.Infrastructure --startup-project Sumpooj.API
-   ```
-
-4. **Run the API**
-   ```bash
-   cd Sumpooj.API
-   dotnet run
-   ```
-
-5. **Run the React frontend** (optional)
-   ```bash
-   cd sumpooj-web
-   npm install
-   npm run dev
-   ```
-
-### Default URLs
-
-| Service | URL |
-|---------|-----|
-| API | https://localhost:7001 |
-| Swagger/Scalar | https://localhost:7001/scalar |
-| Blazor | https://localhost:7002 |
-| React | http://localhost:5173 |
+| Category | Pages |
+|----------|-------|
+| **Dashboard** | Main Dashboard, Health Dashboard, Profit Intelligence |
+| **Sales** | Orders, Cart, Payments, Refunds |
+| **Inventory** | Products, Inventory, Adjustments, Expiry Alerts, Reorder, Stock Ledger, Valuation |
+| **Purchasing** | Purchases |
+| **CRM** | Customers, CRM |
+| **Operations** | Staff, Tasks, Events, Day Close |
+| **Finance** | Gift Cards |
+| **Settings** | Settings, Onboarding, Subscription |
+| **Production** | Production Management |
+| **Auth** | Login, Register |
 
 ---
 
-## 📡 API Endpoints
+## Business Process Flowcharts
 
-### Products
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/products/search` | Search products with filters |
-| GET | `/api/products/{id}` | Get product by ID |
-| POST | `/api/products` | Create new product |
-| PUT | `/api/products/{id}` | Update product |
-| GET | `/api/products/validate-sku` | Validate SKU uniqueness |
-| GET | `/api/products/low-stock` | Get low stock products |
-| GET | `/api/products/reorder` | Get products needing reorder |
+### Order Processing Workflow
 
-### Inventory
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/inventory/batches` | Search batches |
-| GET | `/api/inventory/batches/{id}` | Get batch by ID |
-| POST | `/api/inventory/batches` | Create new batch |
-| GET | `/api/inventory/expiry-alerts` | Get expiring batches |
-| GET | `/api/inventory/summary` | Get inventory summary |
-| GET | `/api/inventory/adjustments` | Search adjustments |
-| POST | `/api/inventory/adjustments` | Create adjustment |
+```mermaid
+flowchart TD
+    START([New Order]) --> SOURCE{Order Source?}
 
-### Suppliers
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/suppliers` | Get all active suppliers |
-| GET | `/api/suppliers/search` | Search suppliers |
-| GET | `/api/suppliers/{id}` | Get supplier by ID |
-| POST | `/api/suppliers` | Create new supplier |
-| PUT | `/api/suppliers/{id}` | Update supplier |
+    SOURCE -->|Walk-in| WALKIN[Create Walk-in Order]
+    SOURCE -->|Phone| PHONE[Create Phone Order]
+    SOURCE -->|Website| WEB[Create Online Order]
+    SOURCE -->|Wire Service| WIRE[Create Wire Order]
 
-### Purchases
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/purchases/search` | Search purchase orders |
-| GET | `/api/purchases/{id}` | Get PO by ID |
-| POST | `/api/purchases` | Create new PO |
-| POST | `/api/purchases/{id}/submit` | Submit PO for approval |
-| POST | `/api/purchases/{id}/approve` | Approve PO |
-| POST | `/api/purchases/{id}/receive` | Receive PO items |
-| POST | `/api/purchases/{id}/cancel` | Cancel PO |
+    WALKIN --> CREATE
+    PHONE --> CREATE
+    WEB --> CREATE
+    WIRE --> CREATE
 
-### Lookup Data
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/lookup/product-types` | Get product types |
-| GET | `/api/lookup/product-categories` | Get categories |
-| GET | `/api/lookup/units-of-measure` | Get units |
-| GET | `/api/lookup/adjustment-types` | Get adjustment types |
+    CREATE[Create Order<br/>Status: PENDING] --> PAYMENT{Payment?}
+
+    PAYMENT -->|Full Payment| PAID[Mark as PAID]
+    PAYMENT -->|Partial| PARTIAL[Mark as PARTIALLY_PAID]
+    PAYMENT -->|Later| UNPAID[Keep as UNPAID]
+
+    PAID --> CONFIRM
+    PARTIAL --> CONFIRM
+    UNPAID --> CONFIRM
+
+    CONFIRM[Confirm Order<br/>Status: CONFIRMED] --> ASSIGN[Assign Designer]
+
+    ASSIGN --> DESIGN[Start Design<br/>Status: PROCESSING<br/>Fulfillment: IN_DESIGN]
+
+    DESIGN --> READY[Mark Ready<br/>Status: READY_FOR_DELIVERY<br/>Fulfillment: READY]
+
+    READY --> DELIVERY{Delivery Type?}
+
+    DELIVERY -->|Pickup| PICKUP[Customer Pickup]
+    DELIVERY -->|Delivery| DRIVER[Assign Driver]
+
+    DRIVER --> OUT[Out for Delivery<br/>Status: OUT_FOR_DELIVERY]
+
+    OUT --> DELIVERED[Delivered<br/>Status: DELIVERED<br/>Fulfillment: COMPLETED]
+    PICKUP --> DELIVERED
+
+    DELIVERED --> DONE([Order Complete])
+
+    style START fill:#c8e6c9
+    style DONE fill:#c8e6c9
+    style DESIGN fill:#fff9c4
+    style READY fill:#bbdefb
+    style DELIVERED fill:#c8e6c9
+```
+
+### Inventory Management Flow
+
+```mermaid
+flowchart TD
+    subgraph "Stock In"
+        PO[Purchase Order] --> RECEIVE[Receive Stock]
+        RECEIVE --> BATCH[Create Batch<br/>with Expiry Date]
+        BATCH --> UPDATE_IN[Update Product<br/>Stock Quantity +]
+    end
+
+    subgraph "Stock Out"
+        ORDER[Sales Order] --> ALLOCATE[Allocate Stock<br/>FIFO Method]
+        ALLOCATE --> DEDUCT[Deduct from<br/>Oldest Batch]
+        DEDUCT --> UPDATE_OUT[Update Product<br/>Stock Quantity -]
+    end
+
+    subgraph "Adjustments"
+        ADJ_START([Adjustment Needed]) --> TYPE{Type?}
+        TYPE -->|Damage| DAMAGE[Record Damage]
+        TYPE -->|Waste/Expired| WASTE[Record Waste]
+        TYPE -->|Theft| THEFT[Record Theft]
+        TYPE -->|Count Correction| COUNT[Stock Count]
+
+        DAMAGE --> ADJUST[Create Adjustment<br/>Record]
+        WASTE --> ADJUST
+        THEFT --> ADJUST
+        COUNT --> ADJUST
+
+        ADJUST --> UPDATE_ADJ[Update Stock]
+    end
+
+    subgraph "Alerts"
+        CHECK{Daily Check} --> LOW{Stock <= Min?}
+        LOW -->|Yes| LOW_ALERT[Low Stock Alert]
+
+        CHECK --> EXPIRY{Expiring Soon?}
+        EXPIRY -->|Yes| EXP_ALERT[Expiry Alert]
+
+        CHECK --> REORDER{Stock <= Reorder?}
+        REORDER -->|Yes| REORDER_ALERT[Reorder Alert]
+    end
+
+    style PO fill:#e3f2fd
+    style ORDER fill:#fff3e0
+    style ADJ_START fill:#fce4ec
+    style LOW_ALERT fill:#ffcdd2
+    style EXP_ALERT fill:#ffcdd2
+    style REORDER_ALERT fill:#fff9c4
+```
+
+### Payment Processing Flow
+
+```mermaid
+flowchart TD
+    START([Payment Request]) --> METHOD{Payment Method?}
+
+    METHOD -->|Cash| CASH[Cash Payment]
+    METHOD -->|Card| CARD[Card Payment]
+    METHOD -->|UPI| UPI[UPI Payment]
+    METHOD -->|Gift Card| GC[Gift Card]
+    METHOD -->|Bank Transfer| BANK[Bank Transfer]
+
+    CASH --> RECEIVE_CASH[Receive Cash<br/>Give Change]
+    RECEIVE_CASH --> APPROVE
+
+    CARD --> TERMINAL{Terminal Type?}
+    TERMINAL -->|External| EXT[Send to Terminal]
+    TERMINAL -->|Integrated| INT[Process Card]
+
+    EXT --> WAIT[Wait for Response]
+    INT --> WAIT
+
+    WAIT --> RESULT{Result?}
+    RESULT -->|Approved| APPROVE[Payment Approved]
+    RESULT -->|Declined| DECLINE[Payment Declined]
+
+    UPI --> UPI_WAIT[Wait for Confirmation]
+    UPI_WAIT --> RESULT
+
+    GC --> CHECK_BAL{Balance OK?}
+    CHECK_BAL -->|Yes| DEDUCT_GC[Deduct Balance]
+    CHECK_BAL -->|No| INSUFFICIENT[Insufficient Balance]
+    DEDUCT_GC --> APPROVE
+
+    BANK --> MANUAL[Manual Verification]
+    MANUAL --> APPROVE
+
+    APPROVE --> UPDATE[Update Order<br/>Payment Status]
+    UPDATE --> RECEIPT[Generate Receipt]
+    RECEIPT --> DONE([Payment Complete])
+
+    DECLINE --> RETRY{Retry?}
+    RETRY -->|Yes| METHOD
+    RETRY -->|No| CANCEL([Payment Cancelled])
+
+    style START fill:#e8f5e9
+    style DONE fill:#c8e6c9
+    style DECLINE fill:#ffcdd2
+    style CANCEL fill:#ffcdd2
+```
+
+### Event Management Flow
+
+```mermaid
+flowchart TD
+    START([Client Inquiry]) --> INQUIRY[Create Event<br/>Status: INQUIRY]
+
+    INQUIRY --> CONSULT[Consultation<br/>Discuss Requirements]
+
+    CONSULT --> PROPOSAL[Create Proposal<br/>Budget & Items]
+
+    PROPOSAL --> SEND[Send Proposal<br/>Status: PROPOSAL_SENT]
+
+    SEND --> RESPONSE{Client Response?}
+
+    RESPONSE -->|Approved| CONFIRM[Confirm Event<br/>Status: CONFIRMED]
+    RESPONSE -->|Changes| REVISE[Revise Proposal]
+    RESPONSE -->|Declined| CANCEL([Event Cancelled])
+
+    REVISE --> SEND
+
+    CONFIRM --> DEPOSIT[Collect Deposit]
+
+    DEPOSIT --> ASSIGN[Assign Designer]
+
+    ASSIGN --> PLAN[Plan & Source<br/>Materials]
+
+    PLAN --> PRODUCE[Production<br/>Status: IN_PRODUCTION]
+
+    PRODUCE --> SETUP[Event Day Setup]
+
+    SETUP --> EXECUTE[Execute Event]
+
+    EXECUTE --> FINAL[Final Payment]
+
+    FINAL --> COMPLETE[Complete Event<br/>Status: COMPLETED]
+
+    COMPLETE --> REVIEW([Client Review])
+
+    style START fill:#e8f5e9
+    style REVIEW fill:#c8e6c9
+    style CANCEL fill:#ffcdd2
+    style PRODUCE fill:#fff9c4
+```
+
+### Day Close Process
+
+```mermaid
+flowchart TD
+    START([End of Day]) --> CHECK{All Orders<br/>Processed?}
+
+    CHECK -->|No| PENDING[Complete Pending<br/>Orders]
+    PENDING --> CHECK
+
+    CHECK -->|Yes| PAYMENTS[Review Day's<br/>Payments]
+
+    PAYMENTS --> CASH_COUNT[Count Physical<br/>Cash]
+
+    CASH_COUNT --> COMPARE{Cash Matches<br/>System?}
+
+    COMPARE -->|Yes| MATCH[No Variance]
+    COMPARE -->|No| VARIANCE[Record Variance<br/>& Reason]
+
+    MATCH --> SUMMARY
+    VARIANCE --> SUMMARY
+
+    SUMMARY[Generate Summary<br/>- Total Orders<br/>- Total Sales<br/>- Payment Breakdown<br/>- Refunds]
+
+    SUMMARY --> REVIEW[Manager Review]
+
+    REVIEW --> APPROVE{Approved?}
+
+    APPROVE -->|Yes| CLOSE[Close Day<br/>Status: CLOSED]
+    APPROVE -->|No| INVESTIGATE[Investigate<br/>Discrepancies]
+
+    INVESTIGATE --> CASH_COUNT
+
+    CLOSE --> REPORT[Generate Report]
+
+    REPORT --> DONE([Day Closed])
+
+    style START fill:#e3f2fd
+    style DONE fill:#c8e6c9
+    style VARIANCE fill:#fff9c4
+```
+
+### Audit Trail Flow
+
+```mermaid
+flowchart LR
+    subgraph "User Actions"
+        A1[Create]
+        A2[Update]
+        A3[Delete]
+        A4[Login]
+        A5[Payment]
+    end
+
+    subgraph "Audit Service"
+        LOG[AuditLogService.LogAsync]
+    end
+
+    subgraph "Audit Record"
+        REC[AuditLog Entity<br/>- Who: UserId, UserName<br/>- What: Action, EntityType<br/>- When: Timestamp<br/>- Where: IP, Path<br/>- Details: Old/New Values]
+    end
+
+    subgraph "Storage"
+        DB[(AuditLogs Table)]
+    end
+
+    subgraph "Reports"
+        R1[User Activity]
+        R2[Entity History]
+        R3[Daily Summary]
+    end
+
+    A1 --> LOG
+    A2 --> LOG
+    A3 --> LOG
+    A4 --> LOG
+    A5 --> LOG
+
+    LOG --> REC
+    REC --> DB
+
+    DB --> R1
+    DB --> R2
+    DB --> R3
+
+    style LOG fill:#e8f5e9
+    style DB fill:#fff3e0
+```
 
 ---
 
-## 🗄️ Database Schema
-
-### Entity Relationship Diagram
+## Entity Relationship Diagram
 
 ```mermaid
 erDiagram
-    Company ||--o{ Customer : has
-    Company ||--o{ Product : has
-    Company ||--o{ Supplier : has
-    Company ||--o{ Order : has
-    Company ||--o{ PurchaseOrder : has
     Company ||--o{ Location : has
-    
+    Company ||--o{ Customer : has
+    Company ||--o{ Staff : has
+    Company ||--o{ Supplier : has
+    Company ||--o{ Product : has
+    Company ||--o{ Order : has
+    Company ||--o{ Event : has
+    Company ||--o{ AuditLog : has
+
     Product ||--o{ ProductBatch : has
-    Product ||--o{ InventoryAdjustment : has
-    Product ||--o{ OrderItem : has
-    Product ||--o{ PurchaseOrderItem : has
-    
-    ProductBatch }o--|| Supplier : from
-    ProductBatch }o--|| Location : stored_at
-    ProductBatch }o--|| PurchaseOrder : received_from
-    
+    Product ||--o{ OrderItem : "sold in"
+    Product ||--o{ PurchaseOrderItem : "ordered in"
+
+    ProductBatch ||--o{ InventoryAdjustment : has
+
     Supplier ||--o{ PurchaseOrder : receives
-    
-    Order ||--o{ OrderItem : contains
-    Order ||--o{ Delivery : has
-    
     PurchaseOrder ||--o{ PurchaseOrderItem : contains
-    
+
     Customer ||--o{ Order : places
+    Order ||--o{ OrderItem : contains
+    Order ||--o{ Payment : has
+    Order ||--o{ Refund : may_have
+    Order ||--o{ Delivery : has
+
+    Refund ||--o{ RefundItem : contains
+
+    Staff ||--o{ StaffTask : assigned
+    Staff ||--o{ Event : designs
+
+    Location ||--o{ DayClose : has
+    Location ||--o{ StaffTask : has
+
+    Company {
+        uuid Id PK
+        string Name
+        string Region
+        string CurrencyCode
+    }
 
     Product {
-        guid Id PK
-        guid CompanyId FK
+        uuid Id PK
         string Name
-        string Sku UK
+        string Sku
         decimal RetailPrice
-        decimal CostPrice
-        bool IsPerishable
         int StockQuantity
     }
-    
-    ProductBatch {
-        guid Id PK
-        guid ProductId FK
-        string BatchNumber
-        int QuantityRemaining
-        datetime ExpiryDate
-    }
-    
-    PurchaseOrder {
-        guid Id PK
-        guid SupplierId FK
-        string OrderNumber UK
-        string Status
+
+    Order {
+        uuid Id PK
+        string OrderNumber
+        int Status
         decimal TotalAmount
     }
+
+    Customer {
+        uuid Id PK
+        string Name
+        string Email
+        int TotalOrders
+    }
 ```
 
 ---
 
-## 📊 Flowcharts
-
-### Purchase Order Workflow
+## Multi-Tenant Data Model
 
 ```mermaid
-flowchart TD
-    A[Create PO Draft] --> B{Add Items?}
-    B -->|Yes| C[Add Products to PO]
-    C --> B
-    B -->|Done| D[Submit PO]
-    D --> E{Manager Approval}
-    E -->|Reject| F[Return to Draft]
-    F --> B
-    E -->|Approve| G[PO Approved]
-    G --> H[Receive Goods]
-    H --> I{All Items Received?}
-    I -->|No| J[Partial Receipt]
-    J --> H
-    I -->|Yes| K[Create Batches]
-    K --> L[Update Stock]
-    L --> M[Update Supplier Stats]
-    M --> N[PO Completed]
-    
-    style A fill:#e1f5fe
-    style N fill:#c8e6c9
-    style E fill:#fff9c4
-```
+graph TB
+    subgraph "Platform Level"
+        PLATFORM[Platform Admin]
+    end
 
-### Inventory Adjustment Flow
+    subgraph "Company A - Flower Shop NYC"
+        CA[Company A]
+        CA_LOC1[Location: Main Store]
+        CA_LOC2[Location: Warehouse]
+        CA_STAFF[Staff Members]
+        CA_CUST[Customers]
+        CA_PROD[Products]
+        CA_ORD[Orders]
+    end
 
-```mermaid
-flowchart TD
-    A[Select Product] --> B[Select Batch Optional]
-    B --> C[Choose Adjustment Type]
-    C --> D{Type?}
-    D -->|Damaged| E[Enter Quantity & Reason]
-    D -->|Spoiled| E
-    D -->|Expired| E
-    D -->|Used for Event| E
-    D -->|Sample| E
-    D -->|Other| E
-    E --> F[Calculate Value]
-    F --> G[Submit Adjustment]
-    G --> H[Deduct from Batch]
-    H --> I[Update Product Stock]
-    I --> J[Create Stock Movement Record]
-    J --> K[Adjustment Complete]
-    
-    style A fill:#e1f5fe
-    style K fill:#c8e6c9
-```
+    subgraph "Company B - Rose Garden LA"
+        CB[Company B]
+        CB_LOC1[Location: Downtown]
+        CB_STAFF[Staff Members]
+        CB_CUST[Customers]
+        CB_PROD[Products]
+        CB_ORD[Orders]
+    end
 
-### Product Creation Flow
+    PLATFORM --> CA
+    PLATFORM --> CB
 
-```mermaid
-flowchart TD
-    A[Start] --> B[Enter Basic Info]
-    B --> C[Set SKU]
-    C --> D{Validate SKU}
-    D -->|Exists| E[Show Error]
-    E --> C
-    D -->|Unique| F[Set Pricing]
-    F --> G{Is Perishable?}
-    G -->|Yes| H[Set Shelf Life & Alerts]
-    G -->|No| I[Skip Perishable]
-    H --> J{Is Flower?}
-    I --> J
-    J -->|Yes| K[Set Flower Attributes]
-    J -->|No| L[Skip Flower Attrs]
-    K --> M[Set Supplier Info]
-    L --> M
-    M --> N[Set Accounting Codes]
-    N --> O[Set Product Settings]
-    O --> P[Save Product]
-    P --> Q{Opening Stock?}
-    Q -->|Yes| R[Create Initial Batch]
-    Q -->|No| S[Done]
-    R --> S
-    
-    style A fill:#e1f5fe
-    style S fill:#c8e6c9
-```
+    CA --> CA_LOC1
+    CA --> CA_LOC2
+    CA --> CA_STAFF
+    CA --> CA_CUST
+    CA --> CA_PROD
+    CA --> CA_ORD
 
-### Order Processing Flow
+    CB --> CB_LOC1
+    CB --> CB_STAFF
+    CB --> CB_CUST
+    CB --> CB_PROD
+    CB --> CB_ORD
 
-```mermaid
-flowchart TD
-    A[New Order] --> B[Pending]
-    B --> C{Confirm Order}
-    C -->|Yes| D[Confirmed]
-    C -->|Cancel| X[Cancelled]
-    D --> E[Assign Staff]
-    E --> F[Processing]
-    F --> G[Prepare Arrangement]
-    G --> H[Ready for Delivery]
-    H --> I[Assign Driver]
-    I --> J[Out for Delivery]
-    J --> K{Delivered?}
-    K -->|Yes| L[Delivered]
-    K -->|Failed| M[Failed - Reschedule]
-    M --> H
-    L --> N[Update Customer Stats]
-    
-    style A fill:#e1f5fe
-    style L fill:#c8e6c9
-    style X fill:#ffcdd2
-```
-
-### Expiry Alert System
-
-```mermaid
-flowchart TD
-    A[Daily Check] --> B[Get All Active Batches]
-    B --> C{Has Expiry Date?}
-    C -->|No| D[Skip]
-    C -->|Yes| E[Calculate Days Until Expiry]
-    E --> F{Days <= 0?}
-    F -->|Yes| G[🔴 EXPIRED]
-    F -->|No| H{Days <= 2?}
-    H -->|Yes| I[🟠 CRITICAL]
-    H -->|No| J{Days <= 5?}
-    J -->|Yes| K[🟡 WARNING]
-    J -->|No| L{Days <= 14?}
-    L -->|Yes| M[🟢 UPCOMING]
-    L -->|No| D
-    G --> N[Generate Alert]
-    I --> N
-    K --> N
-    M --> N
-    N --> O[Notify Staff]
-    
-    style G fill:#ffcdd2
-    style I fill:#ffe0b2
-    style K fill:#fff9c4
-    style M fill:#c8e6c9
+    style PLATFORM fill:#e1bee7
+    style CA fill:#c8e6c9
+    style CB fill:#bbdefb
 ```
 
 ---
 
-## 📁 Project Structure
+## Getting Started
 
-```
-Sumpooj/
-├── Sumpooj.Domain/                 # Domain Layer
-│   └── Entities/
-│       ├── BaseEntity.cs
-│       ├── Product.cs
-│       ├── ProductBatch.cs
-│       ├── Customer.cs
-│       ├── Order.cs
-│       ├── PurchaseOrder.cs
-│       ├── Supplier.cs
-│       ├── Location.cs
-│       ├── InventoryAdjustment.cs
-│       ├── StockMovement.cs
-│       ├── Delivery.cs
-│       └── Enums.cs
-│
-├── Sumpooj.Application/            # Application Layer
-│   ├── Common/
-│   │   └── PagedResult.cs
-│   ├── Interfaces/
-│   │   ├── IProductRepository.cs
-│   │   ├── ISupplierRepository.cs
-│   │   ├── IInventoryRepositories.cs
-│   │   └── ...
-│   ├── Products/
-│   │   ├── ProductDto.cs
-│   │   └── ProductRequests.cs
-│   ├── Inventory/
-│   │   ├── InventoryDto.cs
-│   │   └── InventoryRequests.cs
-│   ├── Purchases/
-│   │   ├── PurchaseOrderDto.cs
-│   │   └── PurchaseOrderRequests.cs
-│   └── UseCases/
-│       ├── ProductService.cs
-│       ├── SupplierService.cs
-│       ├── InventoryService.cs
-│       └── PurchaseOrderService.cs
-│
-├── Sumpooj.Infrastructure/         # Infrastructure Layer
-│   ├── Persistence/
-│   │   ├── SumpoojDbContext.cs
-│   │   └── Configurations/
-│   ├── Repositories/
-│   │   ├── ProductRepository.cs
-│   │   ├── SupplierRepository.cs
-│   │   └── ...
-│   ├── Identity/
-│   │   └── ApplicationUser.cs
-│   └── Migrations/
-│
-├── Sumpooj.API/                    # API Layer
-│   ├── Controllers/
-│   │   ├── ProductsController.cs
-│   │   ├── SuppliersController.cs
-│   │   ├── InventoryController.cs
-│   │   ├── PurchasesController.cs
-│   │   └── LookupController.cs
-│   ├── Authorization/
-│   └── Program.cs
-│
-├── Sumpooj.Blazor/                 # Blazor UI
-│
-└── sumpooj-web/                    # React Frontend
-    └── src/
-        ├── pages/
-        │   ├── products/
-        │   ├── inventory/
-        │   ├── purchases/
-        │   └── ...
-        └── components/
+### Prerequisites
+- .NET 10 SDK
+- Node.js 20+
+- PostgreSQL 15+
+- Visual Studio 2022 or VS Code
+
+### Backend Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/sumitkumarsingh88/FloristERP.git
+cd FloristERP
+
+# Create PostgreSQL database
+psql -U postgres -c "CREATE DATABASE FloristERP;"
+
+# Run schema (Database-First)
+psql -U postgres -d FloristERP -f Database/sumpooj_complete_schema.sql
+
+# Update connection string in Sumpooj.API/appsettings.json
+
+# Run the API
+cd Sumpooj.API
+dotnet run
 ```
 
----
+### Frontend Setup
 
-## 🔐 Authorization
+```bash
+# Navigate to frontend directory
+cd sumpooj-web
 
-### Roles & Policies
+# Install dependencies
+npm install
 
-| Policy | Roles | Description |
-|--------|-------|-------------|
-| `PlatformOnly` | PlatformSuperAdmin | Platform-wide operations |
-| `PlatformSupport` | PlatformSuperAdmin, PlatformSupport | Support operations |
-| `CompanyOnly` | Any authenticated company user | Company-scoped operations |
-| `CompanyAdmin` | CompanyAdmin | Admin operations within company |
-| `StaffAccess` | CompanyAdmin, Manager, Staff | Staff-level access |
+# Start development server
+npm run dev
+```
 
----
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Access Points
+- **API**: https://localhost:5001
+- **API Docs**: https://localhost:5001/scalar
+- **Frontend**: http://localhost:5173
 
 ---
 
-## 👥 Contributors
+## API Endpoints
 
-- **Sumit Kumar Singh** - *Initial work* - [sumitkumarsingh88](https://github.com/sumitkumarsingh88)
+| Category | Base Path | Key Operations |
+|----------|-----------|----------------|
+| Auth | /api/auth | login, register, refresh |
+| Customers | /api/customer | CRUD + search |
+| Products | /api/products | CRUD + search, low-stock alerts |
+| Inventory | /api/inventory | batches, adjustments, expiry-alerts |
+| Orders | /api/orders | CRUD + status, fulfillment, assign |
+| Payments | /api/payments | CRUD + approve, void |
+| Refunds | /api/refunds | CRUD |
+| Gift Cards | /api/gift-cards | issue, redeem, check-balance |
+| Staff | /api/staff | CRUD + search |
+| Events | /api/events | CRUD + upcoming |
+| Tasks | /api/tasks | CRUD + start, complete |
+| Dashboard | /api/dashboard | role-based metrics |
+| Audit Logs | /api/audit-logs | search, summary, user-activity |
+| Day Close | /api/day-close | summary, close, history |
+| Companies | /api/companies | CRUD (platform only) |
+| Locations | /api/locations | CRUD |
+| Suppliers | /api/suppliers | CRUD |
+| Purchases | /api/purchases | CRUD + submit, receive |
+| Lookup | /api/lookup | enum references |
 
 ---
 
-## 🙏 Acknowledgments
+## Authorization Roles
 
-- Clean Architecture principles by Robert C. Martin
-- Domain-Driven Design concepts by Eric Evans
-- ASP.NET Core team for the excellent framework
+| Role | Scope | Access |
+|------|-------|--------|
+| PlatformSuperAdmin | Platform | Full platform access |
+| PlatformSupport | Platform | Support operations |
+| CompanyAdmin | Company | Full company access |
+| Manager | Company | Management operations |
+| Staff | Company | Day-to-day operations |
+| Delivery | Company | Delivery-related only |
 
 ---
 
-<p align="center">
-  Made with ❤️ for florists everywhere
-</p>
+## Roadmap
+
+- [ ] Advanced Reporting and Analytics
+- [ ] Mobile App (React Native)
+- [ ] Stripe/Payment Gateway Integration
+- [ ] Email and SMS Notifications
+- [ ] QuickBooks Integration
+- [ ] Wire Service Integration (FTD, Teleflora)
+- [ ] Customer Portal
+- [ ] Inventory Forecasting with ML
+
+---
+
+## Authors
+
+- **Sumit Kumar Singh** - [GitHub](https://github.com/sumitkumarsingh88)
+- **Anand Kumar** - [GitHub](https://github.com/anandpandeji)
+
+---
+
+## License
+
+This project is licensed under the MIT License.
+
+---
+
+Made with love for Florists

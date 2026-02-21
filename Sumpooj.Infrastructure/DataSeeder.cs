@@ -7,6 +7,11 @@ using Sumpooj.Infrastructure.Persistence;
 
 namespace Sumpooj.Infrastructure;
 
+/// <summary>
+/// Seeds initial data for the application.
+/// Note: Database schema and roles are managed via Database/sumpooj_complete_schema.sql (Database-First approach)
+/// This seeder only creates initial users and demo data that can't be done in SQL.
+/// </summary>
 public static class DataSeeder
 {
     public static async Task SeedAsync(IServiceProvider services)
@@ -17,32 +22,24 @@ public static class DataSeeder
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
 
-        // Ensure DB is up-to-date
-        await db.Database.MigrateAsync();
-
-        // ----------------------------
-        // 1) Roles
-        // ----------------------------
-        var roles = new[]
+        // Database-First: Schema is managed via SQL script
+        if (!await db.Database.CanConnectAsync())
         {
-            "PlatformSuperAdmin",
-            "PlatformSupport",
-            "CompanyAdmin",
-            "Manager",
-            "Staff",
-            "Delivery"
-        };
+            throw new InvalidOperationException(
+                "Cannot connect to database. Ensure PostgreSQL is running and the connection string is correct. " +
+                "Run Database/sumpooj_complete_schema.sql to create the schema.");
+        }
 
-        foreach (var role in roles)
+        // Verify roles exist (seeded by SQL script)
+        // If roles don't exist, the SQL script wasn't run
+        if (!await roleManager.RoleExistsAsync("PlatformSuperAdmin"))
         {
-            if (!await roleManager.RoleExistsAsync(role))
-            {
-                await roleManager.CreateAsync(new IdentityRole<Guid>(role));
-            }
+            throw new InvalidOperationException(
+                "Roles not found in database. Please run Database/sumpooj_complete_schema.sql first.");
         }
 
         // ----------------------------
-        // 2) Platform Super Admin
+        // 1) Platform Super Admin User
         // ----------------------------
         const string superAdminEmail = "sumit.singh@sumpooj.com";
         var superAdmin = await userManager.FindByEmailAsync(superAdminEmail);
@@ -53,17 +50,20 @@ public static class DataSeeder
             {
                 UserName = superAdminEmail,
                 Email = superAdminEmail,
-                CompanyId = null, // platform user
+                CompanyId = null, // platform user - no company
                 EmailConfirmed = true,
                 IsActive = true
             };
 
-            await userManager.CreateAsync(superAdmin, "Admin@123");
-            await userManager.AddToRoleAsync(superAdmin, "PlatformSuperAdmin");
+            var result = await userManager.CreateAsync(superAdmin, "Admin@123");
+            if (result.Succeeded)
+            {
+                await userManager.AddToRoleAsync(superAdmin, "PlatformSuperAdmin");
+            }
         }
 
         // ----------------------------
-        // 3) First Company
+        // 2) Demo Company
         // ----------------------------
         Company company;
         if (!await db.Companies.AnyAsync())
@@ -73,12 +73,12 @@ public static class DataSeeder
                 region: "IN",
                 email: "info@demoflorist.com",
                 phone: "9999999999",
-                address: "Demo Address",
-                shortDescription: "Demo florist company",
+                address: "123 Flower Street, Mumbai, Maharashtra 400001",
+                shortDescription: "A demo florist company for testing",
                 logoPath: null,
                 timeZone: "Asia/Kolkata",
                 currencyCode: "INR",
-                taxIdentifier: "GSTIN123"
+                taxIdentifier: "GSTIN123456789"
             );
 
             db.Companies.Add(company);
@@ -90,7 +90,7 @@ public static class DataSeeder
         }
 
         // ----------------------------
-        // 4) Company Admin
+        // 3) Company Admin User
         // ----------------------------
         const string companyAdminEmail = "admin@demoflorist.com";
         var companyAdmin = await userManager.FindByEmailAsync(companyAdminEmail);
@@ -106,8 +106,30 @@ public static class DataSeeder
                 IsActive = true
             };
 
-            await userManager.CreateAsync(companyAdmin, "Admin@123");
-            await userManager.AddToRoleAsync(companyAdmin, "CompanyAdmin");
+            var result = await userManager.CreateAsync(companyAdmin, "Admin@123");
+            if (result.Succeeded)
+            {
+                await userManager.AddToRoleAsync(companyAdmin, "CompanyAdmin");
+            }
+        }
+
+        // ----------------------------
+        // 4) Default Location for Company
+        // ----------------------------
+        if (!await db.Locations.AnyAsync(l => l.CompanyId == company.Id))
+        {
+            var defaultLocation = new Location(
+                companyId: company.Id,
+                name: "Main Store",
+                code: "MAIN",
+                locationType: LocationType.Store,
+                address: "123 Flower Street, Mumbai"
+            );
+            defaultLocation.SetAsDefault();
+
+            db.Locations.Add(defaultLocation);
+            await db.SaveChangesAsync();
         }
     }
 }
+

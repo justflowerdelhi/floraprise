@@ -75,6 +75,7 @@ import {
   MOCK_CUSTOMERS,
 } from './CRMTypes';
 import { LoyaltyTierBadge, PointsDisplay } from './LoyaltyComponents';
+import { getCurrencySymbol } from '../../core/i18n';
 
 // -----------------------------------------------------------------------------
 // Filter Panel
@@ -212,11 +213,11 @@ function FilterPanel({ filters, onFilterChange, onClear }: FilterPanelProps) {
           <TextField
             size="small"
             type="number"
-            placeholder="₹0"
+            placeholder={`${getCurrencySymbol()}0`}
             value={filters.minLifetimeValue || ''}
             onChange={(e) => onFilterChange({ ...filters, minLifetimeValue: Number(e.target.value) || undefined })}
             InputProps={{
-              startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+              startAdornment: <InputAdornment position="start">{getCurrencySymbol()}</InputAdornment>,
             }}
             sx={{ width: 150 }}
           />

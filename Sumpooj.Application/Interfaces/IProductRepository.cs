@@ -22,4 +22,5 @@ public interface IProductRepository
     Task<List<Product>> GetLowStockProductsAsync();
     Task<List<Product>> GetProductsNeedingReorderAsync();
     Task<bool> SkuExistsAsync(string sku, Guid? excludeProductId = null);
+    Task<int> GetLowStockCountAsync(Guid companyId);
 }

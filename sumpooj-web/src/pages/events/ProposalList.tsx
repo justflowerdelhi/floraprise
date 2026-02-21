@@ -64,6 +64,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Proposal, ProposalStatus } from './ProposalTypes';
 import { PROPOSAL_STATUS_CONFIG, getMarginColor } from './ProposalTypes';
 import { MOCK_PROPOSALS, getProposalStats } from './ProposalMockData';
+import { formatCurrency } from '../../core/i18n';
 
 // ─── Styling Constants ──────────────────────────────────────
 
@@ -75,14 +76,6 @@ const textPrimary = '#1F2937';
 const textSecondary = '#6B7280';
 
 // ─── Format Functions ───────────────────────────────────────
-
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
 
 const formatDate = (dateString: string): string => {
   if (!dateString) return '-';

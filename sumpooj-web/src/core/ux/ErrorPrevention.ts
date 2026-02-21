@@ -8,6 +8,8 @@
  * - Missing required data
  */
 
+import { formatCurrency } from '../i18n';
+
 // ─── Validation Result Types ────────────────────────────────
 
 export type ValidationSeverity = 'error' | 'warning' | 'info';
@@ -140,7 +142,7 @@ export const validateOrderCompletion = (
       isValid: false,
       severity: 'error',
       code: 'PARTIAL_PAYMENT',
-      message: `₹${remaining.toLocaleString('en-IN')} still due.`,
+      message: `${formatCurrency(remaining)} still due.`,
       suggestion: 'Collect remaining amount or adjust the order.',
     };
   }
@@ -221,7 +223,7 @@ export const validateProfitMargin = (
       severity: 'error',
       code: 'MARGIN_TOO_LOW',
       message: `Profit margin is only ${margin.toFixed(1)}% on "${productName}".`,
-      suggestion: `Consider increasing price to at least ₹${Math.ceil(costPrice / (1 - BUSINESS_RULES.MIN_PROFIT_MARGIN_PERCENT / 100))}.`,
+      suggestion: `Consider increasing price to at least ${formatCurrency(Math.ceil(costPrice / (1 - BUSINESS_RULES.MIN_PROFIT_MARGIN_PERCENT / 100)))}.`,
     };
   }
 
@@ -257,7 +259,7 @@ export const validateDiscount = (
       isValid: true,
       severity: 'warning',
       code: 'HIGH_DISCOUNT',
-      message: `Applying ${discountPercent}% discount (₹${((discountPercent / 100) * orderTotal).toLocaleString('en-IN')} off).`,
+      message: `Applying ${discountPercent}% discount (${formatCurrency((discountPercent / 100) * orderTotal)} off).`,
       suggestion: 'Verify this discount is approved.',
     };
   }
@@ -276,7 +278,7 @@ export const validateRefund = (
       severity: 'error',
       code: 'REFUND_EXCEEDS_PAYMENT',
       message: 'Refund amount cannot exceed original payment.',
-      suggestion: `Maximum refund is ₹${originalAmount.toLocaleString('en-IN')}.`,
+      suggestion: `Maximum refund is ${formatCurrency(originalAmount)}.`,
     };
   }
 
@@ -338,7 +340,7 @@ export const getConfirmationRequirement = (
       return {
         required: true,
         title: 'Process Refund?',
-        message: `This will return ₹${((context?.amount as number) ?? 0).toLocaleString('en-IN')} to the customer.`,
+        message: `This will return ${formatCurrency((context?.amount as number) ?? 0)} to the customer.`,
         confirmLabel: 'Yes, Refund',
         cancelLabel: 'Cancel',
         severity: 'danger',

@@ -31,6 +31,7 @@ import {
   Receipt as TaxIcon,
 } from '@mui/icons-material';
 import { getMarginColor, getMarginStatus, MARGIN_THRESHOLDS } from './ProposalTypes';
+import { formatCurrency, getCurrencySymbol } from '../../core/i18n';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -59,13 +60,6 @@ const yellowAccent = '#fdd835';
 
 // ─── Format Currency ────────────────────────────────────────
 
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
 
 // ─── Margin Indicator Bar ───────────────────────────────────
 
@@ -338,7 +332,7 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
               }}
             >
               <MenuItem value="PERCENTAGE">%</MenuItem>
-              <MenuItem value="FIXED">₹</MenuItem>
+              <MenuItem value="FIXED">{getCurrencySymbol()}</MenuItem>
             </TextField>
             <TextField
               type="number"

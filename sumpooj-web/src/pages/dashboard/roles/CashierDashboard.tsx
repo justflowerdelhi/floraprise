@@ -7,6 +7,7 @@
 import { useNavigate } from 'react-router-dom';
 import StatCard from '../components/StatCard';
 import type { CashierDashboardData } from '../api/dashboardApi';
+import { formatCurrency } from '../../../core/i18n';
 
 const ic = 'w-5 h-5';
 
@@ -71,7 +72,7 @@ export default function CashierDashboard({ data }: CashierDashboardProps) {
         <StatCard label="Pending Pickups" value={data.pendingPickups} icon={Icons.pickup} iconBg="bg-amber-50" iconColor="text-amber-600" href="/order-list" />
         <StatCard label="Unpaid Orders" value={data.unpaidOrders} icon={Icons.unpaid} iconBg="bg-rose-50" iconColor="text-rose-500" href="/order-list" />
         <StatCard label="Sales Today" value={data.todaySalesCount} icon={Icons.receipt} iconBg="bg-blue-50" iconColor="text-blue-600" subtitle="transactions" />
-        <StatCard label="Today's Total" value={'₹' + data.todaySalesTotal.toLocaleString('en-IN')} icon={Icons.total} iconBg="bg-emerald-50" iconColor="text-emerald-600" />
+        <StatCard label="Today's Total" value={formatCurrency(data.todaySalesTotal)} icon={Icons.total} iconBg="bg-emerald-50" iconColor="text-emerald-600" />
       </div>
     </div>
   );

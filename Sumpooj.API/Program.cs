@@ -50,8 +50,9 @@ builder.Services.AddCors(options =>
 #region Database
 
 builder.Services.AddDbContext<SumpoojDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("Default")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Default"))
+           .ConfigureWarnings(w => w.Ignore(
+               Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 
 #endregion
 
@@ -172,6 +173,37 @@ builder.Services.AddScoped<PurchaseOrderService>();
 builder.Services.AddScoped<ILocationRepository, LocationRepository>();
 builder.Services.AddScoped<LocationService>();
 
+// New Services
+builder.Services.AddScoped<IStaffRepository, StaffRepository>();
+builder.Services.AddScoped<StaffService>();
+
+builder.Services.AddScoped<IEventRepository, EventRepository>();
+builder.Services.AddScoped<EventService>();
+
+builder.Services.AddScoped<IGiftCardRepository, GiftCardRepository>();
+builder.Services.AddScoped<GiftCardService>();
+
+builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<TaskService>();
+
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<OrderService>();
+
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<PaymentService>();
+
+builder.Services.AddScoped<IRefundRepository, RefundRepository>();
+builder.Services.AddScoped<RefundService>();
+
+builder.Services.AddScoped<IDayCloseRepository, DayCloseRepository>();
+builder.Services.AddScoped<DayCloseService>();
+
+builder.Services.AddScoped<DashboardService>();
+
+// Audit Logging
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<AuditLogService>();
+
 #endregion
 
 #region Controllers & OpenAPI
@@ -187,11 +219,11 @@ var app = builder.Build();
 
 #region Middleware
 
-if (app.Environment.IsDevelopment())
-{
+//if (app.Environment.IsDevelopment())
+//{
     app.MapOpenApi();
     app.MapScalarApiReference(); // optional API explorer
-}
+//}
 
 app.UseHttpsRedirection();
 

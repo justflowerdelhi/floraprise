@@ -23,17 +23,23 @@ public class Order : BaseEntity
         RecipientPhone = recipientPhone;
         Status = OrderStatus.Pending;
         PaymentStatus = PaymentStatus.Unpaid;
+        FulfillmentStatus = FulfillmentStatus.Draft;
+        OrderSource = OrderSource.WalkIn;
         IsActive = true;
     }
 
     public Guid CompanyId { get; private set; }
     public Guid CustomerId { get; private set; }
+    public Customer? Customer { get; private set; }
     public string OrderNumber { get; private set; }
     public DateTime OrderDate { get; private set; }
     public DateTime DeliveryDate { get; private set; }
     public OrderStatus Status { get; private set; }
     public PaymentStatus PaymentStatus { get; private set; }
+    public FulfillmentStatus FulfillmentStatus { get; private set; }
+    public OrderSource OrderSource { get; private set; }
     public bool IsActive { get; private set; }
+    public string? TimeSlot { get; private set; }
 
     // Delivery details
     public string? DeliveryAddress { get; private set; }
@@ -108,6 +114,24 @@ public class Order : BaseEntity
     public void SetDeliveryPriority(DeliveryPriority priority)
     {
         DeliveryPriority = priority;
+        MarkUpdated();
+    }
+
+    public void SetOrderSource(OrderSource source)
+    {
+        OrderSource = source;
+        MarkUpdated();
+    }
+
+    public void SetFulfillmentStatus(FulfillmentStatus status)
+    {
+        FulfillmentStatus = status;
+        MarkUpdated();
+    }
+
+    public void SetTimeSlot(string? timeSlot)
+    {
+        TimeSlot = timeSlot;
         MarkUpdated();
     }
 

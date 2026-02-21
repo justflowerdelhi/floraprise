@@ -61,6 +61,7 @@ import {
   getPointsToNextTier,
   calculatePointsEarned,
 } from './CRMTypes';
+import { getCurrencySymbol } from '../../core/i18n';
 
 // -----------------------------------------------------------------------------
 // Loyalty Tier Badge
@@ -246,7 +247,7 @@ export function TierProgressCard({ customer, compact = false }: TierProgressCard
                 <CheckCircle sx={{ fontSize: 16, color: tierConfig.color }} />
               </ListItemIcon>
               <ListItemText
-                primary={benefit}
+                primary={benefit.replace(/\{symbol\}/g, getCurrencySymbol())}
                 primaryTypographyProps={{ variant: 'body2', sx: { opacity: 0.9 } }}
               />
             </ListItem>
@@ -408,7 +409,7 @@ export function PointsRedemptionDialog({
               </Typography>
             </Box>
             <Typography variant="caption" sx={{ opacity: 0.7 }}>
-              1 point = ₹{DEFAULT_LOYALTY_CONFIG.currencyPerPoint}
+              1 point = {getCurrencySymbol()}{DEFAULT_LOYALTY_CONFIG.currencyPerPoint}
             </Typography>
           </Paper>
 
@@ -561,7 +562,7 @@ export function TierComparisonCard() {
                           <CheckCircle sx={{ fontSize: 14, color: config.color }} />
                         </ListItemIcon>
                         <ListItemText
-                          primary={benefit}
+                          primary={benefit.replace(/\{symbol\}/g, getCurrencySymbol())}
                           primaryTypographyProps={{ variant: 'caption' }}
                         />
                       </ListItem>

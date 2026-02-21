@@ -24,9 +24,9 @@ import {
 import type { ExternalOrder, ExternalOrderStatus, FulfillmentStatus } from './OrderTypes';
 import { FULFILLMENT_STATUS_CONFIG, DESIGNERS, ORDER_SOURCE_CONFIG } from './OrderTypes';
 import { MOCK_EXTERNAL_ORDERS } from './OrderMockData';
+import { formatCurrency } from '../../core/i18n';
 
-const fmtCurrency = (v: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
+const fmtCurrency = (v: number) => formatCurrency(v);
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 

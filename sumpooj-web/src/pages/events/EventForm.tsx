@@ -41,6 +41,7 @@ import {
   formDataToRequest,
 } from './EventTypes';
 import { MOCK_EVENTS } from './EventMockData';
+import { getCurrencySymbol } from '../../core/i18n';
 
 // ─── Form Section Component ─────────────────────────────────
 
@@ -400,7 +401,7 @@ const EventForm: React.FC = () => {
                 </Grid>
                 <Grid size={{ xs: 12, md: 6 }}>
                   <TextField
-                    label="Budget (₹)"
+                    label={`Budget (${getCurrencySymbol()})`}
                     value={formData.budget}
                     onChange={handleChange('budget')}
                     fullWidth
