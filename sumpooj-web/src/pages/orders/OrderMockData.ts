@@ -1,5 +1,5 @@
-/**
- * OrderMockData.ts — Mock products, batches, orders, external orders, deliveries
+﻿/**
+ * OrderMockData.ts â€” Mock products, batches, orders, external orders, deliveries
  */
 import type {
   Product,
@@ -14,7 +14,7 @@ import type {
   InventoryActionStatus,
 } from './OrderTypes';
 
-// ─── Helpers ────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const today = new Date();
 const isoDate  = (d: Date) => d.toISOString().slice(0, 10);
@@ -39,7 +39,7 @@ const mkBatch = (
   supplier,
 });
 
-// ─── Products + Batches ─────────────────────────────────────
+// â”€â”€â”€ Products + Batches â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const P = (
   id: string, name: string, sku: string, barcode: string | undefined,
@@ -121,7 +121,7 @@ export const MOCK_PRODUCTS: Product[] = [
   ]),
 ];
 
-// ─── Cart Item Builder ──────────────────────────────────────
+// â”€â”€â”€ Cart Item Builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 let _itemSeq = 0;
 const mkCartItem = (
@@ -144,6 +144,7 @@ const mkCartItem = (
     batchAllocations: batches,
     expiryWarning: false,
     stockWarning: false,
+    isPerishable: false,
   };
 };
 
@@ -151,7 +152,7 @@ const mkBatchAlloc = (batchId: string, qty: number, cost: number, expiryDays: nu
   batchId, quantity: qty, costPerUnit: cost, expiryDate: daysFrom(expiryDays), isManualOverride: false,
 });
 
-// ─── Mock Orders ────────────────────────────────────────────
+// â”€â”€â”€ Mock Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const MOCK_ORDERS: Order[] = [
   {
@@ -169,7 +170,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p03', 'Sunflowers', 'SNF-003', 'Fresh Flowers', 3, 190, 80, 0.05,
         [mkBatchAlloc('B0005', 3, 78, 5)]),
     ],
-    totals: { subtotal: 1130, taxTotal: 56.5, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 1186.5, totalCost: 480, marginPercent: 57.5, marginWarning: false, itemCount: 5, lineCount: 2 },
+    totals: { subtotal: 1130, taxTotal: 56.5, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 1186.5, totalCost: 480, marginPercent: 57.5, marginWarning: false, itemCount: 5, lineCount: 2, taxBreakdown: [] },
     createdAt: daysAgo(5), updatedAt: daysAgo(5),
   },
   {
@@ -189,7 +190,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p05', 'Spring Garden Arrangement', 'SGA-011', 'Arrangements', 1, 1200, 520, 0.12,
         [mkBatchAlloc('B0009', 1, 510, 4)]),
     ],
-    totals: { subtotal: 2050, taxTotal: 246, discountTotal: 100, orderDiscountAmount: 0, grandTotal: 2196, totalCost: 900, marginPercent: 59, marginWarning: false, itemCount: 2, lineCount: 2 },
+    totals: { subtotal: 2050, taxTotal: 246, discountTotal: 100, orderDiscountAmount: 0, grandTotal: 2196, totalCost: 900, marginPercent: 59, marginWarning: false, itemCount: 2, lineCount: 2, taxBreakdown: [] },
     createdAt: daysAgo(1), updatedAt: daysAgo(1),
   },
   {
@@ -213,7 +214,7 @@ export const MOCK_ORDERS: Order[] = [
         [mkBatchAlloc('B0003', 2, 155, 3)]),
       mkCartItem('p13', 'Chocolate Box (Premium)', 'CBP-031', 'Add-Ons', 1, 650, 320, 0),
     ],
-    totals: { subtotal: 3500, taxTotal: 0, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 3500, totalCost: 1500, marginPercent: 57.1, marginWarning: false, itemCount: 4, lineCount: 3 },
+    totals: { subtotal: 3500, taxTotal: 0, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 3500, totalCost: 1500, marginPercent: 57.1, marginWarning: false, itemCount: 4, lineCount: 3, taxBreakdown: [] },
     createdAt: daysAgo(0), updatedAt: daysAgo(0),
   },
   {
@@ -231,7 +232,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p04', 'Classic Rose Bouquet', 'CRB-010', 'Bouquets', 1, 850, 380, 0.12,
         [mkBatchAlloc('B0007', 1, 370, 5)]),
     ],
-    totals: { subtotal: 850, taxTotal: 102, discountTotal: 50, orderDiscountAmount: 0, grandTotal: 902, totalCost: 380, marginPercent: 57.9, marginWarning: false, itemCount: 1, lineCount: 1 },
+    totals: { subtotal: 850, taxTotal: 102, discountTotal: 50, orderDiscountAmount: 0, grandTotal: 902, totalCost: 380, marginPercent: 57.9, marginWarning: false, itemCount: 1, lineCount: 1, taxBreakdown: [] },
     createdAt: daysAgo(2), updatedAt: daysAgo(0),
   },
   {
@@ -248,7 +249,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p08', "Baby's Breath", 'BBR-006', 'Fresh Flowers', 3, 60, 22, 0.05,
         [mkBatchAlloc('B0011', 3, 20, 5)]),
     ],
-    totals: { subtotal: 460, taxTotal: 23, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 483, totalCost: 186, marginPercent: 59.6, marginWarning: false, itemCount: 4, lineCount: 2 },
+    totals: { subtotal: 460, taxTotal: 23, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 483, totalCost: 186, marginPercent: 59.6, marginWarning: false, itemCount: 4, lineCount: 2, taxBreakdown: [] },
     createdAt: daysAgo(0), updatedAt: daysAgo(0),
   },
   {
@@ -270,7 +271,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p06', 'Orchid Phalaenopsis', 'ORC-004', 'Plants', 2, 550, 280, 0),
       mkCartItem('p09', 'Glass Cylinder Vase', 'GCV-020', 'Add-Ons', 1, 450, 180, 0),
     ],
-    totals: { subtotal: 1550, taxTotal: 0, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 2500, totalCost: 740, marginPercent: 52.3, marginWarning: false, itemCount: 3, lineCount: 2 },
+    totals: { subtotal: 1550, taxTotal: 0, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 2500, totalCost: 740, marginPercent: 52.3, marginWarning: false, itemCount: 3, lineCount: 2, taxBreakdown: [] },
     createdAt: daysAgo(0), updatedAt: daysAgo(0),
   },
   {
@@ -292,7 +293,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p07', 'Eucalyptus Bunch', 'EUC-005', 'Greens & Foliage', 5, 210, 90, 0.05,
         [mkBatchAlloc('B0013', 5, 85, 4)]),
     ],
-    totals: { subtotal: 1900, taxTotal: 154.5, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 2016, totalCost: 830, marginPercent: 56.3, marginWarning: false, itemCount: 6, lineCount: 2 },
+    totals: { subtotal: 1900, taxTotal: 154.5, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 2016, totalCost: 830, marginPercent: 56.3, marginWarning: false, itemCount: 6, lineCount: 2, taxBreakdown: [] },
     createdAt: daysAgo(1), updatedAt: daysAgo(0),
   },
   {
@@ -311,12 +312,12 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p06', 'Orchid Phalaenopsis', 'ORC-004', 'Plants', 1, 550, 280, 0.05),
       mkCartItem('p09', 'Glass Cylinder Vase', 'GCV-020', 'Add-Ons', 2, 450, 180, 0.18),
     ],
-    totals: { subtotal: 2390, taxTotal: 261.5, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 3500, totalCost: 1000, marginPercent: 58.2, marginWarning: false, itemCount: 6, lineCount: 3 },
+    totals: { subtotal: 2390, taxTotal: 261.5, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 3500, totalCost: 1000, marginPercent: 58.2, marginWarning: false, itemCount: 6, lineCount: 3, taxBreakdown: [] },
     createdAt: daysAgo(2), updatedAt: daysAgo(1),
   },
 ];
 
-// ─── Mock External Orders (FTD + BloomNation Inbox) ─────────
+// â”€â”€â”€ Mock External Orders (FTD + BloomNation Inbox) â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const MOCK_EXTERNAL_ORDERS: ExternalOrder[] = [
   {
@@ -385,7 +386,7 @@ export const MOCK_EXTERNAL_ORDERS: ExternalOrder[] = [
       { productName: 'Orchid Collection', quantity: 2, unitPrice: 1600 },
     ],
   },
-  // ─── BloomNation Orders ───────
+  // â”€â”€â”€ BloomNation Orders â”€â”€â”€â”€â”€â”€â”€
   {
     id: 'ext_006', externalOrderId: 'BN-20260215-042', platform: 'BLOOMNATION',
     senderName: 'Jessica Brown',
@@ -431,7 +432,7 @@ export const MOCK_EXTERNAL_ORDERS: ExternalOrder[] = [
   },
 ];
 
-// ─── Mock Deliveries ────────────────────────────────────────
+// â”€â”€â”€ Mock Deliveries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const MOCK_DELIVERIES: DeliveryEntry[] = [
   { orderId: 'ord_002', orderNumber: 'ORD-2026-0002', recipientName: 'Raj Kapoor',      deliveryDate: daysFrom(1), timeSlot: '9:00 AM - 11:00 AM',  address: '45 MG Road, Pune 411001',             assignedDriver: 'Ravi Kumar',   fulfillmentStatus: 'IN_DESIGN',        orderSource: 'PHONE' },
@@ -446,7 +447,7 @@ export const MOCK_DELIVERIES: DeliveryEntry[] = [
   { orderId: 'del_007', orderNumber: 'ORD-2026-0012', recipientName: 'Mohammed Ali',     deliveryDate: daysFrom(3), timeSlot: '3:00 PM - 5:00 PM',   address: '44 Residency Road, Bangalore 560025',  assignedDriver: 'Sameer Das',   fulfillmentStatus: 'DRAFT',            orderSource: 'WEBSITE' },
 ];
 
-// ─── Product Categories for filter ──────────────────────────
+// â”€â”€â”€ Product Categories for filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const PRODUCT_CATEGORIES: ProductCategory[] = [
   'Fresh Flowers',

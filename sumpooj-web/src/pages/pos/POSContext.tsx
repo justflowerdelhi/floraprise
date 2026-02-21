@@ -19,7 +19,19 @@ import React, {
 } from 'react';
 import { useBlocker } from 'react-router-dom';
 import type { CartItem, CartSummary, Product, OrderSource, OrderDiscount, LineItemDiscount, BatchAllocation } from '../orders/OrderTypes';
-import type { POSCustomer, POSOrderType, POSPaymentEntry, POSBillingInfo } from './POSTypes';
+import type {
+  POSCustomer,
+  POSOrderType,
+  POSPaymentEntry,
+  POSBillingInfo,
+  OrderIntent,
+  DeliveryDetails,
+  PickupDetails,
+} from './POSTypes';
+import {
+  EMPTY_DELIVERY_DETAILS,
+  EMPTY_PICKUP_DETAILS,
+} from './POSTypes';
 import { calcLineItem, calcCartSummary, nextLineId } from '../cart/CartUtils';
 
 // ─── Cart Lifecycle States ──────────────────────────────────
@@ -39,7 +51,7 @@ export interface POSSession {
 
 // ─── POS State ──────────────────────────────────────────────
 
-interface POSState {
+export interface POSState {
   // Cart lifecycle
   lifecycle: CartLifecycle;
   
@@ -53,6 +65,11 @@ interface POSState {
   transactionId: string | null;
   customer: POSCustomer | null;
   orderType: POSOrderType;
+
+  // Order intent (TAKE_NOW / DELIVERY / PICKUP_LATER)
+  orderIntent: OrderIntent;
+  deliveryDetails: DeliveryDetails;
+  pickupDetails: PickupDetails;
   
   // Payment state
   payments: POSPaymentEntry[];
@@ -77,6 +94,7 @@ const EMPTY_TOTALS: CartSummary = {
   marginWarning: false,
   itemCount: 0,
   lineCount: 0,
+  taxBreakdown: [],
 };
 
 const createInitialState = (): POSState => ({
@@ -87,7 +105,10 @@ const createInitialState = (): POSState => ({
   orderDiscount: null,
   transactionId: null,
   customer: null,
-  orderType: 'local',
+  orderType: 'TAKE_NOW',
+  orderIntent: 'TAKE_NOW',
+  deliveryDetails: { ...EMPTY_DELIVERY_DETAILS },
+  pickupDetails: { ...EMPTY_PICKUP_DETAILS },
   payments: [],
   billingInfo: null,
   session: {
@@ -114,6 +135,9 @@ type POSAction =
   // Transaction actions
   | { type: 'SET_CUSTOMER'; customer: POSCustomer | null }
   | { type: 'SET_ORDER_TYPE'; orderType: POSOrderType }
+  | { type: 'SET_ORDER_INTENT'; intent: OrderIntent }
+  | { type: 'SET_DELIVERY_DETAILS'; details: DeliveryDetails }
+  | { type: 'SET_PICKUP_DETAILS'; details: PickupDetails }
   // Lifecycle actions
   | { type: 'START_PAYMENT' }
   | { type: 'CANCEL_PAYMENT' }
@@ -218,6 +242,25 @@ function posReducer(state: POSState, action: POSAction): POSState {
     case 'SET_ORDER_TYPE':
       return { ...state, orderType: action.orderType, lastActivity: now };
 
+    case 'SET_ORDER_INTENT': {
+      const intent = action.intent;
+      return {
+        ...state,
+        orderIntent: intent,
+        orderType: intent, // keep in sync
+        // Reset irrelevant details when switching
+        deliveryDetails: intent === 'DELIVERY' ? state.deliveryDetails : { ...EMPTY_DELIVERY_DETAILS },
+        pickupDetails: intent === 'PICKUP_LATER' ? state.pickupDetails : { ...EMPTY_PICKUP_DETAILS },
+        lastActivity: now,
+      };
+    }
+
+    case 'SET_DELIVERY_DETAILS':
+      return { ...state, deliveryDetails: action.details, lastActivity: now };
+
+    case 'SET_PICKUP_DETAILS':
+      return { ...state, pickupDetails: action.details, lastActivity: now };
+
     // ─── Lifecycle Actions ──────────────────────────────────
 
     case 'START_PAYMENT': {
@@ -309,6 +352,9 @@ interface POSContextValue {
   // Transaction actions
   setCustomer: (customer: POSCustomer | null) => void;
   setOrderType: (orderType: POSOrderType) => void;
+  setOrderIntent: (intent: OrderIntent) => void;
+  setDeliveryDetails: (details: DeliveryDetails) => void;
+  setPickupDetails: (details: PickupDetails) => void;
   
   // Lifecycle actions
   startPayment: () => void;
@@ -326,6 +372,7 @@ interface POSContextValue {
   paidAmount: number;
   remainingAmount: number;
   isFullyPaid: boolean;
+  intentErrors: string[];
 }
 
 const POSContext = createContext<POSContextValue | null>(null);
@@ -398,6 +445,18 @@ export const POSProvider: React.FC<POSProviderProps> = ({
     dispatch({ type: 'SET_ORDER_TYPE', orderType });
   }, []);
 
+  const setOrderIntent = useCallback((intent: OrderIntent) => {
+    dispatch({ type: 'SET_ORDER_INTENT', intent });
+  }, []);
+
+  const setDeliveryDetails = useCallback((details: DeliveryDetails) => {
+    dispatch({ type: 'SET_DELIVERY_DETAILS', details });
+  }, []);
+
+  const setPickupDetails = useCallback((details: PickupDetails) => {
+    dispatch({ type: 'SET_PICKUP_DETAILS', details });
+  }, []);
+
   const startPayment = useCallback(() => {
     dispatch({ type: 'START_PAYMENT' });
   }, []);
@@ -428,12 +487,24 @@ export const POSProvider: React.FC<POSProviderProps> = ({
 
   // ─── Computed Values ──────────────────────────────────────
 
-  const canCheckout = state.items.length > 0 && state.lifecycle === 'active';
   const canEditCart = !state.isLocked && state.lifecycle !== 'completed';
   const hasUnsavedCart = state.items.length > 0;
   const paidAmount = state.payments.reduce((sum, p) => sum + p.amount, 0);
   const remainingAmount = Math.max(0, Math.round((state.totals.grandTotal - paidAmount) * 100) / 100);
   const isFullyPaid = remainingAmount === 0 && state.payments.length > 0;
+
+  // Intent-specific validation errors
+  const intentErrors: string[] = [];
+  if (state.orderIntent === 'DELIVERY') {
+    if (!state.deliveryDetails.address.trim()) intentErrors.push('Delivery address is required');
+    if (!state.deliveryDetails.deliveryDate) intentErrors.push('Delivery date is required');
+  }
+  if (state.orderIntent === 'PICKUP_LATER') {
+    if (!state.pickupDetails.pickupDate) intentErrors.push('Pickup date is required');
+  }
+
+  // canCheckout blocks on intent errors
+  const canCheckout = state.items.length > 0 && state.lifecycle === 'active' && intentErrors.length === 0;
 
   const value: POSContextValue = {
     state,
@@ -446,6 +517,9 @@ export const POSProvider: React.FC<POSProviderProps> = ({
     clearOrderDiscount,
     setCustomer,
     setOrderType,
+    setOrderIntent,
+    setDeliveryDetails,
+    setPickupDetails,
     startPayment,
     cancelPayment,
     addPayment,
@@ -459,6 +533,7 @@ export const POSProvider: React.FC<POSProviderProps> = ({
     paidAmount,
     remainingAmount,
     isFullyPaid,
+    intentErrors,
   };
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;

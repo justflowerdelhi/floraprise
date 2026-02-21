@@ -15,10 +15,16 @@ public class ProductRepository : IProductRepository
     }
 
     public Task<Product?> GetByIdAsync(Guid id)
-        => _db.Products.FirstOrDefaultAsync(p => p.Id == id);
+        => _db.Products
+            .Include(p => p.ProductCategoryRef)
+            .Include(p => p.TaxRule)
+            .FirstOrDefaultAsync(p => p.Id == id);
 
     public Task<Product?> GetBySkuAsync(string sku)
-        => _db.Products.FirstOrDefaultAsync(p => p.Sku == sku);
+        => _db.Products
+            .Include(p => p.ProductCategoryRef)
+            .Include(p => p.TaxRule)
+            .FirstOrDefaultAsync(p => p.Sku == sku);
 
     public async Task AddAsync(Product product)
     {
@@ -42,7 +48,10 @@ public class ProductRepository : IProductRepository
         int page,
         int pageSize)
     {
-        var q = _db.Products.AsNoTracking().AsQueryable();
+        var q = _db.Products.AsNoTracking()
+            .Include(p => p.ProductCategoryRef)
+            .Include(p => p.TaxRule)
+            .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(query))
         {
@@ -76,7 +85,7 @@ public class ProductRepository : IProductRepository
 
         if (isPerishable.HasValue)
         {
-            q = q.Where(p => p.IsPerishable == isPerishable.Value);
+            q = q.Where(p => p.ProductCategoryRef != null && p.ProductCategoryRef.IsPerishable == isPerishable.Value);
         }
 
         if (lowStockOnly == true)
@@ -132,5 +141,13 @@ public class ProductRepository : IProductRepository
                             p.IsActive && 
                             p.TrackInventory && 
                             p.StockQuantity <= p.MinimumStockLevel);
+    }
+
+    public async Task<List<Product>> GetProductsWithoutCategoryAsync()
+    {
+        return await _db.Products
+            .IgnoreQueryFilters()
+            .Where(p => p.CategoryId == null)
+            .ToListAsync();
     }
 }

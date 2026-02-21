@@ -11,9 +11,15 @@ public class ProductDto
     public string? Brand { get; set; }
     public string ProductType { get; set; } = default!;
     public string Category { get; set; } = default!;
+    public Guid? CategoryId { get; set; }
+    public string? CategoryName { get; set; }
     public string? Description { get; set; }
     public string UnitOfMeasure { get; set; } = default!;
     public bool IsActive { get; set; }
+
+    // Taxation
+    public Guid? TaxRuleId { get; set; }
+    public string? TaxRuleName { get; set; }
 
     // Pricing
     public decimal RetailPrice { get; set; }
@@ -71,6 +77,10 @@ public class ProductListDto
     public string Sku { get; set; } = default!;
     public string ProductType { get; set; } = default!;
     public string Category { get; set; } = default!;
+    public Guid? CategoryId { get; set; }
+    public string? CategoryName { get; set; }
+    public Guid? TaxRuleId { get; set; }
+    public string? TaxRuleName { get; set; }
     public decimal RetailPrice { get; set; }
     public decimal CostPrice { get; set; }
     public int StockQuantity { get; set; }

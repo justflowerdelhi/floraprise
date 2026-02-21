@@ -71,7 +71,6 @@ export interface CreateProductRequest {
   trackBatch: boolean;
   openingStock?: number | null;
   reorderLevel?: number | null;
-  isPerishable: boolean;
   shelfLifeDays?: number | null;
   expiryAlertDays?: number | null;
   temperatureNotes?: string | null;
@@ -95,7 +94,6 @@ export interface UpdateProductRequest {
   trackInventory?: boolean | null;
   trackBatch?: boolean | null;
   reorderLevel?: number | null;
-  isPerishable?: boolean | null;
   shelfLifeDays?: number | null;
   expiryAlertDays?: number | null;
   temperatureNotes?: string | null;

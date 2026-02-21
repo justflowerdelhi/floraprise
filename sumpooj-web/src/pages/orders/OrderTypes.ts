@@ -159,6 +159,9 @@ export interface Product {
   sellingPrice: number;
   costPrice: number;       // weighted avg FIFO cost
   taxRate: number;         // e.g. 0.05 = 5%
+  taxRuleId?: string | null;
+  taxRuleName?: string | null;
+  taxIsInclusive?: boolean;
   availableStock: number;
   isPerishable: boolean;
   trackBatch: boolean;
@@ -182,6 +185,7 @@ export interface CartItem {
   productName: string;
   sku: string;
   category: ProductCategory;
+  isPerishable: boolean;    // derived from product category
   quantity: number;
   unitPrice: number;        // selling price
   discountPercent: number;
@@ -189,6 +193,9 @@ export interface CartItem {
   lineTotal: number;        // (unitPrice × qty) - discountAmount
   taxRate: number;
   taxAmount: number;
+  taxRuleId?: string | null;
+  taxRuleName?: string | null;
+  taxIsInclusive?: boolean;
   lineCost: number;         // total FIFO cost for this line
   marginPercent: number;
   batchAllocations: BatchAllocation[];
@@ -212,6 +219,16 @@ export interface OrderDiscount {
   reason?: string;
 }
 
+/** Aggregated tax per TaxRule for the order summary */
+export interface TaxBreakdownEntry {
+  taxRuleId: string;
+  taxRuleName: string;
+  rate: number;
+  isInclusive: boolean;
+  taxableAmount: number;
+  taxAmount: number;
+}
+
 export interface CartSummary {
   subtotal: number;
   taxTotal: number;
@@ -223,6 +240,7 @@ export interface CartSummary {
   marginWarning: boolean;   // true if margin < 20%
   itemCount: number;
   lineCount: number;
+  taxBreakdown: TaxBreakdownEntry[];
 }
 
 // ─── Order Model ────────────────────────────────────────────

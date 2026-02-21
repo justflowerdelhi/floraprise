@@ -45,6 +45,7 @@ import {
   AutoAwesome,
   DeleteSweep,
   CardGiftcard,
+  Category,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRBAC } from '../rbac/RBACContext';
@@ -81,6 +82,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   AutoAwesome: <AutoAwesome />,
   DeleteSweep: <DeleteSweep />,
   CardGiftcard: <CardGiftcard />,
+  Category: <Category />,
 };
 
 // ─── Section Colors ─────────────────────────────────────────

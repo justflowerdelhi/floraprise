@@ -40,6 +40,14 @@ public class Product : BaseEntity
     public bool IsActive { get; private set; }
     public UnitOfMeasure UnitOfMeasure { get; private set; }
 
+    // Dynamic category (nullable, future replacement for enum Category)
+    public Guid? CategoryId { get; private set; }
+    public ProductCategoryEntity? ProductCategoryRef { get; private set; }
+
+    // Taxation
+    public Guid? TaxRuleId { get; private set; }
+    public TaxRule? TaxRule { get; private set; }
+
     // Pricing
     public decimal RetailPrice { get; private set; }
     public decimal CostPrice { get; private set; }
@@ -89,6 +97,12 @@ public class Product : BaseEntity
     // Legacy property for backward compatibility
     public decimal Price => RetailPrice;
 
+    public void SetCategoryId(Guid? categoryId)
+    {
+        CategoryId = categoryId;
+        MarkUpdated();
+    }
+
     public void UpdatePricing(decimal retailPrice, decimal costPrice, decimal? wholesalePrice = null, decimal? weddingEventPrice = null)
     {
         if (retailPrice < 0 || costPrice < 0)
@@ -119,9 +133,12 @@ public class Product : BaseEntity
         MarkUpdated();
     }
 
-    public void SetPerishableInfo(bool isPerishable, int? shelfLifeDays, int? expiryAlertDays, string? temperatureNotes)
+    /// <summary>
+    /// Set shelf-life / expiry details.
+    /// IsPerishable is now derived from ProductCategoryRef — do NOT set it here.
+    /// </summary>
+    public void SetPerishableDetails(int? shelfLifeDays, int? expiryAlertDays, string? temperatureNotes)
     {
-        IsPerishable = isPerishable;
         ShelfLifeDays = shelfLifeDays;
         ExpiryAlertDays = expiryAlertDays;
         TemperatureNotes = temperatureNotes;
@@ -182,6 +199,12 @@ public class Product : BaseEntity
     public void SetTaxCategory(TaxCategory taxCategory)
     {
         TaxCategory = taxCategory;
+        MarkUpdated();
+    }
+
+    public void SetTaxRuleId(Guid? taxRuleId)
+    {
+        TaxRuleId = taxRuleId;
         MarkUpdated();
     }
 

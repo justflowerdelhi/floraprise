@@ -26,7 +26,11 @@ export const productFormSchema = z.object({
     'ribbon',
     'supply',
     'service',
-  ]),
+  ]).default('fresh_flower'),
+
+  categoryId: z
+    .string()
+    .min(1, 'Category is required'),
 
   sku: z
     .string()
@@ -228,14 +232,14 @@ export const productFormSchema = z.object({
 )
 .refine(
   (data) => {
-    // Shelf life required for fresh flowers
-    if (data.productType === 'fresh_flower') {
+    // Shelf life required for perishable products
+    if (data.isPerishable) {
       return data.shelfLifeDays !== undefined && data.shelfLifeDays > 0;
     }
     return true;
   },
   {
-    message: 'Shelf life is required for Fresh Flower products',
+    message: 'Shelf life is required for perishable products',
     path: ['shelfLifeDays'],
   }
 )

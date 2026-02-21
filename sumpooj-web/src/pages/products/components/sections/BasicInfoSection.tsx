@@ -3,7 +3,7 @@
  * Core product information fields
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Box, Grid, IconButton, Tooltip, Typography, Chip, ToggleButton, ToggleButtonGroup, CircularProgress } from '@mui/material';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
@@ -11,18 +11,20 @@ import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import AutoModeIcon from '@mui/icons-material/AutoMode';
 import BlockIcon from '@mui/icons-material/Block';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AcUnitIcon from '@mui/icons-material/AcUnit';
 import SectionCard from '../SectionCard';
 import { FormTextField, FormSelect, FormSwitch } from '../FormFields';
 import {
-  PRODUCT_TYPES,
   UNITS_OF_MEASURE,
 } from '../../types/product.types';
-import type { FormSectionProps } from '../../types/product.types';
+import type { FormSectionProps, CategoryOption } from '../../types/product.types';
 import { generateSku } from '../../utils/product.utils';
 import { generateInternalBarcode } from '../../../../components/barcode/BarcodeUtils';
 
 interface BasicInfoSectionProps extends FormSectionProps {
   onGenerateSku?: () => void;
+  categories?: CategoryOption[];
+  loadingCategories?: boolean;
 }
 
 const BasicInfoSection = ({
@@ -31,8 +33,11 @@ const BasicInfoSection = ({
   watch,
   setValue,
   darkMode = false,
+  categories = [],
+  loadingCategories = false,
 }: BasicInfoSectionProps) => {
   const productType = watch('productType');
+  const categoryId = watch('categoryId');
   const productName = watch('productName');
   const status = watch('status');
   const isPerishable = watch('isPerishable');
@@ -43,9 +48,22 @@ const BasicInfoSection = ({
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
   const [barcodeValid, setBarcodeValid] = useState(false);
 
+  // Build category options for <FormSelect>
+  const categoryOptions = useMemo(
+    () => categories.map((c) => ({ value: c.id, label: c.name })),
+    [categories],
+  );
+
+  // Resolve selected category for indicator badges
+  const selectedCategory = useMemo(
+    () => categories.find((c) => c.id === categoryId),
+    [categories, categoryId],
+  );
+
   const handleGenerateSku = () => {
-    if (productName && productType) {
-      const newSku = generateSku(productType, productName);
+    if (productName && categoryId) {
+      const catName = selectedCategory?.name ?? '';
+      const newSku = generateSku(catName, productName);
       setValue('sku', newSku);
     }
   };
@@ -111,16 +129,40 @@ const BasicInfoSection = ({
           />
         </Grid>
 
-        {/* Product Type */}
+        {/* Product Category (Dynamic from API) */}
         <Grid size={{ xs: 12, md: 6 }}>
           <FormSelect
-            name="productType"
+            name="categoryId"
             control={control}
-            label="Product Type"
-            options={PRODUCT_TYPES}
+            label="Category"
+            options={categoryOptions}
             required
             darkMode={darkMode}
+            disabled={loadingCategories}
           />
+          {selectedCategory && (
+            <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
+              {selectedCategory.isPerishable && (
+                <Chip
+                  icon={<AcUnitIcon sx={{ fontSize: 14 }} />}
+                  label="Perishable"
+                  size="small"
+                  color="warning"
+                  variant="outlined"
+                  sx={{ height: 20, fontSize: '0.65rem' }}
+                />
+              )}
+              {selectedCategory.trackBatchByDefault && (
+                <Chip
+                  label="Batch Tracked"
+                  size="small"
+                  color="info"
+                  variant="outlined"
+                  sx={{ height: 20, fontSize: '0.65rem' }}
+                />
+              )}
+            </Box>
+          )}
         </Grid>
 
         {/* SKU with Auto-Generate */}
@@ -140,7 +182,7 @@ const BasicInfoSection = ({
             <Tooltip title="Auto-generate SKU from product name">
               <IconButton
                 onClick={handleGenerateSku}
-                disabled={!productName || !productType}
+                disabled={!productName || !categoryId}
                 sx={{
                   mt: 1,
                   backgroundColor: darkMode ? 'grey.800' : 'grey.100',

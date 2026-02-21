@@ -32,7 +32,7 @@ const POSLayout: React.FC = () => {
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [orderType, setOrderType] = useState<POSOrderType>('local');
+  const [orderType, setOrderType] = useState<POSOrderType>('TAKE_NOW');
   const [selectedCustomer, setSelectedCustomer] = useState<POSCustomer | null>(null);
   const [locationName] = useState('Main Store'); // TODO: From LocationContext
 
@@ -176,6 +176,7 @@ const POSLayout: React.FC = () => {
         locationName={locationName}
         onLocationClick={() => {}} // TODO: Location switcher
         grandTotal={state.totals.grandTotal}
+        hasItems={state.items.length > 0}
       />
 
       {/* Main Content */}

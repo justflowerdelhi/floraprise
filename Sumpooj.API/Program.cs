@@ -160,6 +160,9 @@ builder.Services.AddScoped<ICompanyService, CompanyService>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ProductService>();
 
+builder.Services.AddScoped<IProductCategoryRepository, ProductCategoryRepository>();
+builder.Services.AddScoped<ProductCategoryService>();
+
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 builder.Services.AddScoped<SupplierService>();
 
@@ -198,6 +201,9 @@ builder.Services.AddScoped<RefundService>();
 builder.Services.AddScoped<IDayCloseRepository, DayCloseRepository>();
 builder.Services.AddScoped<DayCloseService>();
 
+builder.Services.AddScoped<IShiftRepository, ShiftRepository>();
+builder.Services.AddScoped<ShiftService>();
+
 builder.Services.AddScoped<DashboardService>();
 
 // Audit Logging
@@ -215,6 +221,11 @@ builder.Services.AddScoped<WireOrderService>();
 // Proposals
 builder.Services.AddScoped<IProposalRepository, ProposalRepository>();
 builder.Services.AddScoped<ProposalService>();
+
+// Tax Rules
+builder.Services.AddScoped<ITaxRuleRepository, TaxRuleRepository>();
+builder.Services.AddScoped<TaxRuleService>();
+builder.Services.AddScoped<TaxCalculationService>();
 
 // Analytics
 builder.Services.AddScoped<ProfitDashboardService>();
@@ -256,6 +267,9 @@ app.MapControllers();
 try
 {
     await DataSeeder.SeedAsync(app.Services);
+
+    // Migrate existing products to use dynamic CategoryId
+    await CategoryMigrationService.MigrateAsync(app.Services);
 }
 catch (Exception ex)
 {

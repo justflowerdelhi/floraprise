@@ -9,8 +9,9 @@ import {
   KeyboardArrowDown as ArrowDownIcon,
   LocationOn as LocationIcon,
 } from '@mui/icons-material';
-import type { POSOrderType, POSCustomer } from './POSTypes';
-import { POS_ORDER_TYPES, POS_SHORTCUTS } from './POSTypes';
+import type { OrderIntent, POSCustomer } from './POSTypes';
+import { POS_SHORTCUTS } from './POSTypes';
+import OrderIntentSwitcher from './OrderIntentSwitcher';
 
 interface POSTopBarProps {
   searchValue: string;
@@ -18,11 +19,12 @@ interface POSTopBarProps {
   onSearchSubmit: () => void;
   selectedCustomer: POSCustomer | null;
   onCustomerClick: () => void;
-  orderType: POSOrderType;
-  onOrderTypeChange: (type: POSOrderType) => void;
+  orderType: OrderIntent;
+  onOrderTypeChange: (type: OrderIntent) => void;
   locationName: string;
   onLocationClick: () => void;
   grandTotal: number;
+  hasItems: boolean;
 }
 
 const POSTopBar: React.FC<POSTopBarProps> = ({
@@ -36,6 +38,7 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
   locationName,
   onLocationClick,
   grandTotal,
+  hasItems,
 }) => {
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -74,8 +77,6 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
     }).format(amount);
   };
 
-  const selectedOrderType = POS_ORDER_TYPES.find(t => t.value === orderType) || POS_ORDER_TYPES[0];
-
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center px-4 gap-4 shrink-0">
       {/* Search / Barcode Input */}
@@ -109,23 +110,12 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
         <ArrowDownIcon className="w-4 h-4 text-gray-400 ml-auto" />
       </button>
 
-      {/* Order Type Dropdown */}
-      <div className="relative">
-        <select
-          value={orderType}
-          onChange={(e) => onOrderTypeChange(e.target.value as POSOrderType)}
-          className="h-10 pl-3 pr-8 text-sm border border-gray-200 rounded-lg
-                     appearance-none bg-white cursor-pointer
-                     hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500"
-        >
-          {POS_ORDER_TYPES.map((type) => (
-            <option key={type.value} value={type.value}>
-              {type.label}
-            </option>
-          ))}
-        </select>
-        <ArrowDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-      </div>
+      {/* Order Intent Segmented Control */}
+      <OrderIntentSwitcher
+        value={orderType}
+        onChange={onOrderTypeChange}
+        hasItems={hasItems}
+      />
 
       {/* Location Dropdown */}
       <button

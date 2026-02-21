@@ -8,64 +8,55 @@
  * - Navigation blocking when cart has items
  * - Single cart architecture enforcement
  */
-import React, { useEffect, useCallback } from 'react';
+import React, { Component, useEffect, useCallback, type ErrorInfo, type ReactNode } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
-import { Warning as WarningIcon } from '@mui/icons-material';
-import { POSProvider, usePOSNavigationBlocker, usePOS } from './POSContext';
+import { CircularProgress } from '@mui/material';
+import { POSProvider, usePOS } from './POSContext';
 import { LocationProvider, useLocation } from '../../core/location/LocationContext';
+import { ShiftProvider, useShift } from './ShiftContext';
+import ShiftOpenModal from './ShiftOpenModal';
+import ShiftCloseDrawer from './ShiftCloseDrawer';
 
-// ─── Navigation Blocker Dialog ──────────────────────────────
+// ─── Error Boundary ─────────────────────────────────────────
 
-const NavigationBlockerDialog: React.FC = () => {
-  const blocker = usePOSNavigationBlocker();
-  const { resetCart } = usePOS();
+interface EBProps { children: ReactNode }
+interface EBState { error: Error | null }
 
-  const handleStay = useCallback(() => {
-    if (blocker.state === 'blocked') {
-      blocker.reset();
+class POSErrorBoundary extends Component<EBProps, EBState> {
+  state: EBState = { error: null };
+
+  static getDerivedStateFromError(error: Error) { return { error }; }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[POSErrorBoundary]', error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="h-screen w-screen flex items-center justify-center bg-red-50 p-8">
+          <div className="max-w-lg text-center">
+            <h1 className="text-2xl font-bold text-red-700 mb-4">POS Error</h1>
+            <p className="text-red-600 mb-2 font-mono text-sm">{this.state.error.message}</p>
+            <pre className="text-xs text-left bg-red-100 p-4 rounded overflow-auto max-h-60 mb-4">
+              {this.state.error.stack}
+            </pre>
+            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-red-600 text-white rounded">
+              Reload
+            </button>
+          </div>
+        </div>
+      );
     }
-  }, [blocker]);
+    return this.props.children;
+  }
+}
 
-  const handleLeave = useCallback(() => {
-    if (blocker.state === 'blocked') {
-      resetCart();
-      blocker.proceed();
-    }
-  }, [blocker, resetCart]);
-
-  if (blocker.state !== 'blocked') return null;
-
-  return (
-    <Dialog
-      open
-      onClose={handleStay}
-      maxWidth="xs"
-      fullWidth
-      PaperProps={{
-        sx: { borderRadius: 2 },
-      }}
-    >
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <WarningIcon color="warning" />
-        Unsaved Cart
-      </DialogTitle>
-      <DialogContent>
-        <p className="text-sm text-gray-600">
-          You have items in your cart. Leaving this page will clear your cart and any unsaved changes.
-        </p>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={handleStay} variant="outlined">
-          Stay on POS
-        </Button>
-        <Button onClick={handleLeave} variant="contained" color="error">
-          Leave & Clear Cart
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
+// ─── Navigation Blocker ─────────────────────────────────────
+// useBlocker requires createBrowserRouter (data router).
+// This app uses <BrowserRouter>, so we rely on beforeunload only.
+// The NavigationBlockerDialog is a no-op placeholder.
+const NavigationBlockerDialog: React.FC = () => null;
 
 // ─── Browser Navigation Warning ─────────────────────────────
 
@@ -119,6 +110,29 @@ const ExitPOSButton: React.FC = () => {
   );
 };
 
+// ─── Close Shift Button ─────────────────────────────────────
+
+const CloseShiftButton: React.FC = () => {
+  const { activeShift, setCloseDrawerOpen } = useShift();
+
+  if (!activeShift) return null;
+
+  return (
+    <button
+      onClick={() => setCloseDrawerOpen(true)}
+      className="fixed top-4 right-36 z-50 flex items-center gap-2 px-3 py-2
+                 bg-white/90 backdrop-blur border border-gray-200 rounded-lg shadow-sm
+                 hover:bg-red-50 hover:border-red-200 transition-colors text-sm font-medium text-gray-700"
+      title="Close current shift"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+      Close Shift
+    </button>
+  );
+};
+
 // ─── POS Keyboard Shortcuts ─────────────────────────────────
 
 const POSKeyboardHandler: React.FC = () => {
@@ -147,9 +161,28 @@ const POSKeyboardHandler: React.FC = () => {
 // ─── Inner Layout (needs POS context) ───────────────────────
 
 const POSFullScreenInner: React.FC = () => {
-  console.log('[DEBUG] POSFullScreenInner rendering');
+  const { loading, activeShift, shiftSystemAvailable } = useShift();
+
+  // Show loading spinner while checking shift status
+  if (loading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <CircularProgress size={40} />
+          <p className="mt-3 text-sm text-gray-500">Checking shift status…</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen w-screen overflow-hidden bg-gray-50">
+      {/* Shift open modal — blocks POS only when shift system is available but no shift open */}
+      <ShiftOpenModal />
+
+      {/* Shift close drawer */}
+      <ShiftCloseDrawer />
+
       {/* Navigation blocker dialog */}
       <NavigationBlockerDialog />
       
@@ -158,11 +191,14 @@ const POSFullScreenInner: React.FC = () => {
       
       {/* Keyboard handler */}
       <POSKeyboardHandler />
+
+      {/* Close Shift button (visible when shift is active) */}
+      <CloseShiftButton />
       
       {/* Exit button */}
       <ExitPOSButton />
       
-      {/* POS Content */}
+      {/* POS Content — always render behind shift modal */}
       <main className="h-full w-full">
         <Outlet />
       </main>
@@ -173,35 +209,30 @@ const POSFullScreenInner: React.FC = () => {
 // ─── Main Layout (provides context) ─────────────────────────
 
 const POSFullScreenLayoutInner: React.FC = () => {
-  console.log('[DEBUG] POSFullScreenLayoutInner rendering');
   const location = useLocation();
-  console.log('[DEBUG] useLocation result:', location);
+
+  const locationId = location.currentLocation?.id || 'loc_default';
 
   return (
-    <POSProvider
-      locationId={location.currentLocation?.id || 'loc_default'}
-      locationName={location.currentLocation?.name || 'Main Store'}
-    >
-      <POSFullScreenInner />
-    </POSProvider>
+    <ShiftProvider locationId={locationId}>
+      <POSProvider
+        locationId={locationId}
+        locationName={location.currentLocation?.name || 'Main Store'}
+      >
+        <POSFullScreenInner />
+      </POSProvider>
+    </ShiftProvider>
   );
 };
 
 const POSFullScreenLayout: React.FC = () => {
-  console.log('[DEBUG] POSFullScreenLayout rendering');
-  
-  // Step 3: Test POSFullScreenLayoutInner (uses useLocation + POSProvider)
   return (
-    <LocationProvider>
-      <POSFullScreenLayoutInner />
-    </LocationProvider>
+    <POSErrorBoundary>
+      <LocationProvider>
+        <POSFullScreenLayoutInner />
+      </LocationProvider>
+    </POSErrorBoundary>
   );
-  
-  // return (
-  //   <LocationProvider>
-  //     <POSFullScreenLayoutInner />
-  //   </LocationProvider>
-  // );
 };
 
 export default POSFullScreenLayout;

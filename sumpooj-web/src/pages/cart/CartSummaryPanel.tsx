@@ -194,7 +194,18 @@ const CartSummaryPanel: React.FC<Props> = ({
           )
         )}
 
-        <Row label="Tax" value={fmtCurrency(totals.taxTotal)} />
+        {/* Dynamic Tax Breakdown */}
+        {totals.taxBreakdown && totals.taxBreakdown.length > 0 ? (
+          totals.taxBreakdown.map((tax) => (
+            <Row
+              key={tax.taxRuleId}
+              label={`${tax.taxRuleName} (${(tax.rate * 100).toFixed(1)}%${tax.isInclusive ? ' incl.' : ''})`}
+              value={fmtCurrency(tax.taxAmount)}
+            />
+          ))
+        ) : totals.taxTotal > 0 ? (
+          <Row label="Tax" value={fmtCurrency(totals.taxTotal)} />
+        ) : null}
         {appliedDeliveryFee > 0 && (
           <Row label="Delivery Fee" value={fmtCurrency(appliedDeliveryFee)} />
         )}

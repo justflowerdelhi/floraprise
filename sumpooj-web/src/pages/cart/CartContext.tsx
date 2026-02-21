@@ -23,6 +23,7 @@ interface CartState {
 const EMPTY_TOTALS: CartSummary = {
   subtotal: 0, taxTotal: 0, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 0,
   totalCost: 0, marginPercent: 0, marginWarning: false, itemCount: 0, lineCount: 0,
+  taxBreakdown: [],
 };
 
 const initialState: CartState = {

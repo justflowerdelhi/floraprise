@@ -53,15 +53,8 @@ const fmtCurrency = (v: number) => formatCurrency(v);
 function buildPerishableMap(order: Order): Record<string, boolean> {
   const map: Record<string, boolean> = {};
   for (const item of order.items) {
-    // If category contains "Fresh Flowers" or "Greens & Foliage" → perishable
-    // Arrangements/Bouquets with batch allocations → perishable
-    // Everything else → non-perishable
-    const cat = item.category;
-    const isPerishable =
-      cat === 'Fresh Flowers' ||
-      cat === 'Greens & Foliage' ||
-      ((cat === 'Arrangements' || cat === 'Bouquets') && item.batchAllocations.length > 0);
-    map[item.productId] = isPerishable;
+    // Use the isPerishable flag carried on each cart item (sourced from category)
+    map[item.productId] = item.isPerishable ?? false;
   }
   return map;
 }

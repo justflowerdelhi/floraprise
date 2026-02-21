@@ -1,238 +1,183 @@
 /**
- * POSScreen.tsx — Main POS Screen using POSContext
- * 
- * Clean 3-zone layout: Category Sidebar | Product Grid | Cart Panel
- * Uses single cart architecture with lifecycle management
- * Optimized for 1440px desktop retail
+ * POSScreen.tsx — Tab-Based POS Workflow
+ *
+ * Four-step tabs:
+ *  1. Order Type  — choose TAKE_NOW / DELIVERY / PICKUP_LATER
+ *  2. Products    — search, scan, build cart
+ *  3. Details     — delivery/pickup forms (or skip for TAKE_NOW)
+ *  4. Payment     — split-pay, complete transaction
+ *
+ * Tab gating: must complete each step before the next unlocks.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Alert, Snackbar } from '@mui/material';
-import POSTopBar from './POSTopBar';
-import CategorySidebar from './CategorySidebar';
-import ProductGrid from './ProductGrid';
-import POSCartPanelV2 from './POSCartPanelV2';
-import POSPaymentDrawerV2 from './POSPaymentDrawerV2';
-import POSCustomerDrawer from './POSCustomerDrawer';
+import { Alert } from '@mui/material';
 import { usePOS } from './POSContext';
 import type { Product } from '../orders/OrderTypes';
 import type { POSCustomer } from './POSTypes';
-import { POS_SHORTCUTS } from './POSTypes';
 import { searchProducts } from '../../api/product.api';
 import { searchCustomers } from '../../api/customer.api';
+import POSTabLayout, { type POSTab } from './POSTabLayout';
+import OrderTypeTab from './OrderTypeTab';
+import ProductsTab from './ProductsTab';
+import DetailsTab from './DetailsTab';
+import PaymentTab from './PaymentTab';
 
 const POSScreen: React.FC = () => {
-  console.log('[DEBUG] POSScreen rendering');
   const {
     state,
-    addProduct,
-    setCustomer,
-    setOrderType,
-    startPayment,
-    resetCart,
-    canCheckout,
-    canEditCart,
+    setOrderIntent,
+    cancelPayment,
+    intentErrors,
   } = usePOS();
-  console.log('[DEBUG] usePOS result state:', state.lifecycle);
 
-  // Data state
+  // ─── Data Loading ─────────────────────────────────────────
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<POSCustomer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // UI state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [customerDrawerOpen, setCustomerDrawerOpen] = useState(false);
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError('');
+    const errors: string[] = [];
 
-  // Snackbar
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'info';
-  }>({
-    open: false,
-    message: '',
-    severity: 'success',
-  });
+    // Load products and customers independently
+    try {
+      const prodRes = await searchProducts({ IsActive: true, PageSize: 500 });
+      setProducts(Array.isArray(prodRes) ? prodRes : prodRes.items ?? []);
+    } catch (err) {
+      console.error('Product load failed:', err);
+      errors.push('products');
+    }
 
-  // Load data on mount
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      setError('');
-      try {
-        const [prodRes, custRes] = await Promise.all([
-          searchProducts({ IsActive: true, PageSize: 500 }),
-          searchCustomers({ PageSize: 500 }),
-        ]);
-        const prodItems = Array.isArray(prodRes) ? prodRes : prodRes.items ?? [];
-        setProducts(prodItems);
-        const custItems = Array.isArray(custRes) ? custRes : custRes.items ?? [];
-        setCustomers(custItems);
-      } catch (err) {
-        console.error('POS data load failed:', err);
-        setError('Failed to load POS data. Please refresh.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadData();
+    try {
+      const custRes = await searchCustomers({ PageSize: 500 });
+      setCustomers(Array.isArray(custRes) ? custRes : custRes.items ?? []);
+    } catch (err) {
+      console.error('Customer load failed:', err);
+      errors.push('customers');
+    }
+
+    if (errors.length > 0) {
+      setError(`Failed to load ${errors.join(' & ')}. Some features may be limited.`);
+    }
+    setIsLoading(false);
   }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // F9 - Quick checkout
-      if (e.key === POS_SHORTCUTS.CHECKOUT && canCheckout) {
-        e.preventDefault();
-        startPayment();
-      }
-      // F8 - Clear cart
-      if (e.key === POS_SHORTCUTS.CLEAR && canEditCart) {
-        e.preventDefault();
-        resetCart();
-        showSnackbar('Cart cleared', 'info');
-      }
-      // F3 - Customer
-      if (e.key === POS_SHORTCUTS.CUSTOMER) {
-        e.preventDefault();
-        setCustomerDrawerOpen(true);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canCheckout, canEditCart, startPayment, resetCart]);
+    loadData();
+  }, [loadData]);
 
-  // Handlers
-  const showSnackbar = useCallback(
-    (message: string, severity: 'success' | 'error' | 'info' = 'success') => {
-      setSnackbar({ open: true, message, severity });
+  // ─── Tab State ────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<POSTab>(0);
+
+  const hasIntent = !!state.orderIntent;
+  const hasItems = state.items.length > 0;
+  const detailsValid = intentErrors.length === 0;
+
+  // Enabled: which tabs the user can click
+  const tabEnabled: Record<POSTab, boolean> = {
+    0: true,
+    1: hasIntent,
+    2: hasIntent && hasItems,
+    3: hasIntent && hasItems && detailsValid,
+  };
+
+  // Completed: green check
+  const tabCompleted: Record<POSTab, boolean> = {
+    0: hasIntent,
+    1: hasItems,
+    2: detailsValid && hasItems,
+    3: state.lifecycle === 'completed',
+  };
+
+  // ─── Navigation Helpers ───────────────────────────────────
+
+  const goTo = useCallback(
+    (tab: POSTab) => {
+      // If leaving payment tab, cancel payment lifecycle
+      if (activeTab === 3 && tab !== 3 && state.lifecycle === 'payment') {
+        cancelPayment();
+      }
+      if (tabEnabled[tab]) setActiveTab(tab);
     },
-    []
+    [activeTab, state.lifecycle, cancelPayment, tabEnabled],
   );
 
-  const handleAddProduct = useCallback(
-    (product: Product) => {
-      if (!canEditCart) {
-        showSnackbar('Cart is locked during payment', 'error');
-        return;
-      }
-      addProduct(product);
-      showSnackbar(`Added ${product.name}`, 'success');
-    },
-    [addProduct, canEditCart, showSnackbar]
-  );
-
-  const handleSearchSubmit = useCallback(() => {
-    const query = searchQuery.trim();
-    if (!query) return;
-
-    const product = products.find(
-      (p) =>
-        p.barcode === query ||
-        p.internalBarcode === query ||
-        p.batchBarcode === query ||
-        p.finishedBarcode === query
-    );
-
-    if (product) {
-      handleAddProduct(product);
-      setSearchQuery('');
+  // Auto-reset to tab 0 after a completed transaction
+  useEffect(() => {
+    if (state.lifecycle === 'idle' && state.items.length === 0 && activeTab !== 0) {
+      setActiveTab(0);
     }
-  }, [searchQuery, products, handleAddProduct]);
+  }, [state.lifecycle, state.items.length, activeTab]);
 
-  const handleCustomerSelect = useCallback(
-    (customer: POSCustomer | null) => {
-      setCustomer(customer);
-      setCustomerDrawerOpen(false);
-    },
-    [setCustomer]
-  );
-
-  // Format currency
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+  // ─── Render ───────────────────────────────────────────────
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
-      {/* Error Alert */}
+    <div className="h-full flex flex-col overflow-hidden bg-gray-50">
       {error && (
-        <Alert severity="error" className="m-4">
+        <Alert
+          severity="warning"
+          className="mx-4 mt-2"
+          onClose={() => setError('')}
+          action={
+            <button
+              onClick={loadData}
+              className="ml-2 px-3 py-1 text-xs font-semibold bg-amber-100 hover:bg-amber-200 rounded transition-colors"
+            >
+              Retry
+            </button>
+          }
+        >
           {error}
         </Alert>
       )}
 
-      {/* Top Bar */}
-      <POSTopBar
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        onSearchSubmit={handleSearchSubmit}
-        selectedCustomer={state.customer}
-        onCustomerClick={() => setCustomerDrawerOpen(true)}
-        orderType={state.orderType}
-        onOrderTypeChange={setOrderType}
-        locationName={state.session.locationName}
-        onLocationClick={() => {}}
-        grandTotal={state.totals.grandTotal}
-      />
-
-      {/* Main Content - 3 Zone Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Category Sidebar (80px) */}
-        <CategorySidebar
-          selectedCategory={selectedCategory}
-          onCategorySelect={setSelectedCategory}
-        />
-
-        {/* Center: Product Grid (flexible) */}
-        <ProductGrid
-          products={products}
-          searchQuery={searchQuery}
-          selectedCategory={selectedCategory}
-          onAddProduct={handleAddProduct}
-          isLoading={isLoading}
-        />
-
-        {/* Right: Cart Panel (320-384px) */}
-        <POSCartPanelV2 products={products} />
-      </div>
-
-      {/* Payment Drawer */}
-      <POSPaymentDrawerV2 />
-
-      {/* Customer Drawer */}
-      <POSCustomerDrawer
-        open={customerDrawerOpen}
-        onClose={() => setCustomerDrawerOpen(false)}
-        customers={customers}
-        selectedCustomer={state.customer}
-        onSelectCustomer={handleCustomerSelect}
-      />
-
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={2000}
-        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      <POSTabLayout
+        activeTab={activeTab}
+        onTabChange={goTo}
+        tabEnabled={tabEnabled}
+        tabCompleted={tabCompleted}
       >
-        <Alert
-          severity={snackbar.severity}
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-          sx={{ minWidth: 200 }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+        {/* Tab 1 — Order Type */}
+        {activeTab === 0 && (
+          <OrderTypeTab
+            selected={state.orderIntent}
+            onSelect={setOrderIntent}
+            onNext={() => goTo(1)}
+          />
+        )}
 
-      {/* Cart Lifecycle Indicator (debug - remove in production) */}
+        {/* Tab 2 — Products */}
+        {activeTab === 1 && (
+          <ProductsTab
+            products={products}
+            customers={customers}
+            isLoading={isLoading}
+            onNext={() => goTo(2)}
+          />
+        )}
+
+        {/* Tab 3 — Details */}
+        {activeTab === 2 && (
+          <DetailsTab
+            onNext={() => goTo(3)}
+            onBack={() => goTo(1)}
+          />
+        )}
+
+        {/* Tab 4 — Payment */}
+        {activeTab === 3 && (
+          <PaymentTab
+            onBack={() => goTo(2)}
+          />
+        )}
+      </POSTabLayout>
+
+      {/* Cart Lifecycle Indicator (debug) */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 left-4 px-3 py-1 bg-gray-800 text-white text-xs rounded-full">
-          Cart: {state.lifecycle} | Items: {state.items.length}
+        <div className="fixed bottom-4 left-4 px-3 py-1 bg-gray-800 text-white text-xs rounded-full z-50">
+          Tab: {activeTab + 1} | Cart: {state.lifecycle} | Items: {state.items.length} | Intent: {state.orderIntent}
         </div>
       )}
     </div>

@@ -12,7 +12,11 @@ import type {
   LabelConfig,
   BarcodeValidationResult,
   BARCODE_PREFIXES,
+  PrintMode,
+  A4GridLayout,
+  A4GridConfig,
 } from './BarcodeTypes';
+import { A4_GRID_LAYOUTS } from './BarcodeTypes';
 
 // ============================================
 // BARCODE GENERATION UTILITIES
@@ -274,12 +278,25 @@ export function generateLabelHTML(
 }
 
 /**
- * Print labels
+ * Print labels – supports Thermal and A4 modes.
  */
 export function printLabels(
   data: LabelData,
-  config: LabelConfig
+  config: LabelConfig,
+  mode: PrintMode = 'thermal',
+  a4Layout: A4GridLayout = '3x8'
 ): void {
+  if (mode === 'a4') {
+    printA4Labels(data, config, a4Layout);
+  } else {
+    printThermalLabels(data, config);
+  }
+}
+
+/**
+ * Print thermal labels (one per page, exact label size).
+ */
+function printThermalLabels(data: LabelData, config: LabelConfig): void {
   const labelsHTML = Array(config.quantity)
     .fill(null)
     .map(() => generateLabelHTML(data, config))
@@ -295,18 +312,19 @@ export function printLabels(
     <!DOCTYPE html>
     <html>
       <head>
-        <title>Print Labels</title>
+        <title>Print Thermal Labels</title>
         <style>
           @page {
             size: ${config.width}mm ${config.height}mm;
             margin: 0;
           }
-          body {
-            margin: 0;
-            padding: 0;
-          }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { margin: 0; padding: 0; }
+          .thermal-label { page-break-after: always; }
+          .thermal-label:last-child { page-break-after: auto; }
           @media print {
-            body { margin: 0; }
+            body { margin: 0; padding: 0; }
+            .no-print { display: none !important; }
           }
         </style>
       </head>
@@ -317,11 +335,146 @@ export function printLabels(
             window.print();
             window.onafterprint = function() { window.close(); };
           };
-        </script>
+        <\/script>
       </body>
     </html>
   `);
   printWindow.document.close();
+}
+
+/**
+ * Print A4 sheet labels in a grid layout.
+ */
+function printA4Labels(
+  data: LabelData,
+  config: LabelConfig,
+  layout: A4GridLayout
+): void {
+  const grid: A4GridConfig = A4_GRID_LAYOUTS[layout];
+  const labelsPerPage = grid.cols * grid.rows;
+  const totalPages = Math.ceil(config.quantity / labelsPerPage);
+
+  let allPagesHTML = '';
+  let remaining = config.quantity;
+
+  for (let p = 0; p < totalPages; p++) {
+    const countThisPage = Math.min(remaining, labelsPerPage);
+    remaining -= countThisPage;
+
+    let cellsHTML = '';
+    for (let i = 0; i < countThisPage; i++) {
+      cellsHTML += generateA4CellHTML(data, config, grid);
+    }
+
+    allPagesHTML += `
+      <div class="a4-page" style="
+        width: 210mm;
+        min-height: 297mm;
+        padding-left: ${grid.marginLeft}mm;
+        padding-top: ${grid.marginTop}mm;
+        box-sizing: border-box;
+        display: grid;
+        grid-template-columns: repeat(${grid.cols}, ${grid.labelWidth}mm);
+        grid-auto-rows: ${grid.labelHeight}mm;
+        column-gap: ${grid.columnGap}mm;
+        row-gap: ${grid.rowGap}mm;
+        page-break-after: ${p < totalPages - 1 ? 'always' : 'auto'};
+      ">
+        ${cellsHTML}
+      </div>
+    `;
+  }
+
+  const printWindow = window.open('', '_blank', 'width=800,height=1000');
+  if (!printWindow) {
+    console.error('Failed to open print window. Check popup blocker.');
+    return;
+  }
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Print A4 Labels</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 0;
+          }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { margin: 0; padding: 0; background: #fff; color: #000; }
+          @media print {
+            body { margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+          }
+        </style>
+      </head>
+      <body>
+        ${allPagesHTML}
+        <script>
+          window.onload = function() {
+            window.print();
+            window.onafterprint = function() { window.close(); };
+          };
+        <\/script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+/**
+ * Generate HTML for a single cell in the A4 grid.
+ */
+function generateA4CellHTML(
+  data: LabelData,
+  config: LabelConfig,
+  grid: A4GridConfig
+): string {
+  const barcodeSVG = generateBarcodeSVGString(data.barcode, {
+    format: config.barcodeFormat,
+    width: 1.2,
+    height: 24,
+    displayValue: true,
+  });
+
+  const priceSection =
+    config.includePrice && data.price !== undefined
+      ? `<div style="font-size: 10px; font-weight: bold; margin-top: 1px;">₹${data.price.toFixed(2)}</div>`
+      : '';
+
+  const expirySection =
+    config.includeExpiry && data.expiryDate
+      ? `<div style="font-size: 6.5px; color: #555;">Exp: ${formatExpiryDate(data.expiryDate)}</div>`
+      : '';
+
+  return `
+    <div style="
+      width: ${grid.labelWidth}mm;
+      height: ${grid.labelHeight}mm;
+      padding: 1mm 1.5mm;
+      font-family: 'Arial', sans-serif;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 0.25px dotted #ccc;
+      overflow: hidden;
+    ">
+      <div style="font-size: 8px; font-weight: bold; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; margin-bottom: 1px;">
+        ${escapeHTML(data.name)}
+      </div>
+      <div style="font-size: 6.5px; color: #666; margin-bottom: 1px;">
+        ${escapeHTML(data.sku)}
+      </div>
+      <div style="margin: 1px 0; max-width: 100%;">
+        ${barcodeSVG}
+      </div>
+      ${priceSection}
+      ${expirySection}
+    </div>
+  `;
 }
 
 // ============================================

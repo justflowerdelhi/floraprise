@@ -99,6 +99,18 @@ export type FlowerGrade = typeof FLOWER_GRADES[number]['value'];
 export type CountryCode = typeof COUNTRIES[number]['value'];
 
 // ============================================
+// DYNAMIC CATEGORY (from API)
+// ============================================
+
+export interface CategoryOption {
+  id: string;
+  name: string;
+  isPerishable: boolean;
+  trackBatchByDefault: boolean;
+  isActive: boolean;
+}
+
+// ============================================
 // SUPPLIER INTERFACE
 // ============================================
 
@@ -119,6 +131,7 @@ export interface ProductFormData {
   // Basic Info (Required)
   productName: string;
   productType: ProductType;
+  categoryId: string;
   sku: string;
   unitOfMeasure: UnitOfMeasure;
   retailPrice: number;
@@ -191,6 +204,7 @@ export interface ProductApiPayload {
   
   // Classification
   productType: ProductType;
+  categoryId?: string;
   brand?: string;
   description?: string;
   tags?: string[];
@@ -211,8 +225,7 @@ export interface ProductApiPayload {
   openingStock?: number;
   reorderLevel?: number;
   
-  // Perishable
-  isPerishable: boolean;
+  // Perishable details (IsPerishable is derived from category)
   shelfLifeDays?: number;
   expiryAlertDays?: number;
   temperatureNotes?: string;
@@ -269,6 +282,7 @@ export interface FormSectionProps {
 export const defaultProductFormValues: ProductFormData = {
   productName: '',
   productType: 'fresh_flower',
+  categoryId: '',
   sku: '',
   unitOfMeasure: 'stem',
   retailPrice: 0,

@@ -168,10 +168,25 @@ const POSCartPanel: React.FC<POSCartPanelProps> = ({
             </div>
           )}
 
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Tax</span>
-            <span className="text-gray-900">{formatCurrency(totals.taxTotal)}</span>
-          </div>
+          {/* Dynamic Tax Breakdown */}
+          {totals.taxBreakdown && totals.taxBreakdown.length > 0 ? (
+            totals.taxBreakdown.map((tax) => (
+              <div key={tax.taxRuleId} className="flex justify-between text-sm">
+                <span className="text-gray-600">
+                  {tax.taxRuleName}
+                  <span className="text-gray-400 text-xs ml-1">
+                    ({(tax.rate * 100).toFixed(1)}%{tax.isInclusive ? ' incl.' : ''})
+                  </span>
+                </span>
+                <span className="text-gray-900">{formatCurrency(tax.taxAmount)}</span>
+              </div>
+            ))
+          ) : totals.taxTotal > 0 ? (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Tax</span>
+              <span className="text-gray-900">{formatCurrency(totals.taxTotal)}</span>
+            </div>
+          ) : null}
 
           <div className="pt-2 border-t border-gray-200 flex justify-between">
             <span className="text-base font-semibold text-gray-900">Total</span>

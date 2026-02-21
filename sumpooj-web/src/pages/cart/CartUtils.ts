@@ -119,7 +119,22 @@ export const calcLineItem = (
   }
 
   const lineTotal = Math.max(0, gross - discountAmount);
-  const taxAmount = Math.round(lineTotal * product.taxRate * 100) / 100;
+
+  // Tax calculation using TaxRule (inclusive / exclusive)
+  const rate = product.taxRate ?? 0;
+  const isInclusive = product.taxIsInclusive ?? false;
+  let taxAmount: number;
+  if (rate > 0) {
+    if (isInclusive) {
+      // Price already includes tax
+      taxAmount = Math.round((lineTotal - lineTotal / (1 + rate)) * 100) / 100;
+    } else {
+      // Tax added on top
+      taxAmount = Math.round(lineTotal * rate * 100) / 100;
+    }
+  } else {
+    taxAmount = 0;
+  }
 
   // FIFO cost
   const lineCost = allocations.reduce((s, a) => s + a.quantity * a.costPerUnit, 0);
@@ -136,6 +151,7 @@ export const calcLineItem = (
     productName: product.name,
     sku: product.sku,
     category: product.category,
+    isPerishable: product.isPerishable,
     quantity: qty,
     unitPrice,
     discountPercent,
@@ -143,6 +159,9 @@ export const calcLineItem = (
     lineTotal,
     taxRate: product.taxRate,
     taxAmount,
+    taxRuleId: product.taxRuleId ?? null,
+    taxRuleName: product.taxRuleName ?? null,
+    taxIsInclusive: product.taxIsInclusive ?? false,
     lineCost,
     marginPercent,
     batchAllocations: allocations,
@@ -155,6 +174,7 @@ export const calcLineItem = (
 // ─── Cart Summary ───────────────────────────────────────────
 
 import type { OrderDiscount } from '../orders/OrderTypes';
+import type { TaxBreakdownEntry } from '../orders/OrderTypes';
 
 /**
  * Calculate order-level discount amount.
@@ -186,14 +206,50 @@ export const calcCartSummary = (
   // Order-level discount calculation
   const orderDiscountAmount = calcOrderDiscountAmount(subtotal, orderDiscount);
 
-  // New calculation order: Subtotal - Discount = Discounted Subtotal, then + Tax = Final Total
+  // Grand total: for exclusive lines tax is added on top; for inclusive it's already inside lineTotal.
+  // lineTotal already accounts for inclusive (price stays as-is) vs exclusive (tax will be added).
   const discountedSubtotal = subtotal - orderDiscountAmount;
-  const grandTotal = Math.round((discountedSubtotal + taxTotal) * 100) / 100;
+
+  // Separate exclusive tax (needs adding) from inclusive tax (already in subtotal)
+  const exclusiveTax = items
+    .filter((i) => !i.taxIsInclusive)
+    .reduce((s, i) => s + i.taxAmount, 0);
+  const grandTotal = Math.round((discountedSubtotal + exclusiveTax) * 100) / 100;
 
   const totalCost     = items.reduce((s, i) => s + i.lineCost, 0);
   const marginPercent = discountedSubtotal > 0
     ? Math.round((1 - totalCost / discountedSubtotal) * 1000) / 10
     : 0;
+
+  // Build tax breakdown grouped by TaxRule
+  const breakdownMap = new Map<string, TaxBreakdownEntry>();
+  for (const item of items) {
+    const ruleId = item.taxRuleId;
+    if (!ruleId || item.taxAmount === 0) continue;
+
+    const existing = breakdownMap.get(ruleId);
+    if (existing) {
+      existing.taxableAmount += item.lineTotal;
+      existing.taxAmount += item.taxAmount;
+    } else {
+      breakdownMap.set(ruleId, {
+        taxRuleId: ruleId,
+        taxRuleName: item.taxRuleName ?? 'Tax',
+        rate: item.taxRate,
+        isInclusive: item.taxIsInclusive ?? false,
+        taxableAmount: item.lineTotal,
+        taxAmount: item.taxAmount,
+      });
+    }
+  }
+
+  const taxBreakdown = Array.from(breakdownMap.values())
+    .map((b) => ({
+      ...b,
+      taxableAmount: Math.round(b.taxableAmount * 100) / 100,
+      taxAmount: Math.round(b.taxAmount * 100) / 100,
+    }))
+    .sort((a, b) => a.taxRuleName.localeCompare(b.taxRuleName));
 
   return {
     subtotal:           Math.round(subtotal * 100) / 100,
@@ -206,6 +262,7 @@ export const calcCartSummary = (
     marginWarning:      marginPercent < 20,
     itemCount:          items.reduce((s, i) => s + i.quantity, 0),
     lineCount:          items.length,
+    taxBreakdown,
   };
 };
 

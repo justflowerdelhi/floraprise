@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Sumpooj.Application.Common;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Products;
@@ -8,12 +9,23 @@ namespace Sumpooj.Application.UseCases;
 public class ProductService
 {
     private readonly IProductRepository _repo;
+    private readonly IProductCategoryRepository _categoryRepo;
+    private readonly ITaxRuleRepository _taxRuleRepo;
     private readonly ITenantContext _tenant;
+    private readonly ILogger<ProductService> _logger;
 
-    public ProductService(IProductRepository repo, ITenantContext tenant)
+    public ProductService(
+        IProductRepository repo,
+        IProductCategoryRepository categoryRepo,
+        ITaxRuleRepository taxRuleRepo,
+        ITenantContext tenant,
+        ILogger<ProductService> logger)
     {
         _repo = repo;
+        _categoryRepo = categoryRepo;
+        _taxRuleRepo = taxRuleRepo;
         _tenant = tenant;
+        _logger = logger;
     }
 
     public async Task<PagedResult<ProductListDto>> SearchAsync(ProductSearchRequest request)
@@ -48,6 +60,20 @@ public class ProductService
         if (_tenant.CompanyId == null)
             throw new InvalidOperationException("Company context required");
 
+        // ── CategoryId is now required ──────────────────
+        if (!request.CategoryId.HasValue || request.CategoryId == Guid.Empty)
+            throw new InvalidOperationException("CategoryId is required when creating a product.");
+
+        var categoryEntity = await _categoryRepo.GetByIdAsync(request.CategoryId.Value)
+            ?? throw new InvalidOperationException($"Category '{request.CategoryId}' not found.");
+
+        // ── TaxRuleId is required ───────────────────
+        if (!request.TaxRuleId.HasValue || request.TaxRuleId == Guid.Empty)
+            throw new InvalidOperationException("TaxRuleId is required when creating a product.");
+
+        var taxRule = await _taxRuleRepo.GetByIdAsync(_tenant.CompanyId!.Value, request.TaxRuleId.Value)
+            ?? throw new InvalidOperationException($"TaxRule '{request.TaxRuleId}' not found.");
+
         // Check if SKU already exists
         if (await _repo.SkuExistsAsync(request.Sku))
             throw new InvalidOperationException($"SKU '{request.Sku}' already exists");
@@ -66,13 +92,19 @@ public class ProductService
             description: request.Description
         );
 
+        // Assign dynamic CategoryId (category is source of truth for IsPerishable)
+        product.SetCategoryId(request.CategoryId.Value);
+
+        // Assign TaxRule
+        product.SetTaxRuleId(request.TaxRuleId!.Value);
+
         // Set additional properties
         product.UpdateBasicInfo(request.ProductName, request.Sku, request.Barcode, request.Brand, request.Description);
         product.UpdatePricing(request.RetailPrice, request.CostPrice, request.WholesalePrice, request.WeddingEventPrice);
         product.SetUnitOfMeasure(ParseEnum<UnitOfMeasure>(request.UnitOfMeasure, UnitOfMeasure.Stem));
         product.SetTaxCategory(ParseEnum<TaxCategory>(request.TaxCategory, TaxCategory.Standard));
         product.SetInventorySettings(request.TrackInventory, request.TrackBatch, request.ReorderLevel ?? 0);
-        product.SetPerishableInfo(request.IsPerishable, request.ShelfLifeDays, request.ExpiryAlertDays, request.TemperatureNotes);
+        product.SetPerishableDetails(request.ShelfLifeDays, request.ExpiryAlertDays, request.TemperatureNotes);
 
         if (request.FlowerAttributes != null)
         {
@@ -120,6 +152,27 @@ public class ProductService
         var product = await _repo.GetByIdAsync(id)
             ?? throw new KeyNotFoundException("Product not found");
 
+        // ── Handle CategoryId change ──────────────────
+        if (request.CategoryId.HasValue && request.CategoryId != Guid.Empty)
+        {
+            var categoryEntity = await _categoryRepo.GetByIdAsync(request.CategoryId.Value)
+                ?? throw new InvalidOperationException($"Category '{request.CategoryId}' not found.");
+
+            product.SetCategoryId(request.CategoryId.Value);
+        }
+
+        // ── Handle TaxRuleId change ──────────────────
+        if (request.TaxRuleId.HasValue)
+        {
+            if (request.TaxRuleId == Guid.Empty)
+                throw new InvalidOperationException("TaxRuleId cannot be empty.");
+
+            var taxRule = await _taxRuleRepo.GetByIdAsync(_tenant.CompanyId!.Value, request.TaxRuleId.Value)
+                ?? throw new InvalidOperationException($"TaxRule '{request.TaxRuleId}' not found.");
+
+            product.SetTaxRuleId(request.TaxRuleId.Value);
+        }
+
         if (request.ProductName != null || request.Barcode != null || request.Brand != null || request.Description != null)
         {
             product.UpdateBasicInfo(
@@ -152,10 +205,9 @@ public class ProductService
                 request.ReorderLevel ?? product.ReorderLevel);
         }
 
-        if (request.IsPerishable.HasValue)
+        if (request.ShelfLifeDays.HasValue || request.ExpiryAlertDays.HasValue || request.TemperatureNotes != null)
         {
-            product.SetPerishableInfo(
-                request.IsPerishable ?? product.IsPerishable,
+            product.SetPerishableDetails(
                 request.ShelfLifeDays ?? product.ShelfLifeDays,
                 request.ExpiryAlertDays ?? product.ExpiryAlertDays,
                 request.TemperatureNotes ?? product.TemperatureNotes);
@@ -249,6 +301,8 @@ public class ProductService
         Brand = p.Brand,
         ProductType = p.ProductType.ToString(),
         Category = p.Category.ToString(),
+        CategoryId = p.CategoryId,
+        CategoryName = p.ProductCategoryRef?.Name,
         Description = p.Description,
         UnitOfMeasure = p.UnitOfMeasure.ToString(),
         IsActive = p.IsActive,
@@ -257,6 +311,8 @@ public class ProductService
         WholesalePrice = p.WholesalePrice,
         WeddingEventPrice = p.WeddingEventPrice,
         TaxCategory = p.TaxCategory.ToString(),
+        TaxRuleId = p.TaxRuleId,
+        TaxRuleName = p.TaxRule?.Name,
         TrackInventory = p.TrackInventory,
         TrackBatch = p.TrackBatch,
         StockQuantity = p.StockQuantity,
@@ -264,7 +320,7 @@ public class ProductService
         ReorderLevel = p.ReorderLevel,
         IsLowStock = p.IsLowStock(),
         NeedsReorder = p.NeedsReorder(),
-        IsPerishable = p.IsPerishable,
+        IsPerishable = p.ProductCategoryRef?.IsPerishable ?? false,
         ShelfLifeDays = p.ShelfLifeDays,
         ExpiryAlertDays = p.ExpiryAlertDays,
         TemperatureNotes = p.TemperatureNotes,
@@ -292,12 +348,16 @@ public class ProductService
         Sku = p.Sku,
         ProductType = p.ProductType.ToString(),
         Category = p.Category.ToString(),
+        CategoryId = p.CategoryId,
+        CategoryName = p.ProductCategoryRef?.Name,
+        TaxRuleId = p.TaxRuleId,
+        TaxRuleName = p.TaxRule?.Name,
         RetailPrice = p.RetailPrice,
         CostPrice = p.CostPrice,
         StockQuantity = p.StockQuantity,
         IsActive = p.IsActive,
         IsLowStock = p.IsLowStock(),
-        IsPerishable = p.IsPerishable,
+        IsPerishable = p.ProductCategoryRef?.IsPerishable ?? false,
         ShelfLifeDays = p.ShelfLifeDays
     };
 

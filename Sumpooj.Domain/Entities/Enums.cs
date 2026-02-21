@@ -276,6 +276,13 @@ public enum DayCloseStatus
     Adjusted
 }
 
+// Shift Status
+public enum ShiftStatus
+{
+    Open,
+    Closed
+}
+
 // Order Source
 public enum OrderSource
 {

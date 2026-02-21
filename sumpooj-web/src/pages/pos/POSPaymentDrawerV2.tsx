@@ -116,6 +116,9 @@ const POSPaymentDrawerV2: React.FC = () => {
         payments: state.payments,
         billingInfo: state.billingInfo,
         customer: state.customer,
+        orderIntent: state.orderIntent,
+        deliveryDetails: state.orderIntent === 'DELIVERY' ? state.deliveryDetails : undefined,
+        pickupDetails: state.orderIntent === 'PICKUP_LATER' ? state.pickupDetails : undefined,
       });
       completeTransaction();
     }

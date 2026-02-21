@@ -51,6 +51,9 @@ export interface CreateOrderRequest {
   deliveryPriority: string;
   timeSlot?: string | null;
   orderSource: string;
+  orderIntent?: string;        // 'TAKE_NOW' | 'DELIVERY' | 'PICKUP_LATER'
+  pickupDate?: string | null;
+  pickupTimeSlot?: string | null;
   deliveryFee: number;
   discountAmount: number;
   internalNotes?: string | null;

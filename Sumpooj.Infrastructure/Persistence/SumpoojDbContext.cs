@@ -44,13 +44,17 @@ public class SumpoojDbContext
     public DbSet<RefundItem> RefundItems => Set<RefundItem>();
     public DbSet<GiftCard> GiftCards => Set<GiftCard>();
     public DbSet<DayClose> DayCloses => Set<DayClose>();
+    public DbSet<Shift> Shifts => Set<Shift>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+    public DbSet<ProductCategoryEntity> ProductCategories => Set<ProductCategoryEntity>();
 
     // New entities
     public DbSet<DeliveryZone> DeliveryZones => Set<DeliveryZone>();
     public DbSet<WireOrder> WireOrders => Set<WireOrder>();
     public DbSet<Proposal> Proposals => Set<Proposal>();
     public DbSet<ProposalItem> ProposalItems => Set<ProposalItem>();
+    public DbSet<TaxRule> TaxRules => Set<TaxRule>();
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -134,6 +138,27 @@ public class SumpoojDbContext
                 !_tenantContext.CompanyId.HasValue ||
                 l.CompanyId == _tenantContext.CompanyId);
 
+        modelBuilder.Entity<ProductCategoryEntity>()
+            .HasQueryFilter(c =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                c.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<Shift>()
+            .HasQueryFilter(s =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                s.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<TaxRule>()
+            .HasQueryFilter(t =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                t.CompanyId == _tenantContext.CompanyId);
+
+        // Apply entity type configurations from assembly
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(SumpoojDbContext).Assembly);
+
         // ===============================
         // Entity Configurations
         // ===============================
@@ -163,6 +188,25 @@ public class SumpoojDbContext
             .WithOne()
             .HasForeignKey("OrderId")
             .OnDelete(DeleteBehavior.Cascade);
+
+        // ProductCategoryEntity: unique name per company
+        modelBuilder.Entity<ProductCategoryEntity>()
+            .HasIndex(c => new { c.CompanyId, c.Name })
+            .IsUnique();
+
+        // Product → ProductCategoryEntity (optional FK)
+        modelBuilder.Entity<Product>()
+            .HasOne(p => p.ProductCategoryRef)
+            .WithMany()
+            .HasForeignKey(p => p.CategoryId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Product → TaxRule (optional FK)
+        modelBuilder.Entity<Product>()
+            .HasOne(p => p.TaxRule)
+            .WithMany()
+            .HasForeignKey(p => p.TaxRuleId)
+            .OnDelete(DeleteBehavior.SetNull);
 
     }
 }

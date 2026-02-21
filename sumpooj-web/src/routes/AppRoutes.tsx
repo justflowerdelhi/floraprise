@@ -51,6 +51,9 @@ import { SubscriptionPage } from '../pages/subscription';
 // Settings
 import TenantSettingsPage from '../pages/settings/TenantSettingsPage';
 
+// Categories
+import { CategoryManagementPage } from '../pages/categories';
+
 // Onboarding
 import OnboardingWizard from '../pages/onboarding/OnboardingWizard';
 
@@ -197,6 +200,7 @@ export default function AppRoutes() {
 
           {/* ─── Catalog ────────────────────────────────── */}
           <Route path="/products/new" element={<AddProductForm />} />
+          <Route path="/categories" element={<CategoryManagementPage />} />
           <Route path="/customers" element={<CustomerList />} />
 
           {/* ─── Events & Weddings ──────────────────────── */}

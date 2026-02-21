@@ -223,6 +223,7 @@ export const acceptExternalOrder = (ext: ExternalOrder): Order => {
       marginWarning: false,
       itemCount: ext.items.reduce((s, i) => s + i.quantity, 0),
       lineCount: ext.items.length,
+      taxBreakdown: [],
     },
 
     createdAt: now,

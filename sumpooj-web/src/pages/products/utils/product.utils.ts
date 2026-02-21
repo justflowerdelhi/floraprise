@@ -10,6 +10,10 @@ import { PRODUCT_TYPES } from '../types/product.types';
 // SKU GENERATOR
 // ============================================
 
+/**
+ * Legacy prefix map kept for backward-compat helpers.
+ * New SKU generation uses the dynamic category name.
+ */
 const productTypePrefixes: Record<ProductType, string> = {
   fresh_flower: 'FLW',
   dried_flower: 'DRY',
@@ -24,13 +28,29 @@ const productTypePrefixes: Record<ProductType, string> = {
 };
 
 /**
- * Generate a unique SKU based on product type and name
+ * Derive a 3-char prefix from an arbitrary category name.
+ * Takes the first 3 consonants (uppercase). Falls back to first 3 chars.
+ */
+const derivePrefixFromName = (name: string): string => {
+  const clean = name.toUpperCase().replace(/[^A-Z]/g, '');
+  const consonants = clean.replace(/[AEIOU]/g, '');
+  return (consonants.slice(0, 3) || clean.slice(0, 3)).padEnd(3, 'X');
+};
+
+/**
+ * Generate a unique SKU.
+ *
+ * Overloaded:
+ *   generateSku(categoryName: string, productName: string)
+ *   generateSku(productType: ProductType, productName: string)  // legacy
  */
 export const generateSku = (
-  productType: ProductType,
-  productName: string
+  categoryOrType: string,
+  productName: string,
 ): string => {
-  const prefix = productTypePrefixes[productType] || 'PRD';
+  // Check if the first arg is a known ProductType value
+  const legacyPrefix = productTypePrefixes[categoryOrType as ProductType];
+  const prefix = legacyPrefix ?? derivePrefixFromName(categoryOrType);
   
   // Extract first 3 consonants from product name (or first 3 chars if not enough)
   const cleanName = productName
@@ -50,10 +70,11 @@ export const generateSku = (
  * Generate a sequential SKU (for when incrementing)
  */
 export const generateSequentialSku = (
-  productType: ProductType,
+  categoryOrType: string,
   lastNumber: number = 0
 ): string => {
-  const prefix = productTypePrefixes[productType] || 'PRD';
+  const legacyPrefix = productTypePrefixes[categoryOrType as ProductType];
+  const prefix = legacyPrefix ?? derivePrefixFromName(categoryOrType);
   const nextNumber = String(lastNumber + 1).padStart(5, '0');
   return `${prefix}-${nextNumber}`;
 };

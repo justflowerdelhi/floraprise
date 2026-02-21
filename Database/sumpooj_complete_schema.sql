@@ -11,6 +11,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- DROP EXISTING TABLES (for fresh start)
 -- =====================================================
 DROP TABLE IF EXISTS "AuditLogs" CASCADE;
+DROP TABLE IF EXISTS "Shifts" CASCADE;
 DROP TABLE IF EXISTS "DayCloses" CASCADE;
 DROP TABLE IF EXISTS "RefundItems" CASCADE;
 DROP TABLE IF EXISTS "Refunds" CASCADE;
@@ -232,6 +233,25 @@ CREATE TABLE "Staff" (
 );
 
 -- =====================================================
+-- PRODUCT CATEGORY TABLE
+-- =====================================================
+
+CREATE TABLE "ProductCategories" (
+    "Id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "CompanyId" UUID NOT NULL,
+    "Name" VARCHAR(200) NOT NULL,
+    "IsPerishable" BOOLEAN NOT NULL DEFAULT FALSE,
+    "TrackBatchByDefault" BOOLEAN NOT NULL DEFAULT FALSE,
+    "IsActive" BOOLEAN NOT NULL DEFAULT TRUE,
+    "CreatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAtUtc" TIMESTAMPTZ NULL,
+    CONSTRAINT "PK_ProductCategories" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_ProductCategories_Companies" FOREIGN KEY ("CompanyId") REFERENCES "Companies" ("Id") ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX "IX_ProductCategories_CompanyName" ON "ProductCategories" ("CompanyId", "Name");
+
+-- =====================================================
 -- PRODUCT TABLE
 -- =====================================================
 
@@ -274,12 +294,14 @@ CREATE TABLE "Products" (
     "AllowAsRawMaterial" BOOLEAN NOT NULL DEFAULT FALSE,
     "AvailableOnline" BOOLEAN NOT NULL DEFAULT FALSE,
     "CommissionEligible" BOOLEAN NOT NULL DEFAULT FALSE,
+    "CategoryId" UUID NULL,
     "Tags" TEXT NULL,
     "CreatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "UpdatedAtUtc" TIMESTAMPTZ NULL,
     CONSTRAINT "PK_Products" PRIMARY KEY ("Id"),
     CONSTRAINT "FK_Products_Companies" FOREIGN KEY ("CompanyId") REFERENCES "Companies" ("Id") ON DELETE CASCADE,
     CONSTRAINT "FK_Products_Suppliers" FOREIGN KEY ("DefaultSupplierId") REFERENCES "Suppliers" ("Id") ON DELETE SET NULL,
+    CONSTRAINT "FK_Products_Categories" FOREIGN KEY ("CategoryId") REFERENCES "ProductCategories" ("Id") ON DELETE SET NULL,
     CONSTRAINT "UQ_Products_CompanySku" UNIQUE ("CompanyId", "Sku")
 );
 
@@ -633,6 +655,41 @@ CREATE TABLE "RefundItems" (
 );
 
 -- =====================================================
+-- SHIFT TABLE (POS Cash-Drawer Shifts)
+-- =====================================================
+
+CREATE TABLE "Shifts" (
+    "Id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "CompanyId" UUID NOT NULL,
+    "LocationId" UUID NOT NULL,
+    "OpenedByUserId" UUID NOT NULL,
+    "OpenedByName" VARCHAR(200) NOT NULL,
+    "OpenedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "OpeningCash" DECIMAL(18,2) NOT NULL DEFAULT 0,
+    "ClosedByUserId" UUID NULL,
+    "ClosedByName" VARCHAR(200) NULL,
+    "ClosedAt" TIMESTAMPTZ NULL,
+    "ClosingCashCount" DECIMAL(18,2) NULL,
+    "CashDifference" DECIMAL(18,2) NULL,
+    "CashSales" DECIMAL(18,2) NOT NULL DEFAULT 0,
+    "CardSales" DECIMAL(18,2) NOT NULL DEFAULT 0,
+    "UpiSales" DECIMAL(18,2) NOT NULL DEFAULT 0,
+    "GiftCardSales" DECIMAL(18,2) NOT NULL DEFAULT 0,
+    "OtherSales" DECIMAL(18,2) NOT NULL DEFAULT 0,
+    "TotalRefunds" DECIMAL(18,2) NOT NULL DEFAULT 0,
+    "PaidOuts" DECIMAL(18,2) NOT NULL DEFAULT 0,
+    "TransactionCount" INTEGER NOT NULL DEFAULT 0,
+    "Status" INTEGER NOT NULL DEFAULT 0,
+    "Notes" TEXT NULL,
+    "CreatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAtUtc" TIMESTAMPTZ NULL,
+    CONSTRAINT "PK_Shifts" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_Shifts_Companies" FOREIGN KEY ("CompanyId") REFERENCES "Companies" ("Id") ON DELETE CASCADE,
+    CONSTRAINT "FK_Shifts_Locations" FOREIGN KEY ("LocationId") REFERENCES "Locations" ("Id") ON DELETE CASCADE,
+    CONSTRAINT "FK_Shifts_OpenedBy" FOREIGN KEY ("OpenedByUserId") REFERENCES "AspNetUsers" ("Id") ON DELETE RESTRICT
+);
+
+-- =====================================================
 -- DAY CLOSE TABLE
 -- =====================================================
 
@@ -734,8 +791,10 @@ CREATE INDEX "IX_Locations_CompanyId" ON "Locations" ("CompanyId");
 CREATE INDEX "IX_Suppliers_CompanyId" ON "Suppliers" ("CompanyId");
 CREATE INDEX "IX_Customers_CompanyId" ON "Customers" ("CompanyId");
 CREATE INDEX "IX_Staff_CompanyId" ON "Staff" ("CompanyId");
+CREATE INDEX "IX_ProductCategories_CompanyId" ON "ProductCategories" ("CompanyId");
 CREATE INDEX "IX_Products_CompanyId" ON "Products" ("CompanyId");
 CREATE INDEX "IX_Products_Sku" ON "Products" ("Sku");
+CREATE INDEX "IX_Products_CategoryId" ON "Products" ("CategoryId");
 CREATE INDEX "IX_ProductBatches_CompanyId" ON "ProductBatches" ("CompanyId");
 CREATE INDEX "IX_ProductBatches_ProductId" ON "ProductBatches" ("ProductId");
 CREATE INDEX "IX_ProductBatches_ExpiryDate" ON "ProductBatches" ("ExpiryDate");
@@ -754,6 +813,8 @@ CREATE INDEX "IX_Tasks_AssignedToStaffId" ON "Tasks" ("AssignedToStaffId");
 CREATE INDEX "IX_GiftCards_CompanyId" ON "GiftCards" ("CompanyId");
 CREATE INDEX "IX_GiftCards_Code" ON "GiftCards" ("Code");
 CREATE INDEX "IX_Refunds_OrderId" ON "Refunds" ("OrderId");
+CREATE INDEX "IX_Shifts_CompanyId_LocationId" ON "Shifts" ("CompanyId", "LocationId");
+CREATE INDEX "IX_Shifts_Status" ON "Shifts" ("Status");
 CREATE INDEX "IX_DayCloses_CompanyId_LocationId" ON "DayCloses" ("CompanyId", "LocationId");
 
 -- Audit Logs

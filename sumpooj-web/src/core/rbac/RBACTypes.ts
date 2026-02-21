@@ -381,6 +381,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         path: '/products/new',
         permissions: ['products:view'],
       },
+      {
+        id: 'categories',
+        label: 'Categories',
+        icon: 'Category',
+        path: '/categories',
+        permissions: ['products:view'],
+      },
     ],
   },
   {
@@ -514,6 +521,7 @@ export const ROUTE_ACCESS: RouteConfig[] = [
   { path: '/staff', permissions: ['staff:view'] },
   { path: '/tasks', permissions: ['tasks:view'] },
   { path: '/products/new', permissions: ['products:view'] },
+  { path: '/categories', permissions: ['products:view'] },
   { path: '/customers', permissions: ['customers:view'] },
   { path: '/crm/customers', permissions: ['crm:view'] },
   { path: '/crm/reminders', permissions: ['crm:reminders'] },

@@ -26,21 +26,63 @@ export const POS_CATEGORIES: POSCategory[] = [
   { id: 'gifts', name: 'Gifts', icon: 'CardGiftcard' },
 ];
 
-// ─── Order Type Options ─────────────────────────────────────
+// ─── Order Intent ───────────────────────────────────────────
 
-export type POSOrderType = 'local' | 'delivery' | 'pickup';
+export type OrderIntent = 'TAKE_NOW' | 'DELIVERY' | 'PICKUP_LATER';
 
-export interface POSOrderTypeOption {
-  value: POSOrderType;
+export interface OrderIntentOption {
+  value: OrderIntent;
   label: string;
   icon: string;
+  shortcut?: string;
 }
 
-export const POS_ORDER_TYPES: POSOrderTypeOption[] = [
-  { value: 'local', label: 'Local', icon: 'Store' },
-  { value: 'delivery', label: 'Delivery', icon: 'LocalShipping' },
-  { value: 'pickup', label: 'Pickup', icon: 'ShoppingBag' },
+export const ORDER_INTENT_OPTIONS: OrderIntentOption[] = [
+  { value: 'TAKE_NOW', label: 'Take Now', icon: 'Store', shortcut: 'F5' },
+  { value: 'DELIVERY', label: 'Delivery', icon: 'LocalShipping', shortcut: 'F6' },
+  { value: 'PICKUP_LATER', label: 'Pickup Later', icon: 'ShoppingBag', shortcut: 'F7' },
 ];
+
+/** @deprecated Alias kept for backward-compat — use OrderIntent instead */
+export type POSOrderType = OrderIntent;
+
+// ─── Delivery Details ───────────────────────────────────────
+
+export interface DeliveryDetails {
+  address: string;
+  recipientName: string;
+  recipientPhone: string;
+  deliveryDate: string;      // ISO date
+  deliveryTimeSlot?: string;
+  deliveryFee: number;
+  instructions?: string;
+}
+
+export const EMPTY_DELIVERY_DETAILS: DeliveryDetails = {
+  address: '',
+  recipientName: '',
+  recipientPhone: '',
+  deliveryDate: '',
+  deliveryTimeSlot: '',
+  deliveryFee: 0,
+  instructions: '',
+};
+
+// ─── Pickup Details ─────────────────────────────────────────
+
+export interface PickupDetails {
+  pickupDate: string;        // ISO date
+  pickupTimeSlot?: string;
+  contactName: string;
+  contactPhone: string;
+}
+
+export const EMPTY_PICKUP_DETAILS: PickupDetails = {
+  pickupDate: '',
+  pickupTimeSlot: '',
+  contactName: '',
+  contactPhone: '',
+};
 
 // ─── Stock Status ───────────────────────────────────────────
 

@@ -10,6 +10,7 @@ public class CreateProductRequest
     // Classification
     public string ProductType { get; set; } = "fresh_flower";
     public string? Category { get; set; }
+    public Guid? CategoryId { get; set; }
     public string? Brand { get; set; }
     public string? Description { get; set; }
     public List<string> Tags { get; set; } = new();
@@ -22,6 +23,7 @@ public class CreateProductRequest
     public decimal? WeddingEventPrice { get; set; }
 
     // Taxation
+    public Guid? TaxRuleId { get; set; }
     public string TaxCategory { get; set; } = "standard";
 
     // Inventory
@@ -30,8 +32,7 @@ public class CreateProductRequest
     public int? OpeningStock { get; set; }
     public int? ReorderLevel { get; set; }
 
-    // Perishable
-    public bool IsPerishable { get; set; }
+    // Perishable details (IsPerishable is derived from Category)
     public int? ShelfLifeDays { get; set; }
     public int? ExpiryAlertDays { get; set; }
     public string? TemperatureNotes { get; set; }
@@ -81,6 +82,7 @@ public class ProductSettingsRequest
 public class UpdateProductRequest
 {
     public string? ProductName { get; set; }
+    public Guid? CategoryId { get; set; }
     public string? Barcode { get; set; }
     public string? Brand { get; set; }
     public string? Description { get; set; }
@@ -91,6 +93,7 @@ public class UpdateProductRequest
     public decimal? CostPrice { get; set; }
     public decimal? WholesalePrice { get; set; }
     public decimal? WeddingEventPrice { get; set; }
+    public Guid? TaxRuleId { get; set; }
     public string? TaxCategory { get; set; }
 
     // Inventory
@@ -98,8 +101,7 @@ public class UpdateProductRequest
     public bool? TrackBatch { get; set; }
     public int? ReorderLevel { get; set; }
 
-    // Perishable
-    public bool? IsPerishable { get; set; }
+    // Perishable details (IsPerishable is derived from Category)
     public int? ShelfLifeDays { get; set; }
     public int? ExpiryAlertDays { get; set; }
     public string? TemperatureNotes { get; set; }

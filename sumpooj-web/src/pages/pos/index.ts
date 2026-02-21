@@ -18,6 +18,9 @@ export { default as POSLayout } from './POSLayout';
 
 // Shared Components
 export { default as POSTopBar } from './POSTopBar';
+export { default as OrderIntentSwitcher } from './OrderIntentSwitcher';
+export { default as DeliveryDetailsForm } from './DeliveryDetailsForm';
+export { default as PickupDetailsForm } from './PickupDetailsForm';
 export { default as CategorySidebar } from './CategorySidebar';
 export { default as ProductGrid } from './ProductGrid';
 export { default as ProductCard } from './ProductCard';

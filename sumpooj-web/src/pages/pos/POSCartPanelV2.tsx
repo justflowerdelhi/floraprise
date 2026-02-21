@@ -17,9 +17,12 @@ import {
   MoreHoriz as MoreIcon,
   ShoppingCart as CartIcon,
   Lock as LockIcon,
+  ErrorOutline as ErrorIcon,
 } from '@mui/icons-material';
 import { usePOS } from './POSContext';
 import type { Product } from '../orders/OrderTypes';
+import DeliveryDetailsForm from './DeliveryDetailsForm';
+import PickupDetailsForm from './PickupDetailsForm';
 
 interface POSCartPanelV2Props {
   products: Product[];
@@ -31,8 +34,11 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
     updateQty,
     removeItem,
     startPayment,
+    setDeliveryDetails,
+    setPickupDetails,
     canCheckout,
     canEditCart,
+    intentErrors,
   } = usePOS();
 
   const formatCurrency = (amount: number) => {
@@ -206,6 +212,34 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
             ))}
           </ul>
         )}
+
+        {/* Delivery / Pickup Details (below items, above totals) */}
+        {state.orderIntent === 'DELIVERY' && (
+          <DeliveryDetailsForm
+            value={state.deliveryDetails}
+            onChange={setDeliveryDetails}
+            disabled={isLocked}
+          />
+        )}
+        {state.orderIntent === 'PICKUP_LATER' && (
+          <PickupDetailsForm
+            value={state.pickupDetails}
+            onChange={setPickupDetails}
+            disabled={isLocked}
+          />
+        )}
+
+        {/* Intent Validation Errors */}
+        {intentErrors.length > 0 && !isEmpty && (
+          <div className="px-4 py-2 bg-red-50 border-b border-red-100">
+            {intentErrors.map((err, i) => (
+              <div key={i} className="flex items-center gap-1.5 py-0.5">
+                <ErrorIcon className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                <span className="text-[11px] text-red-600">{err}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Totals & Payment Section */}
@@ -226,10 +260,34 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
             </div>
           )}
 
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Tax</span>
-            <span className="text-gray-900">{formatCurrency(state.totals.taxTotal)}</span>
-          </div>
+          {state.orderIntent === 'DELIVERY' && state.deliveryDetails.deliveryFee > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Delivery Fee</span>
+              <span className="text-gray-900">
+                {formatCurrency(state.deliveryDetails.deliveryFee)}
+              </span>
+            </div>
+          )}
+
+          {/* Dynamic Tax Breakdown */}
+          {state.totals.taxBreakdown.length > 0 ? (
+            state.totals.taxBreakdown.map((tax) => (
+              <div key={tax.taxRuleId} className="flex justify-between text-sm">
+                <span className="text-gray-600">
+                  {tax.taxRuleName}
+                  <span className="text-gray-400 text-xs ml-1">
+                    ({(tax.rate * 100).toFixed(1)}%{tax.isInclusive ? ' incl.' : ''})
+                  </span>
+                </span>
+                <span className="text-gray-900">{formatCurrency(tax.taxAmount)}</span>
+              </div>
+            ))
+          ) : state.totals.taxTotal > 0 ? (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Tax</span>
+              <span className="text-gray-900">{formatCurrency(state.totals.taxTotal)}</span>
+            </div>
+          ) : null}
 
           <div className="pt-2 border-t border-gray-200 flex justify-between">
             <span className="text-base font-semibold text-gray-900">Total</span>

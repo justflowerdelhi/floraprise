@@ -51,7 +51,7 @@ import QuickAddSupplierModal from './components/QuickAddSupplierModal';
 
 import { productFormSchema } from './schemas/product.schema';
 import type { ProductFormSchema } from './schemas/product.schema';
-import type { ProductFormData, Supplier } from './types/product.types';
+import type { ProductFormData, Supplier, CategoryOption } from './types/product.types';
 import { defaultProductFormValues } from './types/product.types';
 import {
   createProduct,
@@ -63,6 +63,7 @@ import {
   loadDraftFromStorage,
   clearDraftFromStorage,
 } from './utils/product.utils';
+import { getCategories } from '../../api/category.api';
 
 // ============================================
 // MAIN COMPONENT
@@ -88,6 +89,8 @@ const AddProductForm = ({
   const [darkMode, setDarkMode] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const [supplierModalOpen, setSupplierModalOpen] = useState(false);
   const [images, setImages] = useState<File[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -123,19 +126,27 @@ const AddProductForm = ({
 
   // Watched values for conditional rendering
   const productType = watch('productType');
+  const categoryId = watch('categoryId');
   const trackInventory = watch('trackInventory');
   const isPerishable = watch('isPerishable');
 
-  // Fresh flower logic
-  const isFreshFlower = productType === 'fresh_flower';
-  const isFlowerProduct = ['fresh_flower', 'dried_flower', 'plant', 'arrangement', 'bouquet'].includes(productType);
+  // Resolve the selected category object
+  const selectedCategory = categories.find((c) => c.id === categoryId);
 
-  // Auto-enable perishable for fresh flowers
+  // Flower-like logic — show flower attributes if a common flower category is selected
+  const isFlowerProduct = selectedCategory
+    ? /flower|plant|arrangement|bouquet/i.test(selectedCategory.name)
+    : false;
+
+  // Auto-set isPerishable & trackBatch from the selected category
   useEffect(() => {
-    if (isFreshFlower) {
-      setValue('isPerishable', true);
+    if (selectedCategory) {
+      setValue('isPerishable', selectedCategory.isPerishable);
+      if (selectedCategory.trackBatchByDefault) {
+        setValue('trackBatch', true);
+      }
     }
-  }, [isFreshFlower, setValue]);
+  }, [selectedCategory, setValue]);
 
   useEffect(() => {
     if (isPerishable) {
@@ -143,6 +154,30 @@ const AddProductForm = ({
       setValue('trackBatch', true);
     }
   }, [isPerishable, setValue]);
+
+  // Load categories on mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      setLoadingCategories(true);
+      try {
+        const data = await getCategories();
+        setCategories(
+          data.map((c) => ({
+            id: c.id,
+            name: c.name,
+            isPerishable: c.isPerishable,
+            trackBatchByDefault: c.trackBatchByDefault,
+            isActive: c.isActive,
+          })),
+        );
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    loadCategories();
+  }, []);
 
   // Load suppliers on mount
   useEffect(() => {
@@ -413,6 +448,8 @@ const AddProductForm = ({
                   watch={watch}
                   setValue={setValue}
                   darkMode={darkMode}
+                  categories={categories}
+                  loadingCategories={loadingCategories}
                 />
 
                 {/* Pricing */}
@@ -442,7 +479,7 @@ const AddProductForm = ({
                   setValue={setValue}
                   darkMode={darkMode}
                   isPerishable={isPerishable}
-                  isAutoEnabled={isFreshFlower}
+                  isAutoEnabled={!!selectedCategory?.isPerishable}
                 />
 
                 {/* Flower Attributes (conditional) */}

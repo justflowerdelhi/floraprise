@@ -89,6 +89,56 @@ export interface LabelData {
 }
 
 // ============================================
+// PRINT MODE TYPES
+// ============================================
+
+/** Print mode: thermal for single-label printers, a4 for sheet printers */
+export type PrintMode = 'thermal' | 'a4';
+
+/** A4 grid layout presets */
+export type A4GridLayout = '3x8' | '2x7';
+
+export interface A4GridConfig {
+  cols: number;
+  rows: number;
+  /** Label width in mm */
+  labelWidth: number;
+  /** Label height in mm */
+  labelHeight: number;
+  /** Horizontal gap between labels in mm */
+  columnGap: number;
+  /** Vertical gap between labels in mm */
+  rowGap: number;
+  /** Page left margin in mm */
+  marginLeft: number;
+  /** Page top margin in mm */
+  marginTop: number;
+}
+
+export const A4_GRID_LAYOUTS: Record<A4GridLayout, A4GridConfig> = {
+  '3x8': {
+    cols: 3,
+    rows: 8,
+    labelWidth: 64,
+    labelHeight: 34,
+    columnGap: 2,
+    rowGap: 0,
+    marginLeft: 3,
+    marginTop: 8,
+  },
+  '2x7': {
+    cols: 2,
+    rows: 7,
+    labelWidth: 99,
+    labelHeight: 38,
+    columnGap: 2,
+    rowGap: 2,
+    marginLeft: 3,
+    marginTop: 5,
+  },
+};
+
+// ============================================
 // DEFAULT CONFIGURATIONS
 // ============================================
 
@@ -103,7 +153,7 @@ export const DEFAULT_LABEL_CONFIG: LabelConfig = {
 
 // Thermal printer label sizes (common standards)
 export const LABEL_SIZES = [
-  { value: '50x25', label: '50mm × 25mm (Standard)', width: 50, height: 25 },
+  { value: '50x25', label: '50mm × 25mm (2×1 in)', width: 50, height: 25 },
   { value: '40x20', label: '40mm × 20mm (Small)', width: 40, height: 20 },
   { value: '60x30', label: '60mm × 30mm (Large)', width: 60, height: 30 },
   { value: '80x40', label: '80mm × 40mm (XL)', width: 80, height: 40 },

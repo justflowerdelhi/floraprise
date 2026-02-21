@@ -79,14 +79,19 @@ public class PurchaseOrderService
             po.AddNotes(request.Notes);
         }
 
-        // Add items
+        // Add items — derive IsPerishable from product's category (source of truth)
         foreach (var item in request.Items)
         {
             po.AddItem(item.ProductId, item.ProductName, item.Quantity, item.CostPerUnit);
 
             // Get the last added item and set additional details
             var poItem = po.Items.Last();
-            poItem.SetProductDetails(item.Sku, item.Unit, item.IsPerishable, item.ShelfLifeDays);
+
+            // Look up product to derive IsPerishable from its category
+            var product = await _productRepo.GetByIdAsync(item.ProductId);
+            var isPerishable = product?.ProductCategoryRef?.IsPerishable ?? false;
+
+            poItem.SetProductDetails(item.Sku, item.Unit, isPerishable, item.ShelfLifeDays);
             if (!string.IsNullOrEmpty(item.BatchNumber) || item.ExpiryDate.HasValue)
             {
                 poItem.SetBatchInfo(item.BatchNumber ?? "", item.ExpiryDate, item.StorageLocation);
