@@ -6,9 +6,9 @@
  * - getOrder / getAllOrders
  * - updateFulfillmentStatus / updatePaymentStatus
  */
-import React, { createContext, useContext, useReducer, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect, type ReactNode } from 'react';
 import type { Order, FulfillmentStatus, OrderPaymentStatus, InventoryActionStatus, InventoryReservation } from './OrderTypes';
-import { MOCK_ORDERS } from './OrderMockData';
+import { searchOrders } from '../../api/order.api';
 
 // ─── State ──────────────────────────────────────────────────
 
@@ -17,12 +17,13 @@ interface OrderState {
 }
 
 const initialState: OrderState = {
-  orders: Object.fromEntries(MOCK_ORDERS.map((o) => [o.id, o])),
+  orders: {},
 };
 
 // ─── Actions ────────────────────────────────────────────────
 
 type OrderAction =
+  | { type: 'LOAD_ORDERS'; orders: Order[] }
   | { type: 'ADD_ORDER'; order: Order }
   | { type: 'UPDATE_ORDER'; order: Order }
   | { type: 'REMOVE_ORDER'; orderId: string }
@@ -32,6 +33,12 @@ type OrderAction =
 
 function orderReducer(state: OrderState, action: OrderAction): OrderState {
   switch (action.type) {
+    case 'LOAD_ORDERS':
+      return {
+        ...state,
+        orders: Object.fromEntries(action.orders.map((o) => [o.id, o])),
+      };
+
     case 'ADD_ORDER':
       return {
         ...state,
@@ -99,6 +106,7 @@ function orderReducer(state: OrderState, action: OrderAction): OrderState {
 
 interface OrderContextValue {
   state: OrderState;
+  loading: boolean;
   addOrder: (order: Order) => void;
   updateOrder: (order: Order) => void;
   removeOrder: (orderId: string) => void;
@@ -113,6 +121,27 @@ const OrderContext = createContext<OrderContextValue | null>(null);
 
 export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(orderReducer, initialState);
+  const [loading, setLoading] = React.useState(true);
+
+  // Load orders from API on mount
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const result = await searchOrders({ PageSize: 200 });
+        if (!cancelled) {
+          const orders = result?.items ?? (Array.isArray(result) ? result : []);
+          dispatch({ type: 'LOAD_ORDERS', orders });
+        }
+      } catch (err) {
+        console.error('Failed to load orders:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   const addOrder        = useCallback((order: Order) => dispatch({ type: 'ADD_ORDER', order }), []);
   const updateOrder     = useCallback((order: Order) => dispatch({ type: 'UPDATE_ORDER', order }), []);
@@ -138,7 +167,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   return (
     <OrderContext.Provider
       value={{
-        state, addOrder, updateOrder, removeOrder,
+        state, loading, addOrder, updateOrder, removeOrder,
         setFulfillment, setPaymentStatus, setInventoryStatus, getOrder, getAllOrders,
       }}
     >

@@ -18,8 +18,6 @@ import {
   Grid,
   IconButton,
   Tooltip,
-  Snackbar,
-  Alert,
   CircularProgress,
   useTheme,
   useMediaQuery,
@@ -29,6 +27,7 @@ import {
   TextField,
   MenuItem,
   Autocomplete,
+  Alert,
 } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -58,13 +57,12 @@ import {
   createEmptyItem,
   defaultPurchaseHeader,
 } from './types/purchase.types';
-import {
-  mockSuppliers,
-  mockProducts,
-  submitPurchaseOrder,
-  savePurchaseDraft,
-} from './api/purchase.api';
+import { createPurchaseOrder } from './api/purchase.api';
+import { getAllSuppliers } from '../../api/supplier.api';
+import { searchProducts } from '../../api/product.api';
 import { calcOrderSummary } from './utils/purchase.utils';
+import { useToast } from '../../hooks/useToast';
+import { useApiCall } from '../../hooks/useApiCall';
 
 // ============================================
 // MAIN COMPONENT
@@ -74,23 +72,37 @@ const PurchaseEntryForm = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
+  // Hooks
+  const toast = useToast();
+  const { loading: isSubmitting, execute } = useApiCall();
+
   // State
   const [darkMode, setDarkMode] = useState(false);
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
-  const [products] = useState<Product[]>(mockProducts);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [supplierModalOpen, setSupplierModalOpen] = useState(false);
   const [invoiceImageName, setInvoiceImageName] = useState<string | null>(null);
 
-  // Submission states
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Draft saving state
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 
-  // Notifications
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'warning' | 'info';
-  }>({ open: false, message: '', severity: 'info' });
+  // Load suppliers and products on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [suppliersRes, productsRes] = await Promise.all([
+          getAllSuppliers(),
+          searchProducts(),
+        ]);
+        setSuppliers(suppliersRes?.items ?? suppliersRes ?? []);
+        setProducts(productsRes?.items ?? productsRes ?? []);
+      } catch {
+        toast.error('Failed to load suppliers or products.');
+      }
+    };
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Form setup
   const {
@@ -164,26 +176,40 @@ const PurchaseEntryForm = () => {
   }, [append]);
 
   const onSubmit = async (data: PurchaseFormSchemaType) => {
-    setIsSubmitting(true);
-    try {
-      const result = await submitPurchaseOrder({
-        header: data.header as any,
-        items: data.items as any,
-      });
-      setSnackbar({
-        open: true,
-        message: `Purchase Order ${result.purchaseOrderId} created successfully!`,
-        severity: 'success',
-      });
+    const result = await execute(
+      () =>
+        createPurchaseOrder({
+          supplierId: data.header.supplierId,
+          invoiceNumber: data.header.invoiceNumber || null,
+          purchaseDate: data.header.purchaseDate,
+          expectedDeliveryDate: data.header.expectedDeliveryDate,
+          paymentTerms: data.header.paymentTerms || null,
+          location: data.header.location || null,
+          shippingCost: data.header.shippingCost,
+          taxRate: data.header.taxRate,
+          notes: data.header.notes || null,
+          items: data.items.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            sku: item.sku || null,
+            unit: item.unit || null,
+            quantity: item.quantity,
+            costPerUnit: item.costPerUnit,
+            isPerishable: item.isPerishable,
+            shelfLifeDays: item.shelfLifeDays,
+            batchNumber: item.batchNumber || null,
+            expiryDate: item.expiryDate || null,
+            storageLocation: item.storageLocation || null,
+            sellingPrice: item.sellingPrice || null,
+          })),
+        }),
+      {
+        successMessage: 'Purchase order created successfully!',
+        errorMessage: 'Failed to submit purchase order',
+      },
+    );
+    if (result) {
       reset();
-    } catch {
-      setSnackbar({
-        open: true,
-        message: 'Failed to submit purchase order. Please try again.',
-        severity: 'error',
-      });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -191,21 +217,13 @@ const PurchaseEntryForm = () => {
     setIsSavingDraft(true);
     const values = watch();
     try {
-      await savePurchaseDraft({
-        header: values.header as any,
-        items: values.items as any,
-      });
-      setSnackbar({
-        open: true,
-        message: 'Draft saved successfully!',
-        severity: 'info',
-      });
+      localStorage.setItem('purchase_draft', JSON.stringify({
+        header: values.header,
+        items: values.items,
+      }));
+      toast.info('Draft saved locally.');
     } catch {
-      setSnackbar({
-        open: true,
-        message: 'Failed to save draft.',
-        severity: 'error',
-      });
+      toast.error('Failed to save draft.');
     } finally {
       setIsSavingDraft(false);
     }
@@ -215,7 +233,7 @@ const PurchaseEntryForm = () => {
     setSuppliers((prev) => [...prev, supplier]);
     setValue('header.supplierId', supplier.id);
     setSupplierModalOpen(false);
-    setSnackbar({ open: true, message: `Supplier "${supplier.name}" added!`, severity: 'success' });
+    toast.success(`Supplier "${supplier.name}" added!`);
   };
 
   const handleInvoiceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -795,21 +813,6 @@ const PurchaseEntryForm = () => {
         darkMode={darkMode}
       />
 
-      {/* ====== SNACKBAR ====== */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert
-          severity={snackbar.severity}
-          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-          variant="filled"
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 };

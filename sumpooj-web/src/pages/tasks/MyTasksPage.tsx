@@ -10,7 +10,7 @@
  * - Related entity links
  * - Clean simple UI
  */
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Box, Typography, Card, Chip, Button, IconButton,
   ToggleButtonGroup, ToggleButton, Tooltip, Avatar,
@@ -29,17 +29,18 @@ import {
   Flag as PriorityIcon,
 } from '@mui/icons-material';
 import { useRBAC } from '../../core/rbac/RBACContext';
-import { MOCK_LOCATIONS } from '../../core/location/LocationTypes';
-import { getAllStaff } from '../staff/StaffMockData';
+import { getLocations } from '../../api/location.api';
+import { getAllStaff } from '../../api/staff.api';
+import {
+  searchTasks, getTasksByStaff,
+  startTask, completeTask, reopenTask,
+} from '../../api/task.api';
+import { useToast } from '../../hooks/useToast';
 import type { Task, TaskStatus, TaskFilterStatus, RelatedEntityType } from './TaskTypes';
 import {
   TASK_STATUSES, TASK_STATUS_CONFIG,
   TASK_PRIORITY_CONFIG, ENTITY_TYPE_CONFIG,
 } from './TaskTypes';
-import {
-  getAllTasks, getTasksForStaff, getDeliveryTasks,
-  updateTaskStatus, getTaskSummary,
-} from './TaskMockData';
 import CreateTaskDialog from './CreateTaskDialog';
 
 // ─── Entity Icon Mapping ────────────────────────────────────
@@ -123,9 +124,11 @@ interface TaskCardProps {
   task: Task;
   showAssignee: boolean;
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
+  staffList: any[];
+  locations: any[];
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, showAssignee, onStatusChange }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, showAssignee, onStatusChange, staffList, locations }) => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const statusConfig = TASK_STATUS_CONFIG[task.status];
@@ -135,12 +138,12 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, showAssignee, onStatusChange 
   const nextStatus = getNextStatus(task.status);
 
   const assignee = useMemo(() => {
-    return getAllStaff().find((s) => s.id === task.assignedTo);
-  }, [task.assignedTo]);
+    return staffList.find((s: any) => s.id === task.assignedTo);
+  }, [staffList, task.assignedTo]);
 
   const location = useMemo(() => {
-    return MOCK_LOCATIONS.find((l) => l.id === task.locationId);
-  }, [task.locationId]);
+    return locations.find((l: any) => l.id === task.locationId);
+  }, [locations, task.locationId]);
 
   const isOverdue = task.dueDate && task.status !== 'COMPLETED' &&
     new Date(task.dueDate) < new Date(new Date().toISOString().split('T')[0]);
@@ -336,23 +339,66 @@ const MyTasksPage: React.FC = () => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const { user, role, can } = useRBAC();
+  const toast = useToast();
 
   const [filterStatus, setFilterStatus] = useState<TaskFilterStatus>('ALL');
   const [createOpen, setCreateOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [rawTasks, setRawTasks] = useState<Task[]>([]);
+  const [staffList, setStaffList] = useState<any[]>([]);
+  const [locationsList, setLocationsList] = useState<any[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
 
   // Role-based task visibility
   const isManagerOrAdmin = role === 'ADMIN' || role === 'MANAGER';
   const isDriver = role === 'DRIVER';
 
-  const rawTasks = useMemo(() => {
-    if (isManagerOrAdmin) return getAllTasks();
-    if (isDriver) return getDeliveryTasks().filter((t) => t.assignedTo === user?.id?.replace('user-', 'staff-'));
-    // Staff sees own tasks
-    const staffId = user?.id?.replace('user-', 'staff-') ?? '';
-    return getTasksForStaff(staffId);
+  // Load tasks from API
+  useEffect(() => {
+    const loadTasks = async () => {
+      setTasksLoading(true);
+      try {
+        let taskData: Task[];
+        if (isManagerOrAdmin) {
+          const result = await searchTasks();
+          taskData = Array.isArray(result) ? result : (result.items ?? []);
+        } else if (isDriver) {
+          const staffId = user?.id?.replace('user-', 'staff-') ?? '';
+          const result = await getTasksByStaff(staffId);
+          const allTasks: Task[] = Array.isArray(result) ? result : (result.items ?? []);
+          taskData = allTasks.filter((t) => t.relatedEntityType === 'DELIVERY');
+        } else {
+          const staffId = user?.id?.replace('user-', 'staff-') ?? '';
+          const result = await getTasksByStaff(staffId);
+          taskData = Array.isArray(result) ? result : (result.items ?? []);
+        }
+        setRawTasks(taskData);
+      } catch {
+        toast.error('Failed to load tasks');
+      } finally {
+        setTasksLoading(false);
+      }
+    };
+    loadTasks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isManagerOrAdmin, isDriver, user?.id, refreshKey]);
+
+  // Load staff and locations for display
+  useEffect(() => {
+    const loadReferenceData = async () => {
+      try {
+        const [staffData, locData] = await Promise.all([
+          getAllStaff(),
+          getLocations(),
+        ]);
+        setStaffList(Array.isArray(staffData) ? staffData : (staffData.items ?? []));
+        setLocationsList(Array.isArray(locData) ? locData : (locData.items ?? []));
+      } catch {
+        // reference data load failure is non-critical
+      }
+    };
+    loadReferenceData();
+  }, []);
 
   const filteredTasks = useMemo(() => {
     if (filterStatus === 'ALL') return rawTasks;
@@ -388,12 +434,39 @@ const MyTasksPage: React.FC = () => {
     });
   }, [filteredTasks]);
 
-  const summary = useMemo(() => getTaskSummary(), [refreshKey]);
+  const summary = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return {
+      total: rawTasks.length,
+      pending: rawTasks.filter((t) => t.status === 'PENDING').length,
+      inProgress: rawTasks.filter((t) => t.status === 'IN_PROGRESS').length,
+      completed: rawTasks.filter((t) => t.status === 'COMPLETED').length,
+      highPriority: rawTasks.filter((t) => t.priority === 'HIGH' && t.status !== 'COMPLETED').length,
+      dueToday: rawTasks.filter((t) => t.dueDate === today && t.status !== 'COMPLETED').length,
+    };
+  }, [rawTasks]);
 
-  const handleStatusChange = useCallback((taskId: string, newStatus: TaskStatus) => {
-    updateTaskStatus(taskId, newStatus);
-    setRefreshKey((k) => k + 1);
-  }, []);
+  const handleStatusChange = useCallback(async (taskId: string, newStatus: TaskStatus) => {
+    try {
+      const currentTask = rawTasks.find((t) => t.id === taskId);
+      if (!currentTask) return;
+
+      if (currentTask.status === 'PENDING' && newStatus === 'IN_PROGRESS') {
+        await startTask(taskId);
+        toast.success('Task started');
+      } else if (currentTask.status === 'IN_PROGRESS' && newStatus === 'COMPLETED') {
+        await completeTask(taskId);
+        toast.success('Task completed');
+      } else if (currentTask.status === 'COMPLETED' && newStatus === 'IN_PROGRESS') {
+        await reopenTask(taskId);
+        toast.info('Task reopened');
+      }
+      setRefreshKey((k) => k + 1);
+    } catch {
+      toast.error('Failed to update task status');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawTasks]);
 
   const handleTaskCreated = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -557,6 +630,8 @@ const MyTasksPage: React.FC = () => {
               task={task}
               showAssignee={isManagerOrAdmin}
               onStatusChange={handleStatusChange}
+              staffList={staffList}
+              locations={locationsList}
             />
           ))}
         </Box>

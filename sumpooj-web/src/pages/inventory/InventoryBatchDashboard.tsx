@@ -24,7 +24,10 @@ import Inventory2Icon from '@mui/icons-material/Inventory2';
 import WarningIcon from '@mui/icons-material/Warning';
 
 import type { InventoryBatch, FilterState } from './data/inventory.data';
-import { fetchBatches, DEFAULT_FILTERS } from './data/inventory.data';
+import { DEFAULT_FILTERS } from './data/inventory.data';
+import { searchBatches } from '../../api/inventory.api';
+import { useApiCall } from '../../hooks/useApiCall';
+import { useToast } from '../../hooks/useToast';
 import { computeSummary, filterAndSort, fmt } from './utils/inventory.utils';
 
 import SummaryCards from './components/SummaryCards';
@@ -33,28 +36,37 @@ import BatchTable from './components/BatchTable';
 
 const InventoryBatchDashboard = () => {
   const theme = useTheme();
+  const { execute, loading: apiLoading } = useApiCall();
+  const toast = useToast();
 
   // ── State ──────────────────────────────────────────────────
   const [darkMode, setDarkMode] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [batches, setBatches] = useState<InventoryBatch[]>([]);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [initialLoad, setInitialLoad] = useState(true);
+
+  const loading = apiLoading || initialLoad;
 
   // ── Load data ──────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    fetchBatches().then((data) => {
-      if (!cancelled) {
-        setBatches(data);
-        setLoading(false);
+    const loadBatches = async () => {
+      const data = await execute(() => searchBatches(), {
+        errorMessage: 'Failed to load inventory batches',
+      });
+      if (!cancelled && data) {
+        setBatches(data.items ?? data);
+        toast.info(`Loaded ${(data.items ?? data).length} batches`);
       }
-    });
+      if (!cancelled) setInitialLoad(false);
+    };
+    loadBatches();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Derived data ───────────────────────────────────────────

@@ -8,7 +8,7 @@
  * - Commission calculation display
  * - Role-based metric visibility
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -28,6 +28,7 @@ import {
   InputLabel,
   LinearProgress,
   Divider,
+  CircularProgress,
 } from '@mui/material';
 import {
   NavigateNext as NavIcon,
@@ -51,13 +52,23 @@ import {
   Place as PlaceIcon,
 } from '@mui/icons-material';
 import { useNavigate, useParams, Link as RouterLink } from 'react-router-dom';
-import type { DateRangePreset } from './StaffTypes';
+import type { DateRangePreset, StaffPerformance, Staff } from './StaffTypes';
 import {
   STAFF_ROLE_CONFIG,
   DATE_RANGE_PRESETS,
   getDateRangeFromPreset,
 } from './StaffTypes';
-import { getStaffById, getStaffPerformance } from './StaffMockData';
+import { getStaffById } from '../../api/staff.api';
+import { useApiCall } from '../../hooks/useApiCall';
+
+// TODO: Replace with real API endpoint when staff performance API is available
+const getStaffPerformance = async (
+  _staffId: string,
+  _periodStart: string,
+  _periodEnd: string,
+): Promise<StaffPerformance | null> => {
+  return null;
+};
 
 // ─── Currency Formatter (tenant-aware) ───────────────────────
 
@@ -218,6 +229,12 @@ const StaffPerformancePage: React.FC = () => {
   const dk = theme.palette.mode === 'dark';
   const navigate = useNavigate();
   const { staffId } = useParams<{ staffId: string }>();
+  const { execute, loading: apiLoading } = useApiCall();
+
+  // Staff & performance state
+  const [staff, setStaff] = useState<Staff | null>(null);
+  const [performance, setPerformance] = useState<StaffPerformance | null>(null);
+  const [staffLoaded, setStaffLoaded] = useState(false);
 
   // Date range state
   const [datePreset, setDatePreset] = useState<DateRangePreset>('MONTH');
@@ -232,22 +249,37 @@ const StaffPerformancePage: React.FC = () => {
     return getDateRangeFromPreset(datePreset);
   }, [datePreset, customDateFrom, customDateTo]);
 
-  // Get staff data
-  const staff = useMemo(() => {
-    return staffId ? getStaffById(staffId) : null;
-  }, [staffId]);
+  // Load staff data from API
+  useEffect(() => {
+    if (!staffId) return;
+    const load = async () => {
+      const data = await execute(() => getStaffById(staffId), {
+        errorMessage: 'Failed to load staff member',
+      });
+      setStaff(data ?? null);
+      setStaffLoaded(true);
+    };
+    load();
+  }, [staffId, execute]);
 
-  // Get performance data
-  const performance = useMemo(() => {
-    if (!staffId || !dateRange.start || !dateRange.end) return null;
-    return getStaffPerformance(staffId, dateRange.start, dateRange.end);
+  // Load performance data
+  useEffect(() => {
+    if (!staffId || !dateRange.start || !dateRange.end) {
+      setPerformance(null);
+      return;
+    }
+    const load = async () => {
+      const data = await getStaffPerformance(staffId, dateRange.start, dateRange.end);
+      setPerformance(data);
+    };
+    load();
   }, [staffId, dateRange]);
 
   // Role configuration
   const roleConfig = staff ? STAFF_ROLE_CONFIG[staff.role] : null;
 
   // Not found
-  if (!staff) {
+  if (staffLoaded && !staff) {
     return (
       <Box sx={{ p: { xs: 2, md: 3 }, textAlign: 'center', maxWidth: 450, mx: 'auto', mt: 8 }}>
         <WarningIcon sx={{ fontSize: 64, color: '#f44336', opacity: 0.5, mb: 2 }} />
@@ -273,6 +305,14 @@ const StaffPerformancePage: React.FC = () => {
         >
           Back to Staff
         </Button>
+      </Box>
+    );
+  }
+
+  if (!staff) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <CircularProgress />
       </Box>
     );
   }

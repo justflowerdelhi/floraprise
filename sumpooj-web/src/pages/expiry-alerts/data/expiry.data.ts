@@ -7,10 +7,10 @@
 
 import type { InventoryBatch } from '../../inventory/data/inventory.data';
 import {
-  MOCK_BATCHES,
   STORAGE_LOCATIONS,
   SUPPLIERS,
 } from '../../inventory/data/inventory.data';
+import { getExpiryAlerts } from '../../../api/inventory.api';
 
 // Re-export for convenience
 export type { InventoryBatch };
@@ -74,11 +74,7 @@ export const DAYS_LEFT_OPTIONS = [
 
 // ─── Mock API ────────────────────────────────────────────────
 
-export const fetchExpiryBatches = (): Promise<InventoryBatch[]> =>
-  new Promise((resolve) =>
-    setTimeout(() => {
-      // Only return perishable batches (ones with expiry dates)
-      const perishable = MOCK_BATCHES.filter((b) => b.isPerishable && b.expiryDate !== null);
-      resolve([...perishable]);
-    }, 700),
-  );
+export const fetchExpiryBatches = async (): Promise<InventoryBatch[]> => {
+  const data = await getExpiryAlerts();
+  return Array.isArray(data) ? data : data?.items ?? [];
+};

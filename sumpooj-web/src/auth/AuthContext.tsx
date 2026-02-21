@@ -38,6 +38,23 @@ const MOCK_TENANT: Tenant = {
   createdAt: '2025-01-01T00:00:00Z',
 };
 
+// Default tenant for Platform Admins (no company)
+const PLATFORM_ADMIN_TENANT: Tenant = {
+  id: 'platform',
+  name: 'Platform Admin',
+  slug: 'platform',
+  plan: 'ENTERPRISE',
+  subscriptionStatus: 'ACTIVE',
+  country: 'IN',
+  currency: 'INR',
+  taxSystem: 'GST',
+  dateFormat: 'DD/MM/YYYY',
+  timeFormat: '12H',
+  locale: 'en-IN',
+  isActive: true,
+  createdAt: '2025-01-01T00:00:00Z',
+};
+
 // ─── Types ──────────────────────────────────────────────────
 
 /** Shape returned by GET /auth/me */
@@ -62,8 +79,8 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
 
-  /** Store token then resolve identity via /auth/me */
-  login: (token: string) => Promise<void>;
+  /** Store token + user/tenant from login response */
+  login: (token: string, user?: User, tenant?: Tenant | null) => Promise<void>;
 
   /** Clear token + reset state */
   logout: () => void;
@@ -94,7 +111,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const data: AuthMeResponse = await fetchMe();
       setUser(data.user);
-      setTenant(data.tenant);
+      // Use PLATFORM_ADMIN_TENANT for platform admins (no company)
+      setTenant(data.tenant ?? PLATFORM_ADMIN_TENANT);
       setStatus('authenticated');
       return true;
     } catch {
@@ -125,12 +143,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Listen for auth:logout events from the axios 401 interceptor.
+   * This provides a graceful logout via React state instead of a hard page reload.
+   */
+  useEffect(() => {
+    const handleForceLogout = () => {
+      console.log('🔓 Force logout triggered by 401 interceptor');
+      setUser(null);
+      setTenant(null);
+      setStatus('unauthenticated');
+    };
+    window.addEventListener('auth:logout', handleForceLogout);
+    return () => window.removeEventListener('auth:logout', handleForceLogout);
+  }, []);
+
   /** Store token then call /auth/me */
   const login = useCallback(
-    async (token: string) => {
+    async (token: string, userData?: User, tenantData?: Tenant | null) => {
       if (!DEV_BYPASS_AUTH) {
+        // Validate token before storing
+        if (!token || token === 'undefined' || token === 'null') {
+          console.error('\u274c Invalid token received:', token);
+          setStatus('unauthenticated');
+          return;
+        }
         localStorage.setItem('auth_token', token);
       }
+
+      // If user/tenant provided from login response, use directly (no extra API call)
+      if (userData) {
+        setUser(userData);
+        // Use PLATFORM_ADMIN_TENANT for platform admins (no company)
+        setTenant(tenantData ?? PLATFORM_ADMIN_TENANT);
+        setStatus('authenticated');
+        return;
+      }
+
+      // Fallback: resolve from /auth/me
       setStatus('loading');
       await resolveIdentity();
     },

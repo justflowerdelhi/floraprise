@@ -9,12 +9,12 @@
  * - Team summary stats
  * - Responsive layout
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Box, Typography, TextField, InputAdornment, Button, Chip,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   IconButton, MenuItem, Select, FormControl, InputLabel, Card,
-  Grid, useTheme, alpha, Tooltip, TablePagination, Avatar,
+  Grid, useTheme, alpha, Tooltip, TablePagination, Avatar, CircularProgress,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -29,9 +29,11 @@ import {
 import { useNavigate } from 'react-router-dom';
 import type { Staff, StaffRole } from './StaffTypes';
 import { STAFF_ROLES, STAFF_ROLE_CONFIG } from './StaffTypes';
-import { getAllStaff, getTeamSummary, getStaffPerformance } from './StaffMockData';
+import { searchStaff as searchStaffApi } from '../../api/staff.api';
+import { getLocations } from '../../api/location.api';
+import { useApiCall } from '../../hooks/useApiCall';
+import { useToast } from '../../hooks/useToast';
 import { PermissionGate } from '../../core/rbac/RBACContext';
-import { MOCK_LOCATIONS } from '../../core/location/LocationTypes';
 
 // ─── Currency Formatter (tenant-aware) ───────────────────────
 
@@ -125,8 +127,12 @@ const StaffList: React.FC = () => {
   const dk = theme.palette.mode === 'dark';
   const navigate = useNavigate();
 
+  const toast = useToast();
+  const { loading: apiLoading, execute } = useApiCall();
+
   // State
-  const [staff] = useState<Staff[]>(getAllStaff());
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [filters, setFilters] = useState<StaffFilters>({
     search: '',
     role: '',
@@ -136,8 +142,33 @@ const StaffList: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Team summary
-  const teamSummary = useMemo(() => getTeamSummary(), []);
+  // Load staff from API
+  const loadStaff = useCallback(async () => {
+    const result = await execute(() => searchStaffApi({ PageSize: 200 }));
+    if (result?.items || Array.isArray(result)) {
+      setStaff(result.items ?? result);
+    }
+  }, [execute]);
+
+  // Load locations for mapping
+  const loadLocations = useCallback(async () => {
+    try {
+      const data = await getLocations();
+      setLocations(Array.isArray(data) ? data : data.items ?? []);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    loadStaff();
+    loadLocations();
+  }, [loadStaff, loadLocations]);
+
+  // Team summary computed from data
+  const teamSummary = useMemo(() => {
+    const total = staff.length;
+    const active = staff.filter(s => s.isActive).length;
+    return { totalStaff: total, activeStaff: active };
+  }, [staff]);
 
   // Filtered staff
   const filteredStaff = useMemo(() => {
@@ -176,13 +207,10 @@ const StaffList: React.FC = () => {
     return filteredStaff.slice(start, start + rowsPerPage);
   }, [filteredStaff, page, rowsPerPage]);
 
-  // Get staff performance preview
-  const getStaffRevenue = (staffMember: Staff) => {
-    const today = new Date();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-    const endOfMonth = today.toISOString().split('T')[0];
-    const perf = getStaffPerformance(staffMember.id, startOfMonth, endOfMonth);
-    return perf ? (perf.sales.totalRevenue + perf.events.eventRevenue) : 0;
+  // Get location name from loaded locations
+  const getLocationName = (locationId?: string) => {
+    if (!locationId) return '-';
+    return locations.find(l => l.id === locationId)?.name ?? '-';
   };
 
   // Handlers
@@ -244,36 +272,6 @@ const StaffList: React.FC = () => {
             value={teamSummary.activeStaff}
             color="#4caf50"
             icon={<PeopleIcon fontSize="small" />}
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
-          <StatCard
-            label="Total Revenue"
-            value={fmtCurrency(teamSummary.totalRevenue)}
-            color="#2196f3"
-            icon={<TrendingUpIcon fontSize="small" />}
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
-          <StatCard
-            label="Total Orders"
-            value={teamSummary.totalOrders}
-            color="#ff9800"
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
-          <StatCard
-            label="Total Commission"
-            value={fmtCurrency(teamSummary.totalCommission)}
-            color="#fdd835"
-            icon={<MoneyIcon fontSize="small" />}
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
-          <StatCard
-            label="Designers"
-            value={teamSummary.byRole.DESIGNER}
-            color="#e91e63"
           />
         </Grid>
       </Grid>
@@ -374,7 +372,6 @@ const StaffList: React.FC = () => {
                 <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Contact</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Commission</TableCell>
-                <TableCell sx={{ fontWeight: 700 }} align="right">Monthly Revenue</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                 <TableCell sx={{ fontWeight: 700 }} align="center">Actions</TableCell>
               </TableRow>
@@ -391,7 +388,6 @@ const StaffList: React.FC = () => {
               ) : (
                 paginatedStaff.map((staffMember) => {
                   const roleConfig = STAFF_ROLE_CONFIG[staffMember.role];
-                  const revenue = getStaffRevenue(staffMember);
 
                   return (
                     <TableRow
@@ -433,9 +429,7 @@ const StaffList: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {staffMember.locationId
-                            ? MOCK_LOCATIONS.find((l) => l.id === staffMember.locationId)?.name ?? '-'
-                            : '-'}
+                          {getLocationName(staffMember.locationId)}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -459,17 +453,6 @@ const StaffList: React.FC = () => {
                             N/A
                           </Typography>
                         )}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontWeight: 600,
-                            color: revenue > 0 ? '#4caf50' : 'text.secondary',
-                          }}
-                        >
-                          {revenue > 0 ? fmtCurrency(revenue) : '-'}
-                        </Typography>
                       </TableCell>
                       <TableCell>
                         <StatusBadge isActive={staffMember.isActive} />

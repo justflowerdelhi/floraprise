@@ -13,6 +13,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { login as loginApi } from "../../api/auth.api";
 import { useAuth } from "../../auth/AuthContext";
+import { useToast } from "../../hooks/useToast";
 
 export default function Login() {
   const theme = useTheme();
@@ -25,6 +26,7 @@ export default function Login() {
 
   const auth = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const submit = async () => {
     setError("");
@@ -37,11 +39,13 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await loginApi(email, password);
-      // login() stores token and calls /auth/me to resolve identity
-      await auth.login(res.access_token);
+      // Pass user & tenant directly from login response (no extra /auth/me call)
+      await auth.login(res.access_token, res.user as any, res.tenant as any);
+      toast.success('Welcome back!');
       navigate("/pos");
     } catch {
       setError("Invalid email or password");
+      toast.error("Login failed. Please check your credentials.");
     } finally {
       setLoading(false);
     }

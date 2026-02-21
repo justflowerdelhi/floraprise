@@ -35,7 +35,7 @@ import {
   calculateTotalCost, calculateBatchTotalCost, formatCurrency,
   checkStockSufficiency,
 } from './utils/production.utils';
-import { MOCK_LOCATIONS } from '../../core/location/LocationTypes';
+import { getLocations } from '../../api/location.api';
 
 const ProductionScreen = () => {
   const theme = useTheme();
@@ -54,18 +54,24 @@ const ProductionScreen = () => {
   const [result, setResult] = useState<ProductionRunResult | null>(null);
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
   const [error, setError] = useState('');
+  const [locations, setLocations] = useState<Array<{ id: string; name: string; isActive?: boolean }>>([]);
 
-  const activeLocations = useMemo(() => MOCK_LOCATIONS.filter((l) => l.isActive), []);
+  const activeLocations = useMemo(() => locations.filter((l) => l.isActive !== false), [locations]);
 
-  // ── Load ───────────────────────────────────────────────────
+  // ── Load recipes & locations ───────────────────────────────────
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const data = await getRecipes();
-        setRecipes(data.filter((r) => r.isActive));
+        const [recipeData, locationData] = await Promise.all([
+          getRecipes(),
+          getLocations(),
+        ]);
+        setRecipes(recipeData.filter((r: FloralRecipe) => r.isActive));
+        const locs = Array.isArray(locationData) ? locationData : locationData.items ?? locationData ?? [];
+        setLocations(locs);
       } catch {
-        setError('Failed to load recipes');
+        setError('Failed to load recipes or locations');
       } finally {
         setLoading(false);
       }

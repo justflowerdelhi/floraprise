@@ -2,7 +2,7 @@
 // DAY CLOSE SCREEN - POS End-of-Day Reconciliation
 // =============================================================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -44,9 +44,12 @@ import {
   CalendarToday,
 } from '@mui/icons-material';
 import type { DayCloseSummary, DayCloseStatus } from '../../core/audit/AuditTypes';
-import { MOCK_DAY_SUMMARY } from '../../core/audit/AuditTypes';
 import { useSensitiveAction } from '../../core/audit/SensitiveActionModal';
 import { formatCurrency, getCurrencySymbol } from '../../core/i18n';
+import { getDayCloseSummary, closeDay } from '../../api/day-close.api';
+import { useToast } from '../../hooks/useToast';
+import { useApiCall } from '../../hooks/useApiCall';
+import { useLocation } from '../../core/location';
 
 // -----------------------------------------------------------------------------
 // Status Badge
@@ -156,17 +159,36 @@ export default function DayCloseScreen() {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const { requestConfirmation } = useSensitiveAction();
-  const [summary, setSummary] = useState<DayCloseSummary>(MOCK_DAY_SUMMARY);
+  const toast = useToast();
+  const { execute, loading: apiLoading } = useApiCall();
+  const { currentLocationId } = useLocation();
+  const [summary, setSummary] = useState<DayCloseSummary | null>(null);
   const [countedCash, setCountedCash] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isClosing, setIsClosing] = useState(false);
+
+  const loadSummary = useCallback(async () => {
+    const data = await execute(
+      () => getDayCloseSummary({
+        locationId: currentLocationId !== 'ALL' ? currentLocationId : undefined,
+      }),
+      { errorMessage: 'Failed to load day close summary' }
+    );
+    if (data) {
+      setSummary(data);
+    }
+  }, [execute, currentLocationId]);
+
+  useEffect(() => {
+    loadSummary();
+  }, [loadSummary]);
   
-  const cashVariance = countedCash
+  const cashVariance = countedCash && summary
     ? parseFloat(countedCash) - summary.expectedCash
     : null;
   
   const handleCloseDay = async () => {
-    if (!countedCash) {
+    if (!countedCash || !summary) {
       return;
     }
     
@@ -182,22 +204,38 @@ export default function DayCloseScreen() {
     
     if (result.confirmed) {
       setIsClosing(true);
-      // Simulate API call
-      await new Promise((r) => setTimeout(r, 1500));
-      setSummary({
-        ...summary,
-        status: 'CLOSED',
-        countedCash: parseFloat(countedCash),
-        cashVariance: cashVariance || 0,
-        closedBy: 'Admin User',
-        closedAt: new Date().toISOString(),
-        notes: notes || undefined,
-      });
-      setIsClosing(false);
+      try {
+        const data = await execute(
+          () => closeDay({
+            locationId: currentLocationId !== 'ALL' ? currentLocationId : '',
+            businessDate: summary.date,
+            actualCash: parseFloat(countedCash),
+            notes: notes || null,
+          }),
+          { successMessage: 'Day closed successfully', errorMessage: 'Failed to close day' }
+        );
+        if (data) {
+          setSummary({
+            ...summary,
+            status: 'CLOSED',
+            countedCash: parseFloat(countedCash),
+            cashVariance: cashVariance || 0,
+            closedBy: data.closedBy ?? 'Admin User',
+            closedAt: data.closedAt ?? new Date().toISOString(),
+            notes: notes || undefined,
+          });
+          toast.success('Day has been closed and reconciled.');
+        }
+      } catch {
+        toast.error('An error occurred while closing the day.');
+      } finally {
+        setIsClosing(false);
+      }
     }
   };
   
   const handleReopenDay = async () => {
+    if (!summary) return;
     const result = await requestConfirmation('UNLOCK_CLOSED_DAY', {
       metadata: {
         date: summary.date,
@@ -224,7 +262,16 @@ export default function DayCloseScreen() {
     });
   };
   
-  const isDayClosed = summary.status === 'CLOSED';
+  const isDayClosed = summary?.status === 'CLOSED';
+  
+  if (!summary) {
+    return (
+      <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
+        <Typography variant="h4" fontWeight={700} mb={2}>Day Close</Typography>
+        {apiLoading ? <LinearProgress /> : <Alert severity="info">No day close summary available.</Alert>}
+      </Box>
+    );
+  }
   
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>

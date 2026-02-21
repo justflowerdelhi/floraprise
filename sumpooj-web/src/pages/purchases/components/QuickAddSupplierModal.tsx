@@ -25,6 +25,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import type { Supplier } from '../types/purchase.types';
 import { PAYMENT_TERMS } from '../types/purchase.types';
+import { createSupplier } from '../../../api/supplier.api';
+import { useApiCall } from '../../../hooks/useApiCall';
 
 interface QuickAddSupplierModalProps {
   open: boolean;
@@ -40,7 +42,7 @@ const QuickAddSupplierModal = ({
   darkMode = false,
 }: QuickAddSupplierModalProps) => {
   const theme = useTheme();
-  const [loading, setLoading] = useState(false);
+  const { loading, execute } = useApiCall();
   const [form, setForm] = useState({
     name: '',
     contactPerson: '',
@@ -77,24 +79,43 @@ const QuickAddSupplierModal = ({
 
   const handleSubmit = async () => {
     if (!validate()) return;
-    setLoading(true);
-    // Simulate API
-    await new Promise((r) => setTimeout(r, 600));
-    const newSupplier: Supplier = {
-      id: `sup_${Date.now().toString().slice(-6)}`,
-      ...form,
-    };
-    onAdd(newSupplier);
-    setLoading(false);
-    setForm({
-      name: '',
-      contactPerson: '',
-      email: '',
-      phone: '',
-      address: '',
-      defaultPaymentTerms: 'net_30',
-    });
-    setErrors({});
+    const result = await execute(
+      () =>
+        createSupplier({
+          name: form.name,
+          contactPerson: form.contactPerson || null,
+          email: form.email || null,
+          phone: form.phone || null,
+          address: form.address || null,
+          paymentTermsDays:
+            parseInt(form.defaultPaymentTerms.replace('net_', ''), 10) || 30,
+        }),
+      {
+        successMessage: `Supplier "${form.name}" added!`,
+        errorMessage: 'Failed to add supplier',
+      },
+    );
+    if (result) {
+      const newSupplier: Supplier = {
+        id: result.id ?? result.supplierId ?? `sup_${Date.now()}`,
+        name: form.name,
+        contactPerson: form.contactPerson,
+        email: form.email,
+        phone: form.phone,
+        address: form.address,
+        defaultPaymentTerms: form.defaultPaymentTerms,
+      };
+      onAdd(newSupplier);
+      setForm({
+        name: '',
+        contactPerson: '',
+        email: '',
+        phone: '',
+        address: '',
+        defaultPaymentTerms: 'net_30',
+      });
+      setErrors({});
+    }
   };
 
   const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {

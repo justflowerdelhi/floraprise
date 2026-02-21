@@ -7,11 +7,11 @@
  * - Form validation
  * - API-ready structure
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, TextField, Button, Card, Grid, MenuItem,
   Select, FormControl, InputLabel, Collapse, IconButton,
-  useTheme, alpha, Divider, InputAdornment, Snackbar, Alert,
+  useTheme, alpha, Divider, InputAdornment, CircularProgress,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -40,7 +40,9 @@ import {
   getInitialFormData,
   formDataToRequest,
 } from './EventTypes';
-import { MOCK_EVENTS } from './EventMockData';
+import { getEventById, createEvent as createEventApi, updateEvent as updateEventApi } from '../../api/event.api';
+import { useToast } from '../../hooks/useToast';
+import { useApiCall } from '../../hooks/useApiCall';
 import { getCurrencySymbol } from '../../core/i18n';
 
 // ─── Form Section Component ─────────────────────────────────
@@ -89,26 +91,32 @@ const EventForm: React.FC = () => {
   const [formData, setFormData] = useState<EventFormData>(getInitialFormData());
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof EventFormData, string>>>({});
-  const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
-    open: false,
-    message: '',
-    severity: 'success',
-  });
+  const [loadingEvent, setLoadingEvent] = useState(false);
+  const toast = useToast();
+  const { loading, execute } = useApiCall();
 
   // Load existing event for edit
-  useEffect(() => {
-    if (isEdit && id) {
-      const event = MOCK_EVENTS.find((e) => e.id === id);
+  const loadEvent = useCallback(async () => {
+    if (!isEdit || !id) return;
+    setLoadingEvent(true);
+    try {
+      const event = await getEventById(id);
       if (event) {
         setFormData(getInitialFormData(event));
-        // Auto-expand advanced if there are optional fields filled
         if (event.venueAddress || event.colorTheme || event.moodNotes || event.budget) {
           setShowAdvanced(true);
         }
       }
+    } catch {
+      toast.error('Failed to load event details');
+    } finally {
+      setLoadingEvent(false);
     }
   }, [isEdit, id]);
+
+  useEffect(() => {
+    loadEvent();
+  }, [loadEvent]);
 
   // Handlers
   const handleChange = (field: keyof EventFormData) => (
@@ -152,30 +160,14 @@ const EventForm: React.FC = () => {
   const handleSubmit = async () => {
     if (!validate()) return;
 
-    setLoading(true);
-    try {
-      const payload = formDataToRequest(formData);
-      console.log('Submitting event:', payload);
+    const payload = formDataToRequest(formData);
+    const result = await execute(
+      () => isEdit && id ? updateEventApi(id, payload) : createEventApi(payload as any),
+      { successMessage: isEdit ? 'Event updated successfully!' : 'Event created successfully!' }
+    );
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      setSnackbar({
-        open: true,
-        message: isEdit ? 'Event updated successfully!' : 'Event created successfully!',
-        severity: 'success',
-      });
-
-      // Navigate back after short delay
-      setTimeout(() => navigate('/events'), 1000);
-    } catch (err) {
-      setSnackbar({
-        open: true,
-        message: 'Failed to save event. Please try again.',
-        severity: 'error',
-      });
-    } finally {
-      setLoading(false);
+    if (result) {
+      setTimeout(() => navigate('/events'), 800);
     }
   };
 
@@ -540,17 +532,6 @@ const EventForm: React.FC = () => {
         </Box>
       </Card>
 
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 };
