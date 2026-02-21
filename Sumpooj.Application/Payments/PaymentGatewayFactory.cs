@@ -33,17 +33,22 @@ public class PaymentGatewayFactory : IPaymentGatewayFactory
     private void RegisterGateways()
     {
         // Register all gateway implementations
+
+        // India
         _gatewayTypes[PaymentGatewayType.Razorpay] = typeof(Gateways.RazorpayGateway);
+        _gatewayTypes[PaymentGatewayType.PayU] = typeof(Gateways.PayUGateway);
+        _gatewayTypes[PaymentGatewayType.Cashfree] = typeof(Gateways.CashfreeGateway);
+
+        // USA
         _gatewayTypes[PaymentGatewayType.Stripe] = typeof(Gateways.StripeGateway);
-        // Add more as implemented:
-        // _gatewayTypes[PaymentGatewayType.PayPal] = typeof(Gateways.PayPalGateway);
-        // _gatewayTypes[PaymentGatewayType.Square] = typeof(Gateways.SquareGateway);
-        // _gatewayTypes[PaymentGatewayType.PayU] = typeof(Gateways.PayUGateway);
-        // _gatewayTypes[PaymentGatewayType.Cashfree] = typeof(Gateways.CashfreeGateway);
-        // _gatewayTypes[PaymentGatewayType.PayTabs] = typeof(Gateways.PayTabsGateway);
-        // _gatewayTypes[PaymentGatewayType.HyperPay] = typeof(Gateways.HyperPayGateway);
-        // _gatewayTypes[PaymentGatewayType.TapPayments] = typeof(Gateways.TapGateway);
-        // _gatewayTypes[PaymentGatewayType.CheckoutCom] = typeof(Gateways.CheckoutGateway);
+        _gatewayTypes[PaymentGatewayType.Square] = typeof(Gateways.SquareGateway);
+        _gatewayTypes[PaymentGatewayType.PayPal] = typeof(Gateways.PayPalGateway);
+
+        // GCC
+        _gatewayTypes[PaymentGatewayType.PayTabs] = typeof(Gateways.PayTabsGateway);
+        _gatewayTypes[PaymentGatewayType.HyperPay] = typeof(Gateways.HyperPayGateway);
+        _gatewayTypes[PaymentGatewayType.TapPayments] = typeof(Gateways.TapGateway);
+        _gatewayTypes[PaymentGatewayType.CheckoutCom] = typeof(Gateways.CheckoutGateway);
     }
 
     public async Task<IPaymentGateway> CreateAsync(PaymentGatewayConfig config)
