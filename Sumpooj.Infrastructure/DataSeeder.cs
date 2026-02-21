@@ -62,6 +62,8 @@ public static class DataSeeder
             "PlatformSupport",
             "CompanyAdmin",
             "Manager",
+            "Designer",
+            "Accountant",
             "Staff",
             "Delivery"
         };
