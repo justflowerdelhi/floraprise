@@ -57,7 +57,6 @@ import {
   createProduct,
   saveDraft,
   fetchSuppliers,
-  mockSuppliers,
 } from './api/product.api';
 import {
   saveDraftToStorage,
@@ -87,7 +86,7 @@ const AddProductForm = ({
 
   // State
   const [darkMode, setDarkMode] = useState(false);
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [supplierModalOpen, setSupplierModalOpen] = useState(false);
   const [images, setImages] = useState<File[]>([]);

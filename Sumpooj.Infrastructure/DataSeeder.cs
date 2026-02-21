@@ -9,8 +9,8 @@ namespace Sumpooj.Infrastructure;
 
 /// <summary>
 /// Seeds initial data for the application.
-/// Note: Database schema and roles are managed via Database/sumpooj_complete_schema.sql (Database-First approach)
-/// This seeder only creates initial users and demo data that can't be done in SQL.
+/// Note: Database schema is managed via Database/sumpooj_complete_schema.sql (Database-First approach)
+/// This seeder creates roles (if not already seeded via SQL), users, and demo data.
 /// </summary>
 public static class DataSeeder
 {
@@ -25,21 +25,43 @@ public static class DataSeeder
         // Database-First: Schema is managed via SQL script
         if (!await db.Database.CanConnectAsync())
         {
+            var connectionString = db.Database.GetConnectionString();
+            var host = "unknown";
+            if (connectionString != null)
+            {
+                var hostMatch = System.Text.RegularExpressions.Regex.Match(connectionString, @"Host=([^;]+)");
+                if (hostMatch.Success) host = hostMatch.Groups[1].Value;
+            }
+
             throw new InvalidOperationException(
-                "Cannot connect to database. Ensure PostgreSQL is running and the connection string is correct. " +
+                $"Cannot connect to database at Host={host}. " +
+                "Ensure PostgreSQL is running and the connection string in appsettings.json is correct. " +
                 "Run Database/sumpooj_complete_schema.sql to create the schema.");
         }
 
-        // Verify roles exist (seeded by SQL script)
-        // If roles don't exist, the SQL script wasn't run
-        if (!await roleManager.RoleExistsAsync("PlatformSuperAdmin"))
+        // ----------------------------
+        // 1) Roles (create if not seeded via SQL)
+        // ----------------------------
+        var roles = new[]
         {
-            throw new InvalidOperationException(
-                "Roles not found in database. Please run Database/sumpooj_complete_schema.sql first.");
+            "PlatformSuperAdmin",
+            "PlatformSupport",
+            "CompanyAdmin",
+            "Manager",
+            "Staff",
+            "Delivery"
+        };
+
+        foreach (var role in roles)
+        {
+            if (!await roleManager.RoleExistsAsync(role))
+            {
+                await roleManager.CreateAsync(new IdentityRole<Guid>(role));
+            }
         }
 
         // ----------------------------
-        // 1) Platform Super Admin User
+        // 2) Platform Super Admin User
         // ----------------------------
         const string superAdminEmail = "sumit.singh@sumpooj.com";
         var superAdmin = await userManager.FindByEmailAsync(superAdminEmail);
@@ -63,7 +85,7 @@ public static class DataSeeder
         }
 
         // ----------------------------
-        // 2) Demo Company
+        // 3) Demo Company
         // ----------------------------
         Company company;
         if (!await db.Companies.AnyAsync())
@@ -90,7 +112,7 @@ public static class DataSeeder
         }
 
         // ----------------------------
-        // 3) Company Admin User
+        // 4) Company Admin User
         // ----------------------------
         const string companyAdminEmail = "admin@demoflorist.com";
         var companyAdmin = await userManager.FindByEmailAsync(companyAdminEmail);
@@ -114,7 +136,7 @@ public static class DataSeeder
         }
 
         // ----------------------------
-        // 4) Default Location for Company
+        // 5) Default Location for Company
         // ----------------------------
         if (!await db.Locations.AnyAsync(l => l.CompanyId == company.Id))
         {

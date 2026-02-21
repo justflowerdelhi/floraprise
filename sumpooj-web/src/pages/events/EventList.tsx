@@ -9,12 +9,13 @@
  * - Create New Event button
  * - Responsive layout
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Box, Typography, TextField, InputAdornment, Button, Chip,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   IconButton, MenuItem, Select, FormControl, InputLabel, Card,
   Grid, useTheme, alpha, Tooltip, TablePagination, Paper,
+  CircularProgress,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -34,8 +35,9 @@ import {
   STATUS_CONFIG,
   EVENT_TYPE_CONFIG,
 } from './EventTypes';
-import { MOCK_EVENTS, getEventStats } from './EventMockData';
 import { formatCurrency } from '../../core/i18n';
+import { searchEvents } from '../../api/event.api';
+import { useApiCall } from '../../hooks/useApiCall';
 
 // ─── Currency Formatter ───────────────────────────────────────
 
@@ -121,7 +123,7 @@ const EventList: React.FC = () => {
   const navigate = useNavigate();
 
   // State
-  const [events] = useState<Event[]>(MOCK_EVENTS);
+  const [events, setEvents] = useState<Event[]>([]);
   const [filters, setFilters] = useState<EventFilters>({
     search: '',
     status: '',
@@ -132,9 +134,51 @@ const EventList: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const { execute, loading } = useApiCall();
 
-  // Stats
-  const stats = useMemo(() => getEventStats(events), [events]);
+  const loadEvents = useCallback(async () => {
+    const res = await execute(
+      () => searchEvents({
+        Query: filters.search || undefined,
+        Status: filters.status || undefined,
+        EventType: filters.eventType || undefined,
+        FromDate: filters.dateFrom || undefined,
+        ToDate: filters.dateTo || undefined,
+        Page: page + 1,
+        PageSize: rowsPerPage,
+      }),
+      { errorMessage: 'Failed to load events' }
+    );
+    if (res) {
+      setEvents(res.items ?? res ?? []);
+      setTotalCount(res.totalCount ?? 0);
+    }
+  }, [execute, filters, page, rowsPerPage]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  // Stats — computed locally from loaded events (no separate API endpoint)
+  const stats = useMemo(() => {
+    const now = new Date();
+    const thisMonth = now.getMonth();
+    const thisYear = now.getFullYear();
+    return {
+      total: events.length,
+      thisMonth: events.filter((e) => {
+        const d = new Date(e.eventDate);
+        return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+      }).length,
+      inquiries: events.filter((e) => e.status === 'INQUIRY').length,
+      confirmed: events.filter((e) => e.status === 'CONFIRMED').length,
+      inProduction: events.filter((e) => e.status === 'IN_PRODUCTION').length,
+      totalBudget: events
+        .filter((e) => e.status !== 'CANCELLED')
+        .reduce((sum, e) => sum + (e.budget ?? 0), 0),
+    };
+  }, [events]);
 
   // Filtered events
   const filteredEvents = useMemo(() => {

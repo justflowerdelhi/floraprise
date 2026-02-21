@@ -10,11 +10,11 @@
  *     Manager → edit limited fields (phone, email, commission, hourly rate)
  * - Prevents deletion if staff has historical orders (deactivate instead)
  */
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Typography, TextField, Button, Card, Grid, MenuItem,
   Select, FormControl, InputLabel, Switch, FormControlLabel,
-  useTheme, alpha, Divider, InputAdornment, Snackbar, Alert,
+  useTheme, alpha, Divider, InputAdornment, CircularProgress, Alert,
   Breadcrumbs, Link, Chip,
 } from '@mui/material';
 import {
@@ -42,8 +42,10 @@ import {
   COMMISSION_TYPES,
   getInitialFormData,
 } from './StaffTypes';
-import { getStaffById, staffHasOrders, MOCK_STAFF } from './StaffMockData';
-import { MOCK_LOCATIONS } from '../../core/location/LocationTypes';
+import { getStaffById as getStaffByIdApi, createStaff as createStaffApi, updateStaff as updateStaffApi } from '../../api/staff.api';
+import { getLocations } from '../../api/location.api';
+import { useToast } from '../../hooks/useToast';
+import { useApiCall } from '../../hooks/useApiCall';
 
 // ─── Form Section ────────────────────────────────────────────
 
@@ -95,43 +97,47 @@ const StaffForm: React.FC = () => {
   // If neither admin nor manager, redirect (shouldn't happen with route guards)
   const canAccess = isAdmin || canManageStaff;
 
+  const toast = useToast();
+  const { loading, execute } = useApiCall();
+
   // State
   const [formData, setFormData] = useState<StaffFormData>(getInitialFormData());
   const [locationId, setLocationId] = useState<string>('');
   const [errors, setErrors] = useState<Partial<Record<keyof StaffFormData | 'locationId', string>>>({});
-  const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
-    open: false,
-    message: '',
-    severity: 'success',
-  });
+  const [existingStaff, setExistingStaff] = useState<Staff | null>(null);
+  const hasOrders = false; // TODO: add API endpoint for checking if staff has orders
+  const [activeLocations, setActiveLocations] = useState<{ id: string; name: string; isActive: boolean; code?: string }[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
 
   // Load existing staff for edit
-  const existingStaff = useMemo(() => {
-    if (isEdit && staffId) {
-      return getStaffById(staffId);
+  const loadStaff = useCallback(async () => {
+    if (!isEdit || !staffId) return;
+    setLoadingStaff(true);
+    try {
+      const staff = await getStaffByIdApi(staffId);
+      setExistingStaff(staff);
+      setFormData(getInitialFormData(staff));
+      setLocationId(staff.locationId || '');
+    } catch {
+      toast.error('Failed to load staff member');
+    } finally {
+      setLoadingStaff(false);
     }
-    return null;
   }, [isEdit, staffId]);
 
-  // Check if staff has historical orders (prevents deletion)
-  const hasOrders = useMemo(() => {
-    if (!existingStaff) return false;
-    return staffHasOrders(existingStaff.id);
-  }, [existingStaff]);
+  // Load locations
+  const loadLocations = useCallback(async () => {
+    try {
+      const data = await getLocations();
+      const list = Array.isArray(data) ? data : data.items ?? [];
+      setActiveLocations(list.filter((l: any) => l.isActive));
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
-    if (existingStaff) {
-      setFormData(getInitialFormData(existingStaff));
-      setLocationId(existingStaff.locationId || '');
-    }
-  }, [existingStaff]);
-
-  // Active locations for dropdown
-  const activeLocations = useMemo(
-    () => MOCK_LOCATIONS.filter((l) => l.isActive),
-    [],
-  );
+    loadStaff();
+    loadLocations();
+  }, [loadStaff, loadLocations]);
 
   // Handlers
   const handleChange = (field: keyof StaffFormData) => (
@@ -171,52 +177,25 @@ const StaffForm: React.FC = () => {
   const handleSubmit = async () => {
     if (!validate()) return;
 
-    setLoading(true);
-    try {
-      const now = new Date().toISOString();
-      const staffData: Staff = {
-        id: existingStaff?.id || `staff-${Date.now()}`,
-        name: formData.name.trim(),
-        role: formData.role,
-        locationId: locationId || undefined,
-        phone: formData.phone || undefined,
-        email: formData.email || undefined,
-        commissionType: (formData.commissionType as CommissionType) || undefined,
-        commissionRate: formData.commissionRate ? Number(formData.commissionRate) : undefined,
-        hourlyRate: formData.hourlyRate ? Number(formData.hourlyRate) : undefined,
-        isActive: formData.isActive,
-        hireDate: existingStaff?.hireDate || now.split('T')[0],
-        createdAt: existingStaff?.createdAt || now,
-        updatedAt: now,
-      };
+    const payload = {
+      name: formData.name.trim(),
+      role: formData.role,
+      email: formData.email || null,
+      phone: formData.phone || null,
+      commissionType: formData.commissionType || null,
+      commissionRate: formData.commissionRate ? Number(formData.commissionRate) : null,
+      hourlyRate: formData.hourlyRate ? Number(formData.hourlyRate) : null,
+      primaryLocationId: locationId || null,
+      isActive: formData.isActive,
+    };
 
-      // Simulate API call
-      console.log(isEdit ? 'Updating staff:' : 'Creating staff:', staffData);
-      await new Promise((resolve) => setTimeout(resolve, 600));
+    const result = await execute(
+      () => isEdit && staffId ? updateStaffApi(staffId, payload) : createStaffApi(payload as any),
+      { successMessage: isEdit ? 'Staff member updated successfully!' : 'Staff member created successfully!' }
+    );
 
-      // Mock: update in-memory array
-      if (isEdit) {
-        const idx = MOCK_STAFF.findIndex((s) => s.id === staffData.id);
-        if (idx >= 0) MOCK_STAFF[idx] = staffData;
-      } else {
-        MOCK_STAFF.push(staffData);
-      }
-
-      setSnackbar({
-        open: true,
-        message: isEdit ? 'Staff member updated successfully!' : 'Staff member created successfully!',
-        severity: 'success',
-      });
-
+    if (result) {
       setTimeout(() => navigate('/staff'), 800);
-    } catch {
-      setSnackbar({
-        open: true,
-        message: 'Failed to save. Please try again.',
-        severity: 'error',
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -580,17 +559,6 @@ const StaffForm: React.FC = () => {
         </Box>
       </Card>
 
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 };

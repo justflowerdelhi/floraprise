@@ -18,7 +18,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Checkbox, Switch, FormControlLabel, RadioGroup, Radio,
   Alert, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
-  useTheme, alpha, Snackbar, IconButton, Tooltip,
+  useTheme, alpha, IconButton, Tooltip, CircularProgress,
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
@@ -41,8 +41,10 @@ import {
 } from './RefundTypes';
 import { useOrders } from '../orders/OrderContext';
 import { formatCurrency } from '../../core/i18n';
-import type { AuditLog } from '../../core/audit/AuditTypes';
-import { MOCK_AUDIT_LOGS } from '../../core/audit/AuditTypes';
+import { createRefund } from '../../api/refund.api';
+import { updateOrderStatus } from '../../api/order.api';
+import { useToast } from '../../hooks/useToast';
+import { useApiCall } from '../../hooks/useApiCall';
 
 const fmtCurrency = (v: number) => formatCurrency(v);
 
@@ -73,6 +75,8 @@ const RefundScreen: React.FC = () => {
   const navigate = useNavigate();
   const { orderId } = useParams<{ orderId: string }>();
   const { getOrder, updateOrder } = useOrders();
+  const toast = useToast();
+  const { loading: submitting, execute } = useApiCall();
 
   // ─── Load Order ─────────────────────────────────────
   const order = orderId ? getOrder(orderId) : undefined;
@@ -115,8 +119,6 @@ const RefundScreen: React.FC = () => {
   const [method, setMethod] = useState<RefundMethod>('ORIGINAL');
   const [reason, setReason] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [snackMsg, setSnackMsg] = useState('');
-  const [snackSeverity, setSnackSeverity] = useState<'success' | 'error'>('success');
   const [useCustomAmount, setUseCustomAmount] = useState(false);
   const [customAmountStr, setCustomAmountStr] = useState('');
 
@@ -201,85 +203,69 @@ const RefundScreen: React.FC = () => {
     );
   }, []);
 
-  const handleProcessRefund = useCallback(() => {
+  const handleProcessRefund = useCallback(async () => {
     if (!order || !isValid) return;
 
+    const selectedItems = items.filter((i) => i.quantity > 0);
+
+    const result = await execute(
+      () =>
+        createRefund({
+          orderId: order.id,
+          method,
+          reason: reason.trim(),
+          items: selectedItems.map((i) => ({
+            productId: i.productId,
+            productName: i.productName,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            restock: i.restock,
+          })),
+        }),
+      {
+        errorMessage: 'Failed to process refund',
+      },
+    );
+
+    if (!result) {
+      setConfirmOpen(false);
+      return;
+    }
+
+    // Update order status via API
+    const newOrderStatus = deriveRefundOrderStatus(totalPaid, previouslyRefunded, totalRefundAmount);
+    try {
+      await updateOrderStatus(order.id, { status: newOrderStatus });
+    } catch {
+      // Status update is secondary — refund already processed
+      toast.warning('Refund processed but order status could not be updated automatically.');
+    }
+
+    // Sync local order context so UI reflects immediately
+    const newTotalRefunded = previouslyRefunded + totalRefundAmount;
     const refundEntry: RefundEntry = {
-      refundId: nextRefundId(),
+      refundId: result.id ?? result.refundId ?? nextRefundId(),
       refundedAmount: totalRefundAmount,
-      items: items.filter((i) => i.quantity > 0),
+      items: selectedItems,
       method,
       reason: reason.trim(),
-      createdAt: new Date().toISOString(),
-      processedBy: 'user_001',       // TODO: from auth context
-      processedByName: 'Admin User', // TODO: from auth context
+      createdAt: result.createdAt ?? new Date().toISOString(),
+      processedBy: result.processedBy ?? '',
+      processedByName: result.processedByName ?? '',
       status: 'PROCESSED',
     };
-
-    const newRefunds = [...previousRefunds, refundEntry];
-    const newTotalRefunded = previouslyRefunded + totalRefundAmount;
-    const newOrderStatus = deriveRefundOrderStatus(totalPaid, previouslyRefunded, totalRefundAmount);
-
-    // Update order in context
-    const updatedOrder: Order = {
+    updateOrder({
       ...order,
-      refunds: newRefunds,
+      refunds: [...previousRefunds, refundEntry],
       totalRefunded: newTotalRefunded,
       orderStatus: newOrderStatus,
       updatedAt: new Date().toISOString(),
-    };
-    updateOrder(updatedOrder);
-
-    // Create audit log entry
-    const auditEntry: AuditLog = {
-      id: `audit_ref_${Date.now()}`,
-      tenantId: 'tenant_001',
-      locationId: order.locationId,
-      entityType: 'ORDER',
-      entityId: order.id,
-      action: 'REFUND',
-      changedBy: 'user_001',
-      changedByName: 'Admin User',
-      changeSummary: `Refund of ${fmtCurrency(totalRefundAmount)} processed — ${refundEntry.items.length} item(s), method: ${REFUND_METHOD_CONFIG[method].label}`,
-      previousValue: {
-        orderStatus: order.orderStatus,
-        totalRefunded: previouslyRefunded,
-      },
-      newValue: {
-        orderStatus: newOrderStatus,
-        totalRefunded: newTotalRefunded,
-        refundId: refundEntry.refundId,
-      },
-      metadata: {
-        refundMethod: method,
-        reason: reason.trim(),
-        restockedItems: restockItems.map((i) => ({
-          productId: i.productId,
-          productName: i.productName,
-          quantity: i.quantity,
-        })),
-      },
-      createdAt: new Date().toISOString(),
-    };
-    MOCK_AUDIT_LOGS.unshift(auditEntry);
-
-    // Log restock info (in production, this would update inventory)
-    if (restockItems.length > 0) {
-      console.log('📦 Inventory Restock (refund_restock):', restockItems.map((i) => ({
-        productId: i.productId,
-        productName: i.productName,
-        quantity: i.quantity,
-        type: 'refund_restock',
-      })));
-    }
+    });
 
     setConfirmOpen(false);
-    setSnackSeverity('success');
-    setSnackMsg(`Refund of ${fmtCurrency(totalRefundAmount)} processed for ${order.orderNumber}`);
-
-    // Navigate back after short delay
-    setTimeout(() => navigate('/order-list'), 1500);
-  }, [order, isValid, items, method, reason, totalRefundAmount, previousRefunds, previouslyRefunded, totalPaid, restockItems, updateOrder, navigate]);
+    toast.success(`Refund of ${fmtCurrency(totalRefundAmount)} processed for ${order.orderNumber}`);
+    navigate('/order-list');
+  }, [order, isValid, items, method, reason, totalRefundAmount, previousRefunds, previouslyRefunded, totalPaid, execute, updateOrder, navigate, toast]);
 
   // ─── Guard: Order not found ─────────────────────────
   if (!order) {
@@ -648,7 +634,7 @@ const RefundScreen: React.FC = () => {
             color="warning"
             size="large"
             startIcon={<RefundIcon />}
-            disabled={!isValid}
+            disabled={!isValid || submitting}
             onClick={() => setConfirmOpen(true)}
             sx={{ fontWeight: 700, textTransform: 'none', mb: 1, py: 1.2 }}
           >
@@ -759,28 +745,20 @@ const RefundScreen: React.FC = () => {
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setConfirmOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
+          <Button onClick={() => setConfirmOpen(false)} disabled={submitting} sx={{ textTransform: 'none' }}>Cancel</Button>
           <Button
             variant="contained"
             color="warning"
-            startIcon={<RefundIcon />}
+            startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <RefundIcon />}
             onClick={handleProcessRefund}
+            disabled={submitting}
             sx={{ fontWeight: 700, textTransform: 'none' }}
           >
-            Confirm Refund
+            {submitting ? 'Processing…' : 'Confirm Refund'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* ─── Snackbar ───────────────────────────────────── */}
-      <Snackbar
-        open={!!snackMsg}
-        autoHideDuration={3000}
-        onClose={() => setSnackMsg('')}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity={snackSeverity} variant="filled" onClose={() => setSnackMsg('')}>{snackMsg}</Alert>
-      </Snackbar>
     </Box>
   );
 };

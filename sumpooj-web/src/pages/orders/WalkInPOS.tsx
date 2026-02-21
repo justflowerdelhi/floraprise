@@ -10,7 +10,7 @@ import {
   Card, CardContent, Grid, IconButton, Snackbar, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions,
   useTheme, Divider, FormControl, InputLabel, Select, MenuItem,
-  Autocomplete,
+  Autocomplete, CircularProgress,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -24,7 +24,7 @@ import {
 } from '@mui/icons-material';
 import { CardGiftcard as GiftCardIcon } from '@mui/icons-material';
 import type { Product, ProductCategory, OrderType, OrderPaymentEntry, Order } from './OrderTypes';
-import { MOCK_PRODUCTS, PRODUCT_CATEGORIES } from './OrderMockData';
+import { PRODUCT_CATEGORIES } from './OrderMockData';
 import { processOrderInventory, inferFulfillmentMode } from '../inventory/InventoryMovementService';
 import { useCart } from '../cart/CartContext';
 import CartTable from '../cart/CartTable';
@@ -32,16 +32,13 @@ import CartSummaryPanel from '../cart/CartSummaryPanel';
 import { fmtCurrency } from '../cart/CartUtils';
 import PaymentModal from '../payments/PaymentModal';
 import { useTenant } from '../../core/tenant/TenantContext';
-import { MOCK_VENDOR_FLORISTS } from './WireMockData';
-<<<<<<< HEAD
-import CustomerSearchBar, { type SelectedCustomer } from './CustomerSearchBar';
-import QuickCreateCustomerModal from './QuickCreateCustomerModal';
-=======
-import { MOCK_CUSTOMERS, type Customer } from '../crm/CRMTypes';
+import { type Customer } from '../crm/CRMTypes';
 import { useOrders } from './OrderContext';
+import { searchProducts } from '../../api/product.api';
+import { searchCustomers } from '../../api/customer.api';
+import { getAllSuppliers } from '../../api/supplier.api';
 import { GiftCardBuilderModal } from '../gift-cards';
 import type { SavedGiftCard } from '../gift-cards';
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
 
 const WalkInPOS: React.FC = () => {
   const theme = useTheme();
@@ -53,6 +50,39 @@ const WalkInPOS: React.FC = () => {
   const { addOrder } = useOrders();
 
   const { state, addProduct, removeItem, updateQty, setDiscount, setLineDiscount, clearCart, holdOrder, resumeOrder, removeHeld, setOrderSource, setOrderDiscount, clearOrderDiscount } = useCart();
+
+  // ─── API-loaded data ──────────────────────────────────────
+  const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [vendorFlorists, setVendorFlorists] = useState<Array<{ id: string; name: string; city?: string; state?: string; isActive?: boolean; defaultCommissionRate?: number }>>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState('');
+
+  useEffect(() => {
+    const loadData = async () => {
+      setDataLoading(true);
+      setDataError('');
+      try {
+        const [prodRes, custRes, supplierRes] = await Promise.all([
+          searchProducts({ IsActive: true, PageSize: 500 }),
+          searchCustomers({ PageSize: 500 }),
+          getAllSuppliers(),
+        ]);
+        const prodItems = Array.isArray(prodRes) ? prodRes : prodRes.items ?? [];
+        setProducts(prodItems);
+        const custItems = Array.isArray(custRes) ? custRes : custRes.items ?? [];
+        setCustomers(custItems);
+        const suppliers = Array.isArray(supplierRes) ? supplierRes : supplierRes.items ?? [];
+        setVendorFlorists(suppliers);
+      } catch (err: any) {
+        console.error('❌ POS data load failed:', err);
+        setDataError('Failed to load POS data. Please refresh or re-login.');
+      } finally {
+        setDataLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<ProductCategory | ''>('');
@@ -77,8 +107,8 @@ const WalkInPOS: React.FC = () => {
   // Filtered customer suggestions based on name or phone input
   const customerSuggestions = useMemo(() => {
     const q = (customerName || customerPhone || '').toLowerCase().trim();
-    if (!q) return MOCK_CUSTOMERS;
-    return MOCK_CUSTOMERS.filter(
+    if (!q) return customers;
+    return customers.filter(
       (c) => c.name.toLowerCase().includes(q) || c.phone.replace(/\s/g, '').includes(q.replace(/\s/g, '')),
     );
   }, [customerName, customerPhone]);
@@ -112,7 +142,7 @@ const WalkInPOS: React.FC = () => {
 
   // Product search (name, SKU, barcode for non-perishables)
   const filteredProducts = useMemo(() => {
-    let list = MOCK_PRODUCTS;
+    let list = products;
     if (categoryFilter) list = list.filter((p) => p.category === categoryFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -127,12 +157,7 @@ const WalkInPOS: React.FC = () => {
   }, [search, categoryFilter]);
 
   const handleBarcodeSubmit = () => {
-    // Prevent duplicate rapid scans (300ms debounce)
-    const now = Date.now();
-    if (now - lastScanTime < 300) return;
-    setLastScanTime(now);
-
-    const product = MOCK_PRODUCTS.find((p) => !p.isPerishable && p.barcode === search.trim());
+    const product = products.find((p) => !p.isPerishable && p.barcode === search.trim());
     if (product) {
       addProduct(product);
       setSearch('');
@@ -242,8 +267,8 @@ const WalkInPOS: React.FC = () => {
   }, [clearCart, addOrder, paymentOrderId, orderType, customerName, customerPhone, state.items, state.totals]);
 
   const selectedVendor = useMemo(
-    () => MOCK_VENDOR_FLORISTS.find((vendor) => vendor.id === vendorId) ?? null,
-    [vendorId],
+    () => vendorFlorists.find((vendor) => vendor.id === vendorId) ?? null,
+    [vendorId, vendorFlorists],
   );
 
   const customerPaid = state.totals.grandTotal;
@@ -297,6 +322,20 @@ const WalkInPOS: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', bgcolor: bgColor, overflow: 'hidden' }}>
+      {/* Loading / Error overlay */}
+      {dataLoading && (
+        <Box sx={{ position: 'absolute', inset: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: bgColor }}>
+          <Box sx={{ textAlign: 'center' }}>
+            <CircularProgress size={28} sx={{ mb: 1 }} />
+            <Typography variant="body2" color="text.secondary">Loading POS data…</Typography>
+          </Box>
+        </Box>
+      )}
+      {dataError && (
+        <Alert severity="error" sx={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}>
+          {dataError}
+        </Alert>
+      )}
       {/* ─── LEFT: Products ─────────────────────────────── */}
       <Box sx={{ width: 340, minWidth: 300, borderRight: `1px solid ${dk ? 'rgba(255,255,255,0.06)' : '#e0e0e0'}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Header */}
@@ -475,7 +514,7 @@ const WalkInPOS: React.FC = () => {
         <Box sx={{ flex: 1, overflow: 'auto', px: 2 }}>
           <CartTable
             items={state.items}
-            products={MOCK_PRODUCTS}
+            products={products}
             isPriceEditable={state.isPriceEditable}
             onUpdateQty={updateQty}
             onRemove={removeItem}
@@ -491,10 +530,6 @@ const WalkInPOS: React.FC = () => {
         borderLeft: `1px solid ${dk ? 'rgba(255,255,255,0.06)' : '#e0e0e0'}`,
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
-<<<<<<< HEAD
-        {/* Scrollable content area */}
-        <Box sx={{ flex: 1, overflow: 'auto', p: 2, pb: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-=======
         {/* Customer Info */}
         <Card
           ref={customerCardRef}
@@ -619,7 +654,6 @@ const WalkInPOS: React.FC = () => {
           </Typography>
         )}
 
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
         {wireEnabled && (
           <Card
             elevation={dk ? 0 : 1}
@@ -669,9 +703,9 @@ const WalkInPOS: React.FC = () => {
                   label="Vendor Florist"
                   onChange={(e) => setVendorId(e.target.value)}
                 >
-                  {MOCK_VENDOR_FLORISTS.filter((v) => v.isActive).map((vendor) => (
+                  {vendorFlorists.filter((v) => v.isActive !== false).map((vendor) => (
                     <MenuItem key={vendor.id} value={vendor.id}>
-                      {vendor.name} ({vendor.city})
+                      {vendor.name}{vendor.city ? ` (${vendor.city})` : ''}
                     </MenuItem>
                   ))}
                 </Select>
@@ -836,56 +870,6 @@ const WalkInPOS: React.FC = () => {
             </Typography>
           </Box>
 
-<<<<<<< HEAD
-          {showPayment ? (
-            <Button
-              variant="contained"
-              size="large"
-              fullWidth
-              startIcon={<PayIcon />}
-              disabled={state.items.length === 0}
-              onClick={handleOpenPay}
-              sx={{
-                py: 2, fontWeight: 800, fontSize: '1.1rem',
-                minHeight: 56,
-                bgcolor: dk ? '#fdd835' : undefined,
-                color: dk ? '#000' : undefined,
-                transition: 'all 0.15s',
-                '&:hover': {
-                  bgcolor: dk ? '#fbc02d' : undefined,
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-                },
-                '&:active': {
-                  transform: 'scale(0.98)',
-                },
-                '&.Mui-disabled': {
-                  bgcolor: dk ? 'rgba(255,255,255,0.08)' : undefined,
-                  color: dk ? 'rgba(255,255,255,0.3)' : undefined,
-                },
-              }}
-            >
-              Pay {state.totals.grandTotal > 0 ? fmtCurrency(state.totals.grandTotal) : ''}
-            </Button>
-          ) : (
-            <Alert severity="info" sx={{ fontSize: '0.85rem' }}>
-              Customer payment is handled by the wire network.
-            </Alert>
-          )}
-
-          <Button
-            variant="outlined"
-            size="small"
-            fullWidth
-            color="error"
-            disabled={state.items.length === 0}
-            onClick={() => { clearCart(); setSnackMsg('Cart cleared'); }}
-            sx={{ mt: 1.5, minHeight: 40 }}
-          >
-            Clear Cart
-          </Button>
-        </Box>
-=======
         <Button
           variant="outlined"
           size="small"
@@ -914,7 +898,6 @@ const WalkInPOS: React.FC = () => {
         >
           Clear Cart
         </Button>
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
       </Box>
 
       {/* ─── Hold Dialog ────────────────────────────────── */}
@@ -947,26 +930,11 @@ const WalkInPOS: React.FC = () => {
         />
       )}
 
-<<<<<<< HEAD
-      {/* ─── Quick Create Customer Modal ────────────── */}
-      <QuickCreateCustomerModal
-        open={createCustomerOpen}
-        onClose={() => setCreateCustomerOpen(false)}
-        prefillPhone={prefillPhone}
-        onCreated={(customer) => {
-          setSelectedCustomer(customer);
-          setCreateCustomerOpen(false);
-          setSnackMsg(`Customer created: ${customer.name}`);
-          // Return focus to product search after customer added
-          searchRef.current?.focus();
-        }}
-=======
       {/* ─── Gift Card Builder Modal ───────────────── */}
       <GiftCardBuilderModal
         open={giftCardOpen}
         onClose={() => setGiftCardOpen(false)}
         onSave={(card) => { setAttachedGiftCard(card); setSnackMsg('Gift Card attached to order'); }}
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
       />
 
       {/* ─── Snackbar ───────────────────────────────────── */}

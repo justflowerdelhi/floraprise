@@ -19,9 +19,11 @@ import {
 } from '@mui/icons-material';
 import type { TaskFormData, TaskPriority, RelatedEntityType } from './TaskTypes';
 import { TASK_PRIORITIES, TASK_PRIORITY_CONFIG, ENTITY_TYPE_CONFIG, getInitialTaskFormData } from './TaskTypes';
-import { createTask } from './TaskMockData';
-import { getAllStaff } from '../staff/StaffMockData';
-import { MOCK_LOCATIONS } from '../../core/location/LocationTypes';
+import { createTask } from '../../api/task.api';
+import { getAllStaff } from '../../api/staff.api';
+import { getLocations } from '../../api/location.api';
+import { useToast } from '../../hooks/useToast';
+import { useApiCall } from '../../hooks/useApiCall';
 
 // ─── Props ──────────────────────────────────────────────────
 
@@ -43,12 +45,30 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
 }) => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  const toast = useToast();
+  const { execute, loading } = useApiCall();
 
   const [form, setForm] = useState<TaskFormData>(() => getInitialTaskFormData(defaults));
   const [errors, setErrors] = useState<Partial<Record<keyof TaskFormData, string>>>({});
+  const [activeStaff, setActiveStaff] = useState<any[]>([]);
+  const [activeLocations, setActiveLocations] = useState<any[]>([]);
 
-  const activeStaff = getAllStaff().filter((s) => s.isActive);
-  const activeLocations = MOCK_LOCATIONS.filter((l) => l.isActive);
+  // Load staff and locations from API on mount
+  useEffect(() => {
+    const loadData = async () => {
+      const [staffResult, locationsResult] = await Promise.all([
+        execute(() => getAllStaff(), { errorMessage: 'Failed to load staff' }),
+        execute(() => getLocations(), { errorMessage: 'Failed to load locations' }),
+      ]);
+      if (staffResult) {
+        setActiveStaff(Array.isArray(staffResult) ? staffResult.filter((s: any) => s.isActive) : []);
+      }
+      if (locationsResult) {
+        setActiveLocations(Array.isArray(locationsResult) ? locationsResult.filter((l: any) => l.isActive) : []);
+      }
+    };
+    loadData();
+  }, []);
 
   // Reset form when dialog opens with new defaults
   useEffect(() => {
@@ -74,24 +94,31 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
 
-    createTask({
-      tenantId: 'tenant-001',
-      locationId: form.locationId,
-      title: form.title.trim(),
-      description: form.description.trim() || undefined,
-      relatedEntityType: form.relatedEntityType || undefined,
-      relatedEntityId: form.relatedEntityId.trim() || undefined,
-      assignedTo: form.assignedTo,
-      dueDate: form.dueDate || undefined,
-      priority: form.priority,
-      status: 'PENDING',
-    });
+    const result = await execute(
+      () =>
+        createTask({
+          locationId: form.locationId,
+          title: form.title.trim(),
+          description: form.description.trim() || undefined,
+          relatedEntityType: form.relatedEntityType || undefined,
+          relatedEntityId: form.relatedEntityId.trim() || undefined,
+          assignedToStaffId: form.assignedTo,
+          dueDate: form.dueDate || undefined,
+          priority: form.priority,
+        }),
+      {
+        successMessage: 'Task created successfully',
+        errorMessage: 'Failed to create task',
+      },
+    );
 
-    onCreated?.();
-    onClose();
+    if (result) {
+      onCreated?.();
+      onClose();
+    }
   };
 
   return (
@@ -285,6 +312,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
         <Button
           variant="contained"
           onClick={handleSubmit}
+          disabled={loading}
           startIcon={<TaskIcon />}
           sx={{
             bgcolor: '#7c4dff',

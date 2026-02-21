@@ -31,8 +31,8 @@ builder.Services.AddCors(options =>
     {
         if (corsOrigins.Length == 0)
         {
-            // If no origins configured allow nothing by default - caller can adjust appsettings
-            policy.WithOrigins()
+            // Development: allow any origin
+            policy.AllowAnyOrigin()
                   .AllowAnyHeader()
                   .AllowAnyMethod();
         }
@@ -204,6 +204,21 @@ builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddScoped<AuditLogService>();
 
+// Delivery Zones
+builder.Services.AddScoped<IDeliveryZoneRepository, DeliveryZoneRepository>();
+builder.Services.AddScoped<DeliveryZoneService>();
+
+// Wire Orders
+builder.Services.AddScoped<IWireOrderRepository, WireOrderRepository>();
+builder.Services.AddScoped<WireOrderService>();
+
+// Proposals
+builder.Services.AddScoped<IProposalRepository, ProposalRepository>();
+builder.Services.AddScoped<ProposalService>();
+
+// Analytics
+builder.Services.AddScoped<ProfitDashboardService>();
+
 #endregion
 
 #region Controllers & OpenAPI
@@ -238,8 +253,16 @@ app.MapControllers();
 #endregion
 
 #region Data Seed
-
-await DataSeeder.SeedAsync(app.Services);
+try
+{
+    await DataSeeder.SeedAsync(app.Services);
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "An error occurred during data seeding.");
+    throw; // Re-throw to prevent the app from starting with an unseeded database
+}
 
 #endregion
 

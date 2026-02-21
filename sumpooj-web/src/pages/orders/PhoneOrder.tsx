@@ -28,9 +28,9 @@ import {
   StoreMallDirectory as PickupIcon,
   LocalShipping as DeliveryIcon,
   AccessTime as TimeIcon,
+  CardGiftcard as GiftCardIcon,
 } from '@mui/icons-material';
-import { CardGiftcard as GiftCardIcon } from '@mui/icons-material';
-import type { ProductCategory } from './OrderTypes';
+import type { ProductCategory, Product } from './OrderTypes';
 import { MOCK_PRODUCTS, PRODUCT_CATEGORIES } from './OrderMockData';
 import { OCCASIONS, TIME_SLOTS } from './OrderTypes';
 import type { TimeSlot } from './OrderTypes';
@@ -42,11 +42,13 @@ import CartSummaryPanel from '../cart/CartSummaryPanel';
 import { fmtCurrency } from '../cart/CartUtils';
 import PaymentModal from '../payments/PaymentModal';
 import SmartAddressInput from './SmartAddressInput';
-import { MOCK_CUSTOMERS, type Customer } from '../crm/CRMTypes';
+import { type Customer } from '../crm/CRMTypes';
 import { useOrders } from './OrderContext';
 import { GiftCardBuilderModal } from '../gift-cards';
 import type { SavedGiftCard } from '../gift-cards';
 import { processOrderInventory, inferFulfillmentMode } from '../inventory/InventoryMovementService';
+import { searchProducts } from '../../api/product.api';
+import { searchCustomers } from '../../api/customer.api';
 
 const PhoneOrder: React.FC = () => {
   const theme = useTheme();
@@ -59,6 +61,28 @@ const PhoneOrder: React.FC = () => {
   const { state, addProduct, removeItem, updateQty, setDiscount, clearCart, setOrderSource } = useCart();
   const { addOrder } = useOrders();
 >>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
+
+  // ─── API-loaded data ──────────────────────────────────────
+  const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [prodRes, custRes] = await Promise.all([
+          searchProducts({ IsActive: true, PageSize: 500 }),
+          searchCustomers({ PageSize: 500 }),
+        ]);
+        const prodItems = Array.isArray(prodRes) ? prodRes : prodRes.items ?? [];
+        setProducts(prodItems);
+        const custItems = Array.isArray(custRes) ? custRes : custRes.items ?? [];
+        setCustomers(custItems);
+      } catch {
+        // Silently handle — products/customers will just be empty
+      }
+    };
+    loadData();
+  }, []);
 
   // ─── Fulfillment Type ───────────────────────────────────────
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('DELIVERY');
@@ -95,14 +119,14 @@ const PhoneOrder: React.FC = () => {
   // Filtered customer suggestions based on name or phone input
   const customerSuggestions = useMemo(() => {
     const q = (customerName || customerPhone || '').toLowerCase().trim();
-    if (!q) return MOCK_CUSTOMERS;
-    return MOCK_CUSTOMERS.filter(
+    if (!q) return customers;
+    return customers.filter(
       (c) => c.name.toLowerCase().includes(q) || c.phone.replace(/\s/g, '').includes(q.replace(/\s/g, '')),
     );
   }, [customerName, customerPhone]);
 
   const filteredProducts = useMemo(() => {
-    let list = MOCK_PRODUCTS;
+    let list = products;
     if (categoryFilter) list = list.filter((p) => p.category === categoryFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -729,7 +753,7 @@ const PhoneOrder: React.FC = () => {
         <Box sx={{ flex: 1, overflow: 'auto', px: 2 }}>
           <CartTable
             items={state.items}
-            products={MOCK_PRODUCTS}
+            products={products}
             isPriceEditable={state.isPriceEditable}
             onUpdateQty={updateQty}
             onRemove={removeItem}

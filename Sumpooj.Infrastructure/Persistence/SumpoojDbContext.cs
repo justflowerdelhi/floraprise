@@ -46,6 +46,12 @@ public class SumpoojDbContext
     public DbSet<DayClose> DayCloses => Set<DayClose>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+    // New entities
+    public DbSet<DeliveryZone> DeliveryZones => Set<DeliveryZone>();
+    public DbSet<WireOrder> WireOrders => Set<WireOrder>();
+    public DbSet<Proposal> Proposals => Set<Proposal>();
+    public DbSet<ProposalItem> ProposalItems => Set<ProposalItem>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

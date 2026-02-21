@@ -5,10 +5,12 @@ import {
   DialogActions,
   TextField,
   Button,
-  Stack
+  Stack,
+  CircularProgress,
 } from "@mui/material";
 import { useState } from "react";
 import { createCustomer } from "../../api/customer.api";
+import { useApiCall } from "../../hooks/useApiCall";
 
 export default function CreateCustomerDialog({
   open,
@@ -22,17 +24,21 @@ export default function CreateCustomerDialog({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [message, setMessage] = useState("");
+  const { execute, loading } = useApiCall();
 
   const save = async () => {
-    await createCustomer({
-      name,
-      email,
-      phone,
-      defaultCardMessage: message
-    });
-    onCreated();
-    onClose();
+    if (!name.trim()) return;
+    const result = await execute(
+      () => createCustomer({ name, email: email || null, phone: phone || null }),
+      { successMessage: 'Customer created successfully', errorMessage: 'Failed to create customer' }
+    );
+    if (result !== undefined) {
+      setName('');
+      setEmail('');
+      setPhone('');
+      onCreated();
+      onClose();
+    }
   };
 
   return (
@@ -41,22 +47,16 @@ export default function CreateCustomerDialog({
 
       <DialogContent>
         <Stack spacing={2} mt={1}>
-          <TextField label="Name" required onChange={e => setName(e.target.value)} />
-          <TextField label="Email" onChange={e => setEmail(e.target.value)} />
-          <TextField label="Phone" onChange={e => setPhone(e.target.value)} />
-          <TextField
-            label="Default Card Message"
-            multiline
-            rows={3}
-            onChange={e => setMessage(e.target.value)}
-          />
+          <TextField label="Name" required value={name} onChange={e => setName(e.target.value)} />
+          <TextField label="Email" value={email} onChange={e => setEmail(e.target.value)} />
+          <TextField label="Phone" value={phone} onChange={e => setPhone(e.target.value)} />
         </Stack>
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={save}>
-          Save
+        <Button onClick={onClose} disabled={loading}>Cancel</Button>
+        <Button variant="contained" onClick={save} disabled={loading || !name.trim()}>
+          {loading ? <CircularProgress size={20} /> : 'Save'}
         </Button>
       </DialogActions>
     </Dialog>

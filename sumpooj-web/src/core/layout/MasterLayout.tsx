@@ -125,7 +125,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
         {/* Mobile Logo */}
         <Box 
           sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', cursor: 'pointer' }}
-          onClick={() => window.location.href = '/dashboard'}
+          onClick={() => navigate('/dashboard')}
         >
           <img 
             src="/assets/logo/floraedge-icon.svg"

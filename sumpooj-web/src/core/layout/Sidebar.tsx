@@ -300,6 +300,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const dk = theme.palette.mode === 'dark';
   const { getFilteredMenu } = useRBAC();
   const { hasFeature } = useTenant();
+  const navigate = useNavigate();
 
   const wireRoutes = new Set(['/wire-vendors', '/wire-settlements']);
 
@@ -340,7 +341,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           borderBottom: `1px solid ${dk ? 'rgba(255,255,255,0.06)' : '#e0e0e0'}`,
           cursor: 'pointer',
         }}
-        onClick={() => window.location.href = '/dashboard'}
+        onClick={() => navigate('/dashboard')}
       >
         {!collapsed && (
           <Box sx={{ display: 'flex', alignItems: 'center', height: 32 }}>
