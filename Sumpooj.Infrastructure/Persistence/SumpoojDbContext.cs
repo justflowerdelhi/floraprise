@@ -56,6 +56,10 @@ public class SumpoojDbContext
     public DbSet<ProposalItem> ProposalItems => Set<ProposalItem>();
     public DbSet<TaxRule> TaxRules => Set<TaxRule>();
 
+    // Payment Gateway entities
+    public DbSet<PaymentGatewayConfig> PaymentGatewayConfigs => Set<PaymentGatewayConfig>();
+    public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

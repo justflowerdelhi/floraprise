@@ -9,6 +9,7 @@ using Sumpooj.API.Infrastructure;
 using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Companies;
 using Sumpooj.Application.Interfaces;
+using Sumpooj.Application.Payments;
 using Sumpooj.Application.UseCases;
 using Sumpooj.Infrastructure;
 using Sumpooj.Infrastructure.Companies;
@@ -229,6 +230,14 @@ builder.Services.AddScoped<TaxCalculationService>();
 
 // Analytics
 builder.Services.AddScoped<ProfitDashboardService>();
+
+// Payment Gateway Services
+builder.Services.AddHttpClient(); // For gateway HTTP calls
+builder.Services.AddScoped<IPaymentGatewayConfigRepository, PaymentGatewayConfigRepository>();
+builder.Services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();
+builder.Services.AddScoped<IPaymentGatewayFactory, PaymentGatewayFactory>();
+builder.Services.AddScoped<PaymentGatewayConfigService>();
+builder.Services.AddScoped<GatewayPaymentService>();
 
 #endregion
 
