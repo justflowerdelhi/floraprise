@@ -147,7 +147,14 @@ export interface Product {
   id: string;
   name: string;
   sku: string;
+  /** External/manufacturer barcode (UPC, EAN) */
   barcode?: string;
+  /** Internal auto-generated barcode */
+  internalBarcode?: string;
+  /** Batch-specific barcode (for perishables) */
+  batchBarcode?: string;
+  /** Finished goods barcode (for production) */
+  finishedBarcode?: string;
   category: ProductCategory;
   sellingPrice: number;
   costPrice: number;       // weighted avg FIFO cost

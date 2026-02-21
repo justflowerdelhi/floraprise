@@ -121,11 +121,6 @@ const WalkInPOS: React.FC = () => {
   const [commissionPercent, setCommissionPercent] = useState(10);
   const [lastScanTime, setLastScanTime] = useState(0);
 
-  // Customer selection state
-  const [selectedCustomer, setSelectedCustomer] = useState<SelectedCustomer | null>(null);
-  const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
-  const [prefillPhone, setPrefillPhone] = useState('');
-
   // Auto-focus search on mount
   useEffect(() => {
     searchRef.current?.focus();
@@ -157,7 +152,20 @@ const WalkInPOS: React.FC = () => {
   }, [search, categoryFilter]);
 
   const handleBarcodeSubmit = () => {
-    const product = products.find((p) => !p.isPerishable && p.barcode === search.trim());
+    const searchTerm = search.trim();
+    if (!searchTerm) return;
+    
+    // Search order: externalBarcode → internalBarcode → batchBarcode → finishedBarcode
+    const product = products.find((p) => {
+      if (p.isPerishable) return false; // Skip perishables (use batch)
+      return (
+        p.barcode === searchTerm ||
+        p.internalBarcode === searchTerm ||
+        p.batchBarcode === searchTerm ||
+        p.finishedBarcode === searchTerm
+      );
+    });
+    
     if (product) {
       addProduct(product);
       setSearch('');
@@ -424,23 +432,8 @@ const WalkInPOS: React.FC = () => {
 
       {/* ─── CENTER: Cart ───────────────────────────────── */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Customer Selection - Fast lookup */}
-        <Box sx={{ px: 2, pt: 2, pb: 1 }}>
-          <CustomerSearchBar
-            selectedCustomer={selectedCustomer}
-            onSelectCustomer={(customer) => {
-              setSelectedCustomer(customer);
-              if (customer) setSnackMsg(`Customer: ${customer.name}`);
-            }}
-            onCreateNew={(phone) => {
-              setPrefillPhone(phone ?? '');
-              setCreateCustomerOpen(true);
-            }}
-          />
-        </Box>
-
         {/* Cart header + held orders */}
-        <Box sx={{ p: 2, pb: 1, pt: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box sx={{ p: 2, pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <CartIcon sx={{ color: dk ? '#fdd835' : theme.palette.primary.main }} />

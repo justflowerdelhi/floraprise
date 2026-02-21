@@ -19,6 +19,7 @@ import { CartProvider } from '../pages/cart/CartContext';
 import { PaymentProvider } from '../pages/payments/PaymentContext';
 import { OrderProvider } from '../pages/orders/OrderContext';
 import WalkInPOS from '../pages/orders/WalkInPOS';
+import { POSLayout, POSFullScreenLayout, POSScreen } from '../pages/pos';
 import ProfitDashboard from '../pages/profit-intelligence/ProfitDashboard';
 import PhoneOrder from '../pages/orders/PhoneOrder';
 import ExternalOrdersInbox from '../pages/orders/ExternalOrdersInbox';
@@ -100,6 +101,19 @@ export default function AppRoutes() {
           }
         />
 
+        {/* Full-Screen POS (separate from MasterLayout) */}
+        <Route
+          element={
+            <RequireAuth>
+              <OrderProvider>
+                <POSFullScreenLayout />
+              </OrderProvider>
+            </RequireAuth>
+          }
+        >
+          <Route path="/pos-fullscreen" element={<POSScreen />} />
+        </Route>
+
         {/* Protected Routes with MasterLayout */}
         <Route
           element={
@@ -120,6 +134,16 @@ export default function AppRoutes() {
               <PaymentProvider>
                 <CartProvider>
                   <WalkInPOS />
+                </CartProvider>
+              </PaymentProvider>
+            }
+          />
+          <Route
+            path="/pos-v2"
+            element={
+              <PaymentProvider>
+                <CartProvider>
+                  <POSLayout />
                 </CartProvider>
               </PaymentProvider>
             }

@@ -55,12 +55,8 @@ const PhoneOrder: React.FC = () => {
   const dk = theme.palette.mode === 'dark';
   const bgColor = dk ? '#0f0f0f' : '#f8f9fa';
 
-<<<<<<< HEAD
   const { state, addProduct, removeItem, updateQty, setDiscount, setLineDiscount, clearCart, setOrderSource, setOrderDiscount, clearOrderDiscount } = useCart();
-=======
-  const { state, addProduct, removeItem, updateQty, setDiscount, clearCart, setOrderSource } = useCart();
   const { addOrder } = useOrders();
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
 
   // ─── API-loaded data ──────────────────────────────────────
   const [products, setProducts] = useState<Product[]>([]);

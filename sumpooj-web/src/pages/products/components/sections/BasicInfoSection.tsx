@@ -3,9 +3,14 @@
  * Core product information fields
  */
 
-import { Box, Grid, IconButton, Tooltip, Typography, Chip } from '@mui/material';
+import { useState, useCallback } from 'react';
+import { Box, Grid, IconButton, Tooltip, Typography, Chip, ToggleButton, ToggleButtonGroup, CircularProgress } from '@mui/material';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+import AutoModeIcon from '@mui/icons-material/AutoMode';
+import BlockIcon from '@mui/icons-material/Block';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import SectionCard from '../SectionCard';
 import { FormTextField, FormSelect, FormSwitch } from '../FormFields';
 import {
@@ -14,6 +19,7 @@ import {
 } from '../../types/product.types';
 import type { FormSectionProps } from '../../types/product.types';
 import { generateSku } from '../../utils/product.utils';
+import { generateInternalBarcode } from '../../../../components/barcode/BarcodeUtils';
 
 interface BasicInfoSectionProps extends FormSectionProps {
   onGenerateSku?: () => void;
@@ -30,6 +36,12 @@ const BasicInfoSection = ({
   const productName = watch('productName');
   const status = watch('status');
   const isPerishable = watch('isPerishable');
+  const barcodeInputMethod = watch('barcodeInputMethod') || 'none';
+  const sku = watch('sku');
+
+  const [isValidatingBarcode, setIsValidatingBarcode] = useState(false);
+  const [barcodeError, setBarcodeError] = useState<string | null>(null);
+  const [barcodeValid, setBarcodeValid] = useState(false);
 
   const handleGenerateSku = () => {
     if (productName && productType) {
@@ -37,6 +49,37 @@ const BasicInfoSection = ({
       setValue('sku', newSku);
     }
   };
+
+  const handleBarcodeMethodChange = (_event: React.MouseEvent<HTMLElement>, newMethod: string | null) => {
+    if (newMethod) {
+      setValue('barcodeInputMethod', newMethod as 'scan' | 'auto_generate' | 'none');
+      setBarcodeError(null);
+      setBarcodeValid(false);
+      
+      // Clear barcode fields when switching methods
+      if (newMethod === 'none') {
+        setValue('barcode', '');
+        setValue('internalBarcode', '');
+      } else if (newMethod === 'auto_generate') {
+        setValue('barcode', ''); // Clear external barcode
+        // Auto-generate internal barcode
+        if (sku) {
+          const internalBarcode = generateInternalBarcode(sku);
+          setValue('internalBarcode', internalBarcode);
+        }
+      } else if (newMethod === 'scan') {
+        setValue('internalBarcode', ''); // Clear internal barcode
+      }
+    }
+  };
+
+  const handleGenerateInternalBarcode = useCallback(() => {
+    if (sku) {
+      const newBarcode = generateInternalBarcode(sku);
+      setValue('internalBarcode', newBarcode);
+      setBarcodeValid(true);
+    }
+  }, [sku, setValue]);
 
   return (
     <SectionCard
@@ -124,23 +167,110 @@ const BasicInfoSection = ({
           />
         </Grid>
 
-        {/* Barcode */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormTextField
-            name="barcode"
-            control={control}
-            label="Barcode"
-            placeholder="e.g., 123456789012"
-            tooltip={isPerishable ? 'Disabled for perishables (use batch QR instead)' : 'UPC, EAN, or other barcode format'}
-            disabled={isPerishable}
-            darkMode={darkMode}
-          />
-          {isPerishable && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-              Barcode is disabled for perishables. Use batch labels instead.
+        {/* Barcode Input Method Selection */}
+        <Grid size={{ xs: 12 }}>
+          <Box sx={{ mb: 1 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, color: darkMode ? 'grey.300' : 'grey.700' }}>
+              Barcode Method
             </Typography>
-          )}
+            <ToggleButtonGroup
+              value={barcodeInputMethod}
+              exclusive
+              onChange={handleBarcodeMethodChange}
+              size="small"
+              disabled={isPerishable}
+              sx={{
+                '& .MuiToggleButton-root': {
+                  textTransform: 'none',
+                  px: 2,
+                },
+              }}
+            >
+              <ToggleButton value="scan">
+                <QrCodeScannerIcon sx={{ mr: 1, fontSize: 18 }} />
+                Scan Manufacturer Barcode
+              </ToggleButton>
+              <ToggleButton value="auto_generate">
+                <AutoModeIcon sx={{ mr: 1, fontSize: 18 }} />
+                Auto Generate Internal
+              </ToggleButton>
+              <ToggleButton value="none">
+                <BlockIcon sx={{ mr: 1, fontSize: 18 }} />
+                No Barcode
+              </ToggleButton>
+            </ToggleButtonGroup>
+            {isPerishable && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                Barcode is disabled for perishables. Use batch labels instead.
+              </Typography>
+            )}
+          </Box>
         </Grid>
+
+        {/* External Barcode (Scan Mode) */}
+        {barcodeInputMethod === 'scan' && !isPerishable && (
+          <Grid size={{ xs: 12, md: 6 }}>
+            <FormTextField
+              name="barcode"
+              control={control}
+              label="Manufacturer Barcode"
+              placeholder="Scan or enter barcode..."
+              tooltip="Scan the manufacturer's UPC, EAN, or other barcode"
+              darkMode={darkMode}
+              startAdornment={<QrCodeScannerIcon sx={{ fontSize: 20, color: darkMode ? 'grey.500' : 'grey.400' }} />}
+              endAdornment={
+                isValidatingBarcode ? (
+                  <CircularProgress size={18} />
+                ) : barcodeValid ? (
+                  <CheckCircleIcon sx={{ color: 'success.main', fontSize: 20 }} />
+                ) : undefined
+              }
+            />
+            {barcodeError && (
+              <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                {barcodeError}
+              </Typography>
+            )}
+          </Grid>
+        )}
+
+        {/* Internal Barcode (Auto-Generate Mode) */}
+        {barcodeInputMethod === 'auto_generate' && !isPerishable && (
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+              <Box sx={{ flex: 1 }}>
+                <FormTextField
+                  name="internalBarcode"
+                  control={control}
+                  label="Internal Barcode"
+                  placeholder="Auto-generated barcode"
+                  tooltip="Internal barcode for products without manufacturer barcodes"
+                  darkMode={darkMode}
+                  disabled
+                  startAdornment={<AutoModeIcon sx={{ fontSize: 20, color: darkMode ? 'grey.500' : 'grey.400' }} />}
+                />
+              </Box>
+              <Tooltip title="Regenerate internal barcode">
+                <IconButton
+                  onClick={handleGenerateInternalBarcode}
+                  disabled={!sku}
+                  sx={{
+                    mt: 1,
+                    backgroundColor: darkMode ? 'grey.800' : 'grey.100',
+                    '&:hover': {
+                      backgroundColor: darkMode ? 'grey.700' : 'grey.200',
+                    },
+                  }}
+                >
+                  <AutorenewIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Internal barcodes are auto-generated and can be printed on labels.
+            </Typography>
+          </Grid>
+        )}
 
         {/* Brand */}
         <Grid size={{ xs: 12, md: 6 }}>

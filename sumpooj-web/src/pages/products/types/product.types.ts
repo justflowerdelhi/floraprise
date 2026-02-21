@@ -127,7 +127,9 @@ export interface ProductFormData {
   status: 'active' | 'inactive';
 
   // Basic Info (Optional)
+  barcodeInputMethod?: 'scan' | 'auto_generate' | 'none';
   barcode?: string;
+  internalBarcode?: string;
   brand?: string;
   description?: string;
 
@@ -183,7 +185,9 @@ export interface ProductApiPayload {
   // Core identification
   productName: string;
   sku: string;
+  barcodeInputMethod?: 'scan' | 'auto_generate' | 'none';
   barcode?: string;
+  internalBarcode?: string;
   
   // Classification
   productType: ProductType;

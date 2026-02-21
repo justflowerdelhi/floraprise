@@ -159,9 +159,6 @@ export const MOCK_ORDERS: Order[] = [
     orderType: 'LOCAL',
     isPriceEditable: true, customerName: 'Meera Joshi', customerPhone: '9876543210',
     fulfillmentStatus: 'COMPLETED', paymentStatus: 'PAID',
-<<<<<<< HEAD
-    items: [], totals: { subtotal: 1130, taxTotal: 56.5, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 1186.5, totalCost: 500, marginPercent: 57.9, marginWarning: false, itemCount: 4, lineCount: 2 },
-=======
     orderStatus: 'PAID',
     orderFulfillmentMode: 'IMMEDIATE' as OrderFulfillmentMode,
     inventoryStatus: 'DEDUCTED' as InventoryActionStatus,
@@ -172,8 +169,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p03', 'Sunflowers', 'SNF-003', 'Fresh Flowers', 3, 190, 80, 0.05,
         [mkBatchAlloc('B0005', 3, 78, 5)]),
     ],
-    totals: { subtotal: 1130, taxTotal: 56.5, discountTotal: 0, grandTotal: 1186.5, totalCost: 480, marginPercent: 57.5, marginWarning: false, itemCount: 5, lineCount: 2 },
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
+    totals: { subtotal: 1130, taxTotal: 56.5, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 1186.5, totalCost: 480, marginPercent: 57.5, marginWarning: false, itemCount: 5, lineCount: 2 },
     createdAt: daysAgo(5), updatedAt: daysAgo(5),
   },
   {
@@ -184,9 +180,6 @@ export const MOCK_ORDERS: Order[] = [
     deliveryDate: daysFrom(1), deliveryAddress: '45 MG Road, Pune 411001',
     cardMessage: 'Happy Anniversary!', occasion: 'Anniversary',
     fulfillmentStatus: 'IN_DESIGN', paymentStatus: 'UNPAID',
-<<<<<<< HEAD
-    items: [], totals: { subtotal: 2050, taxTotal: 246, discountTotal: 100, orderDiscountAmount: 0, grandTotal: 2196, totalCost: 900, marginPercent: 59, marginWarning: false, itemCount: 3, lineCount: 2 },
-=======
     orderStatus: 'DRAFT',
     orderFulfillmentMode: 'SCHEDULED' as OrderFulfillmentMode,
     inventoryStatus: 'RESERVED' as InventoryActionStatus,
@@ -196,8 +189,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p05', 'Spring Garden Arrangement', 'SGA-011', 'Arrangements', 1, 1200, 520, 0.12,
         [mkBatchAlloc('B0009', 1, 510, 4)]),
     ],
-    totals: { subtotal: 2050, taxTotal: 246, discountTotal: 100, grandTotal: 2196, totalCost: 900, marginPercent: 59, marginWarning: false, itemCount: 2, lineCount: 2 },
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
+    totals: { subtotal: 2050, taxTotal: 246, discountTotal: 100, orderDiscountAmount: 0, grandTotal: 2196, totalCost: 900, marginPercent: 59, marginWarning: false, itemCount: 2, lineCount: 2 },
     createdAt: daysAgo(1), updatedAt: daysAgo(1),
   },
   {
@@ -211,9 +203,6 @@ export const MOCK_ORDERS: Order[] = [
     cardMessage: 'Get well soon!', occasion: 'Get Well',
     externalCommission: 945, externalFees: 0, netPayout: 2555,
     fulfillmentStatus: 'CONFIRMED', paymentStatus: 'PAID',
-<<<<<<< HEAD
-    items: [], totals: { subtotal: 3500, taxTotal: 0, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 3500, totalCost: 1500, marginPercent: 57.1, marginWarning: false, itemCount: 5, lineCount: 3 },
-=======
     orderStatus: 'PAID',
     orderFulfillmentMode: 'SCHEDULED' as OrderFulfillmentMode,
     inventoryStatus: 'RESERVED' as InventoryActionStatus,
@@ -224,8 +213,7 @@ export const MOCK_ORDERS: Order[] = [
         [mkBatchAlloc('B0003', 2, 155, 3)]),
       mkCartItem('p13', 'Chocolate Box (Premium)', 'CBP-031', 'Add-Ons', 1, 650, 320, 0),
     ],
-    totals: { subtotal: 3500, taxTotal: 0, discountTotal: 0, grandTotal: 3500, totalCost: 1500, marginPercent: 57.1, marginWarning: false, itemCount: 4, lineCount: 3 },
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
+    totals: { subtotal: 3500, taxTotal: 0, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 3500, totalCost: 1500, marginPercent: 57.1, marginWarning: false, itemCount: 4, lineCount: 3 },
     createdAt: daysAgo(0), updatedAt: daysAgo(0),
   },
   {
@@ -235,9 +223,6 @@ export const MOCK_ORDERS: Order[] = [
     recipientName: 'Deepa Patil',
     deliveryDate: daysFrom(3), deliveryAddress: '78 Shivaji Nagar, Pune 411005',
     fulfillmentStatus: 'READY', paymentStatus: 'PAID',
-<<<<<<< HEAD
-    items: [], totals: { subtotal: 850, taxTotal: 102, discountTotal: 50, orderDiscountAmount: 0, grandTotal: 902, totalCost: 380, marginPercent: 57.9, marginWarning: false, itemCount: 1, lineCount: 1 },
-=======
     orderStatus: 'PAID',
     orderFulfillmentMode: 'SCHEDULED' as OrderFulfillmentMode,
     inventoryStatus: 'DEDUCTED' as InventoryActionStatus,
@@ -246,8 +231,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p04', 'Classic Rose Bouquet', 'CRB-010', 'Bouquets', 1, 850, 380, 0.12,
         [mkBatchAlloc('B0007', 1, 370, 5)]),
     ],
-    totals: { subtotal: 850, taxTotal: 102, discountTotal: 50, grandTotal: 902, totalCost: 380, marginPercent: 57.9, marginWarning: false, itemCount: 1, lineCount: 1 },
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
+    totals: { subtotal: 850, taxTotal: 102, discountTotal: 50, orderDiscountAmount: 0, grandTotal: 902, totalCost: 380, marginPercent: 57.9, marginWarning: false, itemCount: 1, lineCount: 1 },
     createdAt: daysAgo(2), updatedAt: daysAgo(0),
   },
   {
@@ -255,9 +239,6 @@ export const MOCK_ORDERS: Order[] = [
     orderType: 'LOCAL',
     isPriceEditable: true, customerName: 'Amit Deshmukh',
     fulfillmentStatus: 'DRAFT', paymentStatus: 'UNPAID',
-<<<<<<< HEAD
-    items: [], totals: { subtotal: 560, taxTotal: 28, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 588, totalCost: 220, marginPercent: 62.6, marginWarning: false, itemCount: 3, lineCount: 2 },
-=======
     orderStatus: 'DRAFT',
     orderFulfillmentMode: 'IMMEDIATE' as OrderFulfillmentMode,
     inventoryStatus: 'NONE' as InventoryActionStatus,
@@ -267,8 +248,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p08', "Baby's Breath", 'BBR-006', 'Fresh Flowers', 3, 60, 22, 0.05,
         [mkBatchAlloc('B0011', 3, 20, 5)]),
     ],
-    totals: { subtotal: 460, taxTotal: 23, discountTotal: 0, grandTotal: 483, totalCost: 186, marginPercent: 59.6, marginWarning: false, itemCount: 4, lineCount: 2 },
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
+    totals: { subtotal: 460, taxTotal: 23, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 483, totalCost: 186, marginPercent: 59.6, marginWarning: false, itemCount: 4, lineCount: 2 },
     createdAt: daysAgo(0), updatedAt: daysAgo(0),
   },
   {
@@ -282,9 +262,6 @@ export const MOCK_ORDERS: Order[] = [
     cardMessage: 'Wishing you all the best!', occasion: 'Congratulations',
     externalCommission: 250, externalFees: 0, netPayout: 2250,
     fulfillmentStatus: 'IN_DESIGN', paymentStatus: 'PAID',
-<<<<<<< HEAD
-    items: [], totals: { subtotal: 2500, taxTotal: 0, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 2500, totalCost: 980, marginPercent: 60.8, marginWarning: false, itemCount: 3, lineCount: 2 },
-=======
     orderStatus: 'PAID',
     orderFulfillmentMode: 'SCHEDULED' as OrderFulfillmentMode,
     inventoryStatus: 'RESERVED' as InventoryActionStatus,
@@ -293,8 +270,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p06', 'Orchid Phalaenopsis', 'ORC-004', 'Plants', 2, 550, 280, 0),
       mkCartItem('p09', 'Glass Cylinder Vase', 'GCV-020', 'Add-Ons', 1, 450, 180, 0),
     ],
-    totals: { subtotal: 1550, taxTotal: 0, discountTotal: 0, grandTotal: 2500, totalCost: 740, marginPercent: 52.3, marginWarning: false, itemCount: 3, lineCount: 2 },
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
+    totals: { subtotal: 1550, taxTotal: 0, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 2500, totalCost: 740, marginPercent: 52.3, marginWarning: false, itemCount: 3, lineCount: 2 },
     createdAt: daysAgo(0), updatedAt: daysAgo(0),
   },
   {
@@ -305,9 +281,6 @@ export const MOCK_ORDERS: Order[] = [
     deliveryDate: daysFrom(0), deliveryAddress: '88 Baner Road, Pune 411045',
     cardMessage: 'Happy Birthday sweetheart!', occasion: 'Birthday',
     fulfillmentStatus: 'READY', paymentStatus: 'PARTIAL',
-<<<<<<< HEAD
-    items: [], totals: { subtotal: 1800, taxTotal: 216, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 2016, totalCost: 720, marginPercent: 60, marginWarning: false, itemCount: 2, lineCount: 2 },
-=======
     orderStatus: 'PARTIALLY_PAID',
     orderFulfillmentMode: 'SCHEDULED' as OrderFulfillmentMode,
     inventoryStatus: 'RESERVED' as InventoryActionStatus,
@@ -319,8 +292,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p07', 'Eucalyptus Bunch', 'EUC-005', 'Greens & Foliage', 5, 210, 90, 0.05,
         [mkBatchAlloc('B0013', 5, 85, 4)]),
     ],
-    totals: { subtotal: 1900, taxTotal: 154.5, discountTotal: 0, grandTotal: 2016, totalCost: 830, marginPercent: 56.3, marginWarning: false, itemCount: 6, lineCount: 2 },
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
+    totals: { subtotal: 1900, taxTotal: 154.5, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 2016, totalCost: 830, marginPercent: 56.3, marginWarning: false, itemCount: 6, lineCount: 2 },
     createdAt: daysAgo(1), updatedAt: daysAgo(0),
   },
   {
@@ -339,7 +311,7 @@ export const MOCK_ORDERS: Order[] = [
       mkCartItem('p06', 'Orchid Phalaenopsis', 'ORC-004', 'Plants', 1, 550, 280, 0.05),
       mkCartItem('p09', 'Glass Cylinder Vase', 'GCV-020', 'Add-Ons', 2, 450, 180, 0.18),
     ],
-    totals: { subtotal: 2390, taxTotal: 261.5, discountTotal: 0, grandTotal: 3500, totalCost: 1000, marginPercent: 58.2, marginWarning: false, itemCount: 6, lineCount: 3 },
+    totals: { subtotal: 2390, taxTotal: 261.5, discountTotal: 0, orderDiscountAmount: 0, grandTotal: 3500, totalCost: 1000, marginPercent: 58.2, marginWarning: false, itemCount: 6, lineCount: 3 },
     createdAt: daysAgo(2), updatedAt: daysAgo(1),
   },
 ];

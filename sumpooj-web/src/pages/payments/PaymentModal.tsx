@@ -181,36 +181,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       </DialogTitle>
 
       <DialogContent dividers>
-<<<<<<< HEAD
-        {/* ─── Total at Top - Prominent Display ──────── */}
-        <Box
-          sx={{
-            textAlign: 'center',
-            py: 2,
-            mb: 3,
-            borderRadius: 2,
-            bgcolor: dk ? alpha('#fff', 0.04) : alpha('#000', 0.02),
-          }}
-        >
-          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1.5 }}>
-            Order Total
-          </Typography>
-          <Typography
-            sx={{
-              fontWeight: 800,
-              fontSize: '2.5rem',
-              letterSpacing: '-0.02em',
-              color: dk ? '#fdd835' : theme.palette.primary.main,
-              lineHeight: 1.2,
-            }}
-          >
-            {fmtPaymentAmount(grandTotal)}
-          </Typography>
-        </Box>
-
-        {/* ─── Balance Summary ──────────────────────────── */}
-=======
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
         <Box
           sx={{
             display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3,
@@ -219,15 +189,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           }}
         >
           <Box sx={{ textAlign: 'center' }}>
-<<<<<<< HEAD
-            <Typography variant="caption" color="text.secondary">Paid</Typography>
-            <Typography variant="h6" sx={{ fontWeight: 800, color: theme.palette.success.main }}>
-              {fmtPaymentAmount(approvedTotal)}
-            </Typography>
-=======
             <Typography variant="caption" color="text.secondary">Total</Typography>
             <Typography variant="h6" sx={{ fontWeight: 800 }}>{fmtPaymentAmount(grandTotal)}</Typography>
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
           </Box>
           <Box sx={{ textAlign: 'center' }}>
             <Typography variant="caption" color="text.secondary">Remaining</Typography>
@@ -240,123 +203,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           </Box>
         </Box>
 
-<<<<<<< HEAD
-        {/* ─── Payment Input ───────────────────────────── */}
-        {remaining > 0 && (
-          <>
-            {/* Method selector */}
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Payment Method</Typography>
-            <ToggleButtonGroup
-              value={method}
-              exclusive
-              onChange={(_, val: PaymentMethod | null) => val && setMethod(val)}
-              fullWidth
-              size="large"
-              sx={{ mb: 2 }}
-            >
-              {(Object.keys(PAYMENT_METHOD_CONFIG) as PaymentMethod[]).map((m) => (
-                <ToggleButton
-                  key={m}
-                  value={m}
-                  sx={{
-                    textTransform: 'none', fontWeight: 700, fontSize: '0.85rem',
-                    gap: 0.75, py: 1.75, minHeight: 56,
-                    transition: 'all 0.15s',
-                    '&.Mui-selected': {
-                      bgcolor: alpha(PAYMENT_METHOD_CONFIG[m].color, dk ? 0.25 : 0.15),
-                      color: PAYMENT_METHOD_CONFIG[m].color,
-                      borderColor: PAYMENT_METHOD_CONFIG[m].color,
-                      transform: 'scale(1.02)',
-                    },
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                    },
-                  }}
-                >
-                  {METHOD_ICONS[m]}
-                  {PAYMENT_METHOD_CONFIG[m].label}
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-
-            {/* Amount */}
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-end', mb: 2 }}>
-              <TextField
-                label="Amount"
-                type="number"
-                size="medium"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={remaining.toString()}
-                fullWidth
-                slotProps={{
-                  input: {
-                    sx: { fontWeight: 700, fontSize: '1.25rem', py: 0.5 },
-                  },
-                }}
-                helperText={`Remaining: ${fmtPaymentAmount(remaining)}`}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    minHeight: 56,
-                    ...(dk ? { color: '#e0e0e0', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' } } : {}),
-                  },
-                }}
-              />
-              <Button
-                variant="contained"
-                onClick={handleProcess}
-                disabled={processing || effectiveAmount <= 0}
-                sx={{
-                  minWidth: 160, py: 1.5, minHeight: 52, fontWeight: 800, fontSize: '1rem',
-                  bgcolor: PAYMENT_METHOD_CONFIG[method].color,
-                  transition: 'all 0.15s',
-                  '&:hover': {
-                    bgcolor: alpha(PAYMENT_METHOD_CONFIG[method].color, 0.85),
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-                  },
-                  '&:active': {
-                    transform: 'scale(0.98)',
-                  },
-                  '&.Mui-disabled': {
-                    bgcolor: dk ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
-                  },
-                }}
-              >
-                {processing ? <CircularProgress size={24} color="inherit" /> : 'Process'}
-              </Button>
-            </Box>
-
-            {/* Terminal feedback */}
-            {lastResult && (
-              <Alert
-                severity={lastResult.success ? 'success' : 'error'}
-                icon={lastResult.success ? <ApprovedIcon /> : <DeclinedIcon />}
-                sx={{ mb: 2, fontWeight: 600 }}
-              >
-                {lastResult.message}
-              </Alert>
-            )}
-          </>
-        )}
-
-        {remaining <= 0 && (
-          <Alert severity="success" sx={{ mb: 2, fontWeight: 600 }}>
-            Order is fully paid!
-          </Alert>
-        )}
-
-        {/* ─── Payment History ─────────────────────────── */}
-        {payments.length > 0 && (
-          <>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-              Payment History ({payments.length})
-            </Typography>
-            <TableContainer
-              component={Paper}
-              elevation={dk ? 0 : 1}
-=======
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
           Payment Methods
         </Typography>
@@ -367,7 +213,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
               variant={method === paymentMethod ? 'contained' : 'outlined'}
               onClick={() => handleMethodSelect(paymentMethod)}
               startIcon={METHOD_ICONS[paymentMethod]}
->>>>>>> 0bce1d340b81541ea96ee2e6f50c57e218312c38
               sx={{
                 minHeight: 56,
                 fontWeight: 700,
