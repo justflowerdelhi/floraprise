@@ -1,120 +1,153 @@
 /**
- * GiftCardPage.tsx — AI Floral Background Generator for Gift Card Module
- * Florist ERP SaaS
+ * GiftCardPage.tsx — Full-page Gift Card Builder
  *
- * Two-panel layout:
- *   Left  — Form (GiftCardDesigner)
- *   Right — Preview (GiftCardPreview)
+ * Two-panel layout: Designer (left, scrollable) + Live Preview (right, fixed).
+ * Includes Download-as-Image and Save actions.
  */
-import React, { useState, useCallback } from 'react';
-import { Box, useTheme } from '@mui/material';
+import React, { useState, useRef, useCallback } from 'react';
+import {
+  Box,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  Snackbar,
+  Alert,
+  useTheme,
+} from '@mui/material';
+import { Download, Save } from '@mui/icons-material';
+import { toPng } from 'html-to-image';
+import GiftCardBuilder from './GiftCardBuilder';
+import GiftCardPreview from './GiftCardPreview';
 import type { GiftCardFormData, SavedGiftCard } from './GiftCardTypes';
 import { INITIAL_FORM_DATA } from './GiftCardTypes';
-import { generateBackground } from './giftCardApi';
-import GiftCardDesigner from './GiftCardDesigner';
-import GiftCardPreview from './GiftCardPreview';
 
-const GiftCardPage: React.FC = () => {
+export default function GiftCardPage() {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
-  const bgColor = dk ? '#0f0f0f' : '#f8f9fa';
-
-  // ─── State ────────────────────────────────────────────────
 
   const [form, setForm] = useState<GiftCardFormData>({ ...INITIAL_FORM_DATA });
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
-  const [savedCards, setSavedCards] = useState<SavedGiftCard[]>([]);
+  const [snack, setSnack] = useState<{ msg: string; severity: 'success' | 'error' } | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
-  // ─── Form Change Handler ──────────────────────────────────
-
-  const handleFieldChange = useCallback(
-    (field: keyof GiftCardFormData, value: string) => {
-      setForm((prev) => ({ ...prev, [field]: value }));
-    },
+  const patchForm = useCallback(
+    (patch: Partial<GiftCardFormData>) => setForm((prev) => ({ ...prev, ...patch })),
     [],
   );
 
-  // ─── Generate Background ──────────────────────────────────
-
-  const handleGenerate = useCallback(async () => {
-    if (!form.occasion || !form.colorTheme || !form.floralStyle) return;
-
-    setIsGenerating(true);
+  // ── Download as Image ────────────────────────────────────
+  const handleDownload = useCallback(async () => {
+    if (!previewRef.current) return;
     try {
-      const result = await generateBackground({
-        occasion: form.occasion,
-        theme: form.colorTheme,
-        floralStyle: form.floralStyle,
-      });
-      setBackgroundImageUrl(result.backgroundImageUrl);
-    } catch (err) {
-      console.error('Failed to generate background:', err);
-    } finally {
-      setIsGenerating(false);
+      const dataUrl = await toPng(previewRef.current, { pixelRatio: 2 });
+      const link = document.createElement('a');
+      link.download = `gift-card-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+      setSnack({ msg: 'Image downloaded!', severity: 'success' });
+    } catch {
+      setSnack({ msg: 'Failed to export image', severity: 'error' });
     }
-  }, [form.occasion, form.colorTheme, form.floralStyle]);
-
-  // ─── Save Handler ─────────────────────────────────────────
-
-  const handleSave = useCallback((card: SavedGiftCard) => {
-    setSavedCards((prev) => [card, ...prev]);
-    console.log('💾 Gift Card saved:', card);
-    // In production, POST to backend or attach to order in context
   }, []);
 
-  // ─── Render ───────────────────────────────────────────────
+  // ── Save ─────────────────────────────────────────────────
+  const handleSave = useCallback((): SavedGiftCard => {
+    const saved: SavedGiftCard = {
+      id: `gc_${Date.now()}`,
+      occasion: form.occasion,
+      colorTheme: form.colorTheme,
+      backgroundStyle: form.backgroundId,
+      message: form.message,
+      senderName: form.senderName,
+      fontFamily: form.fontFamily,
+      fontSize: form.fontSize,
+      fontColor: form.fontColor,
+      logoUrl: form.logoPreviewUrl,
+      createdAt: new Date().toISOString(),
+    };
+    setSnack({ msg: `Gift card saved (${saved.id})`, severity: 'success' });
+    return saved;
+  }, [form]);
 
+  // ── Layout ───────────────────────────────────────────────
   return (
     <Box
       sx={{
         display: 'flex',
-        height: '100vh',
-        bgcolor: bgColor,
+        height: '100%',
+        bgcolor: dk ? '#0f0f0f' : '#f8f9fa',
+        gap: 2,
+        p: 2,
         overflow: 'hidden',
       }}
     >
-      {/* Left Panel — Designer Form */}
-      <Box
+      {/* ── Left: Designer Form ──────── */}
+      <Card
         sx={{
-          width: 400,
-          minWidth: 360,
-          maxWidth: 440,
-          borderRight: `1px solid ${dk ? 'rgba(255,255,255,0.06)' : '#e0e0e0'}`,
-          bgcolor: dk ? '#121212' : '#ffffff',
-          overflow: 'auto',
-          flexShrink: 0,
+          flex: '0 0 380px',
+          overflowY: 'auto',
+          bgcolor: dk ? '#1a1a1a' : '#fff',
+          borderRadius: 2,
         }}
       >
-        <GiftCardDesigner
-          form={form}
-          onChange={handleFieldChange}
-          onGenerate={handleGenerate}
-          isGenerating={isGenerating}
-          hasBackground={!!backgroundImageUrl}
-        />
-      </Box>
+        <CardContent sx={{ p: 0 }}>
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 700, px: 2, pt: 2, pb: 1 }}
+          >
+            Gift Card Designer
+          </Typography>
+          <GiftCardBuilder form={form} onChange={patchForm} />
+        </CardContent>
+      </Card>
 
-      {/* Right Panel — Preview */}
+      {/* ── Right: Preview + Actions ─── */}
       <Box
         sx={{
           flex: 1,
-          overflow: 'auto',
           display: 'flex',
-          alignItems: 'flex-start',
+          flexDirection: 'column',
+          alignItems: 'center',
           justifyContent: 'center',
-          p: 3,
+          gap: 2,
+          overflow: 'auto',
         }}
       >
-        <GiftCardPreview
-          form={form}
-          backgroundImageUrl={backgroundImageUrl}
-          isGenerating={isGenerating}
-          onSave={handleSave}
-        />
+        <GiftCardPreview ref={previewRef} form={form} />
+
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <Button
+            variant="contained"
+            startIcon={<Download />}
+            onClick={handleDownload}
+            disabled={!form.backgroundId}
+          >
+            Download as Image
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Save />}
+            onClick={handleSave}
+            disabled={!form.backgroundId || !form.message}
+          >
+            Save Card
+          </Button>
+        </Box>
       </Box>
+
+      {/* ── Snackbar ─────────────────── */}
+      <Snackbar
+        open={!!snack}
+        autoHideDuration={3000}
+        onClose={() => setSnack(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        {snack ? (
+          <Alert severity={snack.severity} onClose={() => setSnack(null)} variant="filled">
+            {snack.msg}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
     </Box>
   );
-};
-
-export default GiftCardPage;
+}

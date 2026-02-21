@@ -29,6 +29,7 @@ import {
   LocalShipping as DeliveryIcon,
   AccessTime as TimeIcon,
 } from '@mui/icons-material';
+import { CardGiftcard as GiftCardIcon } from '@mui/icons-material';
 import type { ProductCategory } from './OrderTypes';
 import { MOCK_PRODUCTS, PRODUCT_CATEGORIES } from './OrderMockData';
 import { OCCASIONS, TIME_SLOTS } from './OrderTypes';
@@ -43,6 +44,8 @@ import PaymentModal from '../payments/PaymentModal';
 import SmartAddressInput from './SmartAddressInput';
 import { MOCK_CUSTOMERS, type Customer } from '../crm/CRMTypes';
 import { useOrders } from './OrderContext';
+import { GiftCardBuilderModal } from '../gift-cards';
+import type { SavedGiftCard } from '../gift-cards';
 import { processOrderInventory, inferFulfillmentMode } from '../inventory/InventoryMovementService';
 
 const PhoneOrder: React.FC = () => {
@@ -80,6 +83,8 @@ const PhoneOrder: React.FC = () => {
   const [snackMsg, setSnackMsg] = useState('');
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [paymentOrderId, setPaymentOrderId] = useState('');
+  const [giftCardOpen, setGiftCardOpen] = useState(false);
+  const [attachedGiftCard, setAttachedGiftCard] = useState<SavedGiftCard | null>(null);
 
   useEffect(() => { setOrderSource('PHONE'); }, [setOrderSource]);
 
@@ -820,6 +825,25 @@ const PhoneOrder: React.FC = () => {
         >
           Proceed to Payment
         </Button>
+
+        <Button
+          variant="outlined"
+          size="small"
+          fullWidth
+          startIcon={<GiftCardIcon />}
+          onClick={() => setGiftCardOpen(true)}
+          sx={{
+            mt: 1,
+            borderColor: dk ? 'rgba(156,39,176,0.5)' : '#9c27b0',
+            color: dk ? '#ce93d8' : '#9c27b0',
+            '&:hover': {
+              borderColor: '#9c27b0',
+              bgcolor: dk ? 'rgba(156,39,176,0.08)' : 'rgba(156,39,176,0.04)',
+            },
+          }}
+        >
+          {attachedGiftCard ? 'Gift Card Attached ✓' : 'Add Gift Card'}
+        </Button>
       </Box>
 
       <PaymentModal
@@ -829,6 +853,13 @@ const PhoneOrder: React.FC = () => {
         orderSource={'PHONE'}
         grandTotal={grandTotalWithDelivery}
         onFullyPaid={handleFullyPaid}
+      />
+
+      {/* ─── Gift Card Builder Modal ───────────────── */}
+      <GiftCardBuilderModal
+        open={giftCardOpen}
+        onClose={() => setGiftCardOpen(false)}
+        onSave={(card) => { setAttachedGiftCard(card); setSnackMsg('Gift Card attached to order'); }}
       />
 
       <Snackbar

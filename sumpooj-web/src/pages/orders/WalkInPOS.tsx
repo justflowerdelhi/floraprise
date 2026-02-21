@@ -22,6 +22,7 @@ import {
   Person as PersonIcon,
   Phone as PhoneIcon,
 } from '@mui/icons-material';
+import { CardGiftcard as GiftCardIcon } from '@mui/icons-material';
 import type { Product, ProductCategory, OrderType, OrderPaymentEntry, Order } from './OrderTypes';
 import { MOCK_PRODUCTS, PRODUCT_CATEGORIES } from './OrderMockData';
 import { processOrderInventory, inferFulfillmentMode } from '../inventory/InventoryMovementService';
@@ -34,6 +35,8 @@ import { useTenant } from '../../core/tenant/TenantContext';
 import { MOCK_VENDOR_FLORISTS } from './WireMockData';
 import { MOCK_CUSTOMERS, type Customer } from '../crm/CRMTypes';
 import { useOrders } from './OrderContext';
+import { GiftCardBuilderModal } from '../gift-cards';
+import type { SavedGiftCard } from '../gift-cards';
 
 const WalkInPOS: React.FC = () => {
   const theme = useTheme();
@@ -53,6 +56,8 @@ const WalkInPOS: React.FC = () => {
   const [holdLabel, setHoldLabel] = useState('');
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [paymentOrderId, setPaymentOrderId] = useState('');
+  const [giftCardOpen, setGiftCardOpen] = useState(false);
+  const [attachedGiftCard, setAttachedGiftCard] = useState<SavedGiftCard | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Customer info
@@ -749,6 +754,24 @@ const WalkInPOS: React.FC = () => {
           variant="outlined"
           size="small"
           fullWidth
+          startIcon={<GiftCardIcon />}
+          onClick={() => setGiftCardOpen(true)}
+          sx={{
+            borderColor: dk ? 'rgba(156,39,176,0.5)' : '#9c27b0',
+            color: dk ? '#ce93d8' : '#9c27b0',
+            '&:hover': {
+              borderColor: '#9c27b0',
+              bgcolor: dk ? 'rgba(156,39,176,0.08)' : 'rgba(156,39,176,0.04)',
+            },
+          }}
+        >
+          {attachedGiftCard ? 'Gift Card Attached ✓' : 'Add Gift Card'}
+        </Button>
+
+        <Button
+          variant="outlined"
+          size="small"
+          fullWidth
           color="error"
           disabled={state.items.length === 0}
           onClick={() => { clearCart(); setCustomerName(''); setCustomerPhone(''); setSelectedCustomer(null); setCustomerError(false); setSnackMsg('Cart cleared'); }}
@@ -786,6 +809,13 @@ const WalkInPOS: React.FC = () => {
           customerValid={isCustomerValid}
         />
       )}
+
+      {/* ─── Gift Card Builder Modal ───────────────── */}
+      <GiftCardBuilderModal
+        open={giftCardOpen}
+        onClose={() => setGiftCardOpen(false)}
+        onSave={(card) => { setAttachedGiftCard(card); setSnackMsg('Gift Card attached to order'); }}
+      />
 
       {/* ─── Snackbar ───────────────────────────────────── */}
       <Snackbar
