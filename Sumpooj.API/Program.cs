@@ -50,8 +50,9 @@ builder.Services.AddCors(options =>
 #region Database
 
 builder.Services.AddDbContext<SumpoojDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("Default")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Default"))
+           .ConfigureWarnings(w => w.Ignore(
+               Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 
 #endregion
 
@@ -218,11 +219,11 @@ var app = builder.Build();
 
 #region Middleware
 
-if (app.Environment.IsDevelopment())
-{
+//if (app.Environment.IsDevelopment())
+//{
     app.MapOpenApi();
     app.MapScalarApiReference(); // optional API explorer
-}
+//}
 
 app.UseHttpsRedirection();
 
