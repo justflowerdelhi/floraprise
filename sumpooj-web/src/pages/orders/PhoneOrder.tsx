@@ -55,7 +55,7 @@ const PhoneOrder: React.FC = () => {
   const dk = theme.palette.mode === 'dark';
   const bgColor = dk ? '#0f0f0f' : '#f8f9fa';
 
-  const { state, addProduct, removeItem, updateQty, setDiscount, clearCart, setOrderSource } = useCart();
+  const { state, addProduct, removeItem, updateQty, setDiscount, setLineDiscount, clearCart, setOrderSource, setOrderDiscount, clearOrderDiscount } = useCart();
   const { addOrder } = useOrders();
 
   // ─── API-loaded data ──────────────────────────────────────
@@ -754,6 +754,7 @@ const PhoneOrder: React.FC = () => {
             onUpdateQty={updateQty}
             onRemove={removeItem}
             onSetDiscount={setDiscount}
+            onSetLineDiscount={setLineDiscount}
             deliveryFee={deliveryFee}
           />
         </Box>
@@ -771,7 +772,14 @@ const PhoneOrder: React.FC = () => {
           gap: 2,
         }}
       >
-        <CartSummaryPanel totals={state.totals} orderSource="PHONE" deliveryFee={deliveryFee} />
+        <CartSummaryPanel
+          totals={state.totals}
+          orderSource="PHONE"
+          deliveryFee={deliveryFee}
+          orderDiscount={state.orderDiscount}
+          onApplyDiscount={setOrderDiscount}
+          onRemoveDiscount={clearOrderDiscount}
+        />
 
         {/* Validation warnings */}
         {state.items.length > 0 && !isFormValid && (

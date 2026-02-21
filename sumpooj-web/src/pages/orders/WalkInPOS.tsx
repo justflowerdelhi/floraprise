@@ -49,7 +49,7 @@ const WalkInPOS: React.FC = () => {
   const wireEnabled = hasFeature('WIRE_MANAGEMENT');
   const { addOrder } = useOrders();
 
-  const { state, addProduct, removeItem, updateQty, setDiscount, clearCart, holdOrder, resumeOrder, removeHeld, setOrderSource } = useCart();
+  const { state, addProduct, removeItem, updateQty, setDiscount, setLineDiscount, clearCart, holdOrder, resumeOrder, removeHeld, setOrderSource, setOrderDiscount, clearOrderDiscount } = useCart();
 
   // ─── API-loaded data ──────────────────────────────────────
   const [products, setProducts] = useState<Product[]>([]);
@@ -119,6 +119,12 @@ const WalkInPOS: React.FC = () => {
   const [wireFee, setWireFee] = useState(0);
   const [sourceNetwork, setSourceNetwork] = useState('');
   const [commissionPercent, setCommissionPercent] = useState(10);
+  const [lastScanTime, setLastScanTime] = useState(0);
+
+  // Auto-focus search on mount
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
 
   // Set order source on mount
   useEffect(() => { setOrderSource('WALK_IN'); }, [setOrderSource]);
@@ -146,11 +152,26 @@ const WalkInPOS: React.FC = () => {
   }, [search, categoryFilter]);
 
   const handleBarcodeSubmit = () => {
-    const product = products.find((p) => !p.isPerishable && p.barcode === search.trim());
+    const searchTerm = search.trim();
+    if (!searchTerm) return;
+    
+    // Search order: externalBarcode → internalBarcode → batchBarcode → finishedBarcode
+    const product = products.find((p) => {
+      if (p.isPerishable) return false; // Skip perishables (use batch)
+      return (
+        p.barcode === searchTerm ||
+        p.internalBarcode === searchTerm ||
+        p.batchBarcode === searchTerm ||
+        p.finishedBarcode === searchTerm
+      );
+    });
+    
     if (product) {
       addProduct(product);
       setSearch('');
       setSnackMsg(`Added ${product.name}`);
+      // Keep focus in search for continuous scanning
+      searchRef.current?.focus();
     }
   };
 
@@ -273,11 +294,15 @@ const WalkInPOS: React.FC = () => {
         cursor: 'pointer',
         bgcolor: dk ? '#1a1a2e' : '#fff',
         border: dk ? '1px solid rgba(255,255,255,0.06)' : '1px solid #eee',
-        transition: 'all 0.15s',
+        transition: 'all 0.15s ease-out',
+        minHeight: 80,
         '&:hover': {
-          transform: 'translateY(-2px)',
-          boxShadow: dk ? '0 4px 16px rgba(0,0,0,0.4)' : '0 4px 16px rgba(0,0,0,0.08)',
+          transform: 'translateY(-3px)',
+          boxShadow: dk ? '0 6px 20px rgba(0,0,0,0.5)' : '0 6px 20px rgba(0,0,0,0.1)',
           borderColor: theme.palette.primary.main,
+        },
+        '&:active': {
+          transform: 'scale(0.98)',
         },
       }}
     >
@@ -330,7 +355,7 @@ const WalkInPOS: React.FC = () => {
           {/* Search / Barcode */}
           <TextField
             inputRef={searchRef}
-            size="small"
+            size="medium"
             fullWidth
             placeholder="Search or scan barcode..."
             value={search}
@@ -338,15 +363,16 @@ const WalkInPOS: React.FC = () => {
             onKeyDown={handleKeyDown}
             slotProps={{
               input: {
+                sx: { fontSize: '1rem', py: 0.5 },
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon sx={{ fontSize: 20, color: dk ? 'rgba(255,255,255,0.4)' : undefined }} />
+                    <SearchIcon sx={{ fontSize: 22, color: dk ? 'rgba(255,255,255,0.4)' : undefined }} />
                   </InputAdornment>
                 ),
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={handleBarcodeSubmit} title="Scan barcode">
-                      <BarcodeIcon sx={{ fontSize: 20 }} />
+                    <IconButton size="medium" onClick={handleBarcodeSubmit} title="Scan barcode" sx={{ mr: -0.5 }}>
+                      <BarcodeIcon sx={{ fontSize: 22 }} />
                     </IconButton>
                   </InputAdornment>
                 ),
@@ -354,31 +380,32 @@ const WalkInPOS: React.FC = () => {
             }}
             sx={{
               mb: 1.5,
-              '& .MuiOutlinedInput-root': dk
-                ? { color: '#e0e0e0', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' } }
-                : {},
+              '& .MuiOutlinedInput-root': {
+                minHeight: 48,
+                ...(dk ? { color: '#e0e0e0', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' } } : {}),
+              },
             }}
           />
 
-          {/* Category chips */}
-          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 1 }}>
+          {/* Category chips - Touch friendly */}
+          <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 1 }}>
             <Chip
               label="All"
-              size="small"
+              size="medium"
               onClick={() => setCategoryFilter('')}
               variant={categoryFilter === '' ? 'filled' : 'outlined'}
               color={categoryFilter === '' ? 'primary' : 'default'}
-              sx={{ fontSize: '0.7rem' }}
+              sx={{ fontSize: '0.8rem', height: 36, px: 1, fontWeight: 600 }}
             />
             {PRODUCT_CATEGORIES.map((cat) => (
               <Chip
                 key={cat}
                 label={cat}
-                size="small"
+                size="medium"
                 onClick={() => setCategoryFilter(cat === categoryFilter ? '' : cat)}
                 variant={categoryFilter === cat ? 'filled' : 'outlined'}
                 color={categoryFilter === cat ? 'primary' : 'default'}
-                sx={{ fontSize: '0.7rem' }}
+                sx={{ fontSize: '0.8rem', height: 36, px: 1, fontWeight: 600 }}
               />
             ))}
           </Box>
@@ -407,11 +434,29 @@ const WalkInPOS: React.FC = () => {
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Cart header + held orders */}
         <Box sx={{ p: 2, pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CartIcon sx={{ color: dk ? '#fdd835' : theme.palette.primary.main }} />
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              Cart ({state.totals.itemCount} items)
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CartIcon sx={{ color: dk ? '#fdd835' : theme.palette.primary.main }} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                Cart ({state.totals.itemCount} items)
+              </Typography>
+            </Box>
+            {/* Selected customer badge */}
+            {selectedCustomer && (
+              <Chip
+                label={selectedCustomer.name}
+                size="small"
+                color="success"
+                variant="outlined"
+                onDelete={() => setSelectedCustomer(null)}
+                sx={{
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  height: 26,
+                  '& .MuiChip-deleteIcon': { fontSize: '1rem' },
+                }}
+              />
+            )}
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             {state.heldOrders.length > 0 && (
@@ -425,12 +470,16 @@ const WalkInPOS: React.FC = () => {
               />
             )}
             <Button
-              size="small"
+              size="medium"
               variant="outlined"
               startIcon={<HoldIcon />}
               disabled={state.items.length === 0}
               onClick={() => setHoldDialogOpen(true)}
-              sx={dk ? { borderColor: 'rgba(255,255,255,0.2)', color: '#e0e0e0' } : {}}
+              sx={{
+                minHeight: 40,
+                fontWeight: 600,
+                ...(dk ? { borderColor: 'rgba(255,255,255,0.2)', color: '#e0e0e0' } : {}),
+              }}
             >
               Hold
             </Button>
@@ -463,15 +512,16 @@ const WalkInPOS: React.FC = () => {
             onUpdateQty={updateQty}
             onRemove={removeItem}
             onSetDiscount={setDiscount}
+            onSetLineDiscount={setLineDiscount}
           />
         </Box>
       </Box>
 
       {/* ─── RIGHT: Summary + Pay ───────────────────────── */}
       <Box sx={{
-        width: 280, minWidth: 260,
+        width: 300, minWidth: 280,
         borderLeft: `1px solid ${dk ? 'rgba(255,255,255,0.06)' : '#e0e0e0'}`,
-        display: 'flex', flexDirection: 'column', p: 2, gap: 2,
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
         {/* Customer Info */}
         <Card
@@ -713,7 +763,13 @@ const WalkInPOS: React.FC = () => {
           </Card>
         )}
 
-        <CartSummaryPanel totals={state.totals} orderSource="WALK_IN" />
+        <CartSummaryPanel
+          totals={state.totals}
+          orderSource="WALK_IN"
+          orderDiscount={state.orderDiscount}
+          onApplyDiscount={setOrderDiscount}
+          onRemoveDiscount={clearOrderDiscount}
+        />
 
         <Card
           elevation={dk ? 0 : 1}
@@ -769,35 +825,43 @@ const WalkInPOS: React.FC = () => {
             )}
           </CardContent>
         </Card>
+        </Box>
 
-        <Divider sx={{ borderColor: dk ? 'rgba(255,255,255,0.06)' : undefined }} />
-
-        {showPayment ? (
-          <Button
-            variant="contained"
-            size="large"
-            fullWidth
-            startIcon={<PayIcon />}
-            disabled={state.items.length === 0}
-            onClick={handleOpenPay}
+        {/* Sticky Total + Pay Section */}
+        <Box
+          sx={{
+            p: 2,
+            borderTop: `1px solid ${dk ? 'rgba(255,255,255,0.08)' : '#e0e0e0'}`,
+            bgcolor: dk ? '#0a0a0f' : '#fafafa',
+          }}
+        >
+          {/* Total Display */}
+          <Box
             sx={{
-              py: 1.5, fontWeight: 800, fontSize: '1rem',
-              bgcolor: dk ? '#fdd835' : undefined,
-              color: dk ? '#000' : undefined,
-              '&:hover': { bgcolor: dk ? '#fbc02d' : undefined },
-              '&.Mui-disabled': {
-                bgcolor: dk ? 'rgba(255,255,255,0.08)' : undefined,
-                color: dk ? 'rgba(255,255,255,0.3)' : undefined,
-              },
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mb: 2,
+              p: 2,
+              borderRadius: 2,
+              bgcolor: dk ? 'rgba(255,255,255,0.04)' : '#fff',
+              border: `1px solid ${dk ? 'rgba(255,255,255,0.08)' : '#e0e0e0'}`,
             }}
           >
-            Pay {state.totals.grandTotal > 0 ? fmtCurrency(state.totals.grandTotal) : ''}
-          </Button>
-        ) : (
-          <Alert severity="info" sx={{ fontSize: '0.85rem' }}>
-            Customer payment is handled by the wire network.
-          </Alert>
-        )}
+            <Typography variant="body1" sx={{ fontWeight: 600, color: dk ? 'rgba(255,255,255,0.7)' : 'text.secondary' }}>
+              Total
+            </Typography>
+            <Typography
+              sx={{
+                fontWeight: 800,
+                fontSize: '1.875rem',
+                letterSpacing: '-0.02em',
+                color: dk ? '#fdd835' : theme.palette.primary.main,
+              }}
+            >
+              {fmtCurrency(state.totals.grandTotal)}
+            </Typography>
+          </Box>
 
         <Button
           variant="outlined"
@@ -869,11 +933,17 @@ const WalkInPOS: React.FC = () => {
       {/* ─── Snackbar ───────────────────────────────────── */}
       <Snackbar
         open={!!snackMsg}
-        autoHideDuration={2000}
+        autoHideDuration={1500}
         onClose={() => setSnackMsg('')}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        TransitionProps={{ timeout: { enter: 150, exit: 150 } }}
       >
-        <Alert severity="success" variant="filled" onClose={() => setSnackMsg('')}>
+        <Alert
+          severity="success"
+          variant="filled"
+          onClose={() => setSnackMsg('')}
+          sx={{ minWidth: 200, fontWeight: 600 }}
+        >
           {snackMsg}
         </Alert>
       </Snackbar>

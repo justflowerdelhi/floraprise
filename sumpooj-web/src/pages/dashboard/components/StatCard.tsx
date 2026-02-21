@@ -33,8 +33,8 @@ export default function StatCard({
       className={`
         bg-white rounded-xl shadow-sm border border-slate-100
         p-5 flex flex-col justify-between h-full
-        transition-all duration-200
-        ${href ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]' : ''}
+        transition-all duration-200 hover:shadow-md hover:-translate-y-1
+        ${href ? 'cursor-pointer active:scale-[0.98]' : ''}
       `}
     >
       {/* Top row: icon + label */}
@@ -42,19 +42,19 @@ export default function StatCard({
         <div className={`w-10 h-10 rounded-xl ${iconBg} ${iconColor} flex items-center justify-center shrink-0`}>
           {icon}
         </div>
-        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide leading-tight">
+        <p className="text-sm text-gray-500 font-medium leading-tight">
           {label}
         </p>
       </div>
 
       {/* Metric */}
-      <p className="text-2xl font-bold text-slate-800 leading-tight">
+      <p className="text-2xl font-semibold text-gray-900 leading-tight">
         {typeof value === 'number' ? value.toLocaleString('en-IN') : value}
       </p>
 
       {/* Subtitle */}
       {subtitle && (
-        <p className="text-xs text-slate-400 mt-1">{subtitle}</p>
+        <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
       )}
     </div>
   );

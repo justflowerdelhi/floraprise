@@ -156,6 +156,26 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      {/* Loading Overlay */}
+      {processing && (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            bgcolor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10,
+            borderRadius: 'inherit',
+          }}
+        >
+          <CircularProgress size={48} sx={{ color: '#fff' }} />
+          <Typography sx={{ color: '#fff', mt: 2, fontWeight: 600 }}>Processing payment...</Typography>
+        </Box>
+      )}
+
       <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>
         <Typography variant="h6" sx={{ fontWeight: 800 }}>Split Payment</Typography>
       </DialogTitle>

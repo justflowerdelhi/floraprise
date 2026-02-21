@@ -64,9 +64,19 @@ export const productFormSchema = z.object({
   // ========================================
   // BASIC INFO (Optional)
   // ========================================
+  barcodeInputMethod: z
+    .enum(['scan', 'auto_generate', 'none'])
+    .default('none'),
+
   barcode: z
     .string()
     .max(50, 'Barcode must be less than 50 characters')
+    .optional()
+    .or(z.literal('')),
+
+  internalBarcode: z
+    .string()
+    .max(50, 'Internal barcode must be less than 50 characters')
     .optional()
     .or(z.literal('')),
 

@@ -94,7 +94,7 @@ export default function ManagerDashboard({ data }: ManagerDashboardProps) {
   return (
     <div>
       {/* Metric cards — 4-col grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
         <StatCard label="Orders to Fulfill" value={data.ordersToFulfill} icon={Icons.orders} iconBg="bg-blue-50" iconColor="text-blue-600" href="/order-list" />
         <StatCard label="Deliveries Today" value={data.deliveriesScheduled} icon={Icons.delivery} iconBg="bg-emerald-50" iconColor="text-emerald-600" href="/delivery-scheduler" />
         <StatCard label="Production Pending" value={data.productionPending} icon={Icons.production} iconBg="bg-violet-50" iconColor="text-violet-600" href="/production/produce" />
@@ -103,15 +103,21 @@ export default function ManagerDashboard({ data }: ManagerDashboardProps) {
         <StatCard label="Staff Tasks" value={data.staffTasksPending} icon={Icons.staff} iconBg="bg-slate-100" iconColor="text-slate-600" href="/staff" subtitle="Pending" />
       </div>
 
+      {/* Subtle divider */}
+      <div className="border-t border-gray-100 my-8" />
+
       {/* Quick actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
         <QuickActionButton label="Create Production" icon={Icons.qaProd} href="/production/produce" variant="primary" />
         <QuickActionButton label="View Deliveries" icon={Icons.qaTruck} href="/delivery-scheduler" />
         <QuickActionButton label="Inventory Adjustment" icon={Icons.qaAdjust} href="/adjustments/new" />
       </div>
 
+      {/* Subtle divider */}
+      <div className="border-t border-gray-100 my-8" />
+
       {/* Operation alerts */}
-      {data.topAlerts.length > 0 && (
+      {data.topAlerts.length > 0 ? (
         <div>
           <div className="mb-4">
             <SectionHeading title="Alerts" count={data.topAlerts.length} />
@@ -121,6 +127,10 @@ export default function ManagerDashboard({ data }: ManagerDashboardProps) {
               <AlertRow key={a.id} alert={a} />
             ))}
           </div>
+        </div>
+      ) : (
+        <div className="text-center py-12 text-gray-400">
+          <p className="text-sm">No alerts for today</p>
         </div>
       )}
     </div>

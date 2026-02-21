@@ -147,7 +147,14 @@ export interface Product {
   id: string;
   name: string;
   sku: string;
+  /** External/manufacturer barcode (UPC, EAN) */
   barcode?: string;
+  /** Internal auto-generated barcode */
+  internalBarcode?: string;
+  /** Batch-specific barcode (for perishables) */
+  batchBarcode?: string;
+  /** Finished goods barcode (for production) */
+  finishedBarcode?: string;
   category: ProductCategory;
   sellingPrice: number;
   costPrice: number;       // weighted avg FIFO cost
@@ -187,12 +194,29 @@ export interface CartItem {
   batchAllocations: BatchAllocation[];
   expiryWarning: boolean;   // true if any batch expiry ≤ 3 days
   stockWarning: boolean;    // true if requested > available
+  lineDiscount?: LineItemDiscount | null; // Enhanced line discount with type
+}
+
+// ─── Line-Item Discount ─────────────────────────────────────
+
+export interface LineItemDiscount {
+  type: 'PERCENT' | 'FLAT';
+  value: number;
+}
+
+// ─── Order-Level Discount ───────────────────────────────────
+
+export interface OrderDiscount {
+  type: 'PERCENT' | 'FLAT';
+  value: number;
+  reason?: string;
 }
 
 export interface CartSummary {
   subtotal: number;
   taxTotal: number;
-  discountTotal: number;
+  discountTotal: number;      // Line-level discounts
+  orderDiscountAmount: number; // Order-level discount amount
   grandTotal: number;
   totalCost: number;
   marginPercent: number;

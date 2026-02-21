@@ -19,7 +19,7 @@ export default function QuickActionButton({
   const navigate = useNavigate();
 
   const base =
-    'inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-[0.97]';
+    'inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 hover:shadow-md hover:-translate-y-1 active:scale-[0.97]';
   const styles =
     variant === 'primary'
       ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'

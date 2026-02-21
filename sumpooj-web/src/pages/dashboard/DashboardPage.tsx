@@ -93,10 +93,16 @@ export default function DashboardPage() {
   return (
     <div className="max-w-7xl mx-auto px-6 py-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-800">
-          {getGreeting()}, {user?.name?.split(' ')[0] ?? 'there'}
-        </h1>
+      <div className="mb-10">
+        <div className="flex items-center flex-wrap gap-2">
+          <h1 className="text-2xl font-bold text-slate-800">
+            {getGreeting()}, {user?.name?.split(' ')[0] ?? 'there'}
+          </h1>
+          {/* Role Badge */}
+          <span className="ml-3 px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+            {role}
+          </span>
+        </div>
         <p className="text-sm text-slate-500 mt-1">{formatToday()}</p>
       </div>
 

@@ -28,7 +28,7 @@ export default function TaskItem({ task, onToggle }: TaskItemProps) {
     <div
       className={`
         flex items-center gap-3 bg-white rounded-xl border border-slate-100
-        px-4 py-3 transition-all duration-200 hover:shadow-sm
+        px-4 py-3 transition-all duration-200 hover:shadow-md hover:-translate-y-1
         ${done ? 'opacity-60' : ''}
       `}
     >
