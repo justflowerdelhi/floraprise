@@ -1,6 +1,6 @@
 ﻿# Sumpooj Florist ERP
 
-A comprehensive, multi-tenant Enterprise Resource Planning (ERP) system designed specifically for florist businesses. Built with .NET 10, Clean Architecture, and PostgreSQL.
+A comprehensive, multi-tenant Enterprise Resource Planning (ERP) system designed specifically for florist businesses. Built with .NET 10, React 19, Clean Architecture, and PostgreSQL.
 
 ## Overview
 
@@ -13,6 +13,7 @@ Sumpooj Florist ERP is a full-featured business management system tailored for f
 - **Complete Order Lifecycle**: From walk-in to delivery with real-time status tracking
 - **Event Management**: Wedding and corporate event planning with budgets and timelines
 - **Comprehensive Audit Trail**: Track every user action for compliance and debugging
+- **Modern React Frontend**: Beautiful, responsive UI with Material UI and Tailwind CSS
 
 ---
 
@@ -53,29 +54,49 @@ Sumpooj Florist ERP is a full-featured business management system tailored for f
 ### Analytics and Reporting
 - **Dashboard**: Role-based metrics and KPIs
 - **Audit Logs**: Complete user activity tracking
-- **User Activity Reports**: Who did what and when
+- **Profit Intelligence**: Revenue and cost analysis
+- **Stock Valuation**: Inventory value tracking
+
+---
+
+## Technology Stack
+
+### Backend
+| Category | Technology |
+|----------|------------|
+| Framework | .NET 10 |
+| Database | PostgreSQL 15+ |
+| ORM | Entity Framework Core 10 |
+| Authentication | ASP.NET Identity + JWT |
+| API Documentation | OpenAPI (Scalar) |
+| Architecture | Clean Architecture / DDD |
+
+### Frontend
+| Category | Technology |
+|----------|------------|
+| Framework | React 19 |
+| Language | TypeScript 5.9 |
+| Build Tool | Vite 7 |
+| UI Library | Material UI 7 |
+| Styling | Tailwind CSS 4 |
+| Forms | React Hook Form + Zod |
+| Charts | Recharts |
+| Routing | React Router 7 |
+| HTTP Client | Axios |
 
 ---
 
 ## Architecture
 
-The solution follows **Clean Architecture** principles with 4 layers:
-
-| Layer | Project | Responsibility |
-|-------|---------|----------------|
-| Domain | Sumpooj.Domain | Core business entities, enums, domain logic |
-| Application | Sumpooj.Application | Use cases, DTOs, service interfaces |
-| Infrastructure | Sumpooj.Infrastructure | Data access, EF Core, Identity |
-| API | Sumpooj.API | HTTP endpoints, authentication |
-
-### Architecture Diagram
+### System Architecture Diagram
 
 ```mermaid
 graph TB
-    subgraph "Client Layer"
-        WEB[Web App<br/>React/Angular]
-        MOBILE[Mobile App]
-        POS[POS Terminal]
+    subgraph "Frontend - sumpooj-web"
+        REACT[React 19 App<br/>TypeScript + Vite]
+        MUI[Material UI 7]
+        TAIL[Tailwind CSS]
+        PAGES[27 Page Modules]
     end
 
     subgraph "API Layer - Sumpooj.API"
@@ -83,34 +104,34 @@ graph TB
         ORDERS[Orders Controller]
         INV[Inventory Controller]
         PAY[Payments Controller]
-        OTHER[Other Controllers...]
+        OTHER[19 Controllers Total]
     end
 
     subgraph "Application Layer - Sumpooj.Application"
-        SVC[Services/Use Cases]
+        SVC[16 Services]
         DTO[DTOs]
         INT[Interfaces]
     end
 
     subgraph "Infrastructure Layer - Sumpooj.Infrastructure"
-        REPO[Repositories]
+        REPO[15 Repositories]
         IDENT[Identity]
         DBCTX[DbContext]
     end
 
     subgraph "Domain Layer - Sumpooj.Domain"
-        ENT[Entities]
+        ENT[17 Entities]
         ENUM[Enums]
-        VAL[Value Objects]
     end
 
-    subgraph "Data Layer"
-        PG[(PostgreSQL)]
+    subgraph "Database"
+        PG[(PostgreSQL<br/>25 Tables)]
     end
 
-    WEB --> AUTH
-    MOBILE --> AUTH
-    POS --> AUTH
+    REACT --> AUTH
+    MUI --> REACT
+    TAIL --> REACT
+    PAGES --> REACT
 
     AUTH --> SVC
     ORDERS --> SVC
@@ -119,19 +140,56 @@ graph TB
     OTHER --> SVC
 
     SVC --> INT
-    SVC --> DTO
-
     INT -.-> REPO
     REPO --> DBCTX
     REPO --> ENT
-
     DBCTX --> PG
 
-    style WEB fill:#e1f5fe
-    style MOBILE fill:#e1f5fe
-    style POS fill:#e1f5fe
-    style PG fill:#fff3e0
+    style REACT fill:#61dafb
+    style PG fill:#336791
+    style MUI fill:#007fff
 ```
+
+### Backend Architecture (Clean Architecture)
+
+| Layer | Project | Responsibility |
+|-------|---------|----------------|
+| Domain | Sumpooj.Domain | Core business entities, enums, domain logic |
+| Application | Sumpooj.Application | Use cases, DTOs, service interfaces |
+| Infrastructure | Sumpooj.Infrastructure | Data access, EF Core, Identity |
+| API | Sumpooj.API | HTTP endpoints, authentication |
+
+### Frontend Architecture
+
+```
+sumpooj-web/
+├── src/
+│   ├── api/            # API client and endpoints
+│   ├── auth/           # Authentication context and guards
+│   ├── components/     # Shared UI components
+│   ├── core/           # Core utilities and types
+│   ├── pages/          # Feature pages (27 modules)
+│   └── routes/         # Route definitions
+```
+
+---
+
+## Frontend Pages
+
+The React application includes 27 feature modules:
+
+| Category | Pages |
+|----------|-------|
+| **Dashboard** | Main Dashboard, Health Dashboard, Profit Intelligence |
+| **Sales** | Orders, Cart, Payments, Refunds |
+| **Inventory** | Products, Inventory, Adjustments, Expiry Alerts, Reorder, Stock Ledger, Valuation |
+| **Purchasing** | Purchases |
+| **CRM** | Customers, CRM |
+| **Operations** | Staff, Tasks, Events, Day Close |
+| **Finance** | Gift Cards |
+| **Settings** | Settings, Onboarding, Subscription |
+| **Production** | Production Management |
+| **Auth** | Login, Register |
 
 ---
 
@@ -402,7 +460,6 @@ flowchart LR
         R1[User Activity]
         R2[Entity History]
         R3[Daily Summary]
-        R4[Compliance Report]
     end
 
     A1 --> LOG
@@ -417,7 +474,6 @@ flowchart LR
     DB --> R1
     DB --> R2
     DB --> R3
-    DB --> R4
 
     style LOG fill:#e8f5e9
     style DB fill:#fff3e0
@@ -425,104 +481,7 @@ flowchart LR
 
 ---
 
-## Technology Stack
-
-| Category | Technology |
-|----------|------------|
-| Framework | .NET 10 |
-| Database | PostgreSQL 15+ |
-| ORM | Entity Framework Core 10 |
-| Authentication | ASP.NET Identity + JWT |
-| API Documentation | OpenAPI (Scalar) |
-
----
-
-## Getting Started
-
-### Prerequisites
-- .NET 10 SDK
-- PostgreSQL 15+
-- Visual Studio 2022 or VS Code
-
-### Installation
-
-1. Clone the repository
-2. Create PostgreSQL database: `CREATE DATABASE FloristERP;`
-3. Run schema: `psql -d FloristERP -f Database/sumpooj_complete_schema.sql`
-4. Update connection string in `Sumpooj.API/appsettings.json`
-5. Run: `cd Sumpooj.API && dotnet run`
-6. Access API at https://localhost:5001
-
-### Default Users
-
-| Role | Email | Password |
-|------|-------|----------|
-| Platform Admin | sumit.singh@sumpooj.com | Admin@123 |
-| Company Admin | admin@demoflorist.com | Admin@123 |
-
----
-
-## Project Structure
-
-| Project | Contents | Count |
-|---------|----------|-------|
-| Sumpooj.Domain | Entities, Enums | 17 entities |
-| Sumpooj.Application | Services, DTOs, Interfaces | 15 services |
-| Sumpooj.Infrastructure | DbContext, Repositories | 15 repositories |
-| Sumpooj.API | Controllers | 19 controllers |
-| Database | SQL Schema | 25 tables |
-
-### Domain Entities
-Company, Customer, Product, ProductBatch, Order, OrderItem, Staff, Event, Payment, Refund, RefundItem, GiftCard, DayClose, AuditLog, PurchaseOrder, Supplier, Location, Delivery, StaffTask, InventoryAdjustment, StockMovement
-
-### Application Services
-ProductService, OrderService, CustomerService, StaffService, EventService, PaymentService, RefundService, GiftCardService, TaskService, DayCloseService, DashboardService, AuditLogService, SupplierService, LocationService, InventoryService, PurchaseOrderService
-
-### API Controllers
-AuthController, CustomerController, ProductsController, OrdersController, PaymentsController, RefundsController, StaffController, EventsController, TasksController, GiftCardsController, DayCloseController, DashboardController, AuditLogsController, SuppliersController, LocationsController, InventoryController, PurchasesController, CompaniesController, LookupController
-
----
-
-## API Endpoints
-
-| Category | Base Path | Key Operations |
-|----------|-----------|----------------|
-| Auth | /api/auth | login, register, refresh |
-| Customers | /api/customer | CRUD + search |
-| Products | /api/products | CRUD + search, low-stock alerts |
-| Inventory | /api/inventory | batches, adjustments, expiry-alerts |
-| Orders | /api/orders | CRUD + status, fulfillment, assign |
-| Payments | /api/payments | CRUD + approve, void |
-| Refunds | /api/refunds | CRUD |
-| Gift Cards | /api/gift-cards | issue, redeem, check-balance |
-| Staff | /api/staff | CRUD + search |
-| Events | /api/events | CRUD + upcoming |
-| Tasks | /api/tasks | CRUD + start, complete |
-| Dashboard | /api/dashboard | role-based metrics |
-| Audit Logs | /api/audit-logs | search, summary, user-activity |
-| Day Close | /api/day-close | summary, close, history |
-| Companies | /api/companies | CRUD (platform only) |
-| Locations | /api/locations | CRUD |
-| Suppliers | /api/suppliers | CRUD |
-| Purchases | /api/purchases | CRUD + submit, receive |
-| Lookup | /api/lookup | enum references |
-
----
-
-## Database Schema (25 Tables)
-
-| Category | Tables |
-|----------|--------|
-| Identity | AspNetUsers, AspNetRoles, +5 related |
-| Core | Companies, Locations, Customers, Staff, Suppliers |
-| Products | Products, ProductBatches, InventoryAdjustments |
-| Orders | Orders, OrderItems, Deliveries |
-| Purchases | PurchaseOrders, PurchaseOrderItems |
-| Finance | Payments, Refunds, RefundItems, GiftCards, DayCloses |
-| Operations | Events, Tasks, StockMovements |
-| Audit | AuditLogs |
-
-### Entity Relationship Diagram
+## Entity Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -562,45 +521,35 @@ erDiagram
         uuid Id PK
         string Name
         string Region
-        string Email
         string CurrencyCode
-        boolean IsActive
     }
 
     Product {
         uuid Id PK
-        uuid CompanyId FK
         string Name
         string Sku
-        int ProductType
-        int Category
         decimal RetailPrice
         int StockQuantity
-        boolean IsPerishable
     }
 
     Order {
         uuid Id PK
-        uuid CompanyId FK
-        uuid CustomerId FK
         string OrderNumber
-        datetime DeliveryDate
         int Status
-        int PaymentStatus
         decimal TotalAmount
     }
 
     Customer {
         uuid Id PK
-        uuid CompanyId FK
         string Name
         string Email
-        string Phone
         int TotalOrders
     }
 ```
 
-### Multi-Tenant Data Model
+---
+
+## Multi-Tenant Data Model
 
 ```mermaid
 graph TB
@@ -650,6 +599,80 @@ graph TB
 
 ---
 
+## Getting Started
+
+### Prerequisites
+- .NET 10 SDK
+- Node.js 20+
+- PostgreSQL 15+
+- Visual Studio 2022 or VS Code
+
+### Backend Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/sumitkumarsingh88/FloristERP.git
+cd FloristERP
+
+# Create PostgreSQL database
+psql -U postgres -c "CREATE DATABASE FloristERP;"
+
+# Run schema (Database-First)
+psql -U postgres -d FloristERP -f Database/sumpooj_complete_schema.sql
+
+# Update connection string in Sumpooj.API/appsettings.json
+
+# Run the API
+cd Sumpooj.API
+dotnet run
+```
+
+### Frontend Setup
+
+```bash
+# Navigate to frontend directory
+cd sumpooj-web
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+### Access Points
+- **API**: https://localhost:5001
+- **API Docs**: https://localhost:5001/scalar
+- **Frontend**: http://localhost:5173
+
+---
+
+## API Endpoints
+
+| Category | Base Path | Key Operations |
+|----------|-----------|----------------|
+| Auth | /api/auth | login, register, refresh |
+| Customers | /api/customer | CRUD + search |
+| Products | /api/products | CRUD + search, low-stock alerts |
+| Inventory | /api/inventory | batches, adjustments, expiry-alerts |
+| Orders | /api/orders | CRUD + status, fulfillment, assign |
+| Payments | /api/payments | CRUD + approve, void |
+| Refunds | /api/refunds | CRUD |
+| Gift Cards | /api/gift-cards | issue, redeem, check-balance |
+| Staff | /api/staff | CRUD + search |
+| Events | /api/events | CRUD + upcoming |
+| Tasks | /api/tasks | CRUD + start, complete |
+| Dashboard | /api/dashboard | role-based metrics |
+| Audit Logs | /api/audit-logs | search, summary, user-activity |
+| Day Close | /api/day-close | summary, close, history |
+| Companies | /api/companies | CRUD (platform only) |
+| Locations | /api/locations | CRUD |
+| Suppliers | /api/suppliers | CRUD |
+| Purchases | /api/purchases | CRUD + submit, receive |
+| Lookup | /api/lookup | enum references |
+
+---
+
 ## Authorization Roles
 
 | Role | Scope | Access |
@@ -663,33 +686,6 @@ graph TB
 
 ---
 
-## Configuration
-
-Key settings in `appsettings.json`:
-- `ConnectionStrings:Default` - PostgreSQL connection
-- `Jwt:Key` - JWT signing key (min 32 chars)
-- `Jwt:Issuer` - JWT issuer identifier
-- `Cors:AllowedOrigins` - Frontend URLs
-
----
-
-## Development
-
-### Build and Run
-```
-dotnet build
-cd Sumpooj.API && dotnet run
-```
-
-### Database Migrations
-```
-cd Sumpooj.Infrastructure
-dotnet ef migrations add MigrationName -s ../Sumpooj.API
-dotnet ef database update -s ../Sumpooj.API
-```
-
----
-
 ## Roadmap
 
 - [ ] Advanced Reporting and Analytics
@@ -699,13 +695,20 @@ dotnet ef database update -s ../Sumpooj.API
 - [ ] QuickBooks Integration
 - [ ] Wire Service Integration (FTD, Teleflora)
 - [ ] Customer Portal
-- [ ] Inventory Forecasting
+- [ ] Inventory Forecasting with ML
 
 ---
 
-## Author
+## Authors
 
-**Sumit Kumar Singh** - [GitHub](https://github.com/sumitkumarsingh88)
+- **Sumit Kumar Singh** - [GitHub](https://github.com/sumitkumarsingh88)
+- **Anand Kumar** - [GitHub](https://github.com/anandpandeji)
+
+---
+
+## License
+
+This project is licensed under the MIT License.
 
 ---
 
