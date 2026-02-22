@@ -23,7 +23,7 @@ export const allocateFIFO = (
   qty: number,
 ): { allocations: BatchAllocation[]; expiryWarning: boolean } => {
   // Sort by receivedDate ASC (oldest first = FIFO)
-  const sorted = [...batches]
+  const sorted = [...(batches || [])]
     .filter((b) => b.quantity > 0)
     .sort((a, b) => a.receivedDate.localeCompare(b.receivedDate));
 

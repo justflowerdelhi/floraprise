@@ -14,7 +14,7 @@ import { Alert } from '@mui/material';
 import { usePOS } from './POSContext';
 import type { Product } from '../orders/OrderTypes';
 import type { POSCustomer } from './POSTypes';
-import { searchProducts } from '../../api/product.api';
+import { searchProducts, normalizeProducts } from '../../api/product.api';
 import { searchCustomers } from '../../api/customer.api';
 import POSTabLayout, { type POSTab } from './POSTabLayout';
 import OrderTypeTab from './OrderTypeTab';
@@ -44,7 +44,8 @@ const POSScreen: React.FC = () => {
     // Load products and customers independently
     try {
       const prodRes = await searchProducts({ IsActive: true, PageSize: 500 });
-      setProducts(Array.isArray(prodRes) ? prodRes : prodRes.items ?? []);
+      const prodItems = Array.isArray(prodRes) ? prodRes : prodRes.items ?? [];
+      setProducts(normalizeProducts(prodItems));
     } catch (err) {
       console.error('Product load failed:', err);
       errors.push('products');

@@ -13,6 +13,7 @@
  *   GET  /products/reorder
  */
 import api from './axios';
+import type { Product } from '../pages/orders/OrderTypes';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -148,4 +149,38 @@ export const getLowStockProducts = async () => {
 export const getReorderProducts = async () => {
   const res = await api.get('/products/reorder');
   return res.data;
+};
+// ─── Product Normalization ──────────────────────────────────
+// Maps API response fields to Product interface
+// Handles field name mismatches (e.g., retailPrice → sellingPrice)
+
+export const normalizeProduct = (apiData: any): Product => {
+  const sellingPrice = apiData.sellingPrice ?? apiData.retailPrice ?? 0;
+  const costPrice = apiData.costPrice ?? 0;
+  
+  return {
+    id: apiData.id || '',
+    name: apiData.name || apiData.productName || '',
+    sku: apiData.sku || '',
+    barcode: apiData.barcode,
+    internalBarcode: apiData.internalBarcode,
+    batchBarcode: apiData.batchBarcode,
+    finishedBarcode: apiData.finishedBarcode,
+    category: apiData.category || 'Fresh Flowers',
+    sellingPrice: Number(sellingPrice) || 0,
+    costPrice: Number(costPrice) || 0,
+    taxRate: Number(apiData.taxRate) || 0,
+    taxRuleId: apiData.taxRuleId,
+    taxRuleName: apiData.taxRuleName,
+    taxIsInclusive: apiData.taxIsInclusive ?? false,
+    availableStock: Number(apiData.availableStock) || 0,
+    isPerishable: apiData.isPerishable ?? false,
+    trackBatch: apiData.trackBatch ?? false,
+    imageUrl: apiData.imageUrl,
+    batches: Array.isArray(apiData.batches) ? apiData.batches : [],
+  };
+};
+
+export const normalizeProducts = (apiData: any[]): Product[] => {
+  return apiData.map(normalizeProduct);
 };

@@ -16,7 +16,7 @@ import { useCart } from '../cart/CartContext';
 import type { Product } from '../orders/OrderTypes';
 import type { POSOrderType, POSCustomer, POSPaymentEntry, POSBillingInfo } from './POSTypes';
 import { POS_SHORTCUTS } from './POSTypes';
-import { searchProducts } from '../../api/product.api';
+import { searchProducts, normalizeProducts } from '../../api/product.api';
 import { searchCustomers } from '../../api/customer.api';
 
 const POSLayout: React.FC = () => {
@@ -59,7 +59,7 @@ const POSLayout: React.FC = () => {
           searchCustomers({ PageSize: 500 }),
         ]);
         const prodItems = Array.isArray(prodRes) ? prodRes : prodRes.items ?? [];
-        setProducts(prodItems);
+        setProducts(normalizeProducts(prodItems));
         const custItems = Array.isArray(custRes) ? custRes : custRes.items ?? [];
         setCustomers(custItems);
       } catch (err) {

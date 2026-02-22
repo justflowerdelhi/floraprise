@@ -34,7 +34,7 @@ import PaymentModal from '../payments/PaymentModal';
 import { useTenant } from '../../core/tenant/TenantContext';
 import { type Customer } from '../crm/CRMTypes';
 import { useOrders } from './OrderContext';
-import { searchProducts } from '../../api/product.api';
+import { searchProducts, normalizeProducts } from '../../api/product.api';
 import { searchCustomers } from '../../api/customer.api';
 import { getAllSuppliers } from '../../api/supplier.api';
 import { GiftCardBuilderModal } from '../gift-cards';
@@ -69,7 +69,7 @@ const WalkInPOS: React.FC = () => {
           getAllSuppliers(),
         ]);
         const prodItems = Array.isArray(prodRes) ? prodRes : prodRes.items ?? [];
-        setProducts(prodItems);
+        setProducts(normalizeProducts(prodItems));
         const custItems = Array.isArray(custRes) ? custRes : custRes.items ?? [];
         setCustomers(custItems);
         const suppliers = Array.isArray(supplierRes) ? supplierRes : supplierRes.items ?? [];
