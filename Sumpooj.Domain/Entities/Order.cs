@@ -31,6 +31,8 @@ public class Order : BaseEntity
     public Guid CompanyId { get; private set; }
     public Guid CustomerId { get; private set; }
     public Customer? Customer { get; private set; }
+    public Guid LocationId { get; set; }
+    public Location Location { get; set; } = null!;
     public string OrderNumber { get; private set; }
     public DateTime OrderDate { get; private set; }
     public DateTime DeliveryDate { get; private set; }

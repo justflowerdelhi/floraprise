@@ -12,7 +12,11 @@ import ProductGrid from './ProductGrid';
 import POSCartPanel from './POSCartPanel';
 import POSPaymentDrawer from './POSPaymentDrawer';
 import POSCustomerDrawer from './POSCustomerDrawer';
+import ShiftOpenModal from './ShiftOpenModal';
+import ShiftCloseDrawer from './ShiftCloseDrawer';
 import { useCart } from '../cart/CartContext';
+import { useShift } from './ShiftContext';
+import { useLocation as useLocationCtx } from '../../core/location/LocationContext';
 import type { Product } from '../orders/OrderTypes';
 import type { POSOrderType, POSCustomer, POSPaymentEntry, POSBillingInfo } from './POSTypes';
 import { POS_SHORTCUTS } from './POSTypes';
@@ -22,6 +26,13 @@ import { searchCustomers } from '../../api/customer.api';
 const POSLayout: React.FC = () => {
   // Cart context
   const { state, addProduct, updateQty, removeItem, clearCart, setOrderSource } = useCart();
+
+  // Shift context
+  const { activeShift, setCloseDrawerOpen } = useShift();
+
+  // Location from global context
+  const { currentLocation, currentLocationId, accessibleLocations, setCurrentLocationId } = useLocationCtx();
+  const locationName = currentLocation?.name ?? 'No Location';
 
   // Local state
   const [products, setProducts] = useState<Product[]>([]);
@@ -34,7 +45,6 @@ const POSLayout: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [orderType, setOrderType] = useState<POSOrderType>('TAKE_NOW');
   const [selectedCustomer, setSelectedCustomer] = useState<POSCustomer | null>(null);
-  const [locationName] = useState('Main Store'); // TODO: From LocationContext
 
   // Drawer states
   const [paymentDrawerOpen, setPaymentDrawerOpen] = useState(false);
@@ -157,6 +167,12 @@ const POSLayout: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+      {/* Shift guard — blocks POS when no active shift */}
+      <ShiftOpenModal />
+
+      {/* Shift close drawer */}
+      <ShiftCloseDrawer />
+
       {/* Error Alert */}
       {error && (
         <Alert severity="error" className="m-4">
@@ -174,9 +190,22 @@ const POSLayout: React.FC = () => {
         orderType={orderType}
         onOrderTypeChange={setOrderType}
         locationName={locationName}
-        onLocationClick={() => {}} // TODO: Location switcher
+        accessibleLocations={accessibleLocations}
+        currentLocationId={typeof currentLocationId === 'string' ? currentLocationId : null}
+        onLocationChange={setCurrentLocationId}
         grandTotal={state.totals.grandTotal}
         hasItems={state.items.length > 0}
+        activeShift={activeShift ? {
+          openingCash: activeShift.openingCash,
+          openedAt: activeShift.openedAt,
+          openedByName: activeShift.openedByName,
+          transactionCount: activeShift.transactionCount,
+          cashSales: activeShift.cashSales,
+          totalRefunds: activeShift.totalRefunds,
+          expectedCash: activeShift.expectedCash,
+          cashDifference: activeShift.cashDifference,
+        } : null}
+        onCloseShift={() => setCloseDrawerOpen(true)}
       />
 
       {/* Main Content */}

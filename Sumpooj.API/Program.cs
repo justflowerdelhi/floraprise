@@ -179,6 +179,7 @@ builder.Services.AddScoped<LocationService>();
 
 // New Services
 builder.Services.AddScoped<IStaffRepository, StaffRepository>();
+builder.Services.AddScoped<IIdentityService, Sumpooj.Infrastructure.IdentityService>();
 builder.Services.AddScoped<StaffService>();
 
 builder.Services.AddScoped<IEventRepository, EventRepository>();
@@ -206,6 +207,8 @@ builder.Services.AddScoped<IShiftRepository, ShiftRepository>();
 builder.Services.AddScoped<ShiftService>();
 
 builder.Services.AddScoped<DashboardService>();
+builder.Services.AddScoped<IDashboardPreferenceRepository, DashboardPreferenceRepository>();
+builder.Services.AddScoped<DashboardPreferenceService>();
 
 // Audit Logging
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();

@@ -10,15 +10,21 @@ public class OrderService
     private readonly IOrderRepository _orderRepository;
     private readonly ICustomerRepository _customerRepository;
     private readonly IProductRepository _productRepository;
+    private readonly ILocationRepository _locationRepository;
+    private readonly IShiftRepository _shiftRepository;
 
     public OrderService(
         IOrderRepository orderRepository,
         ICustomerRepository customerRepository,
-        IProductRepository productRepository)
+        IProductRepository productRepository,
+        ILocationRepository locationRepository,
+        IShiftRepository shiftRepository)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
         _productRepository = productRepository;
+        _locationRepository = locationRepository;
+        _shiftRepository = shiftRepository;
     }
 
     public async Task<OrderDto?> GetByIdAsync(Guid companyId, Guid id)
@@ -55,6 +61,25 @@ public class OrderService
 
     public async Task<Guid> CreateAsync(Guid companyId, CreateOrderRequest request)
     {
+        // Validate LocationId is provided
+        if (request.LocationId == Guid.Empty)
+            throw new InvalidOperationException("LocationId is required when creating an order.");
+
+        // Validate Location exists and belongs to the same company
+        var location = await _locationRepository.GetByIdAsync(request.LocationId)
+            ?? throw new InvalidOperationException($"Location '{request.LocationId}' not found.");
+
+        if (location.CompanyId != companyId)
+            throw new InvalidOperationException("Location does not belong to this company.");
+
+        if (!location.IsActive)
+            throw new InvalidOperationException("Cannot create an order for an inactive location.");
+
+        // Validate an active shift exists for this location
+        var activeShift = await _shiftRepository.GetActiveShiftAsync(companyId, request.LocationId);
+        if (activeShift == null)
+            throw new InvalidOperationException("No active shift for this location. Please open a shift before creating orders.");
+
         // Validate customer exists
         var customer = await _customerRepository.GetByIdAsync(request.CustomerId)
             ?? throw new KeyNotFoundException("Customer not found");
@@ -66,6 +91,9 @@ public class OrderService
             request.DeliveryAddress,
             request.RecipientName,
             request.RecipientPhone);
+
+        // Assign location
+        order.LocationId = request.LocationId;
 
         // Set optional fields
         if (!string.IsNullOrEmpty(request.CardMessage))
@@ -194,6 +222,8 @@ public class OrderService
         TotalAmount = order.TotalAmount,
         AssignedDesignerId = order.AssignedToUserId,
         DeliveryPersonId = order.DeliveryPersonId,
+        LocationId = order.LocationId,
+        LocationName = order.Location?.Name,
         InternalNotes = order.InternalNotes,
         Items = order.Items.Select(i => new OrderItemDto
         {

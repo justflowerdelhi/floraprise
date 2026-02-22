@@ -495,12 +495,19 @@ export const POSProvider: React.FC<POSProviderProps> = ({
 
   // Intent-specific validation errors
   const intentErrors: string[] = [];
+
+  // Phone number is required before payment
+  const hasPhone = !!(state.customer?.phone?.trim());
+  if (!hasPhone) intentErrors.push('Customer phone number is required');
+
   if (state.orderIntent === 'DELIVERY') {
+    if (!state.deliveryDetails.zipCode.trim()) intentErrors.push('ZIP code is required');
     if (!state.deliveryDetails.address.trim()) intentErrors.push('Delivery address is required');
     if (!state.deliveryDetails.deliveryDate) intentErrors.push('Delivery date is required');
   }
   if (state.orderIntent === 'PICKUP_LATER') {
     if (!state.pickupDetails.pickupDate) intentErrors.push('Pickup date is required');
+    if (!state.pickupDetails.pickupTimeSlot) intentErrors.push('Pickup time slot is required');
   }
 
   // canCheckout blocks on intent errors

@@ -18,11 +18,14 @@ import {
   ShoppingCart as CartIcon,
   Lock as LockIcon,
   ErrorOutline as ErrorIcon,
+  TrendingDown as BelowCostIcon,
+  InfoOutlined as InfoIcon,
 } from '@mui/icons-material';
 import { usePOS } from './POSContext';
 import type { Product } from '../orders/OrderTypes';
 import DeliveryDetailsForm from './DeliveryDetailsForm';
 import PickupDetailsForm from './PickupDetailsForm';
+import RevenueGuardBanner from './RevenueGuardBanner';
 
 interface POSCartPanelV2Props {
   products: Product[];
@@ -40,6 +43,9 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
     canEditCart,
     intentErrors,
   } = usePOS();
+
+  // Track whether user attempted checkout — enables red error highlights
+  const [attemptedCheckout, setAttemptedCheckout] = React.useState(false);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -90,7 +96,11 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
   const handlePaymentStart = useCallback(
     (method: 'cash' | 'card' | 'split' | 'more') => {
       if (canCheckout) {
+        setAttemptedCheckout(false);
         startPayment();
+      } else {
+        // Show red highlights on missing required fields
+        setAttemptedCheckout(true);
       }
     },
     [canCheckout, startPayment]
@@ -101,7 +111,7 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
   const isPayment = state.lifecycle === 'payment';
 
   return (
-    <aside className="w-80 xl:w-96 bg-white border-l border-gray-200 flex flex-col h-full shrink-0">
+    <aside className="w-80 xl:w-96 bg-slate-50/60 border-l border-gray-200 flex flex-col h-full shrink-0">
       {/* Cart Header */}
       <header className="px-4 py-3 border-b border-gray-200">
         <div className="flex items-center gap-2">
@@ -150,6 +160,13 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
                     {item.discountPercent > 0 && (
                       <span className="inline-flex items-center mt-1 px-1.5 py-0.5 bg-green-50 text-green-700 text-[10px] font-medium rounded">
                         -{item.discountPercent}% off
+                      </span>
+                    )}
+                    {/* Revenue Guard: below-cost badge */}
+                    {item.lineCost > 0 && item.lineTotal < item.lineCost && (
+                      <span className="inline-flex items-center gap-0.5 mt-1 ml-1 px-1.5 py-0.5 bg-red-50 text-red-600 text-[10px] font-bold rounded border border-red-200">
+                        <BelowCostIcon className="w-3 h-3" />
+                        -{Math.abs(item.marginPercent).toFixed(0)}% margin
                       </span>
                     )}
                   </div>
@@ -219,6 +236,7 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
             value={state.deliveryDetails}
             onChange={setDeliveryDetails}
             disabled={isLocked}
+            showErrors={attemptedCheckout}
           />
         )}
         {state.orderIntent === 'PICKUP_LATER' && (
@@ -226,6 +244,7 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
             value={state.pickupDetails}
             onChange={setPickupDetails}
             disabled={isLocked}
+            showErrors={attemptedCheckout}
           />
         )}
 
@@ -239,6 +258,11 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Revenue Guard Warnings */}
+        {!isEmpty && (
+          <RevenueGuardBanner />
         )}
       </div>
 
@@ -289,17 +313,53 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
             </div>
           ) : null}
 
-          <div className="pt-2 border-t border-gray-200 flex justify-between">
-            <span className="text-base font-semibold text-gray-900">Total</span>
-            <span className="text-xl font-bold text-purple-700">
+          <div className="pt-2 border-t border-gray-200 flex justify-between items-baseline">
+            <span className="text-lg font-bold text-gray-900">Grand Total</span>
+            <span className="text-2xl font-extrabold text-purple-700 tracking-tight">
               {formatCurrency(state.totals.grandTotal)}
             </span>
           </div>
+
+          {/* Revenue Guard: real-time margin % */}
+          {state.items.length > 0 && (
+            <div
+              className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs mt-1 ${
+                state.totals.marginPercent >= 40
+                  ? 'bg-green-50 border-green-200'
+                  : state.totals.marginPercent >= 20
+                    ? 'bg-amber-50 border-amber-200'
+                    : 'bg-red-50 border-red-200'
+              }`}
+            >
+              <span className="text-gray-600 font-medium">Margin</span>
+              <span
+                className={`font-bold ${
+                  state.totals.marginPercent >= 40
+                    ? 'text-green-600'
+                    : state.totals.marginPercent >= 20
+                      ? 'text-amber-600'
+                      : 'text-red-600'
+                }`}
+              >
+                {state.totals.marginPercent.toFixed(1)}%
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Payment Buttons - Hidden during payment */}
-        {!isPayment && (
-          <div className="px-4 pb-4 grid grid-cols-4 gap-2">
+        {/* Subtle warning banner — shown when cart has items but can't checkout */}
+        {!isEmpty && !canCheckout && intentErrors.length > 0 && !isPayment && (
+          <div className="mx-4 mb-3 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+            <InfoIcon sx={{ fontSize: 16, color: '#d97706' }} />
+            <span className="text-[11px] text-amber-700 font-medium">
+              Complete required fields to enable payment
+            </span>
+          </div>
+        )}
+
+        {/* Payment Buttons - Hidden when cart empty or during payment */}
+        {!isPayment && !isEmpty && (
+          <div className="px-4 pb-3 grid grid-cols-4 gap-2">
             <button
               onClick={() => handlePaymentStart('cash')}
               disabled={!canCheckout}
@@ -350,18 +410,26 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
         <div className="px-4 pb-4">
           <button
             onClick={() => handlePaymentStart('split')}
-            disabled={!canCheckout || isPayment}
+            disabled={isPayment || (isEmpty && !isPayment)}
             className={`w-full py-3 font-semibold rounded-lg transition-colors ${
               isPayment
                 ? 'bg-amber-500 text-white cursor-wait'
                 : canCheckout
-                ? 'bg-purple-600 text-white hover:bg-purple-700'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm'
+                : intentErrors.length > 0 && !isEmpty
+                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
             {isPayment
               ? 'Processing Payment...'
-              : `Checkout${!isEmpty ? ` • ${formatCurrency(state.totals.grandTotal)}` : ''}`}
+              : !isEmpty && intentErrors.length > 0
+              ? `Fill required fields (${intentErrors.length})`
+              : canCheckout
+              ? `Pay ${formatCurrency(state.totals.grandTotal)}`
+              : isEmpty
+              ? 'Add items to cart'
+              : 'Checkout'}
           </button>
         </div>
       </div>

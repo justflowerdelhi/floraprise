@@ -27,6 +27,14 @@ public class Staff : BaseEntity
     public string? Email { get; private set; }
     public string? Phone { get; private set; }
     public Guid? UserId { get; private set; }
+
+    /// <summary>
+    /// Optional link to ASP.NET Identity user (ApplicationUser.Id).
+    /// Allows a staff member to log in to the system.
+    /// Navigation property configured in SumpoojDbContext (Infrastructure layer).
+    /// </summary>
+    public Guid? IdentityUserId { get; private set; }
+
     public bool IsActive { get; private set; }
 
     // Commission Settings
@@ -73,6 +81,24 @@ public class Staff : BaseEntity
     public void LinkUser(Guid userId)
     {
         UserId = userId;
+        MarkUpdated();
+    }
+
+    /// <summary>
+    /// Link this staff member to an ASP.NET Identity user for login access.
+    /// </summary>
+    public void LinkIdentityUser(Guid identityUserId)
+    {
+        IdentityUserId = identityUserId;
+        MarkUpdated();
+    }
+
+    /// <summary>
+    /// Remove the identity link (staff can no longer log in).
+    /// </summary>
+    public void UnlinkIdentityUser()
+    {
+        IdentityUserId = null;
         MarkUpdated();
     }
 

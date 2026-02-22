@@ -56,7 +56,7 @@ const CategorySidebar: React.FC<CategorySidebarProps> = ({
                   <button
                     onClick={() => onCategorySelect(category.id)}
                     className={`
-                      w-full flex flex-col items-center justify-center py-3 px-2
+                      w-full flex flex-col items-center justify-center py-4 px-2 min-h-[64px]
                       transition-all duration-150 cursor-pointer
                       ${isSelected 
                         ? 'bg-purple-50 text-purple-700 border-r-2 border-purple-600' 

@@ -55,8 +55,9 @@ public class StaffController : ControllerBase
     [Authorize(Policy = "CompanyAdmin")]
     public async Task<IActionResult> Create([FromBody] CreateStaffRequest request)
     {
-        var id = await _staffService.CreateAsync(CompanyId, request);
-        return CreatedAtAction(nameof(GetById), new { id }, new { id });
+        var result = await _staffService.CreateAsync(CompanyId, request);
+
+        return CreatedAtAction(nameof(GetById), new { id = result.StaffId }, new { id = result.StaffId });
     }
 
     [HttpPut("{id:guid}")]
@@ -72,6 +73,32 @@ public class StaffController : ControllerBase
     public async Task<IActionResult> Deactivate(Guid id)
     {
         await _staffService.DeactivateAsync(CompanyId, id);
+        return NoContent();
+    }
+
+    // ── Login management endpoints ───────────────────────────
+
+    [HttpPost("{id:guid}/enable-login")]
+    [Authorize(Policy = "CompanyAdmin")]
+    public async Task<IActionResult> EnableLogin(Guid id, [FromBody] EnableLoginRequest request)
+    {
+        await _staffService.EnableLoginAsync(CompanyId, id, request);
+        return NoContent();
+    }
+
+    [HttpPost("{id:guid}/reset-password")]
+    [Authorize(Policy = "CompanyAdmin")]
+    public async Task<IActionResult> ResetPassword(Guid id, [FromBody] ResetPasswordRequest request)
+    {
+        await _staffService.ResetPasswordAsync(CompanyId, id, request.Password);
+        return NoContent();
+    }
+
+    [HttpPost("{id:guid}/disable-login")]
+    [Authorize(Policy = "CompanyAdmin")]
+    public async Task<IActionResult> DisableLogin(Guid id)
+    {
+        await _staffService.DisableLoginAsync(CompanyId, id);
         return NoContent();
     }
 }

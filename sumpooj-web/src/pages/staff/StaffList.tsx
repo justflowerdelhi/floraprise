@@ -28,7 +28,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import type { Staff, StaffRole } from './StaffTypes';
-import { STAFF_ROLES, STAFF_ROLE_CONFIG } from './StaffTypes';
+import { STAFF_ROLES, STAFF_ROLE_CONFIG, normalizeRole } from './StaffTypes';
 import { searchStaff as searchStaffApi } from '../../api/staff.api';
 import { getLocations } from '../../api/location.api';
 import { useApiCall } from '../../hooks/useApiCall';
@@ -81,7 +81,7 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, color, icon }) => {
 // ─── Role Chip Component ────────────────────────────────────
 
 const RoleChip: React.FC<{ role: StaffRole }> = ({ role }) => {
-  const config = STAFF_ROLE_CONFIG[role];
+  const config = STAFF_ROLE_CONFIG[role] ?? STAFF_ROLE_CONFIG.STAFF;
   return (
     <Chip
       label={`${config.icon} ${config.label}`}
@@ -146,7 +146,9 @@ const StaffList: React.FC = () => {
   const loadStaff = useCallback(async () => {
     const result = await execute(() => searchStaffApi({ PageSize: 200 }));
     if (result?.items || Array.isArray(result)) {
-      setStaff(result.items ?? result);
+      const items: Staff[] = result.items ?? result;
+      // Normalize PascalCase roles from API to UPPERCASE
+      setStaff(items.map((s: Staff) => ({ ...s, role: normalizeRole(s.role) })));
     }
   }, [execute]);
 
@@ -387,7 +389,7 @@ const StaffList: React.FC = () => {
                 </TableRow>
               ) : (
                 paginatedStaff.map((staffMember) => {
-                  const roleConfig = STAFF_ROLE_CONFIG[staffMember.role];
+                  const roleConfig = STAFF_ROLE_CONFIG[staffMember.role] ?? STAFF_ROLE_CONFIG.STAFF;
 
                   return (
                     <TableRow

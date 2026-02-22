@@ -154,10 +154,39 @@ export const getReorderProducts = async () => {
 // Maps API response fields to Product interface
 // Handles field name mismatches (e.g., retailPrice → sellingPrice)
 
+// Map ProductCategory enum → POS sidebar category names
+// API returns enum names: "Roses", "Lilies", "MixedFlowers", etc.
+const CATEGORY_ENUM_TO_DISPLAY: Record<string, string> = {
+  'Roses': 'Fresh Flowers',
+  'Lilies': 'Fresh Flowers',
+  'Tulips': 'Fresh Flowers',
+  'Orchids': 'Fresh Flowers',
+  'Carnations': 'Fresh Flowers',
+  'MixedFlowers': 'Fresh Flowers',
+  'Seasonal': 'Fresh Flowers',
+  'Exotic': 'Fresh Flowers',
+  'WeddingFlowers': 'Arrangements',
+  'SymPathyFlowers': 'Arrangements',
+  'CelebrationFlowers': 'Bouquets',
+  'IndoorPlants': 'Plants',
+  'OutdoorPlants': 'Plants',
+  'Vases': 'Gift Items',
+  'Ribbons': 'Supplies',
+  'Cards': 'Add-Ons',
+  'ChocolatesAndGifts': 'Gift Items',
+  'Other': 'Add-Ons',
+};
+
 export const normalizeProduct = (apiData: any): Product => {
   const sellingPrice = apiData.sellingPrice ?? apiData.retailPrice ?? 0;
   const costPrice = apiData.costPrice ?? 0;
-  
+
+  // Use raw enum category for reliable mapping to POS sidebar names
+  const category =
+    CATEGORY_ENUM_TO_DISPLAY[apiData.category] ||
+    apiData.category ||
+    'Fresh Flowers';
+
   return {
     id: apiData.id || '',
     name: apiData.name || apiData.productName || '',
@@ -166,7 +195,7 @@ export const normalizeProduct = (apiData: any): Product => {
     internalBarcode: apiData.internalBarcode,
     batchBarcode: apiData.batchBarcode,
     finishedBarcode: apiData.finishedBarcode,
-    category: apiData.category || 'Fresh Flowers',
+    category,
     sellingPrice: Number(sellingPrice) || 0,
     costPrice: Number(costPrice) || 0,
     taxRate: Number(apiData.taxRate) || 0,

@@ -95,6 +95,7 @@ const DetailsTab: React.FC<DetailsTabProps> = ({ onNext, onBack }) => {
               value={state.deliveryDetails}
               onChange={setDeliveryDetails}
               disabled={isLocked}
+              showErrors={hasErrors}
             />
           </div>
         )}
@@ -106,6 +107,7 @@ const DetailsTab: React.FC<DetailsTabProps> = ({ onNext, onBack }) => {
               value={state.pickupDetails}
               onChange={setPickupDetails}
               disabled={isLocked}
+              showErrors={hasErrors}
             />
           </div>
         )}

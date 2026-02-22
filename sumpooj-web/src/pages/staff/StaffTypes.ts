@@ -13,7 +13,7 @@ import type { UserRole } from '../../core/rbac/RBACTypes';
 
 export type StaffRole = UserRole;
 
-export const STAFF_ROLES: StaffRole[] = ['ADMIN', 'MANAGER', 'CASHIER', 'DESIGNER', 'DRIVER'];
+export const STAFF_ROLES: StaffRole[] = ['ADMIN', 'MANAGER', 'CASHIER', 'DESIGNER', 'DRIVER', 'STAFF'];
 
 // ─── Commission Types ───────────────────────────────────────
 
@@ -39,6 +39,11 @@ export interface Staff {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+
+  // ── Identity / Login info ────────────────────────────────
+  identityUserId?: string | null;
+  loginIdentifier?: string | null;
+  loginRole?: string | null;
 }
 
 // ─── Staff Form Data ────────────────────────────────────────
@@ -52,6 +57,12 @@ export interface StaffFormData {
   commissionRate: string;
   hourlyRate: string;
   isActive: boolean;
+  // Optional login access
+  enableLogin: boolean;
+  loginIdentifier: string;
+  loginRole: string;
+  password: string;
+  confirmPassword: string;
 }
 
 // ─── Performance Metrics ────────────────────────────────────
@@ -206,6 +217,26 @@ export const STAFF_ROLE_CONFIG: Record<StaffRole, StaffRoleConfig> = {
     tracksDeliveries: true,
     tracksEvents: false,
   },
+  STAFF: {
+    label: 'Staff',
+    color: '#607d8b',
+    bgColor: 'rgba(96, 125, 138, 0.12)',
+    icon: '👤',
+    description: 'General staff member',
+    tracksSales: true,
+    tracksProduction: false,
+    tracksDeliveries: false,
+    tracksEvents: false,
+  },
+};
+
+/**
+ * Normalize a role string from the backend (PascalCase) to the frontend (UPPERCASE).
+ * Falls back to 'STAFF' for unrecognized roles.
+ */
+export const normalizeRole = (role: string): StaffRole => {
+  const upper = role?.toUpperCase() as StaffRole;
+  return upper in STAFF_ROLE_CONFIG ? upper : 'STAFF';
 };
 
 // ─── Commission Type Config ─────────────────────────────────
@@ -296,7 +327,15 @@ export const getInitialFormData = (staff?: Staff): StaffFormData => ({
   commissionRate: staff?.commissionRate?.toString() || '',
   hourlyRate: staff?.hourlyRate?.toString() || '',
   isActive: staff?.isActive ?? true,
+  enableLogin: false,
+  loginIdentifier: '',
+  loginRole: '',
+  password: '',
+  confirmPassword: '',
 });
+
+/** Roles available for identity login assignment */
+export const LOGIN_ROLES = ['Admin', 'Manager', 'Cashier', 'Designer', 'Driver', 'Staff'] as const;
 
 /**
  * Create empty sales metrics

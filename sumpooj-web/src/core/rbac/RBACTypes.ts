@@ -10,7 +10,7 @@
 
 // ─── User Roles ─────────────────────────────────────────────
 
-export type UserRole = 'ADMIN' | 'MANAGER' | 'CASHIER' | 'DESIGNER' | 'DRIVER';
+export type UserRole = 'ADMIN' | 'MANAGER' | 'CASHIER' | 'DESIGNER' | 'DRIVER' | 'STAFF';
 
 export interface User {
   id: string;
@@ -134,6 +134,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'delivery:view', 'delivery:update',
     'tasks:view',
   ],
+
+  STAFF: [
+    'pos:access',
+    'orders:view',
+    'customers:view',
+    'products:view',
+    'tasks:view',
+  ],
 };
 
 // ─── Role Display Config ────────────────────────────────────
@@ -163,6 +171,11 @@ export const ROLE_CONFIG: Record<UserRole, { label: string; color: string; descr
     label: 'Delivery Driver',
     color: '#00bcd4',
     description: 'Manage deliveries and update status',
+  },
+  STAFF: {
+    label: 'Staff',
+    color: '#607d8b',
+    description: 'General staff member',
   },
 };
 
@@ -614,11 +627,12 @@ export const QUICK_ACTIONS: QuickAction[] = [
 // ─── Default Landing Pages by Role ──────────────────────────
 
 export const DEFAULT_LANDING: Record<UserRole, string> = {
-  ADMIN: '/health-dashboard',
-  MANAGER: '/health-dashboard',
+  ADMIN: '/home',
+  MANAGER: '/home',
   CASHIER: '/pos',
-  DESIGNER: '/order-list',
+  DESIGNER: '/production/recipes',
   DRIVER: '/delivery-scheduler',
+  STAFF: '/home',
 };
 
 // ─── Utility Type Guards ────────────────────────────────────

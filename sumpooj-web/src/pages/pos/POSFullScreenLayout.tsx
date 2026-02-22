@@ -161,7 +161,7 @@ const POSKeyboardHandler: React.FC = () => {
 // ─── Inner Layout (needs POS context) ───────────────────────
 
 const POSFullScreenInner: React.FC = () => {
-  const { loading, activeShift, shiftSystemAvailable } = useShift();
+  const { loading, activeShift } = useShift();
 
   // Show loading spinner while checking shift status
   if (loading) {
@@ -214,7 +214,7 @@ const POSFullScreenLayoutInner: React.FC = () => {
   const locationId = location.currentLocation?.id || 'loc_default';
 
   return (
-    <ShiftProvider locationId={locationId}>
+    <ShiftProvider>
       <POSProvider
         locationId={locationId}
         locationName={location.currentLocation?.name || 'Main Store'}

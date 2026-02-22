@@ -2,16 +2,33 @@
  * POSTopBar.tsx — Top transaction bar for FloraEdge POS
  * Fixed 64px height with search, customer selector, order type, location, and grand total
  */
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import {
   Search as SearchIcon,
   Person as PersonIcon,
   KeyboardArrowDown as ArrowDownIcon,
   LocationOn as LocationIcon,
+  Check as CheckIcon,
+  ExitToApp as CloseShiftIcon,
+  Warning as WarningIcon,
 } from '@mui/icons-material';
 import type { OrderIntent, POSCustomer } from './POSTypes';
 import { POS_SHORTCUTS } from './POSTypes';
 import OrderIntentSwitcher from './OrderIntentSwitcher';
+import type { Location } from '../../core/location/LocationTypes';
+
+/** Compact shift summary for the POS header display */
+export interface ShiftHeaderData {
+  openingCash: number;
+  openedAt: string;
+  openedByName: string;
+  transactionCount: number;
+  cashSales: number;
+  totalRefunds: number;
+  expectedCash: number;
+  /** Cash variance = expectedCash minus a counted value, if available */
+  cashDifference: number | null;
+}
 
 interface POSTopBarProps {
   searchValue: string;
@@ -22,9 +39,15 @@ interface POSTopBarProps {
   orderType: OrderIntent;
   onOrderTypeChange: (type: OrderIntent) => void;
   locationName: string;
-  onLocationClick: () => void;
+  accessibleLocations: Location[];
+  currentLocationId: string | null;
+  onLocationChange: (locationId: string) => void;
   grandTotal: number;
   hasItems: boolean;
+  /** Active shift data (null when no shift open) */
+  activeShift: ShiftHeaderData | null;
+  /** Called when user wants to close the shift */
+  onCloseShift: () => void;
 }
 
 const POSTopBar: React.FC<POSTopBarProps> = ({
@@ -36,11 +59,17 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
   orderType,
   onOrderTypeChange,
   locationName,
-  onLocationClick,
+  accessibleLocations,
+  currentLocationId,
+  onLocationChange,
   grandTotal,
   hasItems,
+  activeShift,
+  onCloseShift,
 }) => {
   const searchRef = useRef<HTMLInputElement>(null);
+  const [locationMenuOpen, setLocationMenuOpen] = useState(false);
+  const locationBtnRef = useRef<HTMLButtonElement>(null);
 
   // Auto-focus search on mount
   useEffect(() => {
@@ -118,15 +147,56 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
       />
 
       {/* Location Dropdown */}
-      <button
-        onClick={onLocationClick}
-        className="flex items-center gap-2 h-10 px-3 border border-gray-200 rounded-lg
-                   hover:bg-gray-50 transition-colors"
-      >
-        <LocationIcon className="w-5 h-5 text-gray-500" />
-        <span className="text-sm text-gray-700">{locationName}</span>
-        <ArrowDownIcon className="w-4 h-4 text-gray-400" />
-      </button>
+      <div className="relative">
+        <button
+          ref={locationBtnRef}
+          onClick={() => setLocationMenuOpen((v) => !v)}
+          className="flex items-center gap-2 h-10 px-3 border border-gray-200 rounded-lg
+                     hover:bg-gray-50 transition-colors"
+        >
+          <LocationIcon className="w-5 h-5 text-green-600" />
+          <span className="text-sm text-gray-700 max-w-[120px] truncate">{locationName}</span>
+          <ArrowDownIcon className={`w-4 h-4 text-gray-400 transition-transform ${locationMenuOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {locationMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <div className="fixed inset-0 z-40" onClick={() => setLocationMenuOpen(false)} />
+
+            {/* Menu */}
+            <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[220px] py-1">
+              {accessibleLocations.map((loc) => {
+                const isSelected = loc.id === currentLocationId;
+                return (
+                  <button
+                    key={loc.id}
+                    onClick={() => {
+                      onLocationChange(loc.id);
+                      setLocationMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors ${
+                      isSelected ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-gray-700'
+                    }`}
+                  >
+                    <LocationIcon className={`w-4 h-4 ${isSelected ? 'text-purple-600' : 'text-gray-400'}`} />
+                    <span className="flex-1 truncate">{loc.name}</span>
+                    {isSelected && <CheckIcon className="w-4 h-4 text-purple-600" />}
+                  </button>
+                );
+              })}
+              {accessibleLocations.length === 0 && (
+                <div className="px-3 py-2 text-sm text-gray-400">No locations available</div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Shift Status & Close Button */}
+      {activeShift && (
+        <ShiftChip shift={activeShift} onClose={onCloseShift} />
+      )}
 
       {/* Grand Total */}
       <div className="ml-auto pl-4 border-l border-gray-200">
@@ -138,6 +208,161 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
         </div>
       </div>
     </header>
+  );
+};
+
+// ─── ShiftChip — compact shift summary in the POS header ────
+
+const CASH_VARIANCE_THRESHOLD = 5; // $ threshold for yellow warning
+
+const ShiftChip: React.FC<{ shift: ShiftHeaderData; onClose: () => void }> = ({
+  shift,
+  onClose,
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const fmt = (v: number) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(v);
+
+  const hasVarianceWarning =
+    shift.cashDifference !== null &&
+    Math.abs(shift.cashDifference) > CASH_VARIANCE_THRESHOLD;
+
+  const isHealthy = !hasVarianceWarning;
+
+  const refundAmount = shift.totalRefunds;
+
+  return (
+    <div className="relative flex items-center gap-2 pl-3 border-l border-gray-200">
+      {/* Compact shift pill */}
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
+                   border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors
+                   cursor-pointer select-none"
+        title="Click to toggle shift details"
+      >
+        {/* Health dot */}
+        <span
+          className={`w-2 h-2 rounded-full shrink-0 ${
+            isHealthy ? 'bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]' : 'bg-yellow-400'
+          }`}
+        />
+
+        {/* Primary: Txn count | Cash total */}
+        <span className="text-[11px] font-semibold text-gray-800 tabular-nums leading-none whitespace-nowrap">
+          {shift.transactionCount} txn
+        </span>
+
+        <span className="text-gray-300 text-[10px]">|</span>
+
+        <span className="text-[11px] font-semibold text-gray-700 tabular-nums leading-none whitespace-nowrap">
+          {fmt(shift.cashSales)} cash
+        </span>
+
+        {/* Variance warning icon */}
+        {hasVarianceWarning && (
+          <WarningIcon className="w-3.5 h-3.5 text-yellow-500 ml-0.5" />
+        )}
+
+        {/* Refund badge */}
+        {refundAmount > 0 && (
+          <span className="ml-0.5 px-1 py-0.5 bg-red-100 text-red-600 text-[9px] font-bold rounded leading-none">
+            {fmt(refundAmount)} ref
+          </span>
+        )}
+      </button>
+
+      {/* Expanded mini-card */}
+      {expanded && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setExpanded(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-lg w-56 py-3 px-3.5">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isHealthy ? 'bg-green-500' : 'bg-yellow-400'
+                  }`}
+                />
+                <span className="text-xs font-semibold text-gray-800">Shift Active</span>
+              </div>
+              <span className="text-[10px] text-gray-400">
+                {new Date(shift.openedAt).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+            </div>
+
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 gap-y-1.5 gap-x-3 text-[11px]">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Opening</span>
+                <span className="font-semibold text-gray-800 tabular-nums">{fmt(shift.openingCash)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Txns</span>
+                <span className="font-semibold text-gray-800 tabular-nums">{shift.transactionCount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Cash Sales</span>
+                <span className="font-semibold text-green-700 tabular-nums">{fmt(shift.cashSales)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Refunds</span>
+                <span
+                  className={`font-semibold tabular-nums ${
+                    refundAmount > 0 ? 'text-red-600' : 'text-gray-400'
+                  }`}
+                >
+                  {fmt(refundAmount)}
+                </span>
+              </div>
+              <div className="flex justify-between col-span-2 pt-1 border-t border-gray-100">
+                <span className="text-gray-500">Expected Cash</span>
+                <span className="font-semibold text-gray-800 tabular-nums">{fmt(shift.expectedCash)}</span>
+              </div>
+            </div>
+
+            {/* Variance alert */}
+            {hasVarianceWarning && (
+              <div className="mt-2 flex items-center gap-1.5 px-2 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <WarningIcon className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
+                <span className="text-[10px] font-medium text-yellow-700">
+                  Cash variance: {fmt(Math.abs(shift.cashDifference!))}
+                </span>
+              </div>
+            )}
+
+            {/* Opened by */}
+            <p className="mt-2 text-[10px] text-gray-400 truncate">
+              Opened by {shift.openedByName}
+            </p>
+          </div>
+        </>
+      )}
+
+      {/* Close Shift button */}
+      <button
+        onClick={onClose}
+        className="flex items-center gap-1.5 h-10 px-3 rounded-lg
+                   bg-red-50 text-red-700 border border-red-200
+                   hover:bg-red-100 active:bg-red-200
+                   transition-colors font-medium text-sm
+                   min-w-[44px] min-h-[44px] touch-manipulation"
+        title="Close current shift"
+      >
+        <CloseShiftIcon className="w-5 h-5" />
+        <span className="hidden md:inline">Close Shift</span>
+      </button>
+    </div>
   );
 };
 

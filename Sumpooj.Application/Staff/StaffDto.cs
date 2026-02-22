@@ -14,6 +14,11 @@ public class StaffDto
     public Guid? PrimaryLocationId { get; set; }
     public Guid? UserId { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+
+    // ── Identity / Login info ────────────────────────────────
+    public Guid? IdentityUserId { get; set; }
+    public string? LoginIdentifier { get; set; }
+    public string? LoginRole { get; set; }
 }
 
 public class StaffListDto
@@ -39,6 +44,22 @@ public class CreateStaffRequest
     public decimal? HourlyRate { get; set; }
     public Guid? PrimaryLocationId { get; set; }
     public bool IsActive { get; set; } = true;
+
+    // ── Optional login access ───────────────────────────────
+    /// <summary>When true, creates an ASP.NET Identity user linked to this staff member.</summary>
+    public bool EnableLogin { get; set; }
+    /// <summary>Email or phone used as the Identity username. Required when EnableLogin is true.</summary>
+    public string? LoginIdentifier { get; set; }
+    /// <summary>Identity role to assign (e.g. "Admin", "Manager", "Staff"). Required when EnableLogin is true.</summary>
+    public string? LoginRole { get; set; }
+    /// <summary>Admin-provided password. Required when EnableLogin is true (min 6 chars, must satisfy Identity rules).</summary>
+    public string? Password { get; set; }
+}
+
+/// <summary>Result returned after creating a staff member.</summary>
+public class CreateStaffResult
+{
+    public Guid StaffId { get; set; }
 }
 
 public class UpdateStaffRequest
@@ -61,6 +82,22 @@ public class StaffSearchRequest
     public bool? IsActive { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 20;
+}
+
+/// <summary>Request to enable login for an existing staff member (edit mode).</summary>
+public class EnableLoginRequest
+{
+    public string LoginIdentifier { get; set; } = default!;
+    public string LoginRole { get; set; } = "Staff";
+    /// <summary>Admin-provided password (min 6 chars, must satisfy Identity rules).</summary>
+    public string Password { get; set; } = default!;
+}
+
+/// <summary>Request to reset password for a staff member's identity user.</summary>
+public class ResetPasswordRequest
+{
+    /// <summary>New password (min 6 chars, must satisfy Identity rules).</summary>
+    public string Password { get; set; } = default!;
 }
 
 public class StaffPerformanceDto

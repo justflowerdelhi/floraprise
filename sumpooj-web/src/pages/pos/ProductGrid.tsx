@@ -15,16 +15,17 @@ interface ProductGridProps {
 }
 
 // Map category IDs to product category names
-const CATEGORY_MAP: Record<string, string> = {
-  'all': '',
-  'fresh-flowers': 'Fresh Flowers',
-  'arrangements': 'Arrangements',
-  'bouquets': 'Bouquets',
-  'plants': 'Plants',
-  'greens': 'Greens & Foliage',
-  'supplies': 'Supplies',
-  'add-ons': 'Add-Ons',
-  'gifts': 'Gift Items',
+// Supports both seed data names and normalized display names
+const CATEGORY_MAP: Record<string, string[]> = {
+  'all': [],
+  'fresh-flowers': ['Fresh Flowers'],
+  'arrangements': ['Arrangements', 'Bouquets & Arrangements'],
+  'bouquets': ['Bouquets', 'Bouquets & Arrangements'],
+  'plants': ['Plants', 'Plants & Succulents'],
+  'greens': ['Greens & Foliage', 'Greens & Fillers'],
+  'supplies': ['Supplies', 'Vases & Containers'],
+  'add-ons': ['Add-Ons'],
+  'gifts': ['Gift Items'],
 };
 
 const ProductGrid: React.FC<ProductGridProps> = ({
@@ -41,9 +42,9 @@ const ProductGrid: React.FC<ProductGridProps> = ({
     let result = products;
 
     // Category filter
-    const categoryName = CATEGORY_MAP[selectedCategory];
-    if (categoryName) {
-      result = result.filter((p) => p.category === categoryName);
+    const categoryNames = CATEGORY_MAP[selectedCategory];
+    if (categoryNames && categoryNames.length > 0) {
+      result = result.filter((p) => categoryNames.includes(p.category));
     }
 
     // Search filter

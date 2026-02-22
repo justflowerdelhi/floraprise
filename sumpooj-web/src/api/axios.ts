@@ -2,7 +2,9 @@ import axios from 'axios';
 import type { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://floritribe.com/floraedgeapi/api',
+  baseURL: import.meta.env.PROD
+    ? 'https://floritribe.com/floraedgeapi/api'
+    : '/api',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

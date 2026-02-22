@@ -41,71 +41,33 @@ export interface LocationFilter {
 
 // ─── Mock Locations ─────────────────────────────────────────
 
+// IDs match remote DB locations for the demo company
 export const MOCK_LOCATIONS: Location[] = [
   {
-    id: 'loc-001',
-    name: 'Florist Hub - Bandra',
-    code: 'MUM-BAN',
-    address: '123 Linking Road, Bandra West',
-    city: 'Mumbai',
-    phone: '+91 22 2648 1234',
-    email: 'bandra@floristhub.com',
+    id: '795f4658-53aa-4016-8484-94cc5d40a7f4',
+    name: 'Main Store',
+    code: 'MAIN-01',
+    address: 'Main Store Location',
+    city: 'Delhi NCR',
+    phone: '+91 11 1234 5678',
+    email: 'main@demoflorist.com',
     isActive: true,
     timezone: 'Asia/Kolkata',
     createdAt: '2020-01-15T10:00:00Z',
     updatedAt: '2026-01-01T10:00:00Z',
   },
   {
-    id: 'loc-002',
-    name: 'Florist Hub - Andheri',
-    code: 'MUM-AND',
-    address: '456 DN Nagar, Andheri West',
-    city: 'Mumbai',
-    phone: '+91 22 2671 5678',
-    email: 'andheri@floristhub.com',
+    id: 'ce51c174-be15-4691-92f9-f4be76fb58eb',
+    name: 'Gurugram',
+    code: 'GGN-01',
+    address: 'Gurugram Location',
+    city: 'Gurugram',
+    phone: '+91 124 456 7890',
+    email: 'gurugram@demoflorist.com',
     isActive: true,
     timezone: 'Asia/Kolkata',
     createdAt: '2021-06-01T10:00:00Z',
     updatedAt: '2026-01-01T10:00:00Z',
-  },
-  {
-    id: 'loc-003',
-    name: 'Florist Hub - Powai',
-    code: 'MUM-POW',
-    address: '789 Hiranandani Gardens, Powai',
-    city: 'Mumbai',
-    phone: '+91 22 2570 9012',
-    email: 'powai@floristhub.com',
-    isActive: true,
-    timezone: 'Asia/Kolkata',
-    createdAt: '2023-03-15T10:00:00Z',
-    updatedAt: '2026-01-01T10:00:00Z',
-  },
-  {
-    id: 'loc-004',
-    name: 'Florist Hub - Pune',
-    code: 'PUN-KOR',
-    address: '321 Koregaon Park',
-    city: 'Pune',
-    phone: '+91 20 2615 3456',
-    email: 'pune@floristhub.com',
-    isActive: true,
-    timezone: 'Asia/Kolkata',
-    createdAt: '2024-09-01T10:00:00Z',
-    updatedAt: '2026-01-01T10:00:00Z',
-  },
-  {
-    id: 'loc-005',
-    name: 'Florist Hub - Thane (Closed)',
-    code: 'MUM-THA',
-    address: '555 Ghodbunder Road, Thane',
-    city: 'Thane',
-    phone: '+91 22 2597 7890',
-    email: 'thane@floristhub.com',
-    isActive: false,
-    timezone: 'Asia/Kolkata',
-    createdAt: '2022-01-01T10:00:00Z',
-    updatedAt: '2025-06-01T10:00:00Z',
   },
 ];
 
@@ -153,5 +115,5 @@ export const filterByLocation = <T extends { locationId?: string }>(
 export const LOCATION_CONFIG = {
   ALL_LOCATIONS_ID: 'ALL' as const,
   ALL_LOCATIONS_LABEL: 'All Locations',
-  DEFAULT_LOCATION_ID: 'loc-001', // Bandra is the primary location
+  DEFAULT_LOCATION_ID: '795f4658-53aa-4016-8484-94cc5d40a7f4', // Main Store
 };

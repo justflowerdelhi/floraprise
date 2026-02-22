@@ -60,6 +60,9 @@ public class SumpoojDbContext
     public DbSet<PaymentGatewayConfig> PaymentGatewayConfigs => Set<PaymentGatewayConfig>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
 
+    // User preferences
+    public DbSet<UserDashboardPreference> UserDashboardPreferences => Set<UserDashboardPreference>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -172,6 +175,12 @@ public class SumpoojDbContext
                 !_tenantContext.CompanyId.HasValue ||
                 p.CompanyId == _tenantContext.CompanyId);
 
+        modelBuilder.Entity<UserDashboardPreference>()
+            .HasQueryFilter(u =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                u.CompanyId == _tenantContext.CompanyId);
+
         // Apply entity type configurations from assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(SumpoojDbContext).Assembly);
 
@@ -205,6 +214,16 @@ public class SumpoojDbContext
             .HasForeignKey("OrderId")
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<Order>()
+            .HasOne(o => o.Location)
+            .WithMany()
+            .HasForeignKey(o => o.LocationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Order>()
+            .Property(o => o.LocationId)
+            .IsRequired();
+
         // ProductCategoryEntity: unique name per company
         modelBuilder.Entity<ProductCategoryEntity>()
             .HasIndex(c => new { c.CompanyId, c.Name })
@@ -223,6 +242,20 @@ public class SumpoojDbContext
             .WithMany()
             .HasForeignKey(p => p.TaxRuleId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // UserDashboardPreference: one per user per company
+        modelBuilder.Entity<UserDashboardPreference>()
+            .HasIndex(u => new { u.CompanyId, u.UserId })
+            .IsUnique();
+
+        // ===============================
+        // Staff → ApplicationUser (optional login)
+        // ===============================
+        modelBuilder.Entity<Staff>()
+            .HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(s => s.IdentityUserId)
+            .OnDelete(DeleteBehavior.Restrict);
 
     }
 }

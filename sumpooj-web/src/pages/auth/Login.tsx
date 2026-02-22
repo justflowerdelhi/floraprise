@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { login as loginApi, normalizeRole } from "../../api/auth.api";
 import { useAuth } from "../../auth/AuthContext";
 import { useToast } from "../../hooks/useToast";
+import { DEFAULT_LANDING } from "../../core/rbac/RBACTypes";
 
 export default function Login() {
   const theme = useTheme();
@@ -30,15 +31,16 @@ export default function Login() {
 
   const submit = async () => {
     setError("");
+    const trimmedEmail = email.trim();
 
-    if (!email || !password) {
+    if (!trimmedEmail || !password) {
       setError("Email and password are required");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await loginApi(email, password);
+      const res = await loginApi(trimmedEmail, password);
       // Normalize backend role to frontend role, then pass to auth context
       const normalizedUser = {
         ...res.user,
@@ -46,9 +48,23 @@ export default function Login() {
       };
       await auth.login(res.access_token, normalizedUser as any, res.tenant as any);
       toast.success('Welcome back!');
-      navigate("/pos");
-    } catch {
-      setError("Invalid email or password");
+      // Role-based landing page
+      const landing = DEFAULT_LANDING[normalizedUser.role] ?? '/home';
+      navigate(landing);
+    } catch (err: any) {
+      // Show the actual backend message if available, otherwise a generic one
+      const backendMsg = err?.response?.data?.message;
+      const statusCode = err?.response?.status;
+      if (backendMsg) {
+        setError(backendMsg);
+      } else if (statusCode) {
+        setError(`Login failed (HTTP ${statusCode}). Please try again.`);
+      } else if (err?.code === 'ERR_NETWORK') {
+        setError("Cannot reach the server. Please check your internet connection.");
+      } else {
+        setError("Invalid email or password");
+      }
+      console.error('Login error:', err);
       toast.error("Login failed. Please check your credentials.");
     } finally {
       setLoading(false);
@@ -104,6 +120,8 @@ export default function Login() {
             margin="normal"
             value={email}
             onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && submit()}
+            autoComplete="email"
           />
 
           <TextField
@@ -113,6 +131,8 @@ export default function Login() {
             margin="normal"
             value={password}
             onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && submit()}
+            autoComplete="current-password"
           />
 
           <Button

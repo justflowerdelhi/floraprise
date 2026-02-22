@@ -1,18 +1,27 @@
 /**
  * DeliveryDetailsForm.tsx — Inline delivery form shown in the cart panel
  * when the order intent is DELIVERY.
+ *
+ * Features:
+ * - ZIP code required before payment
+ * - Auto-calculates delivery fee from ZIP
+ * - Red highlights on empty required fields when showErrors=true
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   LocalShipping as DeliveryIcon,
   CalendarMonth as CalendarIcon,
+  ErrorOutline as ErrorIcon,
 } from '@mui/icons-material';
 import type { DeliveryDetails } from './POSTypes';
+import { calcDeliveryFeeFromZip } from './POSTypes';
 
 interface DeliveryDetailsFormProps {
   value: DeliveryDetails;
   onChange: (details: DeliveryDetails) => void;
   disabled?: boolean;
+  /** When true, empty required fields get a red border */
+  showErrors?: boolean;
 }
 
 const TIME_SLOTS = [
@@ -27,9 +36,30 @@ const DeliveryDetailsForm: React.FC<DeliveryDetailsFormProps> = ({
   value,
   onChange,
   disabled = false,
+  showErrors = false,
 }) => {
   const patch = (partial: Partial<DeliveryDetails>) =>
     onChange({ ...value, ...partial });
+
+  // Auto-calculate delivery fee when ZIP changes
+  const prevZipRef = useRef(value.zipCode);
+  useEffect(() => {
+    if (value.zipCode !== prevZipRef.current) {
+      prevZipRef.current = value.zipCode;
+      const fee = calcDeliveryFeeFromZip(value.zipCode);
+      if (fee !== value.deliveryFee) {
+        onChange({ ...value, deliveryFee: fee });
+      }
+    }
+  }, [value, onChange]);
+
+  const errBorder = (fieldEmpty: boolean) =>
+    showErrors && fieldEmpty
+      ? 'border-red-400 ring-1 ring-red-200'
+      : 'border-gray-200';
+
+  const errLabel = (fieldEmpty: boolean) =>
+    showErrors && fieldEmpty ? 'text-red-500' : 'text-gray-500';
 
   return (
     <div className="px-4 py-3 space-y-3 bg-blue-50/50 border-b border-blue-100">
@@ -41,9 +71,33 @@ const DeliveryDetailsForm: React.FC<DeliveryDetailsFormProps> = ({
         </span>
       </div>
 
+      {/* ZIP Code — required, auto-fee */}
+      <div>
+        <label className={`block text-[11px] font-medium ${errLabel(!value.zipCode.trim())} mb-1`}>
+          ZIP / Postal Code <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={value.zipCode}
+          onChange={(e) => patch({ zipCode: e.target.value })}
+          disabled={disabled}
+          maxLength={10}
+          placeholder="e.g. 10001"
+          className={`w-full h-9 px-3 text-xs rounded-lg
+                     focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent
+                     disabled:bg-gray-100 disabled:cursor-not-allowed placeholder:text-gray-400
+                     ${errBorder(!value.zipCode.trim())}`}
+        />
+        {value.zipCode.length >= 5 && (
+          <p className="mt-1 text-[10px] text-blue-600 font-medium">
+            Delivery fee: ${value.deliveryFee.toFixed(2)}{value.deliveryFee === 0 ? ' (local zone — free)' : ''}
+          </p>
+        )}
+      </div>
+
       {/* Delivery Date */}
       <div>
-        <label className="block text-[11px] font-medium text-gray-500 mb-1">
+        <label className={`block text-[11px] font-medium ${errLabel(!value.deliveryDate)} mb-1`}>
           Delivery Date <span className="text-red-500">*</span>
         </label>
         <div className="relative">
@@ -54,9 +108,10 @@ const DeliveryDetailsForm: React.FC<DeliveryDetailsFormProps> = ({
             onChange={(e) => patch({ deliveryDate: e.target.value })}
             disabled={disabled}
             min={new Date().toISOString().split('T')[0]}
-            className="w-full h-9 pl-8 pr-3 text-xs border border-gray-200 rounded-lg
+            className={`w-full h-9 pl-8 pr-3 text-xs rounded-lg
                        focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent
-                       disabled:bg-gray-100 disabled:cursor-not-allowed"
+                       disabled:bg-gray-100 disabled:cursor-not-allowed
+                       ${errBorder(!value.deliveryDate)}`}
           />
         </div>
       </div>
@@ -85,7 +140,7 @@ const DeliveryDetailsForm: React.FC<DeliveryDetailsFormProps> = ({
 
       {/* Address */}
       <div>
-        <label className="block text-[11px] font-medium text-gray-500 mb-1">
+        <label className={`block text-[11px] font-medium ${errLabel(!value.address.trim())} mb-1`}>
           Delivery Address <span className="text-red-500">*</span>
         </label>
         <textarea
@@ -93,10 +148,11 @@ const DeliveryDetailsForm: React.FC<DeliveryDetailsFormProps> = ({
           onChange={(e) => patch({ address: e.target.value })}
           disabled={disabled}
           rows={2}
-          placeholder="Street address, city, ZIP"
-          className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg resize-none
+          placeholder="Street address, city"
+          className={`w-full px-3 py-2 text-xs rounded-lg resize-none
                      focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent
-                     disabled:bg-gray-100 disabled:cursor-not-allowed placeholder:text-gray-400"
+                     disabled:bg-gray-100 disabled:cursor-not-allowed placeholder:text-gray-400
+                     ${errBorder(!value.address.trim())}`}
         />
       </div>
 
@@ -134,10 +190,11 @@ const DeliveryDetailsForm: React.FC<DeliveryDetailsFormProps> = ({
         </div>
       </div>
 
-      {/* Delivery Fee */}
+      {/* Delivery Fee (read-only, auto-calculated — manual override allowed) */}
       <div>
         <label className="block text-[11px] font-medium text-gray-500 mb-1">
           Delivery Fee ($)
+          <span className="ml-1 text-[10px] text-blue-500">auto-calculated</span>
         </label>
         <input
           type="number"
@@ -169,6 +226,16 @@ const DeliveryDetailsForm: React.FC<DeliveryDetailsFormProps> = ({
                      disabled:bg-gray-100 disabled:cursor-not-allowed placeholder:text-gray-400"
         />
       </div>
+
+      {/* Validation summary */}
+      {showErrors && (!value.zipCode.trim() || !value.address.trim() || !value.deliveryDate) && (
+        <div className="flex items-start gap-2 p-2 bg-red-50 rounded-lg border border-red-200">
+          <ErrorIcon className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-red-600 leading-relaxed">
+            Fill all required fields (ZIP, address, date) before proceeding to payment.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

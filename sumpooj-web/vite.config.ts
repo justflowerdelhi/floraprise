@@ -6,4 +6,13 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig(({ mode }) => ({
   plugins: [tailwindcss(), react()],
   base: mode === 'production' ? '/floraedge/' : '/',
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://floritribe.com/floraedgeapi',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
 }))

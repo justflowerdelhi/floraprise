@@ -26,17 +26,22 @@ const ROLE_LOCATION_ACCESS: Record<UserRole, LocationAccessLevel> = {
   CASHIER: 'SINGLE',
   DESIGNER: 'SINGLE',
   DRIVER: 'SINGLE',
+  STAFF: 'SINGLE',
 };
 
 // ─── User Location Assignments (Mock) ───────────────────────
 // In production, this would come from the user profile/API
 
+// IDs match Database/005_demo_data_seed.sql Locations for Demo Florist
+const LOC_MAIN     = '795f4658-53aa-4016-8484-94cc5d40a7f4';
+const LOC_GURUGRAM = 'ce51c174-be15-4691-92f9-f4be76fb58eb';
+
 const USER_LOCATION_ASSIGNMENTS: Record<string, string[]> = {
-  'user-admin': ['loc-001', 'loc-002', 'loc-003', 'loc-004'], // All active locations
-  'user-manager': ['loc-001', 'loc-002'], // Bandra & Andheri
-  'user-cashier': ['loc-001'], // Bandra only
-  'user-designer': ['loc-001'], // Bandra only
-  'user-driver': ['loc-001', 'loc-002'], // Bandra & Andheri (for deliveries)
+  'user-admin': [LOC_MAIN, LOC_GURUGRAM], // All active locations
+  'user-manager': [LOC_MAIN, LOC_GURUGRAM], // Both locations
+  'user-cashier': [LOC_MAIN], // Main Store only
+  'user-designer': [LOC_MAIN], // Main Store only
+  'user-driver': [LOC_MAIN, LOC_GURUGRAM], // Both (for deliveries)
 };
 
 // ─── Context Types ──────────────────────────────────────────
@@ -102,12 +107,12 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     return ROLE_LOCATION_ACCESS[role];
   }, [role]);
 
-  // Default location (first assigned or default)
+  // Default location — always pick a specific location so POS / shifts work out of the box.
+  // Admin can still switch to "All Locations" from the dropdown if they want a cross-store view.
   const defaultLocationId = useMemo((): LocationFilterValue => {
-    if (accessLevel === 'ALL') return LOCATION_CONFIG.ALL_LOCATIONS_ID;
     if (accessibleLocations.length > 0) return accessibleLocations[0].id;
     return LOCATION_CONFIG.DEFAULT_LOCATION_ID;
-  }, [accessLevel, accessibleLocations]);
+  }, [accessibleLocations]);
 
   // Current location state
   const [currentLocationId, setCurrentLocationId] = useState<LocationFilterValue>(defaultLocationId);

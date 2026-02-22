@@ -729,6 +729,270 @@ SELECT
 WHERE NOT EXISTS (SELECT 1 FROM "GiftCards" WHERE "Code" = 'GIFT-DEMO-002');
 
 -- =====================================================
+-- ADDITIONAL PRODUCT CATEGORIES - Supplies & Add-Ons
+-- =====================================================
+
+INSERT INTO "ProductCategories" ("Id", "CompanyId", "Name", "IsPerishable", "TrackBatchByDefault", "IsActive", "CreatedAtUtc")
+SELECT 
+    'c1111111-1111-1111-1111-111111111117'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'Supplies',
+    FALSE,
+    FALSE,
+    TRUE,
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "ProductCategories" WHERE "Id" = 'c1111111-1111-1111-1111-111111111117'::uuid);
+
+INSERT INTO "ProductCategories" ("Id", "CompanyId", "Name", "IsPerishable", "TrackBatchByDefault", "IsActive", "CreatedAtUtc")
+SELECT 
+    'c1111111-1111-1111-1111-111111111118'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'Add-Ons',
+    FALSE,
+    FALSE,
+    TRUE,
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "ProductCategories" WHERE "Id" = 'c1111111-1111-1111-1111-111111111118'::uuid);
+
+-- =====================================================
+-- ADDITIONAL PRODUCTS - Greens & Fillers
+-- =====================================================
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "WholesalePrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "ShelfLifeDays", "TrackInventory", "TrackBatch", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "SeasonalAvailability", "Color", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111401'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'GREEN-EUCL-001',
+    'Eucalyptus Bunch',
+    'Fresh seeded eucalyptus, fragrant greenery',
+    6, 0,
+    'c1111111-1111-1111-1111-111111111116'::uuid,
+    30.00, 80.00, 50.00,
+    200, 50, 100, 2, TRUE, 10, TRUE, TRUE, TRUE, TRUE, 0,
+    'b1111111-1111-1111-1111-111111111113'::uuid,
+    0, 'Green',
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'GREEN-EUCL-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "WholesalePrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "ShelfLifeDays", "TrackInventory", "TrackBatch", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "SeasonalAvailability", "Color", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111402'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'GREEN-BABY-001',
+    'Baby Breath (Gypsophila)',
+    'Delicate white baby breath, ideal filler',
+    6, 0,
+    'c1111111-1111-1111-1111-111111111116'::uuid,
+    20.00, 50.00, 35.00,
+    350, 80, 150, 2, TRUE, 7, TRUE, TRUE, TRUE, TRUE, 0,
+    'b1111111-1111-1111-1111-111111111113'::uuid,
+    0, 'White',
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'GREEN-BABY-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "WholesalePrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "ShelfLifeDays", "TrackInventory", "TrackBatch", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "SeasonalAvailability", "Color", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111403'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'GREEN-FERN-001',
+    'Leather Leaf Fern',
+    'Classic fern greenery for arrangements',
+    6, 0,
+    'c1111111-1111-1111-1111-111111111116'::uuid,
+    15.00, 35.00, 22.00,
+    500, 100, 200, 2, TRUE, 14, TRUE, TRUE, TRUE, TRUE, 0,
+    'b1111111-1111-1111-1111-111111111113'::uuid,
+    0, 'Green',
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'GREEN-FERN-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+-- =====================================================
+-- ADDITIONAL PRODUCTS - Supplies
+-- =====================================================
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "TrackInventory", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111501'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'SUP-RIBBON-001',
+    'Satin Ribbon Roll - Red',
+    'Premium satin ribbon, 25mm x 25m',
+    15, 2,
+    'c1111111-1111-1111-1111-111111111117'::uuid,
+    80.00, 199.00,
+    75, 15, 30, 3, FALSE, TRUE, TRUE, FALSE, 0,
+    'b1111111-1111-1111-1111-111111111112'::uuid,
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'SUP-RIBBON-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "TrackInventory", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111502'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'SUP-WRAP-001',
+    'Kraft Wrapping Paper',
+    'Eco-friendly kraft paper roll, 50cm x 10m',
+    15, 2,
+    'c1111111-1111-1111-1111-111111111117'::uuid,
+    60.00, 149.00,
+    100, 20, 40, 3, FALSE, TRUE, TRUE, FALSE, 0,
+    'b1111111-1111-1111-1111-111111111112'::uuid,
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'SUP-WRAP-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "TrackInventory", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111503'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'SUP-FOAM-001',
+    'Floral Foam Block',
+    'Standard floral foam brick for arrangements',
+    15, 2,
+    'c1111111-1111-1111-1111-111111111117'::uuid,
+    25.00, 65.00,
+    200, 40, 80, 3, FALSE, TRUE, TRUE, FALSE, 0,
+    'b1111111-1111-1111-1111-111111111112'::uuid,
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'SUP-FOAM-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+-- =====================================================
+-- ADDITIONAL PRODUCTS - Add-Ons
+-- =====================================================
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "TrackInventory", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111601'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'ADD-CARD-001',
+    'Greeting Card - Assorted',
+    'Blank greeting card with envelope',
+    16, 2,
+    'c1111111-1111-1111-1111-111111111118'::uuid,
+    15.00, 49.00,
+    200, 50, 100, 3, FALSE, TRUE, TRUE, TRUE, 0,
+    'b1111111-1111-1111-1111-111111111113'::uuid,
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'ADD-CARD-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "TrackInventory", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111602'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'ADD-BALLOON-001',
+    'Foil Balloon - Happy Birthday',
+    'Helium-quality foil balloon, 18 inch',
+    18, 2,
+    'c1111111-1111-1111-1111-111111111118'::uuid,
+    35.00, 99.00,
+    80, 20, 40, 3, FALSE, TRUE, TRUE, TRUE, 0,
+    'b1111111-1111-1111-1111-111111111113'::uuid,
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'ADD-BALLOON-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "TrackInventory", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111603'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'ADD-CANDLE-001',
+    'Scented Candle - Vanilla',
+    'Luxury soy candle in glass jar, 200g',
+    18, 2,
+    'c1111111-1111-1111-1111-111111111118'::uuid,
+    120.00, 349.00,
+    40, 10, 20, 3, FALSE, TRUE, TRUE, TRUE, 0,
+    'b1111111-1111-1111-1111-111111111113'::uuid,
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'ADD-CANDLE-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+-- =====================================================
+-- ADDITIONAL PRODUCTS - More Fresh Flowers
+-- =====================================================
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "WholesalePrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "ShelfLifeDays", "TrackInventory", "TrackBatch", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "SeasonalAvailability", "Color", "Variety", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111107'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'ROSE-PNK-001',
+    'Pink Roses',
+    'Beautiful soft pink roses, perfect for birthdays',
+    1, 0,
+    'c1111111-1111-1111-1111-111111111111'::uuid,
+    27.00, 62.00, 42.00,
+    350, 80, 150, 1, TRUE, 7, TRUE, TRUE, TRUE, TRUE, 0,
+    'b1111111-1111-1111-1111-111111111111'::uuid,
+    0, 'Pink', 'Sweet Akito',
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'ROSE-PNK-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "WholesalePrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "ShelfLifeDays", "TrackInventory", "TrackBatch", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "SeasonalAvailability", "Color", "Variety", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111108'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'TULIP-MIX-001',
+    'Mixed Tulips',
+    'Colorful Dutch tulips, seasonal import',
+    2, 0,
+    'c1111111-1111-1111-1111-111111111111'::uuid,
+    55.00, 130.00, 90.00,
+    120, 30, 60, 1, TRUE, 5, TRUE, TRUE, TRUE, TRUE, 4,
+    'b1111111-1111-1111-1111-111111111111'::uuid,
+    4, 'Mixed', 'Dutch Mix',
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'TULIP-MIX-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "WholesalePrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "ShelfLifeDays", "TrackInventory", "TrackBatch", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "SeasonalAvailability", "Color", "Variety", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111109'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'SUN-YEL-001',
+    'Sunflowers',
+    'Bright yellow sunflowers, locally grown',
+    6, 0,
+    'c1111111-1111-1111-1111-111111111111'::uuid,
+    20.00, 55.00, 35.00,
+    250, 60, 120, 1, TRUE, 7, TRUE, TRUE, TRUE, TRUE, 2,
+    'b1111111-1111-1111-1111-111111111111'::uuid,
+    2, 'Yellow', 'Helianthus',
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'SUN-YEL-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+-- =====================================================
+-- ADDITIONAL PRODUCTS - More Plants
+-- =====================================================
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "TrackInventory", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "Color", "Variety", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111110'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'PLANT-MON-001',
+    'Monstera Deliciosa',
+    'Trendy monstera plant in decorative pot',
+    12, 0,
+    'c1111111-1111-1111-1111-111111111113'::uuid,
+    400.00, 999.00,
+    15, 5, 10, 3, FALSE, TRUE, TRUE, TRUE, 0,
+    'b1111111-1111-1111-1111-111111111112'::uuid,
+    'Green', 'Deliciosa',
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'PLANT-MON-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+INSERT INTO "Products" ("Id", "CompanyId", "Sku", "Name", "Description", "Category", "ProductType", "CategoryId", "CostPrice", "RetailPrice", "StockQuantity", "MinimumStockLevel", "ReorderLevel", "UnitOfMeasure", "IsPerishable", "TrackInventory", "IsActive", "AvailableOnline", "TaxCategory", "TaxRuleId", "Color", "Variety", "CreatedAtUtc")
+SELECT 
+    'e1111111-1111-1111-1111-111111111111'::uuid,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    'PLANT-SUCC-001',
+    'Succulent Trio Set',
+    'Set of 3 assorted succulents in mini pots',
+    12, 0,
+    'c1111111-1111-1111-1111-111111111113'::uuid,
+    150.00, 399.00,
+    30, 10, 20, 3, FALSE, TRUE, TRUE, TRUE, 0,
+    'b1111111-1111-1111-1111-111111111112'::uuid,
+    'Mixed', 'Assorted',
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM "Products" WHERE "Sku" = 'PLANT-SUCC-001' AND "CompanyId" = '11111111-1111-1111-1111-111111111111'::uuid);
+
+-- =====================================================
 -- SUMMARY
 -- =====================================================
 SELECT 'Demo data seeded successfully!' AS status,

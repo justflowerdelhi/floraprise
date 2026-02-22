@@ -8,16 +8,18 @@ namespace Sumpooj.Application.UseCases;
 public class StaffService
 {
     private readonly IStaffRepository _staffRepository;
+    private readonly IIdentityService? _identityService;
 
-    public StaffService(IStaffRepository staffRepository)
+    public StaffService(IStaffRepository staffRepository, IIdentityService? identityService = null)
     {
         _staffRepository = staffRepository;
+        _identityService = identityService;
     }
 
     public async Task<StaffDto?> GetByIdAsync(Guid companyId, Guid id)
     {
         var staff = await _staffRepository.GetByIdAsync(companyId, id);
-        return staff == null ? null : MapToDto(staff);
+        return staff == null ? null : await MapToDtoWithIdentityAsync(staff);
     }
 
     public async Task<PagedResult<StaffListDto>> SearchAsync(Guid companyId, StaffSearchRequest request)
@@ -35,7 +37,7 @@ public class StaffService
         return await _staffRepository.GetByRoleAsync(companyId, role);
     }
 
-    public async Task<Guid> CreateAsync(Guid companyId, CreateStaffRequest request)
+    public async Task<CreateStaffResult> CreateAsync(Guid companyId, CreateStaffRequest request)
     {
         var role = Enum.TryParse<StaffRole>(request.Role, true, out var r) ? r : StaffRole.Staff;
         
@@ -68,8 +70,62 @@ public class StaffService
             staff.Deactivate();
         }
 
-        await _staffRepository.AddAsync(staff);
-        return staff.Id;
+        // ── Optional login access ───────────────────────────
+        Guid? identityUserId = null;
+
+        if (request.EnableLogin)
+        {
+            if (_identityService == null)
+                throw new InvalidOperationException("Identity service is not available.");
+
+            if (string.IsNullOrWhiteSpace(request.LoginIdentifier))
+                throw new ArgumentException("LoginIdentifier (email or phone) is required when EnableLogin is true.");
+
+            if (string.IsNullOrWhiteSpace(request.LoginRole))
+                throw new ArgumentException("LoginRole is required when EnableLogin is true.");
+
+            if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 6)
+                throw new ArgumentException("Password is required and must be at least 6 characters when EnableLogin is true.");
+
+            // Check for duplicate username
+            if (await _identityService.UserExistsAsync(request.LoginIdentifier))
+                throw new InvalidOperationException($"A user with identifier '{request.LoginIdentifier}' already exists.");
+
+            // Create Identity user + assign role
+            var isEmail = request.LoginIdentifier.Contains('@');
+            var userId = await _identityService.CreateUserAsync(
+                userName: request.LoginIdentifier,
+                password: request.Password,
+                email: isEmail ? request.LoginIdentifier : null,
+                phoneNumber: request.LoginIdentifier,
+                companyId: companyId,
+                role: request.LoginRole);
+
+            identityUserId = userId;
+
+            // Link Staff → Identity user
+            staff.LinkIdentityUser(userId);
+        }
+
+        // ── Persist staff ───────────────────────────────────
+        try
+        {
+            await _staffRepository.AddAsync(staff);
+        }
+        catch
+        {
+            // Rollback: if identity user was created but staff persistence failed, delete the identity user
+            if (identityUserId.HasValue && _identityService != null)
+            {
+                await _identityService.DeleteUserAsync(identityUserId.Value);
+            }
+            throw;
+        }
+
+        return new CreateStaffResult
+        {
+            StaffId = staff.Id,
+        };
     }
 
     public async Task UpdateAsync(Guid companyId, Guid id, UpdateStaffRequest request)
@@ -128,7 +184,91 @@ public class StaffService
         await _staffRepository.UpdateAsync(staff);
     }
 
-    private static StaffDto MapToDto(Domain.Entities.Staff staff) => new()
+    // ── Login management (Edit mode) ─────────────────────────────
+
+    /// <summary>Enable login for an existing staff member who does not yet have an identity user.</summary>
+    public async Task EnableLoginAsync(Guid companyId, Guid staffId, EnableLoginRequest request)
+    {
+        if (_identityService == null)
+            throw new InvalidOperationException("Identity service is not available.");
+
+        var staff = await _staffRepository.GetByIdAsync(companyId, staffId)
+            ?? throw new KeyNotFoundException("Staff not found.");
+
+        if (staff.IdentityUserId.HasValue)
+            throw new InvalidOperationException("This staff member already has login access.");
+
+        if (string.IsNullOrWhiteSpace(request.LoginIdentifier))
+            throw new ArgumentException("LoginIdentifier is required.");
+        if (string.IsNullOrWhiteSpace(request.LoginRole))
+            throw new ArgumentException("LoginRole is required.");
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 6)
+            throw new ArgumentException("Password is required and must be at least 6 characters.");
+
+        if (await _identityService.UserExistsAsync(request.LoginIdentifier))
+            throw new InvalidOperationException($"A user with identifier '{request.LoginIdentifier}' already exists.");
+
+        var isEmail = request.LoginIdentifier.Contains('@');
+        var userId = await _identityService.CreateUserAsync(
+            userName: request.LoginIdentifier,
+            password: request.Password,
+            email: isEmail ? request.LoginIdentifier : null,
+            phoneNumber: request.LoginIdentifier,
+            companyId: companyId,
+            role: request.LoginRole);
+
+        staff.LinkIdentityUser(userId);
+
+        try
+        {
+            await _staffRepository.UpdateAsync(staff);
+        }
+        catch
+        {
+            await _identityService.DeleteUserAsync(userId);
+            throw;
+        }
+    }
+
+    /// <summary>Reset the password for a staff member's identity user.</summary>
+    public async Task ResetPasswordAsync(Guid companyId, Guid staffId, string newPassword)
+    {
+        if (_identityService == null)
+            throw new InvalidOperationException("Identity service is not available.");
+
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 6)
+            throw new ArgumentException("Password is required and must be at least 6 characters.");
+
+        var staff = await _staffRepository.GetByIdAsync(companyId, staffId)
+            ?? throw new KeyNotFoundException("Staff not found.");
+
+        if (!staff.IdentityUserId.HasValue)
+            throw new InvalidOperationException("This staff member does not have login access.");
+
+        await _identityService.ResetPasswordAsync(staff.IdentityUserId.Value, newPassword);
+    }
+
+    /// <summary>Disable login for a staff member by deleting their identity user.</summary>
+    public async Task DisableLoginAsync(Guid companyId, Guid staffId)
+    {
+        if (_identityService == null)
+            throw new InvalidOperationException("Identity service is not available.");
+
+        var staff = await _staffRepository.GetByIdAsync(companyId, staffId)
+            ?? throw new KeyNotFoundException("Staff not found.");
+
+        if (!staff.IdentityUserId.HasValue)
+            throw new InvalidOperationException("This staff member does not have login access.");
+
+        await _identityService.DisableLoginAsync(staff.IdentityUserId.Value);
+
+        staff.UnlinkIdentityUser();
+        await _staffRepository.UpdateAsync(staff);
+    }
+
+    // ── Mapping ──────────────────────────────────────────────────
+
+    private StaffDto MapToDto(Domain.Entities.Staff staff) => new()
     {
         Id = staff.Id,
         Name = staff.Name,
@@ -141,6 +281,25 @@ public class StaffService
         HourlyRate = staff.HourlyRate,
         PrimaryLocationId = staff.PrimaryLocationId,
         UserId = staff.UserId,
-        CreatedAtUtc = staff.CreatedAtUtc
+        CreatedAtUtc = staff.CreatedAtUtc,
+        IdentityUserId = staff.IdentityUserId,
     };
+
+    /// <summary>Populate identity fields that require an async call to the identity service.</summary>
+    public async Task<StaffDto> MapToDtoWithIdentityAsync(Domain.Entities.Staff staff)
+    {
+        var dto = MapToDto(staff);
+
+        if (staff.IdentityUserId.HasValue && _identityService != null)
+        {
+            var info = await _identityService.GetUserInfoAsync(staff.IdentityUserId.Value);
+            if (info.HasValue)
+            {
+                dto.LoginIdentifier = info.Value.UserName;
+                dto.LoginRole = info.Value.Role;
+            }
+        }
+
+        return dto;
+    }
 }

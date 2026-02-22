@@ -18,8 +18,9 @@ import InventoryHealthDashboard from '../pages/health-dashboard/InventoryHealthD
 import { CartProvider } from '../pages/cart/CartContext';
 import { PaymentProvider } from '../pages/payments/PaymentContext';
 import { OrderProvider } from '../pages/orders/OrderContext';
-import WalkInPOS from '../pages/orders/WalkInPOS';
-import { POSLayout, POSFullScreenLayout, POSScreen } from '../pages/pos';
+import { POSLayout } from '../pages/pos';
+import { ShiftProvider } from '../pages/pos/ShiftContext';
+
 import ProfitDashboard from '../pages/profit-intelligence/ProfitDashboard';
 import PhoneOrder from '../pages/orders/PhoneOrder';
 import ExternalOrdersInbox from '../pages/orders/ExternalOrdersInbox';
@@ -89,11 +90,27 @@ import {
 // Role-Based Dashboard
 import { DashboardPage } from '../pages/dashboard';
 
+// Home / Control Center
+import { HomeDashboard } from '../pages/home';
+
 // Production-Ready SaaS Infrastructure
 import { RBACProvider } from '../core/rbac/RBACContext';
 import { MasterLayout } from '../core/layout/MasterLayout';
 import { FeatureGate } from '../core/tenant';
 import { DiscountApprovalProvider } from '../core/rbac/DiscountApprovalModal';
+
+/** Wrapper that wires ShiftProvider (reads location from LocationContext) + POSLayout */
+function POSWithShift() {
+  return (
+    <ShiftProvider>
+      <PaymentProvider>
+        <CartProvider>
+          <POSLayout />
+        </CartProvider>
+      </PaymentProvider>
+    </ShiftProvider>
+  );
+}
 
 export default function AppRoutes() {
   return (
@@ -101,7 +118,7 @@ export default function AppRoutes() {
       <DiscountApprovalProvider>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="/auth/login" element={<Login />} />
 
         {/* Onboarding (authenticated but before main layout) */}
@@ -114,19 +131,6 @@ export default function AppRoutes() {
           }
         />
 
-        {/* Full-Screen POS (separate from MasterLayout) */}
-        <Route
-          element={
-            <RequireAuth>
-              <OrderProvider>
-                <POSFullScreenLayout />
-              </OrderProvider>
-            </RequireAuth>
-          }
-        >
-          <Route path="/pos-fullscreen" element={<POSScreen />} />
-        </Route>
-
         {/* Protected Routes with MasterLayout */}
         <Route
           element={
@@ -137,30 +141,14 @@ export default function AppRoutes() {
             </RequireAuth>
           }
         >
+          {/* ─── Home / Control Center ──────────────────── */}
+          <Route path="/home" element={<HomeDashboard />} />
+
           {/* ─── Dashboard ───────────────────────────────── */}
           <Route path="/dashboard" element={<DashboardPage />} />
 
           {/* ─── Sales / POS ────────────────────────────── */}
-          <Route
-            path="/pos"
-            element={
-              <PaymentProvider>
-                <CartProvider>
-                  <WalkInPOS />
-                </CartProvider>
-              </PaymentProvider>
-            }
-          />
-          <Route
-            path="/pos-v2"
-            element={
-              <PaymentProvider>
-                <CartProvider>
-                  <POSLayout />
-                </CartProvider>
-              </PaymentProvider>
-            }
-          />
+          <Route path="/pos" element={<POSWithShift />} />
           <Route
             path="/phone-order"
             element={

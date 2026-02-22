@@ -50,6 +50,7 @@ export type POSOrderType = OrderIntent;
 
 export interface DeliveryDetails {
   address: string;
+  zipCode: string;
   recipientName: string;
   recipientPhone: string;
   deliveryDate: string;      // ISO date
@@ -60,12 +61,31 @@ export interface DeliveryDetails {
 
 export const EMPTY_DELIVERY_DETAILS: DeliveryDetails = {
   address: '',
+  zipCode: '',
   recipientName: '',
   recipientPhone: '',
   deliveryDate: '',
   deliveryTimeSlot: '',
   deliveryFee: 0,
   instructions: '',
+};
+
+/**
+ * Auto-calculate delivery fee from ZIP code.
+ * Simple zone-based logic: local = $0, nearby = $8, far = $15, unknown = $12.
+ */
+export const calcDeliveryFeeFromZip = (zip: string): number => {
+  if (!zip || zip.length < 5) return 0;
+  const prefix = parseInt(zip.substring(0, 3), 10);
+  if (isNaN(prefix)) return 0;
+  // Local zone
+  if (prefix >= 100 && prefix <= 119) return 0;
+  // Nearby zone
+  if (prefix >= 120 && prefix <= 149) return 8;
+  // Far zone
+  if (prefix >= 150 && prefix <= 199) return 15;
+  // Default
+  return 12;
 };
 
 // ─── Pickup Details ─────────────────────────────────────────

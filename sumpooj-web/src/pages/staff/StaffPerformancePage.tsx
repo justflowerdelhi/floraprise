@@ -57,6 +57,7 @@ import {
   STAFF_ROLE_CONFIG,
   DATE_RANGE_PRESETS,
   getDateRangeFromPreset,
+  normalizeRole,
 } from './StaffTypes';
 import { getStaffById } from '../../api/staff.api';
 import { useApiCall } from '../../hooks/useApiCall';
@@ -256,7 +257,11 @@ const StaffPerformancePage: React.FC = () => {
       const data = await execute(() => getStaffById(staffId), {
         errorMessage: 'Failed to load staff member',
       });
-      setStaff(data ?? null);
+      if (data) {
+        setStaff({ ...data, role: normalizeRole(data.role) });
+      } else {
+        setStaff(null);
+      }
       setStaffLoaded(true);
     };
     load();
@@ -276,7 +281,7 @@ const StaffPerformancePage: React.FC = () => {
   }, [staffId, dateRange]);
 
   // Role configuration
-  const roleConfig = staff ? STAFF_ROLE_CONFIG[staff.role] : null;
+  const roleConfig = staff ? (STAFF_ROLE_CONFIG[staff.role] ?? STAFF_ROLE_CONFIG.STAFF) : null;
 
   // Not found
   if (staffLoaded && !staff) {

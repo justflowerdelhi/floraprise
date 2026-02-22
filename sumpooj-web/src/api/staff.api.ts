@@ -32,6 +32,15 @@ export interface CreateStaffRequest {
   hourlyRate?: number | null;
   primaryLocationId?: string | null;
   isActive: boolean;
+  // Optional login access
+  enableLogin?: boolean;
+  loginIdentifier?: string | null;
+  loginRole?: string | null;
+  password?: string | null;
+}
+
+export interface CreateStaffResult {
+  id: string;
 }
 
 export interface UpdateStaffRequest {
@@ -53,7 +62,7 @@ export const getAllStaff = async () => {
   return res.data;
 };
 
-export const createStaff = async (data: CreateStaffRequest) => {
+export const createStaff = async (data: CreateStaffRequest): Promise<CreateStaffResult> => {
   const res = await api.post('/Staff', data);
   return res.data;
 };
@@ -81,4 +90,28 @@ export const deleteStaff = async (id: string) => {
 export const getStaffByRole = async (role: string) => {
   const res = await api.get(`/Staff/by-role/${role}`);
   return res.data;
+};
+
+// ─── Login Management (Edit mode) ───────────────────────────
+
+export interface EnableLoginRequest {
+  loginIdentifier: string;
+  loginRole: string;
+  password: string;
+}
+
+export interface ResetPasswordRequest {
+  password: string;
+}
+
+export const enableStaffLogin = async (staffId: string, data: EnableLoginRequest): Promise<void> => {
+  await api.post(`/Staff/${staffId}/enable-login`, data);
+};
+
+export const resetStaffPassword = async (staffId: string, data: ResetPasswordRequest): Promise<void> => {
+  await api.post(`/Staff/${staffId}/reset-password`, data);
+};
+
+export const disableStaffLogin = async (staffId: string): Promise<void> => {
+  await api.post(`/Staff/${staffId}/disable-login`);
 };

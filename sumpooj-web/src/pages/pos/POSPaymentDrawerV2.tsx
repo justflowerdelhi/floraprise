@@ -108,7 +108,9 @@ const POSPaymentDrawerV2: React.FC = () => {
   }, []);
 
   const handleComplete = useCallback(() => {
-    if (isFullyPaid) {
+    // PICKUP_LATER allows partial payment (deposit), others require full payment
+    const canComplete = isFullyPaid || (state.orderIntent === 'PICKUP_LATER' && paidAmount > 0);
+    if (canComplete) {
       // TODO: Call API to create order
       console.log('Completing transaction:', {
         items: state.items,
@@ -117,12 +119,13 @@ const POSPaymentDrawerV2: React.FC = () => {
         billingInfo: state.billingInfo,
         customer: state.customer,
         orderIntent: state.orderIntent,
+        orderStatus: state.orderIntent === 'PICKUP_LATER' ? 'RESERVED' : 'COMPLETED',
         deliveryDetails: state.orderIntent === 'DELIVERY' ? state.deliveryDetails : undefined,
         pickupDetails: state.orderIntent === 'PICKUP_LATER' ? state.pickupDetails : undefined,
       });
       completeTransaction();
     }
-  }, [isFullyPaid, state, completeTransaction]);
+  }, [isFullyPaid, paidAmount, state, completeTransaction]);
 
   const handleClose = useCallback(() => {
     cancelPayment();
@@ -138,6 +141,10 @@ const POSPaymentDrawerV2: React.FC = () => {
   const isBillingValid =
     !requiresBilling || (localBilling.name.trim() && localBilling.email.trim());
 
+  // Pickup orders can be completed with partial payment (deposit)
+  const isPickup = state.orderIntent === 'PICKUP_LATER';
+  const canCompletePayment = isFullyPaid || (isPickup && paidAmount > 0);
+
   return (
     <Drawer
       anchor="right"
@@ -150,7 +157,14 @@ const POSPaymentDrawerV2: React.FC = () => {
       <div className="h-full flex flex-col bg-gray-50">
         {/* Header */}
         <header className="px-6 py-4 bg-white border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Payment</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Payment</h2>
+            {isPickup && (
+              <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full uppercase">
+                📅 Pickup — Deposit OK
+              </span>
+            )}
+          </div>
           <button
             onClick={handleClose}
             className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -357,22 +371,27 @@ const POSPaymentDrawerV2: React.FC = () => {
 
         {/* Footer Actions */}
         <footer className="px-6 py-4 bg-white border-t border-gray-200 space-y-2">
-          {isFullyPaid ? (
+          {canCompletePayment ? (
             <button
               onClick={handleComplete}
               disabled={!isBillingValid}
-              className="w-full py-3 bg-purple-600 text-white font-semibold rounded-lg
-                         hover:bg-purple-700 transition-colors
-                         disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className={`w-full py-3 font-semibold rounded-lg transition-colors
+                         disabled:bg-gray-300 disabled:cursor-not-allowed ${
+                           isFullyPaid
+                             ? 'bg-purple-600 text-white hover:bg-purple-700'
+                             : 'bg-amber-500 text-white hover:bg-amber-600'
+                         }`}
             >
-              Complete Payment
+              {isFullyPaid
+                ? 'Complete Payment'
+                : `Save as Reserved (Deposit ${formatCurrency(paidAmount)})`}
             </button>
           ) : (
             <button
               disabled
               className="w-full py-3 bg-gray-200 text-gray-500 font-semibold rounded-lg cursor-not-allowed"
             >
-              Add payment to continue
+              {isPickup ? 'Add deposit to reserve' : 'Add payment to continue'}
             </button>
           )}
           <button

@@ -43,11 +43,11 @@ const ProductCard: React.FC<ProductCardProps> = memo(({ product, onAdd }) => {
     <div
       onClick={handleClick}
       className={`
-        group relative bg-white border border-gray-200 rounded-lg overflow-hidden
-        transition-all duration-150 cursor-pointer
+        group relative bg-white border border-gray-200 rounded-xl overflow-hidden
+        transition-all duration-200 ease-out cursor-pointer
         ${isDisabled 
           ? 'opacity-50 cursor-not-allowed' 
-          : 'hover:shadow-md hover:border-purple-300 hover:-translate-y-0.5'
+          : 'hover:shadow-lg hover:shadow-purple-100/50 hover:border-purple-300 hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98] active:shadow-sm'
         }
       `}
     >

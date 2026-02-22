@@ -23,6 +23,7 @@ import {
   openShift as apiOpenShift,
   closeShift as apiCloseShift,
 } from '../../api/shift.api';
+import { useLocation as useLocationCtx } from '../../core/location/LocationContext';
 
 // ─── Context Types ──────────────────────────────────────────
 
@@ -35,8 +36,8 @@ interface ShiftContextValue {
   error: string | null;
   /** Whether the shift-close drawer is visible */
   isCloseDrawerOpen: boolean;
-  /** True when the shift API is reachable (false = shifts not deployed yet, skip guard) */
-  shiftSystemAvailable: boolean;
+  /** The locationId this provider is bound to */
+  locationId: string;
   /** Open a new shift with the given cash amount */
   openShift: (openingCash: number) => Promise<void>;
   /** Close the active shift */
@@ -53,46 +54,71 @@ const ShiftContext = createContext<ShiftContextValue | null>(null);
 
 interface ShiftProviderProps {
   children: ReactNode;
-  locationId: string;
 }
 
-export const ShiftProvider: React.FC<ShiftProviderProps> = ({ children, locationId }) => {
+export const ShiftProvider: React.FC<ShiftProviderProps> = ({ children }) => {
+  // Read selected location from global LocationContext
+  const { currentLocation, currentLocationId, isAllLocations } = useLocationCtx();
+
+  // Derive the effective locationId (empty when "ALL" or no specific location)
+  const selectedLocationId = (!isAllLocations && currentLocation?.id) ? currentLocation.id : '';
+
   const [activeShift, setActiveShift] = useState<ShiftDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCloseDrawerOpen, setCloseDrawerOpen] = useState(false);
-  const [shiftSystemAvailable, setShiftSystemAvailable] = useState(true);
 
   // ─── Fetch active shift ─────────────────────────────────
   const refreshShift = useCallback(async () => {
-    if (!locationId) return;
+    if (!selectedLocationId) {
+      console.error('[ShiftProvider] No locationId — cannot fetch active shift. currentLocationId:', currentLocationId);
+      setActiveShift(null);
+      setError('Select a location to continue.');
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-      const shift = await getActiveShift(locationId);
+      const shift = await getActiveShift(selectedLocationId);
       setActiveShift(shift);
-      setShiftSystemAvailable(true);
     } catch (err: unknown) {
-      console.error('Failed to fetch active shift', err);
-      // If the endpoint doesn't exist yet (404) or network error, mark shifts as unavailable
-      // so the POS is not blocked.
-      setShiftSystemAvailable(false);
-      setError(null); // Don't show error when system is simply not deployed
+      console.error('[ShiftProvider] Failed to fetch active shift for location', selectedLocationId, err);
+      setActiveShift(null);
+      const msg = err instanceof Error ? err.message : 'Failed to check shift status';
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  }, [locationId]);
+  }, [selectedLocationId, currentLocationId]);
 
+  // Re-fetch whenever selectedLocationId changes
   useEffect(() => {
-    refreshShift();
-  }, [refreshShift]);
+    if (selectedLocationId) {
+      refreshShift();
+    } else {
+      // No specific location — reset shift state
+      setActiveShift(null);
+      setError('Select a location to continue.');
+      setLoading(false);
+    }
+  }, [selectedLocationId, refreshShift]);
+
+  // Auto-refresh shift summary every 60 seconds while a shift is open
+  useEffect(() => {
+    if (!activeShift || !selectedLocationId) return;
+    const interval = setInterval(() => {
+      refreshShift();
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [activeShift?.id, selectedLocationId, refreshShift]);
 
   // ─── Open shift ─────────────────────────────────────────
   const openShift = useCallback(
     async (openingCash: number) => {
       try {
         setError(null);
-        await apiOpenShift({ locationId, openingCash });
+        await apiOpenShift({ locationId: selectedLocationId, openingCash });
         await refreshShift();
       } catch (err: unknown) {
         const msg =
@@ -101,7 +127,7 @@ export const ShiftProvider: React.FC<ShiftProviderProps> = ({ children, location
         throw err;
       }
     },
-    [locationId, refreshShift],
+    [selectedLocationId, refreshShift],
   );
 
   // ─── Close shift ────────────────────────────────────────
@@ -129,7 +155,7 @@ export const ShiftProvider: React.FC<ShiftProviderProps> = ({ children, location
     loading,
     error,
     isCloseDrawerOpen,
-    shiftSystemAvailable,
+    locationId: selectedLocationId,
     openShift,
     closeShift,
     refreshShift,

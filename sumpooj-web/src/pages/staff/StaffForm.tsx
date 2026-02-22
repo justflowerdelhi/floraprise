@@ -10,12 +10,13 @@
  *     Manager → edit limited fields (phone, email, commission, hourly rate)
  * - Prevents deletion if staff has historical orders (deactivate instead)
  */
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, TextField, Button, Card, Grid, MenuItem,
   Select, FormControl, InputLabel, Switch, FormControlLabel,
   useTheme, alpha, Divider, InputAdornment, CircularProgress, Alert,
-  Breadcrumbs, Link, Chip,
+  Breadcrumbs, Link, Chip, Checkbox, Dialog, DialogTitle, DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -31,6 +32,8 @@ import {
   NavigateNext as NavIcon,
   ToggleOn as ActiveIcon,
   Warning as WarnIcon,
+  VpnKey as LoginIcon,
+  Lock as LockIcon,
 } from '@mui/icons-material';
 import { useNavigate, useParams, Link as RouterLink } from 'react-router-dom';
 import { useRBAC } from '../../core/rbac/RBACContext';
@@ -40,9 +43,11 @@ import {
   STAFF_ROLE_CONFIG,
   COMMISSION_TYPE_CONFIG,
   COMMISSION_TYPES,
+  LOGIN_ROLES,
   getInitialFormData,
+  normalizeRole,
 } from './StaffTypes';
-import { getStaffById as getStaffByIdApi, createStaff as createStaffApi, updateStaff as updateStaffApi } from '../../api/staff.api';
+import { getStaffById as getStaffByIdApi, createStaff as createStaffApi, updateStaff as updateStaffApi, enableStaffLogin, resetStaffPassword, disableStaffLogin } from '../../api/staff.api';
 import { getLocations } from '../../api/location.api';
 import { useToast } from '../../hooks/useToast';
 import { useApiCall } from '../../hooks/useApiCall';
@@ -109,14 +114,19 @@ const StaffForm: React.FC = () => {
   const [activeLocations, setActiveLocations] = useState<{ id: string; name: string; isActive: boolean; code?: string }[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
 
+  // Login management state (edit mode)
+  const [loginActionLoading, setLoginActionLoading] = useState(false);
+  const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
+
   // Load existing staff for edit
   const loadStaff = useCallback(async () => {
     if (!isEdit || !staffId) return;
     setLoadingStaff(true);
     try {
       const staff = await getStaffByIdApi(staffId);
-      setExistingStaff(staff);
-      setFormData(getInitialFormData(staff));
+      const normalized = { ...staff, role: normalizeRole(staff.role) };
+      setExistingStaff(normalized);
+      setFormData(getInitialFormData(normalized));
       setLocationId(staff.locationId || '');
     } catch {
       toast.error('Failed to load staff member');
@@ -170,6 +180,22 @@ const StaffForm: React.FC = () => {
       newErrors.hourlyRate = 'Enter a valid amount';
     }
 
+    // Login access validation
+    if (formData.enableLogin) {
+      if (!formData.loginIdentifier.trim()) {
+        newErrors.loginIdentifier = 'Login identifier (email or phone) is required';
+      }
+      if (!formData.loginRole) {
+        newErrors.loginRole = 'Login role is required';
+      }
+      if (!formData.password || formData.password.length < 8) {
+        newErrors.password = 'Password must be at least 8 characters';
+      }
+      if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -187,6 +213,15 @@ const StaffForm: React.FC = () => {
       hourlyRate: formData.hourlyRate ? Number(formData.hourlyRate) : null,
       primaryLocationId: locationId || null,
       isActive: formData.isActive,
+      // Login fields — only sent on create when enabled
+      ...(!isEdit && formData.enableLogin
+        ? {
+            enableLogin: true,
+            loginIdentifier: formData.loginIdentifier.trim(),
+            loginRole: formData.loginRole,
+            password: formData.password,
+          }
+        : {}),
     };
 
     const result = await execute(
@@ -196,6 +231,78 @@ const StaffForm: React.FC = () => {
 
     if (result) {
       setTimeout(() => navigate('/staff'), 800);
+    }
+  };
+
+  // ── Login management handlers (edit mode) ─────────────────
+
+  const handleEnableLogin = async () => {
+    if (!staffId) return;
+    // Validate login fields first
+    const newErrors: Partial<Record<keyof StaffFormData, string>> = {};
+    if (!formData.loginIdentifier.trim()) newErrors.loginIdentifier = 'Login identifier is required';
+    if (!formData.loginRole) newErrors.loginRole = 'Login role is required';
+    if (!formData.password || formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters';
+    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setLoginActionLoading(true);
+    try {
+      await enableStaffLogin(staffId, {
+        loginIdentifier: formData.loginIdentifier.trim(),
+        loginRole: formData.loginRole,
+        password: formData.password,
+      });
+      // Refresh staff data so UI shows login-enabled state
+      await loadStaff();
+      toast.success('Login access enabled successfully!');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to enable login');
+    } finally {
+      setLoginActionLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!staffId) return;
+    // Validate password
+    if (!formData.password || formData.password.length < 8) {
+      setErrors({ password: 'Password must be at least 8 characters' });
+      return;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setErrors({ confirmPassword: 'Passwords do not match' });
+      return;
+    }
+
+    setLoginActionLoading(true);
+    try {
+      await resetStaffPassword(staffId, { password: formData.password });
+      setFormData((prev) => ({ ...prev, password: '', confirmPassword: '' }));
+      toast.success('Password reset successfully!');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to reset password');
+    } finally {
+      setLoginActionLoading(false);
+    }
+  };
+
+  const handleDisableLogin = async () => {
+    if (!staffId) return;
+    setDisableConfirmOpen(false);
+    setLoginActionLoading(true);
+    try {
+      await disableStaffLogin(staffId);
+      // Refresh staff data so UI shows login-disabled state
+      await loadStaff();
+      toast.success('Login access disabled successfully');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to disable login');
+    } finally {
+      setLoginActionLoading(false);
     }
   };
 
@@ -532,6 +639,407 @@ const StaffForm: React.FC = () => {
           )}
         </FormSection>
 
+        {/* ─── Login Access (Admin only) ────────────── */}
+        {isAdmin && (
+          <>
+            <Divider sx={{ my: 3 }} />
+            <FormSection title="Login Access" icon={<LoginIcon fontSize="small" />}>
+              {/* ── EDIT Mode: Staff already has login ── */}
+              {isEdit && existingStaff?.identityUserId && (
+                <>
+                  {/* Read-only login info */}
+                  <Box sx={{
+                    bgcolor: dk ? 'rgba(255,255,255,0.04)' : '#f8f9fa',
+                    border: `1px solid ${dk ? 'rgba(255,255,255,0.08)' : '#e0e0e0'}`,
+                    borderRadius: 2, p: 2, mb: 2,
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                      <Chip
+                        label="Login Enabled"
+                        size="small"
+                        sx={{ bgcolor: alpha('#4caf50', 0.15), color: '#4caf50', fontWeight: 700, fontSize: '0.7rem' }}
+                      />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        Login Identifier
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
+                        {existingStaff.loginIdentifier || '—'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        Login Role
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {existingStaff.loginRole || '—'}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* Action buttons */}
+                  <Grid container spacing={2} sx={{ mt: 1 }}>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        label="New Password"
+                        value={formData.password}
+                        onChange={handleChange('password')}
+                        fullWidth
+                        type="password"
+                        error={Boolean(errors.password)}
+                        helperText={errors.password || 'Min 8 characters'}
+                        placeholder="Enter new password"
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <LockIcon sx={{ color: 'text.secondary' }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        label="Confirm New Password"
+                        value={formData.confirmPassword}
+                        onChange={handleChange('confirmPassword')}
+                        fullWidth
+                        type="password"
+                        error={Boolean(errors.confirmPassword)}
+                        helperText={errors.confirmPassword || 'Re-enter the new password'}
+                        placeholder="Confirm new password"
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <LockIcon sx={{ color: 'text.secondary' }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Grid>
+                    <Grid size={12}>
+                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<LockIcon />}
+                          onClick={handleResetPassword}
+                          disabled={loginActionLoading}
+                          sx={{ textTransform: 'none', fontWeight: 600 }}
+                        >
+                          {loginActionLoading ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+                          Reset Password
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          color="error"
+                          onClick={() => setDisableConfirmOpen(true)}
+                          disabled={loginActionLoading}
+                          sx={{ textTransform: 'none', fontWeight: 600 }}
+                        >
+                          Disable Login
+                        </Button>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </>
+              )}
+
+              {/* ── EDIT Mode: No login yet — offer to enable ── */}
+              {isEdit && !existingStaff?.identityUserId && (
+                <>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.enableLogin}
+                        onChange={(e) => {
+                          setFormData({
+                            ...formData,
+                            enableLogin: e.target.checked,
+                            loginIdentifier: e.target.checked
+                              ? formData.email || formData.phone || ''
+                              : '',
+                            loginRole: e.target.checked
+                              ? formData.role.charAt(0) + formData.role.slice(1).toLowerCase()
+                              : '',
+                          });
+                          if (!e.target.checked) {
+                            setErrors((prev) => {
+                              const next = { ...prev };
+                              delete next.loginIdentifier;
+                              delete next.loginRole;
+                              delete next.password;
+                              delete next.confirmPassword;
+                              return next;
+                            });
+                          }
+                        }}
+                        color="primary"
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          Enable Login Access
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          Creates an identity account so this staff member can log in to the system
+                        </Typography>
+                      </Box>
+                    }
+                  />
+
+                  {formData.enableLogin && (
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          label="Login Identifier (Email or Phone)"
+                          value={formData.loginIdentifier}
+                          onChange={handleChange('loginIdentifier')}
+                          fullWidth
+                          required
+                          error={Boolean(errors.loginIdentifier)}
+                          helperText={errors.loginIdentifier || 'Used as the username for login'}
+                          placeholder="staff@florist.com or +91 98765 43210"
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <LockIcon sx={{ color: 'text.secondary' }} />
+                              </InputAdornment>
+                            ),
+                          }}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <FormControl fullWidth required error={Boolean(errors.loginRole)}>
+                          <InputLabel>Login Role</InputLabel>
+                          <Select
+                            value={formData.loginRole}
+                            label="Login Role"
+                            onChange={(e) => {
+                              setFormData({ ...formData, loginRole: e.target.value });
+                              if (errors.loginRole) setErrors({ ...errors, loginRole: undefined });
+                            }}
+                          >
+                            {LOGIN_ROLES.map((r) => (
+                              <MenuItem key={r} value={r}>{r}</MenuItem>
+                            ))}
+                          </Select>
+                          {errors.loginRole ? (
+                            <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5, ml: 1.75 }}>
+                              {errors.loginRole}
+                            </Typography>
+                          ) : (
+                            <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, ml: 1.75 }}>
+                              Determines system permissions for this user
+                            </Typography>
+                          )}
+                        </FormControl>
+                      </Grid>
+
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          label="Password"
+                          value={formData.password}
+                          onChange={handleChange('password')}
+                          fullWidth
+                          required
+                          type="password"
+                          error={Boolean(errors.password)}
+                          helperText={errors.password || 'Min 8 characters'}
+                          placeholder="Enter password"
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <LockIcon sx={{ color: 'text.secondary' }} />
+                              </InputAdornment>
+                            ),
+                          }}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          label="Confirm Password"
+                          value={formData.confirmPassword}
+                          onChange={handleChange('confirmPassword')}
+                          fullWidth
+                          required
+                          type="password"
+                          error={Boolean(errors.confirmPassword)}
+                          helperText={errors.confirmPassword || 'Re-enter the password'}
+                          placeholder="Confirm password"
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <LockIcon sx={{ color: 'text.secondary' }} />
+                              </InputAdornment>
+                            ),
+                          }}
+                        />
+                      </Grid>
+
+                      <Grid size={12}>
+                        <Button
+                          variant="contained"
+                          startIcon={<LoginIcon />}
+                          onClick={handleEnableLogin}
+                          disabled={loginActionLoading}
+                          sx={{
+                            bgcolor: '#7c4dff', '&:hover': { bgcolor: '#651fff' },
+                            fontWeight: 700, textTransform: 'none',
+                          }}
+                        >
+                          {loginActionLoading ? <CircularProgress size={16} sx={{ mr: 1, color: '#fff' }} /> : null}
+                          Enable Login
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  )}
+                </>
+              )}
+
+              {/* ── CREATE Mode: Offer login during creation ── */}
+              {!isEdit && (
+                <>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.enableLogin}
+                        onChange={(e) => {
+                          setFormData({
+                            ...formData,
+                            enableLogin: e.target.checked,
+                            loginIdentifier: e.target.checked
+                              ? formData.email || formData.phone || ''
+                              : '',
+                            loginRole: e.target.checked
+                              ? formData.role.charAt(0) + formData.role.slice(1).toLowerCase()
+                              : '',
+                          });
+                          if (!e.target.checked) {
+                            setErrors((prev) => {
+                              const next = { ...prev };
+                              delete next.loginIdentifier;
+                              delete next.loginRole;
+                              delete next.password;
+                              delete next.confirmPassword;
+                              return next;
+                            });
+                          }
+                        }}
+                        color="primary"
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          Enable Login Access
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          Creates an identity account so this staff member can log in to the system
+                        </Typography>
+                      </Box>
+                    }
+                  />
+
+                  {formData.enableLogin && (
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          label="Login Identifier (Email or Phone)"
+                          value={formData.loginIdentifier}
+                          onChange={handleChange('loginIdentifier')}
+                          fullWidth
+                          required
+                          error={Boolean(errors.loginIdentifier)}
+                          helperText={errors.loginIdentifier || 'Used as the username for login'}
+                          placeholder="staff@florist.com or +91 98765 43210"
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <LockIcon sx={{ color: 'text.secondary' }} />
+                              </InputAdornment>
+                            ),
+                          }}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <FormControl fullWidth required error={Boolean(errors.loginRole)}>
+                          <InputLabel>Login Role</InputLabel>
+                          <Select
+                            value={formData.loginRole}
+                            label="Login Role"
+                            onChange={(e) => {
+                              setFormData({ ...formData, loginRole: e.target.value });
+                              if (errors.loginRole) setErrors({ ...errors, loginRole: undefined });
+                            }}
+                          >
+                            {LOGIN_ROLES.map((r) => (
+                              <MenuItem key={r} value={r}>{r}</MenuItem>
+                            ))}
+                          </Select>
+                          {errors.loginRole ? (
+                            <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5, ml: 1.75 }}>
+                              {errors.loginRole}
+                            </Typography>
+                          ) : (
+                            <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, ml: 1.75 }}>
+                              Determines system permissions for this user
+                            </Typography>
+                          )}
+                        </FormControl>
+                      </Grid>
+
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          label="Password"
+                          value={formData.password}
+                          onChange={handleChange('password')}
+                          fullWidth
+                          required
+                          type="password"
+                          error={Boolean(errors.password)}
+                          helperText={errors.password || 'Min 8 characters'}
+                          placeholder="Enter password"
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <LockIcon sx={{ color: 'text.secondary' }} />
+                              </InputAdornment>
+                            ),
+                          }}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          label="Confirm Password"
+                          value={formData.confirmPassword}
+                          onChange={handleChange('confirmPassword')}
+                          fullWidth
+                          required
+                          type="password"
+                          error={Boolean(errors.confirmPassword)}
+                          helperText={errors.confirmPassword || 'Re-enter the password'}
+                          placeholder="Confirm password"
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <LockIcon sx={{ color: 'text.secondary' }} />
+                              </InputAdornment>
+                            ),
+                          }}
+                        />
+                      </Grid>
+                    </Grid>
+                  )}
+                </>
+              )}
+            </FormSection>
+          </>
+        )}
+
         {/* ─── Action Buttons ─────────────────────────── */}
         <Box sx={{ display: 'flex', gap: 2, mt: 4, justifyContent: 'flex-end' }}>
           <Button
@@ -558,6 +1066,50 @@ const StaffForm: React.FC = () => {
           </Button>
         </Box>
       </Card>
+
+      {/* ─── Disable Login Confirmation Dialog ───────── */}
+      <Dialog
+        open={disableConfirmOpen}
+        onClose={() => setDisableConfirmOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <Box sx={{
+          bgcolor: alpha('#f44336', 0.08),
+          px: 3, py: 2.5,
+          display: 'flex', alignItems: 'center', gap: 1.5,
+          borderBottom: `1px solid ${alpha('#f44336', 0.2)}`,
+        }}>
+          <WarnIcon sx={{ color: '#f44336' }} />
+          <DialogTitle sx={{ p: 0, fontSize: '1rem', fontWeight: 700 }}>
+            Disable Login Access
+          </DialogTitle>
+        </Box>
+        <DialogContent sx={{ px: 3, py: 2.5 }}>
+          <Typography variant="body2" sx={{ mb: 1.5 }}>
+            This will permanently delete the identity account for <strong>{existingStaff?.loginIdentifier}</strong>.
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            The staff member will no longer be able to log in. You can re-enable login later, but a new account and password will be created.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={() => setDisableConfirmOpen(false)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDisableLogin}
+            disabled={loginActionLoading}
+            sx={{ fontWeight: 600, textTransform: 'none' }}
+          >
+            {loginActionLoading ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+            Disable Login
+          </Button>
+        </DialogActions>
+      </Dialog>
 
     </Box>
   );
