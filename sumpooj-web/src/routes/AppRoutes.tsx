@@ -51,6 +51,15 @@ import { SubscriptionPage } from '../pages/subscription';
 // Settings
 import TenantSettingsPage from '../pages/settings/TenantSettingsPage';
 import PaymentGatewaySettings from '../pages/settings/PaymentGatewaySettings';
+import TaxRulesSettings from '../pages/settings/TaxRulesSettings';
+import LocationsSettings from '../pages/settings/LocationsSettings';
+import DeliveryZonesSettings from '../pages/settings/DeliveryZonesSettings';
+
+// Suppliers
+import SuppliersPage from '../pages/suppliers/SuppliersPage';
+
+// Admin
+import AuditLogsPage from '../pages/admin/AuditLogsPage';
 
 // Categories
 import { CategoryManagementPage } from '../pages/categories';
@@ -228,11 +237,20 @@ export default function AppRoutes() {
           {/* ─── Tasks ──────────────────────────────────── */}
           <Route path="/tasks" element={<MyTasksPage />} />
 
+          {/* ─── Suppliers ──────────────────────────────── */}
+          <Route path="/suppliers" element={<SuppliersPage />} />
+
           {/* ─── Settings / Subscription ────────────────── */}
           <Route path="/subscription" element={<SubscriptionPage />} />
           <Route path="/settings/tenant" element={<TenantSettingsPage />} />
           <Route path="/settings/payment-gateways" element={<PaymentGatewaySettings />} />
+          <Route path="/settings/tax-rules" element={<TaxRulesSettings />} />
+          <Route path="/settings/locations" element={<LocationsSettings />} />
+          <Route path="/settings/delivery-zones" element={<DeliveryZonesSettings />} />
           <Route path="/day-close" element={<DayCloseScreen />} />
+
+          {/* ─── Admin ──────────────────────────────────── */}
+          <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
 
           {/* ─── CRM & Customer Intelligence ────────────── */}
           <Route path="/crm/customers" element={<CustomerListPage />} />

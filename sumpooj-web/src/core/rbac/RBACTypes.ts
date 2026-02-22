@@ -276,40 +276,6 @@ export const MENU_SECTIONS: MenuSection[] = [
     ],
   },
   {
-    id: 'inventory',
-    title: 'Inventory',
-    items: [
-      {
-        id: 'inventory-batches',
-        label: 'Stock Overview',
-        icon: 'Inventory2',
-        path: '/inventory',
-        permissions: ['inventory:view'],
-      },
-      {
-        id: 'purchases',
-        label: 'New Purchase',
-        icon: 'AddShoppingCart',
-        path: '/purchases/new',
-        permissions: ['inventory:purchase'],
-      },
-      {
-        id: 'adjustments',
-        label: 'Adjustments',
-        icon: 'Tune',
-        path: '/adjustments/new',
-        permissions: ['inventory:adjust'],
-      },
-      {
-        id: 'expiry-alerts',
-        label: 'Expiry Alerts',
-        icon: 'Warning',
-        path: '/expiry-alerts',
-        permissions: ['inventory:view'],
-      },
-    ],
-  },
-  {
     id: 'reports',
     title: 'Reports',
     items: [
@@ -472,6 +438,47 @@ export const MENU_SECTIONS: MenuSection[] = [
     ],
   },
   {
+    id: 'inventory',
+    title: 'Inventory',
+    items: [
+      {
+        id: 'inventory-batches',
+        label: 'Stock Overview',
+        icon: 'Inventory2',
+        path: '/inventory',
+        permissions: ['inventory:view'],
+      },
+      {
+        id: 'suppliers',
+        label: 'Suppliers',
+        icon: 'LocalShipping',
+        path: '/suppliers',
+        permissions: ['inventory:view'],
+      },
+      {
+        id: 'purchases',
+        label: 'New Purchase',
+        icon: 'AddShoppingCart',
+        path: '/purchases/new',
+        permissions: ['inventory:purchase'],
+      },
+      {
+        id: 'adjustments',
+        label: 'Adjustments',
+        icon: 'Tune',
+        path: '/adjustments/new',
+        permissions: ['inventory:adjust'],
+      },
+      {
+        id: 'expiry-alerts',
+        label: 'Expiry Alerts',
+        icon: 'Warning',
+        path: '/expiry-alerts',
+        permissions: ['inventory:view'],
+      },
+    ],
+  },
+  {
     id: 'settings',
     title: 'Settings',
     items: [
@@ -480,6 +487,27 @@ export const MENU_SECTIONS: MenuSection[] = [
         label: 'Tenant Settings',
         icon: 'Settings',
         path: '/settings/tenant',
+        permissions: ['settings:edit'],
+      },
+      {
+        id: 'locations',
+        label: 'Locations',
+        icon: 'Store',
+        path: '/settings/locations',
+        permissions: ['settings:edit'],
+      },
+      {
+        id: 'tax-rules',
+        label: 'Tax Rules',
+        icon: 'Receipt',
+        path: '/settings/tax-rules',
+        permissions: ['settings:edit'],
+      },
+      {
+        id: 'delivery-zones',
+        label: 'Delivery Zones',
+        icon: 'LocalShipping',
+        path: '/settings/delivery-zones',
         permissions: ['settings:edit'],
       },
       {
@@ -495,6 +523,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         icon: 'CreditCard',
         path: '/subscription',
         permissions: ['settings:billing'],
+      },
+      {
+        id: 'audit-logs',
+        label: 'Audit Logs',
+        icon: 'History',
+        path: '/admin/audit-logs',
+        permissions: ['settings:edit'],
       },
     ],
   },

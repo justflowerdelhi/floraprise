@@ -47,6 +47,7 @@ import {
   CardGiftcard,
   Category,
   Settings,
+  Store,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRBAC } from '../rbac/RBACContext';
@@ -85,6 +86,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   CardGiftcard: <CardGiftcard />,
   Category: <Category />,
   Settings: <Settings />,
+  Store: <Store />,
 };
 
 // ─── Section Colors ─────────────────────────────────────────
