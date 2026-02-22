@@ -50,6 +50,7 @@ import { SubscriptionPage } from '../pages/subscription';
 
 // Settings
 import TenantSettingsPage from '../pages/settings/TenantSettingsPage';
+import PaymentGatewaySettings from '../pages/settings/PaymentGatewaySettings';
 
 // Categories
 import { CategoryManagementPage } from '../pages/categories';
@@ -230,6 +231,7 @@ export default function AppRoutes() {
           {/* ─── Settings / Subscription ────────────────── */}
           <Route path="/subscription" element={<SubscriptionPage />} />
           <Route path="/settings/tenant" element={<TenantSettingsPage />} />
+          <Route path="/settings/payment-gateways" element={<PaymentGatewaySettings />} />
           <Route path="/day-close" element={<DayCloseScreen />} />
 
           {/* ─── CRM & Customer Intelligence ────────────── */}

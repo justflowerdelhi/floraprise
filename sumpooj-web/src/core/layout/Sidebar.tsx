@@ -46,6 +46,7 @@ import {
   DeleteSweep,
   CardGiftcard,
   Category,
+  Settings,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRBAC } from '../rbac/RBACContext';
@@ -83,6 +84,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   DeleteSweep: <DeleteSweep />,
   CardGiftcard: <CardGiftcard />,
   Category: <Category />,
+  Settings: <Settings />,
 };
 
 // ─── Section Colors ─────────────────────────────────────────

@@ -483,6 +483,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         permissions: ['settings:edit'],
       },
       {
+        id: 'payment-gateways',
+        label: 'Payment Gateways',
+        icon: 'CreditCard',
+        path: '/settings/payment-gateways',
+        permissions: ['settings:edit'],
+      },
+      {
         id: 'subscription',
         label: 'Subscription',
         icon: 'CreditCard',
