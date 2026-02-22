@@ -160,6 +160,18 @@ public class SumpoojDbContext
                 !_tenantContext.CompanyId.HasValue ||
                 t.CompanyId == _tenantContext.CompanyId);
 
+        modelBuilder.Entity<PaymentGatewayConfig>()
+            .HasQueryFilter(p =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                p.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<PaymentTransaction>()
+            .HasQueryFilter(p =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                p.CompanyId == _tenantContext.CompanyId);
+
         // Apply entity type configurations from assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(SumpoojDbContext).Assembly);
 
