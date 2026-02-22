@@ -31,6 +31,7 @@ import {
   CheckCircle,
   Warning,
   Error,
+  Help,
   PointOfSale,
   Phone,
   Language,
@@ -63,21 +64,26 @@ const STATUS_CONFIG: Record<DayCloseStatus, { color: string; icon: React.ReactNo
 };
 
 interface DayStatusBadgeProps {
-  status: DayCloseStatus;
+  status?: DayCloseStatus | null;
 }
 
 function DayStatusBadge({ status }: DayStatusBadgeProps) {
-  const config = STATUS_CONFIG[status];
+  // Fallback config if status is undefined or not in STATUS_CONFIG
+  const defaultConfig = { color: '#9e9e9e', icon: <Help />, label: 'Unknown Status' };
+  const config = status ? STATUS_CONFIG[status] : defaultConfig;
+  
+  // Use default if config is still undefined
+  const safeConfig = config || defaultConfig;
   
   return (
     <Chip
-      icon={config.icon as React.ReactElement}
-      label={config.label}
+      icon={safeConfig.icon as React.ReactElement}
+      label={safeConfig.label}
       sx={{
-        bgcolor: alpha(config.color, 0.15),
-        color: config.color,
+        bgcolor: alpha(safeConfig.color, 0.15),
+        color: safeConfig.color,
         fontWeight: 600,
-        '& .MuiChip-icon': { color: config.color },
+        '& .MuiChip-icon': { color: safeConfig.color },
       }}
     />
   );

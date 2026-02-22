@@ -9,6 +9,7 @@ import type { ReactNode } from 'react';
 import type { User, UserRole } from '../core/rbac/RBACTypes';
 import type { Tenant } from '../core/tenant/TenantTypes';
 import { fetchMe } from '../api/auth.api';
+import { setAuthToken, clearAuthToken } from '../api/axios';
 
 // ─── Dev Bypass ─────────────────────────────────────────────
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true';
@@ -117,7 +118,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return true;
     } catch {
       // Token invalid / expired / missing
-      localStorage.removeItem('auth_token');
+      clearAuthToken();
       setUser(null);
       setTenant(null);
       setStatus('unauthenticated');
@@ -168,7 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setStatus('unauthenticated');
           return;
         }
-        localStorage.setItem('auth_token', token);
+        setAuthToken(token);
       }
 
       // If user/tenant provided from login response, use directly (no extra API call)
@@ -189,7 +190,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   /** Clear everything */
   const logout = useCallback(() => {
-    localStorage.removeItem('auth_token');
+    clearAuthToken();
     setUser(null);
     setTenant(null);
     setStatus('unauthenticated');

@@ -152,17 +152,17 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({
 
   // Single permission check
   if (permission) {
-    return can(permission) ? <>{children}</> : <>{fallback}</>;
+    return can(permission) ? children : fallback;
   }
 
   // Multiple permissions
   if (permissions.length > 0) {
     const hasAccess = requireAll ? canAll(permissions) : canAny(permissions);
-    return hasAccess ? <>{children}</> : <>{fallback}</>;
+    return hasAccess ? children : fallback;
   }
 
   // No permissions specified, allow access
-  return <>{children}</>;
+  return children;
 };
 
 // ─── Role Picker Component (Dev-only — for local testing) ───

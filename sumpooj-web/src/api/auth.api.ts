@@ -1,4 +1,29 @@
 import api from './axios';
+import type { UserRole } from '../core/rbac/RBACTypes';
+
+/**
+ * Normalize backend role strings to frontend UserRole type.
+ * Backend roles: ADMIN, COMPANYADMIN, MANAGER, CASHIER, DESIGNER, DRIVER, etc.
+ * Frontend roles: ADMIN, MANAGER, CASHIER, DESIGNER, DRIVER
+ */
+export function normalizeRole(backendRole: string): UserRole {
+  const normalized = backendRole.toUpperCase();
+  
+  // Map common backend roles to frontend roles
+  const roleMap: Record<string, UserRole> = {
+    'ADMIN': 'ADMIN',
+    'COMPANYADMIN': 'ADMIN',  // Backend's company admin → frontend admin
+    'MANAGER': 'MANAGER',
+    'STOREMANAGER': 'MANAGER',
+    'CASHIER': 'CASHIER',
+    'DESIGNER': 'DESIGNER',
+    'FLORALDESIGNER': 'DESIGNER',
+    'DRIVER': 'DRIVER',
+    'DELIVERYDRIVER': 'DRIVER',
+  };
+
+  return roleMap[normalized] || 'CASHIER';  // Default to CASHIER for unknown roles
+}
 
 /** Login response from backend */
 export interface LoginResponse {

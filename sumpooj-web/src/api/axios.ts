@@ -9,29 +9,47 @@ const api = axios.create({
   },
 });
 
+// ─── Module-level token (primary source for interceptor) ────
+// Keeps token in JS memory so the interceptor always has it
+// immediately after login — eliminates localStorage timing issues.
+let _authToken: string | null = localStorage.getItem('auth_token');
+
+/** Call after login to make the token available to every request */
+export function setAuthToken(token: string): void {
+  _authToken = token;
+  console.log(`🔐 [setAuthToken] Token stored in memory: ${token.substring(0, 30)}...`);
+  try { 
+    localStorage.setItem('auth_token', token);
+    console.log(`💾 [setAuthToken] Token also saved to localStorage`);
+  } catch { 
+    console.warn(`⚠️ [setAuthToken] Could not save to localStorage (quota or private mode)`);
+  }
+}
+
+/** Call on logout to clear the token everywhere */
+export function clearAuthToken(): void {
+  _authToken = null;
+  console.log(`🔓 [clearAuthToken] Token cleared from memory and localStorage`);
+  try { localStorage.removeItem('auth_token'); } catch { /* ignore */ }
+}
+
 // ─── Request: attach Bearer token ───────────────────────────
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = localStorage.getItem('auth_token');
-  console.log('📤 Request:', config.method?.toUpperCase(), config.url);
-  console.log('🔑 Token present:', !!token, token ? `${token.substring(0, 20)}...` : 'null');
-
+  const token = _authToken;
+  console.log(`🔐 [Interceptor] Token present: ${!!token} | URL: ${config.url}`);
   if (token && token !== 'undefined' && token !== 'null') {
-    config.headers.Authorization = `Bearer ${token}`;
+    config.headers.set('Authorization', `Bearer ${token}`);
+    console.log(`✅ [Interceptor] Authorization header set: Bearer ${token.substring(0, 20)}...`);
+  } else {
+    console.warn(`❌ [Interceptor] NO TOKEN - cannot attach Authorization header`);
   }
   return config;
 });
 
 // ─── Response: log and handle errors ────────────────────────
 api.interceptors.response.use(
-  (response: AxiosResponse) => {
-    console.log('📥 Response:', response.status, response.config.url);
-    console.log('📥 Response data:', response.data);
-    return response;
-  },
+  (response: AxiosResponse) => response,
   (error: AxiosError) => {
-    console.error('❌ Error:', error.response?.status, error.config?.url);
-    console.error('❌ Error data:', error.response?.data);
-
     const status = error.response?.status;
 
     if (status === 401) {
@@ -40,10 +58,8 @@ api.interceptors.response.use(
       // the token is invalid.  Other endpoints returning 401 (e.g. missing
       // company context for PlatformSuperAdmin) should NOT trigger logout.
       const isAuthEndpoint = requestUrl.includes('/auth/me');
-      const token = localStorage.getItem('auth_token');
-      if (token && isAuthEndpoint) {
-        console.log('\ud83d\udd13 Token rejected by /auth/me - clearing and logging out');
-        localStorage.removeItem('auth_token');
+      if (_authToken && isAuthEndpoint) {
+        clearAuthToken();
         window.dispatchEvent(new CustomEvent('auth:logout'));
       }
     }

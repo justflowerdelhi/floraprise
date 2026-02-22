@@ -11,7 +11,7 @@ import {
   useTheme
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { login as loginApi } from "../../api/auth.api";
+import { login as loginApi, normalizeRole } from "../../api/auth.api";
 import { useAuth } from "../../auth/AuthContext";
 import { useToast } from "../../hooks/useToast";
 
@@ -39,8 +39,12 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await loginApi(email, password);
-      // Pass user & tenant directly from login response (no extra /auth/me call)
-      await auth.login(res.access_token, res.user as any, res.tenant as any);
+      // Normalize backend role to frontend role, then pass to auth context
+      const normalizedUser = {
+        ...res.user,
+        role: normalizeRole(res.user.role),
+      };
+      await auth.login(res.access_token, normalizedUser as any, res.tenant as any);
       toast.success('Welcome back!');
       navigate("/pos");
     } catch {

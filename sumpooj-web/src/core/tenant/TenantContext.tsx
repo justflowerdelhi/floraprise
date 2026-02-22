@@ -240,10 +240,10 @@ export function FeatureGate({ feature, children, fallback = null }: FeatureGateP
   const { hasFeature } = useTenant();
   
   if (hasFeature(feature)) {
-    return <>{children}</>;
+    return children;
   }
   
-  return <>{fallback}</>;
+  return fallback;
 }
 
 // -----------------------------------------------------------------------------

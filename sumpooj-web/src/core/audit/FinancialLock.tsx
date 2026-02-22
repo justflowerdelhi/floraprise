@@ -121,7 +121,7 @@ export function LockedFieldWrapper({
   fieldLabel,
 }: LockedFieldWrapperProps) {
   if (!lockStatus.isLocked) {
-    return <>{children}</>;
+    return children;
   }
   
   return (
@@ -200,7 +200,7 @@ export function EditLockGuard({
   };
   
   if (!lockStatus.isLocked) {
-    return <>{children}</>;
+    return children;
   }
   
   return (

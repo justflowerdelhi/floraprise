@@ -192,3 +192,20 @@ export const getEventProfit = async (fromDate?: string, toDate?: string) => {
   const res = await api.get('/analytics/event-profit', { params: { fromDate, toDate } });
   return res.data;
 };
+/** GET /analytics/profit-by-channel - Get profit breakdown by sales channel */
+export const getProfitByChannel = async (fromDate?: string, toDate?: string): Promise<ChannelProfit[]> => {
+  const res = await api.get('/analytics/profit-by-channel', { params: { fromDate, toDate } });
+  return res.data;
+};
+
+/** GET /analytics/product-profit - Get profit breakdown by products */
+export const getProductProfit = async (fromDate?: string, toDate?: string): Promise<ProductProfit[]> => {
+  const res = await api.get('/analytics/product-profit', { params: { fromDate, toDate } });
+  return res.data;
+};
+
+/** GET /analytics/platform-commission - Get platform commission analysis */
+export const getPlatformCommission = async (fromDate?: string, toDate?: string): Promise<PlatformCommission[]> => {
+  const res = await api.get('/analytics/platform-commission', { params: { fromDate, toDate } });
+  return res.data;
+};
