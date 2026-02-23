@@ -47,6 +47,42 @@ export const statusConfig: Record<
 };
 
 // ─── Calculations ─────────────────────────────────────────────
+// Multi-unit flower calculations
+/**
+ * Validate InventoryBatch multi-unit fields
+ * Throws error if invalid
+ */
+export function validateInventoryBatchUnits(batch: InventoryBatch, product: { isMultiUnit?: boolean; avgUnitsPerStem?: number }) {
+  const stems = batch.stemsInStock ?? batch.quantityRemaining ?? 0;
+  if (stems < 0) throw new Error('StemsInStock cannot be negative');
+  const total = getTotalUnits(batch, product);
+  const used = batch.usedUnits ?? 0;
+  const damaged = batch.damagedUnits ?? 0;
+  if (used + damaged > total) throw new Error('UsedUnits + DamagedUnits cannot exceed total units');
+}
+/**
+ * Get total units in batch (stems or multi-units)
+ * @param batch InventoryBatch
+ * @param product Product
+ */
+export function getTotalUnits(batch: InventoryBatch, product: { isMultiUnit?: boolean; avgUnitsPerStem?: number }): number {
+  const stems = batch.stemsInStock ?? batch.quantityRemaining ?? 0;
+  if (!product.isMultiUnit) return stems;
+  const avgUnits = product.avgUnitsPerStem && product.avgUnitsPerStem > 1 ? product.avgUnitsPerStem : 1;
+  return stems * avgUnits;
+}
+
+/**
+ * Get available units in batch (total - used - damaged)
+ * @param batch InventoryBatch
+ * @param product Product
+ */
+export function getAvailableUnits(batch: InventoryBatch, product: { isMultiUnit?: boolean; avgUnitsPerStem?: number }): number {
+  const total = getTotalUnits(batch, product);
+  const used = batch.usedUnits ?? 0;
+  const damaged = batch.damagedUnits ?? 0;
+  return total - used - damaged;
+}
 
 export const getRemainingValue = (b: InventoryBatch): number =>
   b.quantityRemaining * b.costPerUnit;

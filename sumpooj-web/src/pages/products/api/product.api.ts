@@ -15,6 +15,22 @@ import { getAllSuppliers, createSupplier as createSupplierApi } from '../../../a
 // ============================================
 
 export const transformToApiPayload = (formData: ProductFormData): ProductApiPayload => {
+  // --- Multi-unit validation logic ---
+  let isMultiUnit = formData.isMultiUnit ?? false;
+  let avgUnitsPerStem = formData.avgUnitsPerStem;
+  let consumptionUnit = formData.consumptionUnit ?? 'STEM';
+  if (!isMultiUnit) {
+    avgUnitsPerStem = 1;
+    consumptionUnit = 'STEM';
+  } else {
+    if (!avgUnitsPerStem || avgUnitsPerStem <= 1) {
+      avgUnitsPerStem = 2; // Enforce >1 for multi-unit
+    }
+    if (!['STEM', 'BUD', 'BLOOM'].includes(consumptionUnit)) {
+      consumptionUnit = 'STEM';
+    }
+  }
+
   const payload: ProductApiPayload = {
     productName: formData.productName,
     sku: formData.sku,
@@ -47,6 +63,13 @@ export const transformToApiPayload = (formData: ProductFormData): ProductApiPayl
       availableOnline: formData.availableOnline,
       commissionEligible: formData.commissionEligible,
     },
+
+    // Multi-unit flower configuration (backward compatible)
+    isMultiUnit,
+    baseUnit: formData.baseUnit ?? 'STEM',
+    consumptionUnit,
+    avgUnitsPerStem,
+    allowPartialConsumption: formData.allowPartialConsumption ?? false,
   };
 
   if (formData.color || formData.variety || formData.grade || 
@@ -102,7 +125,7 @@ export const createProduct = async (
       return {
         success: false,
         error: result.error,
-        data: null,
+        data: undefined,
         message: result.error,
       };
     }
@@ -119,7 +142,7 @@ export const createProduct = async (
     return {
       success: false,
       error: errorMsg,
-      data: null,
+      data: undefined,
       message: errorMsg,
     };
   }

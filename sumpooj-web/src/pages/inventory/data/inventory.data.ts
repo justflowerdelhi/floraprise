@@ -23,6 +23,10 @@ export interface InventoryBatch {
   costPerUnit: number;
   sellingPricePerUnit: number;
   isPerishable: boolean;
+  // Multi-unit flower support
+  stemsInStock?: number; // Number of stems in this batch
+  usedUnits?: number; // Units used from this batch (default 0)
+  damagedUnits?: number; // Units damaged in this batch (default 0)
 }
 
 export interface DashboardSummary {

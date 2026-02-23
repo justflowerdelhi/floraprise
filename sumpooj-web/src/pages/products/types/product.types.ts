@@ -188,6 +188,13 @@ export interface ProductFormData {
 
   // Tags
   tags?: string[];
+
+  // Multi-unit flower configuration
+  isMultiUnit?: boolean; // If true, product supports multi-unit consumption
+  baseUnit?: 'STEM'; // Always STEM for flowers, default STEM
+  consumptionUnit?: 'STEM' | 'BUD' | 'BLOOM'; // Allowed values
+  avgUnitsPerStem?: number; // Default 1, >1 if isMultiUnit
+  allowPartialConsumption?: boolean; // If true, partial consumption allowed
 }
 
 // ============================================
@@ -198,6 +205,12 @@ export interface ProductApiPayload {
   // Core identification
   productName: string;
   sku: string;
+  // Multi-unit flower configuration
+  isMultiUnit?: boolean;
+  baseUnit?: 'STEM';
+  consumptionUnit?: 'STEM' | 'BUD' | 'BLOOM';
+  avgUnitsPerStem?: number;
+  allowPartialConsumption?: boolean;
   barcodeInputMethod?: 'scan' | 'auto_generate' | 'none';
   barcode?: string;
   internalBarcode?: string;
@@ -298,4 +311,10 @@ export const defaultProductFormValues: ProductFormData = {
   availableOnline: false,
   commissionEligible: false,
   tags: [],
+  // Multi-unit flower configuration defaults
+  isMultiUnit: false,
+  baseUnit: 'STEM',
+  consumptionUnit: 'STEM',
+  avgUnitsPerStem: 1,
+  allowPartialConsumption: false,
 };
