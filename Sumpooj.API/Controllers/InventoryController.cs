@@ -66,6 +66,13 @@ public class InventoryController : ControllerBase
         return Ok(summary);
     }
 
+    [HttpGet("batch-summary")]
+    public async Task<IActionResult> GetBatchSummary()
+    {
+        var projections = await _service.GetBatchSummaryAsync();
+        return Ok(projections);
+    }
+
     #endregion
 
     #region Adjustments

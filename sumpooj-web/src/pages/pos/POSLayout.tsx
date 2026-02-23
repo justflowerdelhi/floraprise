@@ -161,9 +161,10 @@ const POSLayout: React.FC = () => {
           internalNotes: billingInfo.internalNotes || '',
           items: state.items.map(item => ({
             productId: item.productId,
-            qty: item.qty,
-            price: item.price,
-            notes: item.notes || '',
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            specialInstructions: (item as any).notes || null,
           })),
         };
         await import('../../api/order.api').then(({ createOrder }) => createOrder(orderPayload));
@@ -201,9 +202,10 @@ const POSLayout: React.FC = () => {
           internalNotes: billingInfo.internalNotes || '',
           items: state.items.map(item => ({
             productId: item.productId,
-            qty: item.qty,
-            price: item.price,
-            notes: item.notes || '',
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            specialInstructions: (item as any).notes || null,
           })),
         };
         await import('../../api/order.api').then(({ createOrder }) => createOrder(orderPayload));
@@ -316,6 +318,8 @@ const POSLayout: React.FC = () => {
         customers={customers}
         selectedCustomer={selectedCustomer}
         onSelectCustomer={setSelectedCustomer}
+        products={products}
+        onAddProduct={addProduct}
       />
 
       {/* Snackbar */}

@@ -5,133 +5,128 @@ public class Delivery : BaseEntity
     private Delivery() { }
 
     public Delivery(
-        Guid companyId,
-        Guid orderId,
-        DateTime scheduledDateTime,
-        string deliveryAddress,
-        string? recipientName,
-        string? recipientPhone)
+        Guid salesOrderId,
+        DateTime deliveryDate,
+        string timeSlot,
+        string deliveryAddress)
     {
-        CompanyId = companyId;
-        OrderId = orderId;
-        ScheduledDateTime = scheduledDateTime;
+        if (salesOrderId == Guid.Empty)
+            throw new ArgumentException("SalesOrderId is required.", nameof(salesOrderId));
+        if (string.IsNullOrWhiteSpace(timeSlot))
+            throw new ArgumentException("TimeSlot is required.", nameof(timeSlot));
+        if (string.IsNullOrWhiteSpace(deliveryAddress))
+            throw new ArgumentException("DeliveryAddress is required.", nameof(deliveryAddress));
+
+        SalesOrderId = salesOrderId;
+        DeliveryDate = deliveryDate;
+        TimeSlot = timeSlot;
         DeliveryAddress = deliveryAddress;
-        RecipientName = recipientName;
-        RecipientPhone = recipientPhone;
         Status = DeliveryStatus.Scheduled;
-        IsActive = true;
     }
 
-    public Guid CompanyId { get; private set; }
-    public Guid OrderId { get; private set; }
+    public Guid SalesOrderId { get; private set; }
+    public DateTime DeliveryDate { get; private set; }
+    public string TimeSlot { get; private set; } = string.Empty;
+    public string DeliveryAddress { get; private set; } = string.Empty;
     public Guid? DeliveryPersonId { get; private set; }
-    public DateTime ScheduledDateTime { get; private set; }
-    public DateTime? ActualDeliveryDateTime { get; private set; }
     public DeliveryStatus Status { get; private set; }
-    public bool IsActive { get; private set; }
 
-    public string DeliveryAddress { get; private set; }
-    public string? RecipientName { get; private set; }
-    public string? RecipientPhone { get; private set; }
+    // ── Domain Methods ───────────────────────────────────────────────────
 
-    // Delivery tracking
-    public string? DeliveryProofPhotoPath { get; private set; }
-    public string? RecipientSignature { get; private set; }
-    public string? DeliveryNotes { get; private set; }
-
-    // Geolocation
-    public double? DeliveryLatitude { get; private set; }
-    public double? DeliveryLongitude { get; private set; }
-
-    public void AssignDeliveryPerson(Guid deliveryPersonId)
+    /// <summary>
+    /// Assign a delivery person and mark out for delivery.
+    /// </summary>
+    public void MarkOutForDelivery(Guid? deliveryPersonId = null)
     {
         if (Status != DeliveryStatus.Scheduled)
-            throw new InvalidOperationException("Can only assign delivery person to scheduled deliveries");
+            throw new InvalidOperationException("Only Scheduled deliveries can be marked OutForDelivery.");
 
-        DeliveryPersonId = deliveryPersonId;
+        if (deliveryPersonId.HasValue)
+            DeliveryPersonId = deliveryPersonId;
+
+        Status = DeliveryStatus.OutForDelivery;
         MarkUpdated();
     }
 
-    public void StartDelivery()
+    /// <summary>
+    /// Mark the delivery as successfully completed.
+    /// </summary>
+    public void MarkDelivered()
     {
-        if (Status != DeliveryStatus.Scheduled)
-            throw new InvalidOperationException("Can only start scheduled deliveries");
+        if (Status != DeliveryStatus.OutForDelivery)
+            throw new InvalidOperationException("Only OutForDelivery deliveries can be marked Delivered.");
 
-        if (!DeliveryPersonId.HasValue)
-            throw new InvalidOperationException("Cannot start delivery without assigned delivery person");
-
-        Status = DeliveryStatus.InProgress;
+        Status = DeliveryStatus.Delivered;
         MarkUpdated();
     }
 
-    public void CompleteDelivery(
-        string? proofPhotoPath,
-        string? recipientSignature,
-        double? latitude,
-        double? longitude,
-        string? notes)
+    /// <summary>
+    /// Mark the delivery as failed (e.g., customer not available).
+    /// </summary>
+    public void MarkFailed()
     {
-        if (Status != DeliveryStatus.InProgress)
-            throw new InvalidOperationException("Can only complete deliveries in progress");
-
-        Status = DeliveryStatus.Completed;
-        ActualDeliveryDateTime = DateTime.UtcNow;
-        DeliveryProofPhotoPath = proofPhotoPath;
-        RecipientSignature = recipientSignature;
-        DeliveryLatitude = latitude;
-        DeliveryLongitude = longitude;
-        DeliveryNotes = notes;
-        MarkUpdated();
-    }
-
-    public void MarkFailed(string reason)
-    {
-        if (Status == DeliveryStatus.Completed)
-            throw new InvalidOperationException("Cannot mark completed delivery as failed");
+        if (Status != DeliveryStatus.OutForDelivery)
+            throw new InvalidOperationException("Only OutForDelivery deliveries can be marked Failed.");
 
         Status = DeliveryStatus.Failed;
-        DeliveryNotes = reason;
         MarkUpdated();
     }
 
-    public void Reschedule(DateTime newDateTime, string? reason)
+    /// <summary>
+    /// Cancel the delivery. Only allowed if not already delivered or cancelled.
+    /// </summary>
+    public void Cancel()
     {
-        if (Status == DeliveryStatus.Completed)
-            throw new InvalidOperationException("Cannot reschedule completed delivery");
+        if (Status == DeliveryStatus.Delivered)
+            throw new InvalidOperationException("Cannot cancel a delivery that has already been delivered.");
+        if (Status == DeliveryStatus.Cancelled)
+            throw new InvalidOperationException("Delivery is already cancelled.");
 
-        ScheduledDateTime = newDateTime;
-        Status = DeliveryStatus.Rescheduled;
-        
-        if (!string.IsNullOrEmpty(reason))
-        {
-            DeliveryNotes = string.IsNullOrEmpty(DeliveryNotes)
-                ? $"Rescheduled: {reason}"
-                : $"{DeliveryNotes}\nRescheduled: {reason}";
-        }
-        
+        Status = DeliveryStatus.Cancelled;
         MarkUpdated();
     }
 
-    public void UpdateDeliveryAddress(string newAddress)
+    /// <summary>
+    /// Reschedule a failed or scheduled delivery.
+    /// </summary>
+    public void Reschedule(DateTime newDeliveryDate, string newTimeSlot)
     {
-        if (Status == DeliveryStatus.Completed)
-            throw new InvalidOperationException("Cannot update address for completed delivery");
+        if (Status != DeliveryStatus.Scheduled && Status != DeliveryStatus.Failed)
+            throw new InvalidOperationException("Only Scheduled or Failed deliveries can be rescheduled.");
+
+        if (string.IsNullOrWhiteSpace(newTimeSlot))
+            throw new ArgumentException("TimeSlot is required.", nameof(newTimeSlot));
+
+        DeliveryDate = newDeliveryDate;
+        TimeSlot = newTimeSlot;
+        Status = DeliveryStatus.Scheduled;
+        MarkUpdated();
+    }
+
+    /// <summary>
+    /// Update delivery address.
+    /// </summary>
+    public void UpdateAddress(string newAddress)
+    {
+        if (Status == DeliveryStatus.Delivered || Status == DeliveryStatus.Cancelled)
+            throw new InvalidOperationException("Cannot update address for completed or cancelled deliveries.");
+
+        if (string.IsNullOrWhiteSpace(newAddress))
+            throw new ArgumentException("DeliveryAddress is required.", nameof(newAddress));
 
         DeliveryAddress = newAddress;
         MarkUpdated();
     }
 
-    public void AddNote(string note)
+    /// <summary>
+    /// Assign or change delivery person.
+    /// </summary>
+    public void AssignDeliveryPerson(Guid deliveryPersonId)
     {
-        DeliveryNotes = string.IsNullOrEmpty(DeliveryNotes)
-            ? note
-            : $"{DeliveryNotes}\n{note}";
-        MarkUpdated();
-    }
+        if (Status == DeliveryStatus.Delivered || Status == DeliveryStatus.Cancelled)
+            throw new InvalidOperationException("Cannot assign delivery person to completed or cancelled deliveries.");
 
-    public void Deactivate()
-    {
-        IsActive = false;
+        DeliveryPersonId = deliveryPersonId;
         MarkUpdated();
     }
 }

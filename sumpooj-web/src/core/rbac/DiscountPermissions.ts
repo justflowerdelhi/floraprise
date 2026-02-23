@@ -50,6 +50,12 @@ export const DISCOUNT_PERMISSIONS: Record<UserRole, DiscountPermission> = {
     requiresApproval: true,
     canApproveDiscounts: false,
   },
+  STAFF: {
+    maxOrderPercent: 5,
+    maxLinePercent: 5,
+    requiresApproval: true,
+    canApproveDiscounts: false,
+  },
 };
 
 // ─── Validation Types ───────────────────────────────────────

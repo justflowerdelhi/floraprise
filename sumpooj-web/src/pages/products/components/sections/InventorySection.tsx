@@ -11,6 +11,7 @@ import type { FormSectionProps } from '../../types/product.types';
 
 interface InventorySectionProps extends FormSectionProps {
   isEnabled: boolean;
+  hideBatchTracking?: boolean;
 }
 
 const InventorySection = ({
@@ -20,6 +21,7 @@ const InventorySection = ({
   setValue: _setValue,
   darkMode = false,
   isEnabled,
+  hideBatchTracking = false,
 }: InventorySectionProps) => {
   const openingStock = watch('openingStock');
   const reorderLevel = watch('reorderLevel');
@@ -67,20 +69,22 @@ const InventorySection = ({
             />
           </Grid>
 
-          {/* Track Batch */}
-          <Grid size={{ xs: 12 }}>
-            <FormSwitch
-              name="trackBatch"
-              control={control}
-              label="Track Batches"
-              disabled={isPerishable}
-              helperText={isPerishable
-                ? 'Perishable items always use batch tracking.'
-                : 'Enable batch labels and QR scans for hard goods.'
-              }
-              darkMode={darkMode}
-            />
-          </Grid>
+          {/* Track Batch (hidden for bouquet) */}
+          {!hideBatchTracking && (
+            <Grid size={{ xs: 12 }}>
+              <FormSwitch
+                name="trackBatch"
+                control={control}
+                label="Track Batches"
+                disabled={isPerishable}
+                helperText={isPerishable
+                  ? 'Perishable items always use batch tracking.'
+                  : 'Enable batch labels and QR scans for hard goods.'
+                }
+                darkMode={darkMode}
+              />
+            </Grid>
+          )}
 
           {/* Low Stock Warning */}
           <Grid size={{ xs: 12 }}>

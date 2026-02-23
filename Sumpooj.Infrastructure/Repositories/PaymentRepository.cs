@@ -50,6 +50,14 @@ public class PaymentRepository : IPaymentRepository
             .SumAsync(p => p.Amount);
     }
 
+    public async Task<decimal> GetTodayTotalAsync()
+    {
+        var today = DateTime.UtcNow.Date;
+        return await _db.Payments
+            .Where(p => p.Status == PaymentTransactionStatus.Approved && p.CreatedAtUtc.Date == today)
+            .SumAsync(p => p.Amount);
+    }
+
     public async Task AddAsync(Payment payment)
     {
         await _db.Payments.AddAsync(payment);

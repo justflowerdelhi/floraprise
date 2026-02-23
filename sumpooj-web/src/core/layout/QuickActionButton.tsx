@@ -51,7 +51,7 @@ const ALL_QUICK_ACTIONS: ActionItem[] = [
     id: 'phone-order',
     label: 'Phone Order',
     icon: <PhoneIcon />,
-    path: '/phone-order',
+    path: '/phone-orders',
     permissions: ['orders:create'],
     color: '#2196f3',
   },

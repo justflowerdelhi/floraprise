@@ -93,10 +93,10 @@ public enum PurchaseOrderStatus
 public enum DeliveryStatus
 {
     Scheduled,
-    InProgress,
-    Completed,
+    OutForDelivery,
+    Delivered,
     Failed,
-    Rescheduled
+    Cancelled
 }
 
 public enum StockMovementType
@@ -304,4 +304,38 @@ public enum FulfillmentStatus
     OutForDelivery,
     Completed,
     Cancelled
+}
+
+// Inventory Reservation Status
+public enum ReservationStatus
+{
+    Active,
+    Released,
+    Converted
+}
+
+// Sales Order
+public enum OrderType
+{
+    PhoneLocal,
+    PhoneOutstation
+}
+
+public enum SalesOrderStatus
+{
+    Draft,
+    Confirmed,
+    InProduction,
+    SentToVendor,
+    Delivered,
+    Cancelled
+}
+
+// Vendor Execution Status
+public enum VendorExecutionStatus
+{
+    Pending,
+    Accepted,
+    Delivered,
+    Paid
 }

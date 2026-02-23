@@ -37,6 +37,10 @@ public class CreateProductRequest
     public int? ExpiryAlertDays { get; set; }
     public string? TemperatureNotes { get; set; }
 
+    // Multi-unit flower configuration
+    public bool IsMultiUnit { get; set; }
+    public int AvgUnitsPerStem { get; set; } = 1;
+
     // Flower Attributes
     public FlowerAttributesRequest? FlowerAttributes { get; set; }
 
@@ -105,6 +109,10 @@ public class UpdateProductRequest
     public int? ShelfLifeDays { get; set; }
     public int? ExpiryAlertDays { get; set; }
     public string? TemperatureNotes { get; set; }
+
+    // Multi-unit flower configuration
+    public bool? IsMultiUnit { get; set; }
+    public int? AvgUnitsPerStem { get; set; }
 
     // Flower Attributes
     public FlowerAttributesRequest? FlowerAttributes { get; set; }

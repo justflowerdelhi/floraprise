@@ -188,7 +188,9 @@ const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
   CASHIER: <CashierIcon />,
   DESIGNER: <DesignerIcon />,
   DRIVER: <DriverIcon />,
+  STAFF: <SupervisorAccountIcon />,
 };
+import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 
 /**
  * Dev-only role picker.

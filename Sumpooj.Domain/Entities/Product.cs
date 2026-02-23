@@ -68,6 +68,10 @@ public class Product : BaseEntity
     public int? ExpiryAlertDays { get; private set; }
     public string? TemperatureNotes { get; private set; }
 
+    // Multi-unit support (e.g. a stem may yield multiple usable units)
+    public bool IsMultiUnit { get; private set; }
+    public int AvgUnitsPerStem { get; private set; } = 1;
+
     // Flower-specific properties
     public string? Color { get; private set; }
     public string? Variety { get; private set; }
@@ -227,6 +231,47 @@ public class Product : BaseEntity
     public void SetSeasonalAvailability(SeasonalAvailability availability)
     {
         SeasonalAvailability = availability;
+        MarkUpdated();
+    }
+
+    public void SetMultiUnit(bool isMultiUnit, int avgUnitsPerStem = 1)
+    {
+        if (avgUnitsPerStem < 1)
+            throw new ArgumentException("AvgUnitsPerStem must be at least 1.");
+
+        IsMultiUnit = isMultiUnit;
+        AvgUnitsPerStem = isMultiUnit ? avgUnitsPerStem : 1;
+        MarkUpdated();
+    }
+
+    /// <summary>
+    /// Sets multi-unit configuration with inventory existence validation.
+    /// Use this overload when product may have existing batches to enforce domain invariant.
+    /// </summary>
+    /// <param name="isMultiUnit">Whether the product supports multi-unit consumption.</param>
+    /// <param name="avgUnitsPerStem">Average units per stem (must be >= 1).</param>
+    /// <param name="existingBatches">Existing product batches to validate against.</param>
+    public void SetMultiUnit(bool isMultiUnit, int avgUnitsPerStem, IEnumerable<ProductBatch> existingBatches)
+    {
+        if (avgUnitsPerStem < 1)
+            throw new ArgumentException("AvgUnitsPerStem must be at least 1.");
+
+        // Check if any batch has existing inventory activity
+        if (existingBatches != null)
+        {
+            var hasExistingInventory = existingBatches.Any(b =>
+                b.StemsInStock > 0 || b.UsedUnits > 0 || b.ReservedUnits > 0);
+
+            // Only prevent change if configuration is actually changing
+            if (hasExistingInventory && (IsMultiUnit != isMultiUnit || AvgUnitsPerStem != avgUnitsPerStem))
+            {
+                throw new InvalidOperationException(
+                    "Cannot change multi-unit configuration after inventory exists.");
+            }
+        }
+
+        IsMultiUnit = isMultiUnit;
+        AvgUnitsPerStem = isMultiUnit ? avgUnitsPerStem : 1;
         MarkUpdated();
     }
 

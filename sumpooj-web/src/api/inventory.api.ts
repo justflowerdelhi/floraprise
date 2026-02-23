@@ -115,3 +115,26 @@ export const getRecentAdjustments = async (count = 10) => {
   const res = await api.get('/inventory/adjustments/recent', { params: { count } });
   return res.data;
 };
+
+// ─── Batch Summary (aggregated inventory projections) ───────
+
+export interface BatchSummaryItem {
+  batchId: string;
+  productId: string;
+  productName: string;
+  batchNumber: string;
+  stemsInStock: number;
+  totalUnits: number;
+  usedUnits: number;
+  damagedUnits: number;
+  reservedUnits: number;
+  availableUnits: number;
+  consumedStems: number;
+  remainingStems: number;
+  partialUsedUnits: number;
+}
+
+export const getBatchSummary = async (): Promise<BatchSummaryItem[]> => {
+  const res = await api.get('/inventory/batch-summary');
+  return res.data;
+};

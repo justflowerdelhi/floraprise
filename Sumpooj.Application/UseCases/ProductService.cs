@@ -11,6 +11,7 @@ public class ProductService
     private readonly IProductRepository _repo;
     private readonly IProductCategoryRepository _categoryRepo;
     private readonly ITaxRuleRepository _taxRuleRepo;
+    private readonly IProductBatchRepository _batchRepo;
     private readonly ITenantContext _tenant;
     private readonly ILogger<ProductService> _logger;
 
@@ -18,12 +19,14 @@ public class ProductService
         IProductRepository repo,
         IProductCategoryRepository categoryRepo,
         ITaxRuleRepository taxRuleRepo,
+        IProductBatchRepository batchRepo,
         ITenantContext tenant,
         ILogger<ProductService> logger)
     {
         _repo = repo;
         _categoryRepo = categoryRepo;
         _taxRuleRepo = taxRuleRepo;
+        _batchRepo = batchRepo;
         _tenant = tenant;
         _logger = logger;
     }
@@ -136,6 +139,9 @@ public class ProductService
         {
             product.AdjustStock(request.OpeningStock.Value);
         }
+
+        // Set multi-unit configuration (no batches exist for new product)
+        product.SetMultiUnit(request.IsMultiUnit, request.AvgUnitsPerStem);
 
         // Handle status
         if (request.Settings.Status == "inactive")
@@ -252,6 +258,16 @@ public class ProductService
         if (request.Tags != null)
         {
             product.SetTags(string.Join(",", request.Tags));
+        }
+
+        // Handle multi-unit configuration with inventory validation
+        if (request.IsMultiUnit.HasValue || request.AvgUnitsPerStem.HasValue)
+        {
+            var existingBatches = await _batchRepo.GetBatchesByProductIdAsync(product.Id);
+            product.SetMultiUnit(
+                request.IsMultiUnit ?? product.IsMultiUnit,
+                request.AvgUnitsPerStem ?? product.AvgUnitsPerStem,
+                existingBatches);
         }
 
         await _repo.UpdateAsync(product);

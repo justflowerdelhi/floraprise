@@ -63,6 +63,10 @@ public class SumpoojDbContext
     // User preferences
     public DbSet<UserDashboardPreference> UserDashboardPreferences => Set<UserDashboardPreference>();
 
+    // Sales Orders
+    public DbSet<SalesOrder> SalesOrders => Set<SalesOrder>();
+    public DbSet<SalesOrderItem> SalesOrderItems => Set<SalesOrderItem>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

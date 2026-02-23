@@ -68,3 +68,23 @@ public class ExpiryAlertDto
     public string? StorageLocation { get; set; }
     public string AlertLevel { get; set; } = default!; // Critical, Warning, Upcoming
 }
+
+/// <summary>
+/// Projection DTO exposing computed values from ProductBatch.
+/// </summary>
+public class InventoryBatchProjection
+{
+    public Guid BatchId { get; set; }
+    public Guid ProductId { get; set; }
+    public string ProductName { get; set; } = default!;
+    public string BatchNumber { get; set; } = default!;
+    public int StemsInStock { get; set; }
+    public int TotalUnits { get; set; }
+    public int UsedUnits { get; set; }
+    public int DamagedUnits { get; set; }
+    public int ReservedUnits { get; set; }
+    public int AvailableUnits { get; set; }
+    public int ConsumedStems { get; set; }
+    public int RemainingStems { get; set; }
+    public int PartialUsedUnits { get; set; }
+}

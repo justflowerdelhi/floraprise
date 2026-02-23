@@ -7,6 +7,16 @@ import { z } from 'zod';
 
 export const productFormSchema = z.object({
   // ========================================
+  // PRODUCT INTENT (Top-level selector)
+  // ========================================
+  productIntent: z.enum([
+    'fresh_flower',
+    'bouquet',
+    'gift_item',
+    'raw_material',
+  ]).default('fresh_flower'),
+
+  // ========================================
   // BASIC INFO (Required)
   // ========================================
   productName: z
@@ -186,6 +196,18 @@ export const productFormSchema = z.object({
       'wedding_season',
     ]))
     .optional(),
+
+  // ========================================
+  // FLOWER CONFIGURATION (Multi-unit support)
+  // ========================================
+  isMultiUnit: z.boolean().default(false),
+
+  avgUnitsPerStem: z
+    .number()
+    .int('Average units per stem must be a whole number')
+    .min(1, 'Must be at least 1')
+    .optional()
+    .default(1),
 
   // ========================================
   // SUPPLIER INFO (Optional)

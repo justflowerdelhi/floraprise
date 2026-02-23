@@ -215,7 +215,7 @@ export const MENU_SECTIONS: MenuSection[] = [
         id: 'phone-order',
         label: 'Phone Order',
         icon: 'Phone',
-        path: '/phone-order',
+        path: '/phone-orders',
         permissions: ['orders:create'],
       },
       {
@@ -246,10 +246,10 @@ export const MENU_SECTIONS: MenuSection[] = [
         permissions: ['orders:view'],
       },
       {
-        id: 'delivery-scheduler',
+        id: 'deliveries',
         label: 'Deliveries',
         icon: 'LocalShipping',
-        path: '/delivery-scheduler',
+        path: '/deliveries',
         permissions: ['delivery:view'],
       },
       {
@@ -357,7 +357,7 @@ export const MENU_SECTIONS: MenuSection[] = [
         id: 'products',
         label: 'Products',
         icon: 'LocalFlorist',
-        path: '/products/new',
+        path: '/products',
         permissions: ['products:view'],
       },
       {
@@ -558,9 +558,14 @@ export interface RouteConfig {
 
 export const ROUTE_ACCESS: RouteConfig[] = [
   { path: '/pos', permissions: ['pos:access'] },
-  { path: '/phone-order', permissions: ['orders:create'] },
+  { path: '/phone-orders', permissions: ['orders:create'] },
+  { path: '/phone-orders/new', permissions: ['orders:create'] },
+  { path: '/phone-orders/production', permissions: ['orders:create'] },
+  { path: '/phone-orders/list', permissions: ['orders:view'] },
+  { path: '/phone-orders/:orderId', permissions: ['orders:create'] },
   { path: '/external-orders', permissions: ['orders:external'] },
   { path: '/order-list', permissions: ['orders:view'] },
+  { path: '/deliveries', permissions: ['delivery:view'] },
   { path: '/delivery-scheduler', permissions: ['delivery:view'] },
   { path: '/events', permissions: ['events:view'] },
   { path: '/proposals', permissions: ['proposals:view'] },
@@ -610,7 +615,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     id: 'phone-order',
     label: 'Phone Order',
     icon: 'Phone',
-    path: '/phone-order',
+    path: '/phone-orders',
     permissions: ['orders:create'],
     color: '#2196f3',
   },
@@ -631,7 +636,7 @@ export const DEFAULT_LANDING: Record<UserRole, string> = {
   MANAGER: '/home',
   CASHIER: '/pos',
   DESIGNER: '/production/recipes',
-  DRIVER: '/delivery-scheduler',
+  DRIVER: '/deliveries',
   STAFF: '/home',
 };
 

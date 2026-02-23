@@ -135,6 +135,18 @@ export interface POSBillingInfo {
   name: string;
   email: string;
   phone?: string;
+  deliveryDate?: string;
+  deliveryAddress?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  cardMessage?: string;
+  deliveryPriority?: string;
+  timeSlot?: string;
+  pickupDate?: string;
+  pickupTimeSlot?: string;
+  deliveryFee?: number;
+  discountAmount?: number;
+  internalNotes?: string;
 }
 
 // ─── Cart Line Item Add-On ──────────────────────────────────

@@ -509,6 +509,7 @@ export const getTeamSummary = (): {
     CASHIER: 0,
     DESIGNER: 0,
     DRIVER: 0,
+    STAFF: 0,
   };
 
   MOCK_STAFF.forEach((staff) => {

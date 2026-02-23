@@ -234,6 +234,12 @@ builder.Services.AddScoped<TaxCalculationService>();
 // Analytics
 builder.Services.AddScoped<ProfitDashboardService>();
 
+// Sales Orders & Deliveries
+builder.Services.AddScoped<ISalesOrderRepository, SalesOrderRepository>();
+builder.Services.AddScoped<IDeliveryRepository, DeliveryRepository>();
+builder.Services.AddScoped<ScheduleDeliveryHandler>();
+builder.Services.AddScoped<AssignDeliveryPersonHandler>();
+
 // Payment Gateway Services
 builder.Services.AddHttpClient(); // For gateway HTTP calls
 builder.Services.AddScoped<IPaymentGatewayConfigRepository, PaymentGatewayConfigRepository>();

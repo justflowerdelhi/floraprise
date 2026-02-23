@@ -75,6 +75,8 @@ export interface CreateProductRequest {
   shelfLifeDays?: number | null;
   expiryAlertDays?: number | null;
   temperatureNotes?: string | null;
+  isMultiUnit?: boolean;
+  avgUnitsPerStem?: number;
   flowerAttributes?: FlowerAttributesRequest | null;
   supplier?: SupplierInfoRequest | null;
   accounting: AccountingInfoRequest;
@@ -98,6 +100,8 @@ export interface UpdateProductRequest {
   shelfLifeDays?: number | null;
   expiryAlertDays?: number | null;
   temperatureNotes?: string | null;
+  isMultiUnit?: boolean | null;
+  avgUnitsPerStem?: number | null;
   flowerAttributes?: FlowerAttributesRequest | null;
   supplier?: SupplierInfoRequest | null;
   accounting?: AccountingInfoRequest | null;

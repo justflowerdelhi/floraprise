@@ -124,10 +124,19 @@ export interface Supplier {
 }
 
 // ============================================
+// PRODUCT INTENT TYPE
+// ============================================
+
+export type ProductIntent = 'fresh_flower' | 'bouquet' | 'gift_item' | 'raw_material';
+
+// ============================================
 // PRODUCT FORM DATA INTERFACE
 // ============================================
 
 export interface ProductFormData {
+  // Product Intent (top-level selector)
+  productIntent: ProductIntent;
+
   // Basic Info (Required)
   productName: string;
   productType: ProductType;
@@ -293,6 +302,7 @@ export interface FormSectionProps {
 // ============================================
 
 export const defaultProductFormValues: ProductFormData = {
+  productIntent: 'fresh_flower',
   productName: '',
   productType: 'fresh_flower',
   categoryId: '',

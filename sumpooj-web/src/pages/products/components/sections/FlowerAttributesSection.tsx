@@ -3,8 +3,16 @@
  * Specific attributes for flower products
  */
 
-import { Grid, Collapse } from '@mui/material';
+import { useEffect } from 'react';
+import {
+  Grid,
+  Collapse,
+  FormControlLabel,
+  Switch,
+  TextField,
+} from '@mui/material';
 import ColorLensIcon from '@mui/icons-material/ColorLens';
+import { Controller } from 'react-hook-form';
 import SectionCard from '../SectionCard';
 import { FormTextField, FormSelect, FormMultiSelect } from '../FormFields';
 import {
@@ -27,6 +35,15 @@ const FlowerAttributesSection = ({
   darkMode = false,
   isFlowerProduct,
 }: FlowerAttributesSectionProps) => {
+  const isMultiUnit = watch('isMultiUnit');
+
+  // Auto-set avgUnitsPerStem to 1 when isMultiUnit is disabled
+  useEffect(() => {
+    if (!isMultiUnit) {
+      setValue('avgUnitsPerStem', 1);
+    }
+  }, [isMultiUnit, setValue]);
+
   return (
     <Collapse in={isFlowerProduct}>
       <SectionCard
@@ -99,6 +116,71 @@ const FlowerAttributesSection = ({
               tooltip="When this flower is typically available"
               darkMode={darkMode}
             />
+          </Grid>
+
+          {/* Multi-unit Switch */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Controller
+              name="isMultiUnit"
+              control={control}
+              render={({ field }) => (
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={field.value ?? false}
+                      onChange={(e) => field.onChange(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label="Multi-bud flower"
+                  sx={{
+                    '& .MuiFormControlLabel-label': {
+                      fontSize: '0.875rem',
+                      color: darkMode ? 'grey.300' : 'grey.700',
+                    },
+                  }}
+                />
+              )}
+            />
+          </Grid>
+
+          {/* Average Units Per Stem */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Collapse in={isMultiUnit}>
+              <Controller
+                name="avgUnitsPerStem"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    type="number"
+                    label="Avg units per stem"
+                    fullWidth
+                    size="small"
+                    slotProps={{
+                      input: {
+                        inputProps: { min: 2 },
+                      },
+                    }}
+                    value={field.value ?? 2}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      field.onChange(isNaN(val) ? 2 : Math.max(2, val));
+                    }}
+                    error={!!errors?.avgUnitsPerStem}
+                    helperText={
+                      errors?.avgUnitsPerStem?.message ??
+                      'Usable buds/blooms per stem'
+                    }
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        bgcolor: darkMode ? 'grey.900' : 'grey.50',
+                      },
+                    }}
+                  />
+                )}
+              />
+            </Collapse>
           </Grid>
         </Grid>
       </SectionCard>

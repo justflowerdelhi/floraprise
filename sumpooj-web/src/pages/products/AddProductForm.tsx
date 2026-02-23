@@ -14,7 +14,6 @@ import {
   Button,
   Paper,
   Stack,
-  Grid,
   IconButton,
   Tooltip,
   Snackbar,
@@ -24,6 +23,8 @@ import {
   useMediaQuery,
   alpha,
   Chip,
+  Drawer,
+  Divider,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
@@ -34,20 +35,23 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
+import TuneIcon from '@mui/icons-material/Tune';
 
 import {
   BasicInfoSection,
   InventorySection,
   PerishableSection,
-  PricingSection,
   AccountingSection,
   SettingsSection,
   FlowerAttributesSection,
   SupplierSection,
   ImageUploadSection,
+  CorePricingSection,
+  AdditionalPricingSection,
 } from './components/sections';
 
 import QuickAddSupplierModal from './components/QuickAddSupplierModal';
+import ProductIntentSelector from './components/ProductIntentSelector';
 
 import { productFormSchema } from './schemas/product.schema';
 import type { ProductFormSchema } from './schemas/product.schema';
@@ -129,6 +133,22 @@ const AddProductForm = ({
   const categoryId = watch('categoryId');
   const trackInventory = watch('trackInventory');
   const isPerishable = watch('isPerishable');
+  const productIntent = watch('productIntent');
+
+  // Advanced Settings Drawer state
+  const [advancedDrawerOpen, setAdvancedDrawerOpen] = useState(false);
+
+  // Auto-open Advanced Settings drawer for raw_material
+  useEffect(() => {
+    if (productIntent === 'raw_material') {
+      setAdvancedDrawerOpen(true);
+    }
+  }, [productIntent]);
+
+  // Conditional rendering flags based on productIntent
+  const showFlowerAttributes = productIntent === 'fresh_flower';
+  const showPerishableSection = productIntent !== 'gift_item';
+  const hideBatchTracking = productIntent === 'bouquet';
 
   // Resolve the selected category object
   const selectedCategory = categories.find((c) => c.id === categoryId);
@@ -435,43 +455,171 @@ const AddProductForm = ({
       </Paper>
 
       {/* Main Form Content */}
-      <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Container maxWidth="md" sx={{ py: 3 }}>
         <form onSubmit={handleSubmit(onSubmit as any)}>
-          <Grid container spacing={3}>
-            {/* Left Column - Main Sections */}
-            <Grid size={{ xs: 12, lg: 8 }}>
-              <Stack spacing={3}>
-                {/* Basic Info */}
-                <BasicInfoSection
-                  control={control}
-                  errors={errors}
-                  watch={watch}
-                  setValue={setValue}
-                  darkMode={darkMode}
-                  categories={categories}
-                  loadingCategories={loadingCategories}
-                />
+          <Stack spacing={3}>
+            {/* ─── Product Intent Selector ────────────────────── */}
+            <ProductIntentSelector control={control} darkMode={darkMode} />
 
-                {/* Pricing */}
-                <PricingSection
-                  control={control}
-                  errors={errors}
-                  watch={watch}
-                  setValue={setValue}
-                  darkMode={darkMode}
-                />
+            {/* ─── Basic Product (always visible) ─────────────── */}
+            
+            {/* Basic Info */}
+            <BasicInfoSection
+              control={control}
+              errors={errors}
+              watch={watch}
+              setValue={setValue}
+              darkMode={darkMode}
+              categories={categories}
+              loadingCategories={loadingCategories}
+            />
 
-                {/* Inventory (conditional) */}
-                <InventorySection
-                  control={control}
-                  errors={errors}
-                  watch={watch}
-                  setValue={setValue}
-                  darkMode={darkMode}
-                  isEnabled={trackInventory}
-                />
+            {/* Core Pricing (retail/cost with margin) */}
+            <CorePricingSection
+              control={control}
+              errors={errors}
+              watch={watch}
+              setValue={setValue}
+              darkMode={darkMode}
+            />
 
-                {/* Perishable (conditional) */}
+            {/* Inventory (core fields) */}
+            <InventorySection
+              control={control}
+              errors={errors}
+              watch={watch}
+              setValue={setValue}
+              darkMode={darkMode}
+              isEnabled={trackInventory}
+              hideBatchTracking={hideBatchTracking}
+            />
+
+            {/* Flower Attributes (only for fresh_flower) */}
+            {showFlowerAttributes && (
+              <FlowerAttributesSection
+                control={control}
+                errors={errors}
+                watch={watch}
+                setValue={setValue}
+                darkMode={darkMode}
+                isFlowerProduct={isFlowerProduct}
+              />
+            )}
+
+            {/* ─── Advanced Settings Button ──────────────────── */}
+            <Button
+              variant="outlined"
+              startIcon={<TuneIcon />}
+              onClick={() => setAdvancedDrawerOpen(true)}
+              fullWidth
+              sx={{
+                py: 1.5,
+                borderRadius: 3,
+                borderColor: darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)',
+                color: darkMode ? 'grey.300' : 'grey.700',
+                '&:hover': {
+                  borderColor: '#5B2E91',
+                  bgcolor: alpha('#5B2E91', 0.08),
+                },
+              }}
+            >
+              Advanced Settings
+            </Button>
+          </Stack>
+        </form>
+      </Container>
+
+      {/* ─── Advanced Settings Drawer ─────────────────────── */}
+      <Drawer
+        anchor="right"
+        open={advancedDrawerOpen}
+        onClose={() => setAdvancedDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: 400,
+            maxWidth: '100vw',
+            bgcolor: darkMode ? theme.palette.grey[900] : '#fafafa',
+          },
+        }}
+      >
+        {/* Drawer Header */}
+        <Box
+          sx={{
+            p: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+            position: 'sticky',
+            top: 0,
+            bgcolor: darkMode ? theme.palette.grey[900] : '#fafafa',
+            zIndex: 10,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <TuneIcon sx={{ color: '#5B2E91' }} />
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Advanced Settings
+            </Typography>
+          </Box>
+          <IconButton onClick={() => setAdvancedDrawerOpen(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+
+        {/* Drawer Content */}
+        <Box sx={{ p: 2, pb: 10, overflowY: 'auto' }}>
+          <Stack spacing={3}>
+            {/* Additional Pricing Fields */}
+            <AdditionalPricingSection
+              control={control}
+              errors={errors}
+              watch={watch}
+              setValue={setValue}
+              darkMode={darkMode}
+            />
+
+            <Divider />
+
+            {/* Accounting */}
+            <AccountingSection
+              control={control}
+              errors={errors}
+              watch={watch}
+              setValue={setValue}
+              darkMode={darkMode}
+            />
+
+            <Divider />
+
+            {/* Supplier */}
+            <SupplierSection
+              control={control}
+              errors={errors}
+              watch={watch}
+              setValue={setValue}
+              darkMode={darkMode}
+              onOpenSupplierModal={() => setSupplierModalOpen(true)}
+              suppliers={suppliers}
+              loadingSuppliers={loadingSuppliers}
+            />
+
+            <Divider />
+
+            {/* Settings */}
+            <SettingsSection
+              control={control}
+              errors={errors}
+              watch={watch}
+              setValue={setValue}
+              darkMode={darkMode}
+            />
+
+            <Divider />
+
+            {/* Perishable (conditional - hidden for gift_item) */}
+            {showPerishableSection && (
+              <>
                 <PerishableSection
                   control={control}
                   errors={errors}
@@ -481,68 +629,58 @@ const AddProductForm = ({
                   isPerishable={isPerishable}
                   isAutoEnabled={!!selectedCategory?.isPerishable}
                 />
+                <Divider />
+              </>
+            )}
 
-                {/* Flower Attributes (conditional) */}
-                <FlowerAttributesSection
-                  control={control}
-                  errors={errors}
-                  watch={watch}
-                  setValue={setValue}
-                  darkMode={darkMode}
-                  isFlowerProduct={isFlowerProduct}
-                />
-              </Stack>
-            </Grid>
+            {/* Image Upload */}
+            <ImageUploadSection
+              control={control}
+              errors={errors}
+              watch={watch}
+              setValue={setValue}
+              darkMode={darkMode}
+              images={images}
+              imageUrls={imageUrls}
+              onImagesChange={handleImagesChange}
+            />
+          </Stack>
+        </Box>
 
-            {/* Right Column - Secondary Sections */}
-            <Grid size={{ xs: 12, lg: 4 }}>
-              <Stack spacing={3}>
-                {/* Accounting */}
-                <AccountingSection
-                  control={control}
-                  errors={errors}
-                  watch={watch}
-                  setValue={setValue}
-                  darkMode={darkMode}
-                />
-
-                {/* Supplier */}
-                <SupplierSection
-                  control={control}
-                  errors={errors}
-                  watch={watch}
-                  setValue={setValue}
-                  darkMode={darkMode}
-                  onOpenSupplierModal={() => setSupplierModalOpen(true)}
-                  suppliers={suppliers}
-                  loadingSuppliers={loadingSuppliers}
-                />
-
-                {/* Image Upload */}
-                <ImageUploadSection
-                  control={control}
-                  errors={errors}
-                  watch={watch}
-                  setValue={setValue}
-                  darkMode={darkMode}
-                  images={images}
-                  imageUrls={imageUrls}
-                  onImagesChange={handleImagesChange}
-                />
-
-                {/* Settings */}
-                <SettingsSection
-                  control={control}
-                  errors={errors}
-                  watch={watch}
-                  setValue={setValue}
-                  darkMode={darkMode}
-                />
-              </Stack>
-            </Grid>
-          </Grid>
-        </form>
-      </Container>
+        {/* Drawer Footer */}
+        <Box
+          sx={{
+            p: 2,
+            display: 'flex',
+            gap: 2,
+            justifyContent: 'flex-end',
+            borderTop: `1px solid ${darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            bgcolor: darkMode ? theme.palette.grey[900] : '#fafafa',
+          }}
+        >
+          <Button
+            variant="outlined"
+            onClick={() => setAdvancedDrawerOpen(false)}
+            sx={{ borderRadius: 2 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => setAdvancedDrawerOpen(false)}
+            sx={{
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, #5B2E91 0%, #9c27b0 100%)',
+            }}
+          >
+            Save
+          </Button>
+        </Box>
+      </Drawer>
 
       {/* Sticky Action Bar */}
       <Paper

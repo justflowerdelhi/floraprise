@@ -164,6 +164,37 @@ public class InventoryService
         };
     }
 
+    public async Task<List<InventoryBatchProjection>> GetBatchSummaryAsync()
+    {
+        var (batches, _) = await _batchRepo.SearchAsync(null, null, null, null, true, null, null, 1, int.MaxValue);
+        var projections = new List<InventoryBatchProjection>();
+
+        foreach (var batch in batches)
+        {
+            var product = await _productRepo.GetByIdAsync(batch.ProductId);
+            if (product == null) continue;
+
+            projections.Add(new InventoryBatchProjection
+            {
+                BatchId = batch.Id,
+                ProductId = batch.ProductId,
+                ProductName = product.Name,
+                BatchNumber = batch.BatchNumber,
+                StemsInStock = batch.StemsInStock,
+                TotalUnits = batch.GetTotalUnits(product),
+                UsedUnits = batch.UsedUnits,
+                DamagedUnits = batch.DamagedUnits,
+                ReservedUnits = batch.ReservedUnits,
+                AvailableUnits = batch.GetAvailableUnits(product),
+                ConsumedStems = batch.GetConsumedStems(product),
+                RemainingStems = batch.GetRemainingStems(product),
+                PartialUsedUnits = batch.GetPartialUsedUnits(product)
+            });
+        }
+
+        return projections;
+    }
+
     #endregion
 
     #region Adjustments

@@ -7,6 +7,7 @@ import RequireAuth from '../auth/RequireAuth';
 import CustomerList from '../pages/customers/CustomerList';
 import OrderForm from '../pages/orders/OrderForm';
 import AddProductForm from '../pages/products/AddProductForm';
+import ProductsListPage from '../pages/products/ProductsListPage';
 import PurchaseEntryForm from '../pages/purchases/PurchaseEntryForm';
 import InventoryBatchDashboard from '../pages/inventory/InventoryBatchDashboard';
 import AdjustmentEntryPage from '../pages/adjustments/AdjustmentEntryPage';
@@ -22,9 +23,16 @@ import { POSLayout } from '../pages/pos';
 import { ShiftProvider } from '../pages/pos/ShiftContext';
 
 import ProfitDashboard from '../pages/profit-intelligence/ProfitDashboard';
-import PhoneOrder from '../pages/orders/PhoneOrder';
 import ExternalOrdersInbox from '../pages/orders/ExternalOrdersInbox';
+
+// Phone-Orders Module
+import PhoneOrderPage from '../modules/phone-orders/PhoneOrderPage';
+import PhoneOrdersHome from '../modules/phone-orders/PhoneOrdersHome';
+import UnifiedPhoneOrderPage from '../modules/phone-orders/UnifiedPhoneOrderPage';
+import PhoneOrdersListPage from '../modules/phone-orders/PhoneOrdersListPage';
+import ProductionDashboard from '../modules/phone-orders/ProductionDashboard';
 import DeliveryScheduler from '../pages/orders/DeliveryScheduler';
+import DeliveryBoardPage from '../modules/deliveries/DeliveryBoardPage';
 import OrderList from '../pages/orders/OrderList';
 import WireVendorsPage from '../pages/orders/WireVendorsPage';
 import WireSettlementsPage from '../pages/orders/WireSettlementsPage';
@@ -149,23 +157,26 @@ export default function AppRoutes() {
 
           {/* ─── Sales / POS ────────────────────────────── */}
           <Route path="/pos" element={<POSWithShift />} />
-          <Route
-            path="/phone-order"
-            element={
-              <PaymentProvider>
-                <CartProvider>
-                  <PhoneOrder />
-                </CartProvider>
-              </PaymentProvider>
-            }
-          />
 
           {/* ─── Orders ─────────────────────────────────── */}
           <Route path="/external-orders" element={<ExternalOrdersInbox />} />
           <Route path="/order-list" element={<OrderList />} />
           <Route path="/orders/:orderId/refund" element={<RefundScreen />} />
           <Route path="/orders/new" element={<OrderForm />} />
-          <Route path="/delivery-scheduler" element={<DeliveryScheduler />} />
+
+          {/* ─── Phone Orders Module ────────────────────── */}
+          <Route path="/phone-orders">
+            <Route index element={<PhoneOrdersHome />} />
+            <Route path="new" element={<UnifiedPhoneOrderPage />} />
+            <Route path="production" element={<ProductionDashboard />} />
+            <Route path="list" element={<PhoneOrdersListPage />} />
+            <Route path=":orderId" element={<PhoneOrderPage />} />
+          </Route>
+
+          {/* Backward compatibility: /phone-order → /phone-orders */}
+          <Route path="/phone-order/*" element={<Navigate to="/phone-orders" replace />} />
+          <Route path="/deliveries" element={<DeliveryBoardPage />} />
+          <Route path="/delivery-scheduler" element={<Navigate to="/deliveries" replace />} />
           <Route
             path="/wire-vendors"
             element={
@@ -197,7 +208,9 @@ export default function AppRoutes() {
           <Route path="/profit-intelligence" element={<ProfitDashboard />} />
 
           {/* ─── Catalog ────────────────────────────────── */}
+          <Route path="/products" element={<ProductsListPage />} />
           <Route path="/products/new" element={<AddProductForm />} />
+          <Route path="/products/:id" element={<AddProductForm />} />
           <Route path="/categories" element={<CategoryManagementPage />} />
           <Route path="/customers" element={<CustomerList />} />
 
