@@ -95,12 +95,34 @@ export const createProduct = async (
   formData: ProductFormData
 ): Promise<ApiResponse<CreatedProduct>> => {
   const payload = transformToApiPayload(formData);
-  const result = await createProductApi(payload as any);
-  return {
-    success: true,
-    data: result,
-    message: 'Product created successfully',
-  };
+  try {
+    const result = await createProductApi(payload as any);
+    // If backend returns error in result, handle it
+    if (result && result.error) {
+      return {
+        success: false,
+        error: result.error,
+        data: null,
+        message: result.error,
+      };
+    }
+    return {
+      success: true,
+      data: result,
+      message: 'Product created successfully',
+    };
+  } catch (error) {
+    let errorMsg = 'An unexpected error occurred';
+    if (error && typeof error === 'object' && 'message' in error) {
+      errorMsg = (error as any).message;
+    }
+    return {
+      success: false,
+      error: errorMsg,
+      data: null,
+      message: errorMsg,
+    };
+  }
 };
 
 /**

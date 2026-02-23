@@ -140,21 +140,83 @@ const POSLayout: React.FC = () => {
   }, [state.items.length]);
 
   const handlePaymentComplete = useCallback((payments: POSPaymentEntry[], billingInfo: POSBillingInfo) => {
-    // TODO: Create order via API
-    console.log('Payment complete:', { payments, billingInfo, items: state.items, totals: state.totals });
-    setPaymentDrawerOpen(false);
-    clearCart();
-    setSelectedCustomer(null);
-    showSnackbar(`Order completed - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(state.totals.grandTotal)}`, 'success');
+    // Create order via API
+    const createOrder = async () => {
+      try {
+        const orderPayload = {
+          customerId: selectedCustomer?.id || '',
+          deliveryDate: billingInfo.deliveryDate || '',
+          deliveryAddress: billingInfo.deliveryAddress || '',
+          recipientName: billingInfo.recipientName || '',
+          recipientPhone: billingInfo.recipientPhone || '',
+          cardMessage: billingInfo.cardMessage || '',
+          deliveryPriority: billingInfo.deliveryPriority || 'NORMAL',
+          timeSlot: billingInfo.timeSlot || '',
+          orderSource: 'WALK_IN',
+          orderIntent: orderType,
+          pickupDate: billingInfo.pickupDate || '',
+          pickupTimeSlot: billingInfo.pickupTimeSlot || '',
+          deliveryFee: billingInfo.deliveryFee || 0,
+          discountAmount: billingInfo.discountAmount || 0,
+          internalNotes: billingInfo.internalNotes || '',
+          items: state.items.map(item => ({
+            productId: item.productId,
+            qty: item.qty,
+            price: item.price,
+            notes: item.notes || '',
+          })),
+        };
+        await import('../../api/order.api').then(({ createOrder }) => createOrder(orderPayload));
+        setPaymentDrawerOpen(false);
+        clearCart();
+        setSelectedCustomer(null);
+        showSnackbar(`Order completed - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(state.totals.grandTotal)}`, 'success');
+      } catch (err) {
+        setPaymentDrawerOpen(false);
+        showSnackbar('Order creation failed. Please try again.', 'error');
+      }
+    };
+    createOrder();
   }, [state.items, state.totals, clearCart, showSnackbar]);
 
   const handlePartialSave = useCallback((payments: POSPaymentEntry[], billingInfo: POSBillingInfo, paidAmount: number, remainingAmount: number) => {
-    // TODO: Create order with balance via API
-    console.log('Partial save:', { payments, billingInfo, paidAmount, remainingAmount });
-    setPaymentDrawerOpen(false);
-    clearCart();
-    setSelectedCustomer(null);
-    showSnackbar(`Order saved - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(remainingAmount)} balance due`, 'info');
+    // Create order with balance via API
+    const createOrderWithBalance = async () => {
+      try {
+        const orderPayload = {
+          customerId: selectedCustomer?.id || '',
+          deliveryDate: billingInfo.deliveryDate || '',
+          deliveryAddress: billingInfo.deliveryAddress || '',
+          recipientName: billingInfo.recipientName || '',
+          recipientPhone: billingInfo.recipientPhone || '',
+          cardMessage: billingInfo.cardMessage || '',
+          deliveryPriority: billingInfo.deliveryPriority || 'NORMAL',
+          timeSlot: billingInfo.timeSlot || '',
+          orderSource: 'WALK_IN',
+          orderIntent: orderType,
+          pickupDate: billingInfo.pickupDate || '',
+          pickupTimeSlot: billingInfo.pickupTimeSlot || '',
+          deliveryFee: billingInfo.deliveryFee || 0,
+          discountAmount: billingInfo.discountAmount || 0,
+          internalNotes: billingInfo.internalNotes || '',
+          items: state.items.map(item => ({
+            productId: item.productId,
+            qty: item.qty,
+            price: item.price,
+            notes: item.notes || '',
+          })),
+        };
+        await import('../../api/order.api').then(({ createOrder }) => createOrder(orderPayload));
+        setPaymentDrawerOpen(false);
+        clearCart();
+        setSelectedCustomer(null);
+        showSnackbar(`Order saved - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(remainingAmount)} balance due`, 'info');
+      } catch (err) {
+        setPaymentDrawerOpen(false);
+        showSnackbar('Order creation failed. Please try again.', 'error');
+      }
+    };
+    createOrderWithBalance();
   }, [clearCart, showSnackbar]);
 
   const handleUpdateQty = useCallback((lineId: string, qty: number, product: Product) => {
