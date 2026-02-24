@@ -15,7 +15,52 @@ import { usePOS } from './POSContext';
 import type { Product } from '../orders/OrderTypes';
 import type { POSCustomer } from './POSTypes';
 import { searchProducts, normalizeProducts } from '../../api/product.api';
+import { MOCK_PRODUCTS } from '../orders/OrderMockData';
 import { searchCustomers } from '../../api/customer.api';
+const MOCK_CUSTOMERS = [
+  {
+    id: 'cust_001',
+    tenantId: 'tenant_001',
+    name: 'Meera Joshi',
+    phone: '9876543210',
+    email: 'meera@example.com',
+    preferredAddress: '123 Main St',
+    createdAt: new Date().toISOString(),
+    tags: ['NEW_CUSTOMER'],
+    lifetimeValue: 10000,
+    totalOrders: 2,
+    averageOrderValue: 5000,
+    referralCount: 0,
+    loyaltyPoints: 100,
+    loyaltyTier: 'SILVER',
+    loyaltyPointsEarned: 100,
+    loyaltyPointsRedeemed: 0,
+    totalProfit: 2000,
+    profitMargin: 20,
+    marketingConsent: true,
+  },
+  {
+    id: 'cust_002',
+    tenantId: 'tenant_001',
+    name: 'Raj Kapoor',
+    phone: '9988776655',
+    email: 'raj@example.com',
+    preferredAddress: '45 MG Road',
+    createdAt: new Date().toISOString(),
+    tags: ['REPEAT_CUSTOMER'],
+    lifetimeValue: 20000,
+    totalOrders: 5,
+    averageOrderValue: 4000,
+    referralCount: 1,
+    loyaltyPoints: 200,
+    loyaltyTier: 'GOLD',
+    loyaltyPointsEarned: 200,
+    loyaltyPointsRedeemed: 50,
+    totalProfit: 5000,
+    profitMargin: 25,
+    marketingConsent: true,
+  },
+];
 import POSTabLayout, { type POSTab } from './POSTabLayout';
 import OrderTypeTab from './OrderTypeTab';
 import ProductsTab from './ProductsTab';
@@ -39,28 +84,16 @@ const POSScreen: React.FC = () => {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError('');
-    const errors: string[] = [];
-
-    // Load products and customers independently
+    // Use mock data for products and customers
     try {
-      const prodRes = await searchProducts({ IsActive: true, PageSize: 500 });
-      const prodItems = Array.isArray(prodRes) ? prodRes : prodRes.items ?? [];
-      setProducts(normalizeProducts(prodItems));
+      setProducts(MOCK_PRODUCTS);
     } catch (err) {
-      console.error('Product load failed:', err);
-      errors.push('products');
+      setError('Failed to load products.');
     }
-
     try {
-      const custRes = await searchCustomers({ PageSize: 500 });
-      setCustomers(Array.isArray(custRes) ? custRes : custRes.items ?? []);
+      setCustomers(MOCK_CUSTOMERS);
     } catch (err) {
-      console.error('Customer load failed:', err);
-      errors.push('customers');
-    }
-
-    if (errors.length > 0) {
-      setError(`Failed to load ${errors.join(' & ')}. Some features may be limited.`);
+      setError('Failed to load customers.');
     }
     setIsLoading(false);
   }, []);

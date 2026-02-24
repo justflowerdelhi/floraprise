@@ -12,7 +12,8 @@
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Alert, Snackbar } from '@mui/material';
-import CategorySidebar from './CategorySidebar';
+import { Box, Chip } from '@mui/material';
+import { POS_CATEGORIES } from './POSTypes';
 import ProductGrid from './ProductGrid';
 import POSCartPanelV2 from './POSCartPanelV2';
 import POSCustomerDrawer from './POSCustomerDrawer';
@@ -381,12 +382,37 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
         </button>
       </div>
 
-      {/* 3-zone layout */}
+      {/* Horizontal Category Chips */}
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 1.5,
+          overflowX: 'auto',
+          pb: 1,
+          mb: 2,
+          '&::-webkit-scrollbar': { display: 'none' },
+        }}
+      >
+        {POS_CATEGORIES.map((category) => (
+          <Chip
+            key={category.id}
+            label={category.name}
+            clickable
+            color={selectedCategory === category.id ? 'primary' : 'default'}
+            onClick={() => setSelectedCategory(category.id)}
+            sx={{
+              fontSize: 14,
+              height: 40,
+              px: 2,
+              fontWeight: 500,
+              borderRadius: 3,
+            }}
+          />
+        ))}
+      </Box>
+
+      {/* Product grid and cart panel, full width */}
       <div className="flex-1 flex overflow-hidden">
-        <CategorySidebar
-          selectedCategory={selectedCategory}
-          onCategorySelect={setSelectedCategory}
-        />
         <ProductGrid
           products={products}
           searchQuery={searchQuery}

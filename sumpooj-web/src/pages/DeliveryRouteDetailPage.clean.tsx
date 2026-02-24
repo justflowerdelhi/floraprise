@@ -1,15 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import type { RouteDetail, Driver, Delivery } from '../types/deliveryRouteTypes';
-import { MOCK_DELIVERY_ROUTES } from './DeliveryRouteMockData';
 import { Button, Card, CardContent, Typography, Chip, Select, MenuItem, CircularProgress } from '@mui/material';
 import { useParams } from 'react-router-dom';
 import { useToast } from '../hooks/useToast';
 
 const fetchRouteDetail = async (routeId: string): Promise<RouteDetail> => {
-  // Use mock data if available
-  const mock = MOCK_DELIVERY_ROUTES.find(r => r.id === routeId);
-  if (mock) return mock as RouteDetail;
-  // Fallback to API
+  // Replace with real API call
   const res = await fetch(`/api/delivery-routes/${routeId}`);
   return await res.json() as RouteDetail;
 };

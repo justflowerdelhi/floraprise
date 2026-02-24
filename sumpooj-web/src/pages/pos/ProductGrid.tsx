@@ -39,6 +39,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
 
   // Filter products based on search and category
   const filteredProducts = useMemo(() => {
+    console.log('ProductGrid incoming products:', products);
     let result = products;
 
     // Category filter
@@ -59,6 +60,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
       );
     }
 
+    console.log('ProductGrid filteredProducts:', result);
     return result;
   }, [products, searchQuery, selectedCategory]);
 

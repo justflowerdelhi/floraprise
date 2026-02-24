@@ -5,6 +5,7 @@
  * Designed for high-speed checkout with Square/Shopify POS feel
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Alert, Snackbar } from '@mui/material';
 import POSTopBar from './POSTopBar';
 import CategorySidebar from './CategorySidebar';
@@ -45,6 +46,11 @@ const POSLayout: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [orderType, setOrderType] = useState<POSOrderType>('TAKE_NOW');
   const [selectedCustomer, setSelectedCustomer] = useState<POSCustomer | null>(null);
+
+  // Sidebar collapse logic for POS routes
+  const location = useLocation();
+  const isPOSRoute = location.pathname.startsWith('/pos') || location.pathname.startsWith('/walk-in') || location.pathname.startsWith('/sales');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isPOSRoute);
 
   // Drawer states
   const [paymentDrawerOpen, setPaymentDrawerOpen] = useState(false);
@@ -273,21 +279,26 @@ const POSLayout: React.FC = () => {
       />
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className={`flex-1 flex overflow-hidden ${isPOSRoute ? 'pl-2' : ''}`}>
         {/* Category Sidebar */}
         <CategorySidebar
           selectedCategory={selectedCategory}
           onCategorySelect={setSelectedCategory}
+          categories={undefined}
+          collapsed={sidebarCollapsed}
+          disableExpand={isPOSRoute}
         />
 
         {/* Product Grid */}
-        <ProductGrid
-          products={products}
-          searchQuery={searchQuery}
-          selectedCategory={selectedCategory}
-          onAddProduct={handleAddProduct}
-          isLoading={isLoading}
-        />
+        <div className={isPOSRoute ? 'flex-1 min-w-0 max-w-[calc(100vw-80px)]' : 'flex-1 min-w-0'}>
+          <ProductGrid
+            products={products}
+            searchQuery={searchQuery}
+            selectedCategory={selectedCategory}
+            onAddProduct={handleAddProduct}
+            isLoading={isLoading}
+          />
+        </div>
 
         {/* Cart Panel */}
         <POSCartPanel

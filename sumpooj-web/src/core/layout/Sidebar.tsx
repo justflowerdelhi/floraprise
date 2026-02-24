@@ -309,10 +309,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { getFilteredMenu } = useRBAC();
   const { hasFeature } = useTenant();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const wireRoutes = new Set(['/wire-vendors', '/wire-settlements']);
 
-  const menuSections = getFilteredMenu()
+  // Route-based filtering for POS/Walk-In
+  const isPOS = location.pathname.startsWith('/pos') || location.pathname.startsWith('/walk-in');
+
+  let menuSections = getFilteredMenu()
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
@@ -323,6 +327,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }),
     }))
     .filter((section) => section.items.length > 0);
+
+  if (isPOS) {
+    // Only keep Walk-In Sales, Phone Order, Day Close
+    const allowedLabels = new Set(['Walk-In Sales', 'Phone Order', 'Day Close']);
+    menuSections = menuSections
+      .map(section => ({
+        ...section,
+        items: section.items.filter(item => allowedLabels.has(item.label)),
+      }))
+      .filter(section => section.items.length > 0);
+  }
 
   return (
     <Box

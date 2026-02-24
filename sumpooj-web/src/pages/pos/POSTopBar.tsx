@@ -107,7 +107,7 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
   };
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center px-4 gap-4 shrink-0">
+    <header className="h-16 bg-white border-b border-gray-200 flex items-center px-2 gap-2 shrink-0">
       {/* Search / Barcode Input */}
       <div className="flex-1 max-w-md">
         <div className="relative">
@@ -129,8 +129,8 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
       {/* Customer Selector */}
       <button
         onClick={onCustomerClick}
-        className="flex items-center gap-2 h-10 px-3 border border-gray-200 rounded-lg
-                   hover:bg-gray-50 transition-colors min-w-[140px]"
+        className="flex items-center gap-1.5 h-9 px-2 border border-gray-200 rounded-md
+                   hover:bg-gray-50 transition-colors min-w-[110px] text-xs"
       >
         <PersonIcon className="w-5 h-5 text-gray-500" />
         <span className="text-sm text-gray-700 truncate max-w-[100px]">
@@ -151,12 +151,12 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
         <button
           ref={locationBtnRef}
           onClick={() => setLocationMenuOpen((v) => !v)}
-          className="flex items-center gap-2 h-10 px-3 border border-gray-200 rounded-lg
-                     hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-1 h-8 px-2 border border-gray-200 rounded-md
+                     hover:bg-gray-50 transition-colors text-xs"
         >
-          <LocationIcon className="w-5 h-5 text-green-600" />
-          <span className="text-sm text-gray-700 max-w-[120px] truncate">{locationName}</span>
-          <ArrowDownIcon className={`w-4 h-4 text-gray-400 transition-transform ${locationMenuOpen ? 'rotate-180' : ''}`} />
+          <LocationIcon className="w-4 h-4 text-green-600" />
+          <span className="max-w-[80px] truncate">{locationName}</span>
+          <ArrowDownIcon className={`w-3 h-3 text-gray-400 transition-transform ${locationMenuOpen ? 'rotate-180' : ''}`} />
         </button>
 
         {locationMenuOpen && (
@@ -238,13 +238,11 @@ const ShiftChip: React.FC<{ shift: ShiftHeaderData; onClose: () => void }> = ({
   const refundAmount = shift.totalRefunds;
 
   return (
-    <div className="relative flex items-center gap-2 pl-3 border-l border-gray-200">
+    <div className="relative flex items-center gap-1 pl-2 border-l border-gray-200">
       {/* Compact shift pill */}
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
-                   border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors
-                   cursor-pointer select-none"
+        className="hidden sm:flex items-center gap-1 px-2 py-1 rounded border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer select-none text-xs"
         title="Click to toggle shift details"
       >
         {/* Health dot */}
@@ -352,14 +350,10 @@ const ShiftChip: React.FC<{ shift: ShiftHeaderData; onClose: () => void }> = ({
       {/* Close Shift button */}
       <button
         onClick={onClose}
-        className="flex items-center gap-1.5 h-10 px-3 rounded-lg
-                   bg-red-50 text-red-700 border border-red-200
-                   hover:bg-red-100 active:bg-red-200
-                   transition-colors font-medium text-sm
-                   min-w-[44px] min-h-[44px] touch-manipulation"
+        className="flex items-center gap-1 h-8 px-2 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 active:bg-red-200 transition-colors font-medium text-xs min-w-[36px] min-h-[32px] touch-manipulation"
         title="Close current shift"
       >
-        <CloseShiftIcon className="w-5 h-5" />
+        <CloseShiftIcon className="w-4 h-4" />
         <span className="hidden md:inline">Close Shift</span>
       </button>
     </div>

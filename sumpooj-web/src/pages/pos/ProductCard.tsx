@@ -17,14 +17,6 @@ const ProductCard: React.FC<ProductCardProps> = memo(({ product, onAdd }) => {
   const stockConfig = STOCK_STATUS_CONFIG[stockStatus];
   const isDisabled = stockStatus === 'out-of-stock';
 
-  // Check for upcoming expiry (within 3 days)
-  const hasExpiryWarning = product.isPerishable && product.batches?.some(batch => {
-    const expiryDate = new Date(batch.expiryDate);
-    const today = new Date();
-    const diffDays = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays <= 3 && diffDays >= 0;
-  });
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -76,15 +68,10 @@ const ProductCard: React.FC<ProductCardProps> = memo(({ product, onAdd }) => {
             backgroundColor: stockConfig.bgColor 
           }}
         >
-          {product.availableStock > 0 ? product.availableStock : 'Out'}
+          {product.availableStock}
         </span>
 
-        {/* Expiry Warning */}
-        {hasExpiryWarning && (
-          <span className="absolute top-2 left-2 p-1 bg-amber-100 rounded text-amber-600">
-            <ExpiryIcon className="w-4 h-4" />
-          </span>
-        )}
+        // ...existing code...
 
         {/* Add Button Overlay */}
         {!isDisabled && (
