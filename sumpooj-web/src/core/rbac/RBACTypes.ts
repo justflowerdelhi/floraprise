@@ -266,6 +266,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         path: '/wire-settlements',
         permissions: ['orders:view'],
       },
+      {
+        id: 'delivery-routes',
+        label: 'Delivery Routes',
+        icon: 'AltRoute',
+        path: '/delivery-routes',
+        permissions: ['orders:view'],
+      },
     ],
   },
   {

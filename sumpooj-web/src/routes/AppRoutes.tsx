@@ -24,6 +24,8 @@ import { ShiftProvider } from '../pages/pos/ShiftContext';
 
 import ProfitDashboard from '../pages/profit-intelligence/ProfitDashboard';
 import ExternalOrdersInbox from '../pages/orders/ExternalOrdersInbox';
+import DeliveryRoutesPage from '../pages/DeliveryRoutesPage';
+import DeliveryRouteDetailPage from '../pages/DeliveryRouteDetailPage';
 
 // Phone-Orders Module
 import PhoneOrderPage from '../modules/phone-orders/PhoneOrderPage';
@@ -270,6 +272,10 @@ export default function AppRoutes() {
           <Route path="/production/finished-goods" element={<FinishedGoodsInventory />} />
           <Route path="/production/custom-builder" element={<CustomBouquetBuilder />} />
           <Route path="/production/wastage" element={<WastageLogPage />} />
+
+          {/* ─── Delivery Routes ───────────────────────────── */}
+          <Route path="/delivery-routes" element={<DeliveryRoutesPage />} />
+          <Route path="/delivery-routes/:routeId" element={<DeliveryRouteDetailPage />} />
         </Route>
       </Routes>
       </DiscountApprovalProvider>

@@ -31,6 +31,35 @@ public class Delivery : BaseEntity
     public Guid? DeliveryPersonId { get; private set; }
     public DeliveryStatus Status { get; private set; }
 
+    // Route assignment
+    public Guid? DeliveryRouteId { get; private set; }
+    public int? StopOrder { get; private set; }
+    /// <summary>
+    /// Assign this delivery to a route and stop order.
+    /// </summary>
+    public void AssignToRoute(Guid routeId, int stopOrder)
+    {
+        if (Status != DeliveryStatus.Scheduled)
+            throw new InvalidOperationException("Only Scheduled deliveries can be assigned to a route.");
+        if (DeliveryRouteId.HasValue)
+            throw new InvalidOperationException("Delivery is already assigned to a route.");
+        if (Status == DeliveryStatus.Delivered || Status == DeliveryStatus.Cancelled)
+            throw new InvalidOperationException("Cannot assign route for delivered or cancelled deliveries.");
+        DeliveryRouteId = routeId;
+        StopOrder = stopOrder;
+        MarkUpdated();
+    }
+
+    /// <summary>
+    /// Remove this delivery from its route assignment.
+    /// </summary>
+    public void RemoveFromRoute()
+    {
+        DeliveryRouteId = null;
+        StopOrder = null;
+        MarkUpdated();
+    }
+
     // ── Domain Methods ───────────────────────────────────────────────────
 
     /// <summary>

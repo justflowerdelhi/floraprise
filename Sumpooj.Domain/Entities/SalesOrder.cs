@@ -8,14 +8,30 @@ public class SalesOrder : BaseEntity
     public SalesOrder(
         Guid companyId,
         Guid customerId,
-        OrderType orderType)
+        OrderType orderType,
+        string deliveryAddressLine1,
+        string? deliveryAddressLine2,
+        string city,
+        string postalCode,
+        string? state)
     {
         CompanyId = companyId;
         CustomerId = customerId;
         OrderType = orderType;
         OrderNumber = GenerateSalesOrderNumber();
         Status = SalesOrderStatus.Draft;
+        DeliveryAddressLine1 = deliveryAddressLine1;
+        DeliveryAddressLine2 = deliveryAddressLine2;
+        City = city;
+        PostalCode = postalCode;
+        State = state;
     }
+
+    public string DeliveryAddressLine1 { get; private set; }
+    public string? DeliveryAddressLine2 { get; private set; }
+    public string City { get; private set; }
+    public string PostalCode { get; private set; }
+    public string? State { get; private set; }
 
     public Guid CompanyId { get; private set; }
     public Guid CustomerId { get; private set; }

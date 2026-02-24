@@ -1,6 +1,28 @@
 namespace Sumpooj.Domain.Entities;
+public enum DriverStatus
+{
+    Available,
+    Engaged,
+    OffDuty
+}
 
 public class Staff : BaseEntity
+    public DriverStatus DriverStatus { get; private set; } = DriverStatus.Available;
+
+    public void SetAvailable()
+    {
+        DriverStatus = DriverStatus.Available;
+    }
+
+    public void SetEngaged()
+    {
+        DriverStatus = DriverStatus.Engaged;
+    }
+
+    public void SetOffDuty()
+    {
+        DriverStatus = DriverStatus.OffDuty;
+    }
 {
     private Staff() { }
 

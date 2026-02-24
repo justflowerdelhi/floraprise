@@ -48,6 +48,7 @@ import {
   Category,
   Settings,
   Store,
+  AltRoute,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRBAC } from '../rbac/RBACContext';
@@ -87,6 +88,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Category: <Category />,
   Settings: <Settings />,
   Store: <Store />,
+  AltRoute: <AltRoute />,
 };
 
 // ─── Section Colors ─────────────────────────────────────────
