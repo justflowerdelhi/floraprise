@@ -34,14 +34,30 @@ const ProductCard: React.FC<ProductCardProps> = memo(({ product, onAdd }) => {
   return (
     <div
       onClick={handleClick}
-      className={`
-        group relative bg-white border border-gray-200 rounded-xl overflow-hidden
-        transition-all duration-200 ease-out cursor-pointer
-        ${isDisabled 
-          ? 'opacity-50 cursor-not-allowed' 
-          : 'hover:shadow-lg hover:shadow-purple-100/50 hover:border-purple-300 hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98] active:shadow-sm'
+      style={{
+        minHeight: 220,
+        borderRadius: 12,
+        transition: 'all 0.15s ease',
+        boxShadow: 'none',
+        background: '#fff',
+        cursor: isDisabled ? 'not-allowed' : 'pointer',
+        opacity: isDisabled ? 0.5 : 1,
+        border: '1px solid #e5e7eb',
+        overflow: 'hidden',
+        position: 'relative',
+        transform: 'none',
+      }}
+      className={`group product-card${isDisabled ? ' disabled' : ''}`}
+      onMouseEnter={e => {
+        if (!isDisabled) {
+          (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.02)';
+          (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 18px rgba(0,0,0,0.08)';
         }
-      `}
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLDivElement).style.transform = 'none';
+        (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
+      }}
     >
       {/* Product Image */}
       <div className="aspect-square bg-gray-100 relative overflow-hidden">
@@ -51,6 +67,7 @@ const ProductCard: React.FC<ProductCardProps> = memo(({ product, onAdd }) => {
             alt={product.name}
             className="w-full h-full object-cover"
             loading="lazy"
+            style={{ filter: 'none' }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-300">
@@ -60,16 +77,15 @@ const ProductCard: React.FC<ProductCardProps> = memo(({ product, onAdd }) => {
           </div>
         )}
 
-        {/* Stock Badge */}
-        <span
-          className="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-semibold rounded"
-          style={{ 
-            color: stockConfig.color, 
-            backgroundColor: stockConfig.bgColor 
-          }}
-        >
-          {product.availableStock}
-        </span>
+        {/* Out-of-stock Chip (small, clean) */}
+        {isDisabled && (
+          <span
+            className="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-gray-200 text-gray-600 shadow"
+            style={{ fontWeight: 500, fontSize: 11 }}
+          >
+            Out of stock
+          </span>
+        )}
 
         // ...existing code...
 
@@ -85,11 +101,17 @@ const ProductCard: React.FC<ProductCardProps> = memo(({ product, onAdd }) => {
 
       {/* Product Info */}
       <div className="p-3">
-        <h3 className="text-sm font-medium text-gray-900 line-clamp-2 min-h-[2.5rem]">
+        <h3
+          className="text-base font-semibold text-gray-900 line-clamp-2 min-h-[2.5rem]"
+          style={{ fontWeight: 600 }}
+        >
           {product.name}
         </h3>
         <div className="mt-2 flex items-center justify-between">
-          <span className="text-base font-bold text-purple-700">
+          <span
+            className="text-lg text-purple-700"
+            style={{ fontWeight: 700 }}
+          >
             {formatCurrency(product.sellingPrice)}
           </span>
           <span className="text-xs text-gray-400">

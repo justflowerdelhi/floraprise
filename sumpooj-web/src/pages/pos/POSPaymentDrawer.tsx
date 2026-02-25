@@ -14,7 +14,8 @@ import {
   CheckCircle as CheckIcon,
 } from '@mui/icons-material';
 import { Drawer } from '@mui/material';
-import type { POSPaymentMethod, POSPaymentEntry, POSBillingInfo, POSCustomer } from './POSTypes';
+import type { POSPaymentMethod, POSPaymentEntry, POSBillingInfo } from './POSTypes';
+import type { POSCustomer } from './POSCustomerTypes';
 
 interface POSPaymentDrawerProps {
   open: boolean;

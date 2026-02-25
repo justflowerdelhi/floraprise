@@ -11,6 +11,7 @@ export interface BackgroundTemplate {
   image: string;
   /** CSS gradient used as visible background (always shown; image overlays if present) */
   gradient: string;
+  isCustom?: boolean;
 }
 
 export const BACKGROUND_TEMPLATES: BackgroundTemplate[] = [
@@ -200,6 +201,9 @@ export interface GiftCardFormData {
   logoPreviewUrl: string;
   logoPosition: LogoPosition;
   logoEnabled: boolean;
+  customBackgroundFile: File | null;
+  customBackgroundPreviewUrl: string;
+  backgroundMode: 'template' | 'custom';
 }
 
 export const INITIAL_FORM_DATA: GiftCardFormData = {
@@ -216,6 +220,9 @@ export const INITIAL_FORM_DATA: GiftCardFormData = {
   logoPreviewUrl: '',
   logoPosition: 'top',
   logoEnabled: false,
+  customBackgroundFile: null,
+  customBackgroundPreviewUrl: '',
+  backgroundMode: 'template',
 };
 
 // ─── Saved Gift Card Object ─────────────────────────────────

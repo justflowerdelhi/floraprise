@@ -38,45 +38,59 @@ const GiftCardPreview = forwardRef<HTMLDivElement, Props>(({ form }, ref) => {
         mx: 'auto',
       }}
     >
-      {/* ── Background Image ────────── */}
-      {bg && (
-        <>
-          {/* Gradient base (always visible) */}
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              background: bg.gradient,
-            }}
-          />
-          {/* Photo overlay (covers gradient when loaded) */}
-          <Box
-            component="img"
-            src={bg.image}
-            alt={bg.name}
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
-            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        </>
-      )}
-
-      {/* ── Fallback when no background ── */}
-      {!bg && (
+      {/* ── Custom Background ────────── */}
+      {form.backgroundMode === 'custom' && form.customBackgroundPreviewUrl ? (
         <Box
           sx={{
             position: 'absolute',
             inset: 0,
-            background: 'linear-gradient(135deg, #fce4ec 0%, #f3e5f5 50%, #e8eaf6 100%)',
+            backgroundImage: `url(${form.customBackgroundPreviewUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
           }}
         />
+      ) : (
+        <>
+          {/* Template Background */}
+          {bg && (
+            <>
+              {/* Gradient base (always visible) */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: bg.gradient,
+                }}
+              />
+              {/* Photo overlay (covers gradient when loaded) */}
+              <Box
+                component="img"
+                src={bg.image}
+                alt={bg.name}
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                }}
+                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </>
+          )}
+          {/* Fallback when no background */}
+          {!bg && (
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(135deg, #fce4ec 0%, #f3e5f5 50%, #e8eaf6 100%)',
+              }}
+            />
+          )}
+        </>
       )}
 
       {/* ── Logo (top) ────────────── */}

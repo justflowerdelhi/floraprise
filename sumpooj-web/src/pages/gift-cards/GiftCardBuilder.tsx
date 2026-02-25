@@ -4,7 +4,7 @@
  * Left-side form with: occasion, color theme, background grid selector,
  * message template / custom message, sender name, font controls, logo upload.
  */
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Typography,
@@ -29,7 +29,7 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import type { SelectChangeEvent } from '@mui/material';
-import type { GiftCardFormData, LogoPosition } from './GiftCardTypes';
+import type { GiftCardFormData, LogoPosition, BackgroundTemplate } from './GiftCardTypes';
 import {
   OCCASION_OPTIONS,
   COLOR_THEME_OPTIONS,
@@ -46,6 +46,35 @@ interface Props {
 export default function GiftCardBuilder({ form, onChange }: Props) {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+
+  // ─── Custom Backgrounds State ────────────────────────────
+  const [customBackgrounds, setCustomBackgrounds] = useState<BackgroundTemplate[]>([]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('customGiftCardBackgrounds');
+    if (stored) {
+      setCustomBackgrounds(JSON.parse(stored));
+    }
+  }, []);
+
+  // Save custom background function
+  const handleSaveCustomBackground = (file: File) => {
+    const previewUrl = URL.createObjectURL(file);
+    const newBg: BackgroundTemplate = {
+      id: `custom-${Date.now()}`,
+      name: 'Custom Upload',
+      image: previewUrl,
+      gradient: 'linear-gradient(180deg, #ffffff 0%, #f5f5f5 100%)',
+      isCustom: true,
+    };
+    const updated = [...customBackgrounds, newBg];
+    setCustomBackgrounds(updated);
+    localStorage.setItem('customGiftCardBackgrounds', JSON.stringify(updated));
+    onChange({
+      backgroundId: newBg.id,
+      backgroundMode: 'template',
+    });
+  };
 
   // ─── Helpers ─────────────────────────────────────────────
 
@@ -113,60 +142,96 @@ export default function GiftCardBuilder({ form, onChange }: Props) {
             gap: 1,
           }}
         >
-          {BACKGROUND_TEMPLATES.map((t) => (
-            <Box
-              key={t.id}
-              onClick={() => onChange({ backgroundId: t.id })}
-              sx={{
-                position: 'relative',
-                aspectRatio: '5 / 7',
-                borderRadius: 1,
-                overflow: 'hidden',
-                cursor: 'pointer',
-                border: form.backgroundId === t.id
-                  ? '3px solid'
-                  : '2px solid transparent',
-                borderColor: form.backgroundId === t.id
-                  ? 'primary.main'
-                  : 'transparent',
-                transition: 'all 0.2s',
-                '&:hover': { opacity: 0.85, transform: 'scale(1.03)' },
-                background: t.gradient,
-              }}
-            >
+          {(() => {
+            const allBackgrounds = [
+              ...BACKGROUND_TEMPLATES,
+              ...customBackgrounds,
+            ];
+            return allBackgrounds.map((template) => (
               <Box
-                component="img"
-                src={t.image}
-                alt={t.name}
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
+                key={template.id}
+                onClick={() => {
+                  if (template.isCustom) {
+                    onChange({
+                      backgroundId: template.id,
+                      backgroundMode: 'custom',
+                      customBackgroundPreviewUrl: template.image,
+                    });
+                  } else {
+                    onChange({
+                      backgroundId: template.id,
+                      backgroundMode: 'template',
+                    });
+                  }
                 }}
-                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-              {/* Label overlay */}
-              <Box
                 sx={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  background: 'linear-gradient(transparent, rgba(0,0,0,0.45))',
-                  p: 0.5,
-                  pt: 1.5,
+                  width: 90,
+                  height: 120,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  backgroundImage: `url(${template.image})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  border:
+                    form.backgroundId === template.id && ((template.isCustom && form.backgroundMode === 'custom') || (!template.isCustom && form.backgroundMode === 'template'))
+                      ? '3px solid #7c3aed'
+                      : '1px solid #ddd',
+                  position: 'relative',
                 }}
               >
-                <Typography variant="caption" sx={{ fontSize: '0.55rem', lineHeight: 1.1, color: '#fff', fontWeight: 600 }}>
-                  {t.name}
-                </Typography>
+                {template.isCustom && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      bgcolor: 'rgba(0,0,0,0.6)',
+                      color: '#fff',
+                      px: 1,
+                      fontSize: 10,
+                      borderRadius: 1,
+                    }}
+                  >
+                    Custom
+                  </Box>
+                )}
               </Box>
-            </Box>
-          ))}
+            ));
+          })()}
+
+          {/* Upload Background Option */}
+          <Box
+            component="label"
+            sx={{
+              width: 120,
+              height: 120,
+              border: '2px dashed #bbb',
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              textAlign: 'center',
+              fontSize: 14,
+              color: '#666',
+            }}
+          >
+            Upload Image
+            <input
+              type="file"
+              hidden
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 5 * 1024 * 1024) {
+                  alert('Max file size 5MB');
+                  return;
+                }
+                handleSaveCustomBackground(file);
+              }}
+            />
+          </Box>
         </Box>
       </Box>
 

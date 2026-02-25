@@ -1,9 +1,11 @@
+export type { POSCustomer, CustomerTagType } from './POSCustomerTypes';
+
 /**
  * POSTypes.ts — Type definitions for the FloraEdge POS system
  */
 
 import type { Product, CartItem, CartSummary, OrderPaymentEntry } from '../orders/OrderTypes';
-import type { Customer as CRMCustomer } from '../crm/CRMTypes';
+// import type { Customer as CRMCustomer } from '../crm/CRMTypes';
 
 // ─── Category Types ─────────────────────────────────────────
 
@@ -170,4 +172,5 @@ export const POS_SHORTCUTS = {
 // ─── Re-exports for convenience ─────────────────────────────
 
 export type { Product, CartItem, CartSummary, OrderPaymentEntry };
-export type POSCustomer = CRMCustomer;
+
+// Fallback types (inline for compatibility)

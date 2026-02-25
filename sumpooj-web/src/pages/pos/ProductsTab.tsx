@@ -20,7 +20,7 @@ import POSCustomerDrawer from './POSCustomerDrawer';
 import OrderIntentDropdown from './OrderIntentDropdown';
 import { usePOS } from './POSContext';
 import type { Product } from '../orders/OrderTypes';
-import type { POSCustomer } from './POSTypes';
+import type { POSCustomer } from './POSCustomerTypes';
 import { POS_SHORTCUTS } from './POSTypes';
 
 // ─── Props ──────────────────────────────────────────────────

@@ -12,7 +12,8 @@ import {
   ExitToApp as CloseShiftIcon,
   Warning as WarningIcon,
 } from '@mui/icons-material';
-import type { OrderIntent, POSCustomer } from './POSTypes';
+import type { OrderIntent } from './POSTypes';
+import type { POSCustomer } from './POSCustomerTypes';
 import { POS_SHORTCUTS } from './POSTypes';
 import OrderIntentSwitcher from './OrderIntentSwitcher';
 import type { Location } from '../../core/location/LocationTypes';
@@ -48,6 +49,14 @@ interface POSTopBarProps {
   activeShift: ShiftHeaderData | null;
   /** Called when user wants to close the shift */
   onCloseShift: () => void;
+  /** Optional style props for search input */
+  searchProps?: any;
+  /** Optional style props for order intent control */
+  orderTypeProps?: any;
+  /** Optional style props for location selector */
+  locationProps?: any;
+  /** Optional style props for close shift button */
+  closeShiftProps?: any;
 }
 
 const POSTopBar: React.FC<POSTopBarProps> = ({
@@ -66,6 +75,10 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
   hasItems,
   activeShift,
   onCloseShift,
+  searchProps,
+  orderTypeProps,
+  locationProps,
+  closeShiftProps,
 }) => {
   const searchRef = useRef<HTMLInputElement>(null);
   const [locationMenuOpen, setLocationMenuOpen] = useState(false);
@@ -115,13 +128,12 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
           <input
             ref={searchRef}
             type="text"
-            placeholder="Search products or scan barcode... (F2)"
+            placeholder={searchProps?.placeholder || "Search products or scan barcode... (F2)"}
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="w-full h-10 pl-10 pr-4 text-sm border border-gray-200 rounded-lg 
-                       focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent
-                       placeholder:text-gray-400"
+            className={searchProps?.className || "w-full h-10 pl-10 pr-4 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-400"}
+            style={searchProps?.sx}
           />
         </div>
       </div>
@@ -144,6 +156,7 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
         value={orderType}
         onChange={onOrderTypeChange}
         hasItems={hasItems}
+        {...(orderTypeProps || {})}
       />
 
       {/* Location Dropdown */}
@@ -151,8 +164,8 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
         <button
           ref={locationBtnRef}
           onClick={() => setLocationMenuOpen((v) => !v)}
-          className="flex items-center gap-1 h-8 px-2 border border-gray-200 rounded-md
-                     hover:bg-gray-50 transition-colors text-xs"
+          className={locationProps?.className || "flex items-center gap-1 h-8 px-2 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors text-xs"}
+          style={locationProps?.sx}
         >
           <LocationIcon className="w-4 h-4 text-green-600" />
           <span className="max-w-[80px] truncate">{locationName}</span>
@@ -195,7 +208,7 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
 
       {/* Shift Status & Close Button */}
       {activeShift && (
-        <ShiftChip shift={activeShift} onClose={onCloseShift} />
+        <ShiftChip shift={activeShift} onClose={onCloseShift} closeShiftProps={closeShiftProps} />
       )}
 
       {/* Grand Total */}
@@ -212,12 +225,18 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
 };
 
 // ─── ShiftChip — compact shift summary in the POS header ────
-
 const CASH_VARIANCE_THRESHOLD = 5; // $ threshold for yellow warning
 
-const ShiftChip: React.FC<{ shift: ShiftHeaderData; onClose: () => void }> = ({
+interface ShiftChipProps {
+  shift: ShiftHeaderData;
+  onClose: () => void;
+  closeShiftProps?: any;
+}
+
+const ShiftChip: React.FC<ShiftChipProps> = ({
   shift,
   onClose,
+  closeShiftProps,
 }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -350,7 +369,8 @@ const ShiftChip: React.FC<{ shift: ShiftHeaderData; onClose: () => void }> = ({
       {/* Close Shift button */}
       <button
         onClick={onClose}
-        className="flex items-center gap-1 h-8 px-2 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 active:bg-red-200 transition-colors font-medium text-xs min-w-[36px] min-h-[32px] touch-manipulation"
+        className={closeShiftProps?.className || "flex items-center gap-1 h-8 px-2 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 active:bg-red-200 transition-colors font-medium text-xs min-w-[36px] min-h-[32px] touch-manipulation"}
+        style={closeShiftProps?.sx}
         title="Close current shift"
       >
         <CloseShiftIcon className="w-4 h-4" />

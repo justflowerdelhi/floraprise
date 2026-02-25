@@ -13,11 +13,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Alert } from '@mui/material';
 import { usePOS } from './POSContext';
 import type { Product } from '../orders/OrderTypes';
-import type { POSCustomer } from './POSTypes';
+import type { POSCustomer } from './POSCustomerTypes';
 import { searchProducts, normalizeProducts } from '../../api/product.api';
 import { MOCK_PRODUCTS } from '../orders/OrderMockData';
 import { searchCustomers } from '../../api/customer.api';
-const MOCK_CUSTOMERS = [
+const MOCK_CUSTOMERS: POSCustomer[] = [
   {
     id: 'cust_001',
     tenantId: 'tenant_001',
@@ -38,6 +38,8 @@ const MOCK_CUSTOMERS = [
     totalProfit: 2000,
     profitMargin: 20,
     marketingConsent: true,
+    lastOrderDate: new Date().toISOString(),
+    notes: 'First order, prefers lilies.'
   },
   {
     id: 'cust_002',
@@ -59,6 +61,8 @@ const MOCK_CUSTOMERS = [
     totalProfit: 5000,
     profitMargin: 25,
     marketingConsent: true,
+    lastOrderDate: new Date().toISOString(),
+    notes: 'VIP customer, likes orchids.'
   },
 ];
 import POSTabLayout, { type POSTab } from './POSTabLayout';
@@ -91,7 +95,7 @@ const POSScreen: React.FC = () => {
       setError('Failed to load products.');
     }
     try {
-      setCustomers(MOCK_CUSTOMERS);
+      setCustomers(MOCK_CUSTOMERS as POSCustomer[]);
     } catch (err) {
       setError('Failed to load customers.');
     }

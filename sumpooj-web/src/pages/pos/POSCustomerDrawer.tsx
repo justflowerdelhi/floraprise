@@ -21,7 +21,7 @@ import {
   AttachMoney as MoneyIcon,
 } from '@mui/icons-material';
 import { Drawer, CircularProgress } from '@mui/material';
-import type { POSCustomer } from './POSTypes';
+import type { POSCustomer } from './POSCustomerTypes';
 import type { Product } from '../orders/OrderTypes';
 import { searchCustomers } from '../../api/customer.api';
 import { getOrdersByCustomer } from '../../api/order.api';

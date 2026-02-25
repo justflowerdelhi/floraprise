@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Grid, Card, CardContent, Typography, Button, Chip, Snackbar, CircularProgress, Box } from '@mui/material';
+import { Card, CardContent, Typography, Button, Chip, Snackbar, CircularProgress, Box } from '@mui/material';
+// import { Grid } from '@mui/material';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -69,9 +70,9 @@ export default function ProductionBoardPage() {
           <CircularProgress />
         </Box>
       ) : (
-        <Grid container spacing={2}>
+        <Box display="flex" gap={2}>
           {grouped.map(group => (
-            <Grid item xs={12} md={4} key={group.key}>
+            <Box key={group.key} flex={1} minWidth={0}>
               <Typography variant="h6" mb={2}>{group.label}</Typography>
               {group.jobs.map(job => (
                 <Card key={job.JobId} sx={{ mb: 2 }}>
@@ -108,9 +109,9 @@ export default function ProductionBoardPage() {
                   </CardContent>
                 </Card>
               ))}
-            </Grid>
+            </Box>
           ))}
-        </Grid>
+        </Box>
       )}
       <Snackbar
         open={toast.open}
