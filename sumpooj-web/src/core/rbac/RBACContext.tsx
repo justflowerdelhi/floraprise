@@ -182,6 +182,9 @@ import {
 import { ROLE_CONFIG } from './RBACTypes';
 import { useState } from 'react';
 
+
+import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
+
 const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
   ADMIN: <AdminIcon />,
   MANAGER: <ManagerIcon />,
@@ -190,7 +193,6 @@ const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
   DRIVER: <DriverIcon />,
   STAFF: <SupervisorAccountIcon />,
 };
-import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 
 /**
  * Dev-only role picker.

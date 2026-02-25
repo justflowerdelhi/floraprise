@@ -90,7 +90,12 @@ const POSScreen: React.FC = () => {
     setError('');
     // Use mock data for products and customers
     try {
-      setProducts(MOCK_PRODUCTS);
+      // Fallback: ensure availableStock is set for all products
+      const normalizedProducts = MOCK_PRODUCTS.map(p => ({
+        ...p,
+        availableStock: typeof p.availableStock === 'number' ? p.availableStock : (p.currentStock ?? 999)
+      }));
+      setProducts(normalizedProducts);
     } catch (err) {
       setError('Failed to load products.');
     }

@@ -1,15 +1,76 @@
 import React, { useEffect, useState } from 'react';
 import type { RouteDetail, Driver, Delivery } from '../types/deliveryRouteTypes';
-import { MOCK_DELIVERY_ROUTES } from './DeliveryRouteMockData';
-import { Button, Card, CardContent, Typography, Chip, Select, MenuItem, CircularProgress } from '@mui/material';
+import { Button, Card, CardContent, Typography, Chip, Select, MenuItem, CircularProgress, IconButton, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+// ...existing code...
+// Reorder stop API
+const reorderStop = async (routeId: string, stopId: string, newPosition: number): Promise<void> => {
+  await fetch(`/api/delivery-routes/${routeId}/reorder-stop`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stopId, newPosition })
+  });
+};
+// Move stop API
+const moveStop = async (routeId: string, stopId: string, targetRouteId: string): Promise<void> => {
+  await fetch(`/api/delivery-routes/${routeId}/move-stop`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stopId, targetRouteId })
+  });
+};
+  // Move modal state
+  const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [moveStopId, setMoveStopId] = useState<string | null>(null);
+  const [targetDraftRouteId, setTargetDraftRouteId] = useState<string>('');
+  const [draftRoutes, setDraftRoutes] = useState<RouteDetail[]>([]);
+  // Fetch all draft routes for move dropdown
+  useEffect(() => {
+    async function fetchDraftRoutes() {
+      if (route && route.status === 'Draft') {
+        const res = await fetch(`/api/delivery-routes?date=${route.routeDate}&status=Draft`);
+        const data = await res.json();
+        setDraftRoutes(data.filter((r: RouteDetail) => r.id !== route.id));
+      }
+    }
+    fetchDraftRoutes();
+  }, [route]);
+  // Reorder handler
+  const handleReorder = async (stopId: string, newPosition: number) => {
+    setLoading(true);
+    try {
+      if (!routeId) throw new Error('Missing routeId');
+      await reorderStop(routeId, stopId, newPosition);
+      toast.success('Stop reordered!');
+      await loadRoute();
+    } catch (e) {
+      toast.error('Failed to reorder stop');
+    }
+    setLoading(false);
+  };
+
+  // Move handler
+  const handleMove = async () => {
+    setLoading(true);
+    try {
+      if (!routeId || !moveStopId || !targetDraftRouteId) throw new Error('Missing info');
+      await moveStop(routeId, moveStopId, targetDraftRouteId);
+      toast.success('Stop moved!');
+      setMoveModalOpen(false);
+      setTargetDraftRouteId('');
+      setMoveStopId(null);
+      await loadRoute();
+    } catch (e) {
+      toast.error('Failed to move stop');
+    }
+    setLoading(false);
+  };
 import { useParams } from 'react-router-dom';
 import { useToast } from '../hooks/useToast';
 
 const fetchRouteDetail = async (routeId: string): Promise<RouteDetail> => {
-  // Use mock data if available
-  const mock = MOCK_DELIVERY_ROUTES.find(r => r.id === routeId);
-  if (mock) return mock as RouteDetail;
-  // Fallback to API
   const res = await fetch(`/api/delivery-routes/${routeId}`);
   return await res.json() as RouteDetail;
 };
@@ -147,22 +208,73 @@ export default function DeliveryRouteDetailPage() {
       )}
       <div style={{ marginTop: 24 }}>
         <Typography variant="h6" gutterBottom>Deliveries</Typography>
-        <div style={{ display: 'grid', gridTemplateColumns: '60px 140px 180px 120px 120px', gap: 8, fontWeight: 600, marginBottom: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '60px 140px 180px 120px 120px 120px 60px', gap: 8, fontWeight: 600, marginBottom: 8 }}>
           <div>Stop</div>
           <div>Order Number</div>
           <div>Customer</div>
           <div>Time Slot</div>
           <div>Postal Code</div>
+          <div>Status</div>
+          <div>Actions</div>
         </div>
-        {route.deliveries.sort((a: Delivery, b: Delivery) => a.stopOrder - b.stopOrder).map((delivery: Delivery) => (
-          <div key={delivery.id} style={{ display: 'grid', gridTemplateColumns: '60px 140px 180px 120px 120px', gap: 8, alignItems: 'center', borderBottom: '1px solid #eee', padding: '8px 0' }}>
-            <div>{delivery.stopOrder}</div>
-            <div>{delivery.orderNumber}</div>
-            <div>{delivery.customerName}</div>
-            <div>{delivery.timeSlot}</div>
-            <div>{delivery.postalCode}</div>
+        {route.deliveries.sort((a: Delivery, b: Delivery) => a.stopOrder - b.stopOrder).map((delivery: Delivery, idx: number, arr: Delivery[]) => {
+          const isDraft = route.status === 'Draft';
+          const isPending = delivery.status === 'Pending' || !['Delivered', 'Failed'].includes(delivery.status);
+          const isFirst = idx === 0;
+          const isLast = idx === arr.length - 1;
+          const canMoveUp = isDraft && isPending && !isFirst && arr[idx - 1].status !== 'Delivered' && arr[idx - 1].status !== 'Failed';
+          const canMoveDown = isDraft && isPending && !isLast && arr[idx + 1].status !== 'Delivered' && arr[idx + 1].status !== 'Failed';
+          return (
+            <div key={delivery.id} style={{ display: 'grid', gridTemplateColumns: '60px 140px 180px 120px 120px 120px 60px', gap: 8, alignItems: 'center', borderBottom: '1px solid #eee', padding: '8px 0' }}>
+              <div>{delivery.stopOrder}</div>
+              <div>{delivery.orderNumber}</div>
+              <div>{delivery.customerName}</div>
+              <div>{delivery.timeSlot}</div>
+              <div>{delivery.postalCode}</div>
+              <div>{delivery.status ?? 'Pending'}</div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {isDraft && isPending && (
+                  <>
+                    <IconButton size="small" disabled={!canMoveUp || loading} onClick={() => handleReorder(delivery.id, delivery.stopOrder - 1)}><ArrowUpwardIcon fontSize="small" /></IconButton>
+                    <IconButton size="small" disabled={!canMoveDown || loading} onClick={() => handleReorder(delivery.id, delivery.stopOrder + 1)}><ArrowDownwardIcon fontSize="small" /></IconButton>
+                    {draftRoutes.length > 0 && (
+                      <>
+                        <IconButton size="small" onClick={() => { setMoveModalOpen(true); setMoveStopId(delivery.id); }}><MoreVertIcon fontSize="small" /></IconButton>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {/* Move modal */}
+        <Dialog open={moveModalOpen} onClose={() => setMoveModalOpen(false)}>
+          <DialogTitle>Move Stop to Another Draft Route</DialogTitle>
+          <DialogContent>
+            <Select
+              value={targetDraftRouteId}
+              onChange={e => setTargetDraftRouteId(e.target.value)}
+              displayEmpty
+              style={{ minWidth: 200 }}
+            >
+              <MenuItem value="" disabled>Select Route</MenuItem>
+              {draftRoutes.map((r: RouteDetail) => (
+                <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>
+              ))}
+            </Select>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setMoveModalOpen(false)} color="secondary">Cancel</Button>
+            <Button onClick={handleMove} color="primary" disabled={!targetDraftRouteId || loading}>Move</Button>
+          </DialogActions>
+        </Dialog>
+        {/* Route Locked badge for non-Draft */}
+        {route.status !== 'Draft' && (
+          <div style={{ marginTop: 16 }}>
+            <Chip label="Route Locked" color="warning" />
           </div>
-        ))}
+        )}
       </div>
     </div>
   );

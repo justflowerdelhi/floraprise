@@ -66,7 +66,7 @@ const P = (
     sellingPrice: sell,
     costPrice: cost,
     taxRate: tax,
-    availableStock: 999,
+    availableStock: 999, // Always set to 999 for test
     isPerishable: perishable,
     trackBatch: perishable,
     batches: updatedBatches,
@@ -74,62 +74,62 @@ const P = (
 };
 
 export const MOCK_PRODUCTS: Product[] = [
-  P('p01','Red Roses (Premium)','RSP-001','8901234001','Fresh Flowers',    280, 120, 0.05, 999, true, [
+  P('p01','Red Roses (Premium)','RSP-001','8901234001','Fresh Flowers',    280, 120, 0.05, 10, true, [
     mkBatch('p01', 80, 115, 3, 4, 'Holland Direct'),
     mkBatch('p01', 60, 120, 1, 6, 'Holland Direct'),
     mkBatch('p01', 40, 125, 0, 8, 'Local Growers Co-op'),
   ]),
-  P('p02','White Lilies','WHL-002','8901234002','Fresh Flowers',          350, 160, 0.05, 999, true, [
+  P('p02','White Lilies','WHL-002','8901234002','Fresh Flowers',          350, 160, 0.05, 10, true, [
     mkBatch('p02', 50, 155, 4, 3, 'FlowerFresh Imports'),
     mkBatch('p02', 45, 165, 1, 7, 'Holland Direct'),
   ]),
-  P('p03','Sunflowers','SNF-003','8901234003','Fresh Flowers',            190, 80, 0.05, 999, true, [
+  P('p03','Sunflowers','SNF-003','8901234003','Fresh Flowers',            190, 80, 0.05, 10, true, [
     mkBatch('p03', 35, 78, 2, 5, 'Local Growers Co-op'),
     mkBatch('p03', 25, 82, 0, 9, 'Local Growers Co-op'),
   ]),
-  P('p04','Classic Rose Bouquet','CRB-010','8901234010','Bouquets',        850, 380, 0.12, 999, true, [
+  P('p04','Classic Rose Bouquet','CRB-010','8901234010','Bouquets',        850, 380, 0.12, 10, true, [
     mkBatch('p04', 15, 370, 2, 5, 'In-House'),
     mkBatch('p04', 10, 390, 0, 8, 'In-House'),
   ]),
-  P('p05','Spring Garden Arrangement','SGA-011','8901234011','Arrangements',1200, 520, 0.12, 999, true, [
+  P('p05','Spring Garden Arrangement','SGA-011','8901234011','Arrangements',1200, 520, 0.12, 10, true, [
     mkBatch('p05', 8, 510, 1, 4, 'In-House'),
     mkBatch('p05', 4, 530, 0, 7, 'In-House'),
   ]),
-  P('p06','Orchid Phalaenopsis','ORC-004','8901234004','Plants',           550, 280, 0.05, 999, false, [
+  P('p06','Orchid Phalaenopsis','ORC-004','8901234004','Plants',           550, 280, 0.05, 10, false, [
     mkBatch('p06', 20, 270, 5, 30, 'FlowerFresh Imports'),
     mkBatch('p06', 10, 290, 1, 45, 'FlowerFresh Imports'),
   ]),
-  P('p07','Eucalyptus Bunch','EUC-005','8901234005','Greens & Foliage',    210, 90, 0.05, 999, true, [
+  P('p07','Eucalyptus Bunch','EUC-005','8901234005','Greens & Foliage',    210, 90, 0.05, 10, true, [
     mkBatch('p07', 60, 85, 3, 4, 'GreenLeaf Distributors'),
     mkBatch('p07', 50, 95, 1, 8, 'GreenLeaf Distributors'),
   ]),
-  P('p08',"Baby's Breath","BBR-006",'8901234006','Fresh Flowers',           60, 22, 0.05, 999, true, [
+  P('p08',"Baby's Breath","BBR-006",'8901234006','Fresh Flowers',           60, 22, 0.05, 10, true, [
     mkBatch('p08', 200, 20, 2, 5, 'Holland Direct'),
     mkBatch('p08', 220, 24, 0, 9, 'Local Growers Co-op'),
   ]),
-  P('p09','Glass Cylinder Vase','GCV-020','8901234020','Add-Ons',          450, 180, 0.18, 999, false, [
+  P('p09','Glass Cylinder Vase','GCV-020','8901234020','Add-Ons',          450, 180, 0.18, 10, false, [
     mkBatch('p09', 45, 180, 20, 999, 'Petal Perfect'),
   ]),
-  P('p10','Satin Ribbon Roll','SRR-021','8901234021','Supplies',            110, 45, 0.18, 999, false, [
+  P('p10','Satin Ribbon Roll','SRR-021','8901234021','Supplies',            110, 45, 0.18, 10, false, [
     mkBatch('p10', 80, 45, 15, 999, 'Petal Perfect'),
   ]),
-  P('p11','Gift Wrapping Paper','GWP-022','8901234022','Gift Items',         30, 10, 0.18, 999, false, [
+  P('p11','Gift Wrapping Paper','GWP-022','8901234022','Gift Items',         30, 10, 0.18, 10, false, [
     mkBatch('p11', 350, 10, 25, 999, 'Petal Perfect'),
   ]),
-  P('p12','Teddy Bear (Medium)','TBM-030','8901234030','Add-Ons',          480, 200, 0.18, 999, false, [
+  P('p12','Teddy Bear (Medium)','TBM-030','8901234030','Add-Ons',          480, 200, 0.18, 10, false, [
     mkBatch('p12', 18, 200, 30, 999, 'Petal Perfect'),
   ]),
-  P('p13','Chocolate Box (Premium)','CBP-031','8901234031','Add-Ons',       650, 320, 0.12, 999, false, [
+  P('p13','Chocolate Box (Premium)','CBP-031','8901234031','Add-Ons',       650, 320, 0.12, 10, false, [
     mkBatch('p13', 22, 320, 10, 60, 'Petal Perfect'),
   ]),
-  P('p14','Pink Carnations','PCN-007','8901234007','Fresh Flowers',         120, 48, 0.05, 999, true, [
+  P('p14','Pink Carnations','PCN-007','8901234007','Fresh Flowers',         120, 48, 0.05, 10, true, [
     mkBatch('p14', 80, 45, 3, 4, 'Pacific Blooms'),
     mkBatch('p14', 60, 50, 0, 7, 'Pacific Blooms'),
   ]),
-  P('p15','Sympathy Spray','SYS-012','8901234012','Arrangements',         2200, 950, 0.12, 999, true, [
+  P('p15','Sympathy Spray','SYS-012','8901234012','Arrangements',         2200, 950, 0.12, 10, true, [
     mkBatch('p15', 6, 950, 1, 5, 'In-House'),
   ]),
-  P('p16','Preserved Rose Box','PRB-032','8901234032','Gift Items',       1200, 480, 0.18, 999, false, [
+  P('p16','Preserved Rose Box','PRB-032','8901234032','Gift Items',       1200, 480, 0.18, 10, false, [
     mkBatch('p16', 14, 480, 15, 180, 'Petal Perfect'),
   ]),
 ];
