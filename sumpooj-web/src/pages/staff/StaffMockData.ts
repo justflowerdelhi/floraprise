@@ -504,6 +504,7 @@ export const getTeamSummary = (): {
   let totalOrders = 0;
   let totalCommission = 0;
   const byRole: Record<StaffRole, number> = {
+    PLATFORMSUPERADMIN: 0,
     ADMIN: 0,
     MANAGER: 0,
     CASHIER: 0,

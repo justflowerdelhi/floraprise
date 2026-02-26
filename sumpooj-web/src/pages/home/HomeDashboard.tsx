@@ -1,12 +1,12 @@
 /**
- * HomeDashboard.tsx — FloraEdge Control Center
+ * HomeDashboard.tsx — FloraPrice Control Center
  *
  * Main landing page after login.
  * Top KPI strip + responsive grid of feature tiles.
  * Loads user dashboard preferences from API and allows customization.
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { IconButton, Tooltip, CircularProgress, Snackbar, Alert } from '@mui/material';
 import {
   PointOfSale as POSIcon,
@@ -25,6 +25,7 @@ import {
   Celebration,
   Tune as CustomizeIcon,
 } from '@mui/icons-material';
+import { useAuth } from '../../auth/AuthContext';
 import CustomizeDashboardDrawer, { type ModuleItem } from './CustomizeDashboardDrawer';
 import {
   getDashboardPreference,
@@ -119,6 +120,12 @@ const DEFAULT_KEYS = FEATURE_TILES.map((t) => t.key);
 
 const HomeDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Redirect platform admins to their dedicated dashboard
+  if (user?.role === 'PLATFORMSUPERADMIN') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
 
   // ── Single source of truth: ordered module list with visibility ──
   const [modules, setModules] = useState<ModuleItem[]>(
@@ -188,7 +195,7 @@ const HomeDashboard: React.FC = () => {
             Control Center
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            FloraEdge — your business at a glance
+            FloraPrice — your business at a glance
           </p>
         </div>
         <Tooltip title="Customize Dashboard">

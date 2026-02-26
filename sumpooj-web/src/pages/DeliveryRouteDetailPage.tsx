@@ -4,69 +4,6 @@ import { Button, Card, CardContent, Typography, Chip, Select, MenuItem, Circular
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-// ...existing code...
-// Reorder stop API
-const reorderStop = async (routeId: string, stopId: string, newPosition: number): Promise<void> => {
-  await fetch(`/api/delivery-routes/${routeId}/reorder-stop`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ stopId, newPosition })
-  });
-};
-// Move stop API
-const moveStop = async (routeId: string, stopId: string, targetRouteId: string): Promise<void> => {
-  await fetch(`/api/delivery-routes/${routeId}/move-stop`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ stopId, targetRouteId })
-  });
-};
-  // Move modal state
-  const [moveModalOpen, setMoveModalOpen] = useState(false);
-  const [moveStopId, setMoveStopId] = useState<string | null>(null);
-  const [targetDraftRouteId, setTargetDraftRouteId] = useState<string>('');
-  const [draftRoutes, setDraftRoutes] = useState<RouteDetail[]>([]);
-  // Fetch all draft routes for move dropdown
-  useEffect(() => {
-    async function fetchDraftRoutes() {
-      if (route && route.status === 'Draft') {
-        const res = await fetch(`/api/delivery-routes?date=${route.routeDate}&status=Draft`);
-        const data = await res.json();
-        setDraftRoutes(data.filter((r: RouteDetail) => r.id !== route.id));
-      }
-    }
-    fetchDraftRoutes();
-  }, [route]);
-  // Reorder handler
-  const handleReorder = async (stopId: string, newPosition: number) => {
-    setLoading(true);
-    try {
-      if (!routeId) throw new Error('Missing routeId');
-      await reorderStop(routeId, stopId, newPosition);
-      toast.success('Stop reordered!');
-      await loadRoute();
-    } catch (e) {
-      toast.error('Failed to reorder stop');
-    }
-    setLoading(false);
-  };
-
-  // Move handler
-  const handleMove = async () => {
-    setLoading(true);
-    try {
-      if (!routeId || !moveStopId || !targetDraftRouteId) throw new Error('Missing info');
-      await moveStop(routeId, moveStopId, targetDraftRouteId);
-      toast.success('Stop moved!');
-      setMoveModalOpen(false);
-      setTargetDraftRouteId('');
-      setMoveStopId(null);
-      await loadRoute();
-    } catch (e) {
-      toast.error('Failed to move stop');
-    }
-    setLoading(false);
-  };
 import { useParams } from 'react-router-dom';
 import { useToast } from '../hooks/useToast';
 
@@ -77,6 +14,20 @@ const fetchRouteDetail = async (routeId: string): Promise<RouteDetail> => {
 const fetchAvailableDrivers = async (): Promise<Driver[]> => {
   const res = await fetch('/api/staff/available-drivers');
   return await res.json();
+};
+const reorderStop = async (routeId: string, stopId: string, newPosition: number): Promise<void> => {
+  await fetch(`/api/delivery-routes/${routeId}/reorder-stop`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stopId, newPosition })
+  });
+};
+const moveStop = async (routeId: string, stopId: string, targetRouteId: string): Promise<void> => {
+  await fetch(`/api/delivery-routes/${routeId}/move-stop`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stopId, targetRouteId })
+  });
 };
 const assignDriver = async (routeId: string, driverId: string): Promise<void> => {
   await fetch(`/api/delivery-routes/${routeId}/assign-driver`, {
@@ -99,6 +50,10 @@ export default function DeliveryRouteDetailPage() {
   const [selectedDriver, setSelectedDriver] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const toast = useToast();
+  const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [moveStopId, setMoveStopId] = useState<string | null>(null);
+  const [targetDraftRouteId, setTargetDraftRouteId] = useState<string>('');
+  const [draftRoutes, setDraftRoutes] = useState<RouteDetail[]>([]);
 
   const loadRoute = async () => {
     setLoading(true);
@@ -119,6 +74,17 @@ export default function DeliveryRouteDetailPage() {
     if (route && route.status === 'Draft') {
       fetchAvailableDrivers().then(setDrivers);
     }
+  }, [route]);
+
+  useEffect(() => {
+    async function fetchDraftRoutes() {
+      if (route && route.status === 'Draft') {
+        const res = await fetch(`/api/delivery-routes?date=${route.routeDate}&status=Draft`);
+        const data = await res.json();
+        setDraftRoutes(data.filter((r: RouteDetail) => r.id !== route.id));
+      }
+    }
+    fetchDraftRoutes();
   }, [route]);
 
   const handleAssignDriver = async () => {
@@ -156,6 +122,35 @@ export default function DeliveryRouteDetailPage() {
       await loadRoute();
     } catch (e) {
       toast.error('Failed to complete route');
+    }
+    setLoading(false);
+  };
+
+  const handleReorder = async (stopId: string, newPosition: number) => {
+    setLoading(true);
+    try {
+      if (!routeId) throw new Error('Missing routeId');
+      await reorderStop(routeId, stopId, newPosition);
+      toast.success('Stop reordered!');
+      await loadRoute();
+    } catch (e) {
+      toast.error('Failed to reorder stop');
+    }
+    setLoading(false);
+  };
+
+  const handleMove = async () => {
+    setLoading(true);
+    try {
+      if (!routeId || !moveStopId || !targetDraftRouteId) throw new Error('Missing info');
+      await moveStop(routeId, moveStopId, targetDraftRouteId);
+      toast.success('Stop moved!');
+      setMoveModalOpen(false);
+      setTargetDraftRouteId('');
+      setMoveStopId(null);
+      await loadRoute();
+    } catch (e) {
+      toast.error('Failed to move stop');
     }
     setLoading(false);
   };
@@ -219,11 +214,11 @@ export default function DeliveryRouteDetailPage() {
         </div>
         {route.deliveries.sort((a: Delivery, b: Delivery) => a.stopOrder - b.stopOrder).map((delivery: Delivery, idx: number, arr: Delivery[]) => {
           const isDraft = route.status === 'Draft';
-          const isPending = delivery.status === 'Pending' || !['Delivered', 'Failed'].includes(delivery.status);
+          const isPending = delivery.status === 'Pending' || !['Delivered', 'Failed'].includes(delivery.status ?? 'Pending');
           const isFirst = idx === 0;
           const isLast = idx === arr.length - 1;
-          const canMoveUp = isDraft && isPending && !isFirst && arr[idx - 1].status !== 'Delivered' && arr[idx - 1].status !== 'Failed';
-          const canMoveDown = isDraft && isPending && !isLast && arr[idx + 1].status !== 'Delivered' && arr[idx + 1].status !== 'Failed';
+          const canMoveUp = isDraft && isPending && !isFirst && (arr[idx - 1].status ?? 'Pending') !== 'Delivered' && (arr[idx - 1].status ?? 'Pending') !== 'Failed';
+          const canMoveDown = isDraft && isPending && !isLast && (arr[idx + 1].status ?? 'Pending') !== 'Delivered' && (arr[idx + 1].status ?? 'Pending') !== 'Failed';
           return (
             <div key={delivery.id} style={{ display: 'grid', gridTemplateColumns: '60px 140px 180px 120px 120px 120px 60px', gap: 8, alignItems: 'center', borderBottom: '1px solid #eee', padding: '8px 0' }}>
               <div>{delivery.stopOrder}</div>

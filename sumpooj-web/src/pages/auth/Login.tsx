@@ -86,8 +86,8 @@ export default function Login() {
       {/* Logo */}
       <Box sx={{ textAlign: 'center' }}>
         <img 
-          src={dk ? '/assets/logo/floraedge-logo-light.svg' : '/assets/logo/floraedge-logo.svg'}
-          alt="FloraEdge"
+          src={dk ? '/assets/logo/floraprise-logo-light.svg' : '/assets/logo/floraprise-logo.svg'}
+          alt="FloraPrice"
           style={{ height: '48px', marginBottom: '16px' }}
         />
         <Typography 

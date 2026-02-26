@@ -10,7 +10,7 @@
 
 // ─── User Roles ─────────────────────────────────────────────
 
-export type UserRole = 'ADMIN' | 'MANAGER' | 'CASHIER' | 'DESIGNER' | 'DRIVER' | 'STAFF';
+export type UserRole = 'ADMIN' | 'MANAGER' | 'CASHIER' | 'DESIGNER' | 'DRIVER' | 'STAFF' | 'PLATFORMSUPERADMIN';
 
 export interface User {
   id: string;
@@ -21,6 +21,8 @@ export interface User {
   // Multi-location support
   primaryLocationId?: string; // Default location for the user
   assignedLocationIds?: string[]; // All locations user can access
+  // Platform admin flag
+  isPlatformAdmin?: boolean;
 }
 
 // ─── Permission Types ───────────────────────────────────────
@@ -74,6 +76,25 @@ export type Permission =
 // ─── Role Permission Mapping ────────────────────────────────
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+  PLATFORMSUPERADMIN: [
+    // Platform admins have all permissions
+    'pos:access', 'pos:refund', 'pos:day_close',
+    'orders:view', 'orders:create', 'orders:edit', 'orders:delete', 'orders:external', 'orders:status_update',
+    'customers:view', 'customers:create', 'customers:edit',
+    'crm:view', 'crm:reminders', 'crm:loyalty',
+    'inventory:view', 'inventory:adjust', 'inventory:purchase',
+    'products:view', 'products:create', 'products:edit',
+    'reports:view', 'reports:profit', 'reports:inventory',
+    'delivery:view', 'delivery:update', 'delivery:schedule',
+    'events:view', 'events:manage',
+    'proposals:view', 'proposals:create', 'proposals:edit',
+    'payments:schedule:view', 'payments:schedule:manage',
+    'staff:view', 'staff:manage',
+    'tasks:view', 'tasks:manage',
+    'production:view', 'production:manage',
+    'settings:view', 'settings:edit', 'settings:billing', 'users:manage',
+  ],
+
   ADMIN: [
     'pos:access', 'pos:refund', 'pos:day_close',
     'orders:view', 'orders:create', 'orders:edit', 'orders:delete', 'orders:external', 'orders:status_update',
@@ -110,12 +131,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
 
   CASHIER: [
-    'pos:access',
-    'orders:view', 'orders:create',
-    'customers:view', 'customers:create',
+    'pos:access', 'pos:refund',
+    'orders:view',
+    'customers:view',
     'products:view',
-    'delivery:view',
-    'tasks:view',
+    'payments:schedule:view',
   ],
 
   DESIGNER: [
@@ -147,6 +167,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 // ─── Role Display Config ────────────────────────────────────
 
 export const ROLE_CONFIG: Record<UserRole, { label: string; color: string; description: string }> = {
+  PLATFORMSUPERADMIN: {
+    label: 'Platform Admin',
+    color: '#1B5E20',
+    description: 'Platform-wide administration',
+  },
   ADMIN: {
     label: 'Administrator',
     color: '#9c27b0',
@@ -639,6 +664,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
 // ─── Default Landing Pages by Role ──────────────────────────
 
 export const DEFAULT_LANDING: Record<UserRole, string> = {
+  PLATFORMSUPERADMIN: '/admin/dashboard',
   ADMIN: '/home',
   MANAGER: '/home',
   CASHIER: '/pos',

@@ -30,6 +30,13 @@ public class OrderRepository : IOrderRepository
             .FirstOrDefaultAsync(o => o.CompanyId == companyId && o.OrderNumber == orderNumber);
     }
 
+    public async Task<List<Order>> GetByIdsAsync(Guid companyId, List<Guid> ids)
+    {
+        return await _db.Orders
+            .Where(o => o.CompanyId == companyId && ids.Contains(o.Id))
+            .ToListAsync();
+    }
+
     public async Task<PagedResult<OrderListDto>> SearchAsync(Guid companyId, OrderSearchRequest request)
     {
         var query = _db.Orders.Where(o => o.CompanyId == companyId && o.IsActive);

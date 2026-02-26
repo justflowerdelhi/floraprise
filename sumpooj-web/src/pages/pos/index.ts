@@ -1,6 +1,6 @@
 /**
  * POS Module Exports
- * FloraEdge Walk-In POS System
+ * FloraPrice Walk-In POS System
  */
 
 // Full-Screen POS (Single Cart Architecture)

@@ -98,9 +98,9 @@ const SECTION_COLORS: Record<string, string> = {
   orders: '#2196f3',
   events: '#e91e63',
   inventory: '#ff9800',
-  reports: '#5B2E91',    // FloraEdge Purple
+  reports: '#5B2E91',    // FloraPrice Purple
   catalog: '#00bcd4',
-  crm: '#5B2E91',        // FloraEdge Purple
+  crm: '#5B2E91',        // FloraPrice Purple
   production: '#00897b', // Teal
   'gift-cards': '#9c27b0', // Purple accent
   staff: '#ff5722',
@@ -369,8 +369,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {!collapsed && (
           <Box sx={{ display: 'flex', alignItems: 'center', height: 32 }}>
             <img 
-              src={dk ? '/assets/logo/floraedge-logo-light.svg' : '/assets/logo/floraedge-logo.svg'}
-              alt="FloraEdge"
+              src={dk ? '/assets/logo/floraprise-logo-light.svg' : '/assets/logo/floraprise-logo.svg'}
+              alt="FloraPrice"
               style={{ height: '32px', display: 'block' }}
             />
           </Box>
@@ -378,8 +378,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {collapsed && (
           <img 
-            src="/assets/logo/floraedge-icon.svg"
-            alt="FloraEdge"
+            src="/assets/logo/floraprise-icon.svg"
+            alt="FloraPrice"
             style={{ height: '32px', width: '32px', display: 'block' }}
           />
         )}
@@ -456,7 +456,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               textAlign: 'center',
             }}
           >
-            v1.0.0 • FloraEdge
+            v1.0.0 • FloraPrice
           </Typography>
         </Box>
       )}

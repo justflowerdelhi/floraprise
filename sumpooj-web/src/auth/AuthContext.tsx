@@ -17,7 +17,7 @@ const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true';
 const MOCK_USER: User = {
   id: 'dev-user-1',
   name: 'Dev Admin',
-  email: 'admin@floraedge.dev',
+  email: 'admin@floraprise.dev',
   role: 'ADMIN',
   primaryLocationId: 'loc-1',
   assignedLocationIds: ['loc-1'],
@@ -127,20 +127,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   /**
-   * On mount: if a token exists try to resolve identity.
-   * If no token, go straight to unauthenticated.
+   * On mount: hydrate from localStorage and validate session
    */
   useEffect(() => {
-    if (DEV_BYPASS_AUTH) {
-      resolveIdentity();
-      return;
-    }
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      resolveIdentity();
-    } else {
-      setStatus('unauthenticated');
-    }
+    let isMounted = true;
+
+    const initAuth = async () => {
+      if (DEV_BYPASS_AUTH) {
+        if (isMounted) {
+          setUser(MOCK_USER);
+          setTenant(MOCK_TENANT);
+          setStatus('authenticated');
+        }
+        return;
+      }
+
+      try {
+        // 1. Try to restore user from localStorage
+        const storedUserJson = localStorage.getItem('app:user');
+        if (storedUserJson) {
+          try {
+            const storedUser = JSON.parse(storedUserJson);
+            if (isMounted) setUser(storedUser);
+          } catch {
+            // Invalid JSON, ignore
+          }
+        }
+
+        // 2. Try to restore token from localStorage
+        const token = localStorage.getItem('auth_token');
+        if (token && token !== 'undefined' && token !== 'null') {
+          // Ensure axios interceptor has the token
+          setAuthToken(token);
+
+          // 3. Validate token with backend
+          const isValid = await resolveIdentity();
+          if (isMounted && !isValid) {
+            setUser(null);
+          }
+        } else {
+          // No token, go straight to login
+          if (isMounted) {
+            setUser(null);
+            setStatus('unauthenticated');
+          }
+        }
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+        if (isMounted) {
+          setUser(null);
+          setStatus('unauthenticated');
+        }
+      }
+    };
+
+    initAuth();
+    return () => {
+      isMounted = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -177,6 +221,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(userData);
         // Use PLATFORM_ADMIN_TENANT for platform admins (no company)
         setTenant(tenantData ?? PLATFORM_ADMIN_TENANT);
+        // Store user for session persistence
+        try {
+          localStorage.setItem('app:user', JSON.stringify(userData));
+        } catch {}
         setStatus('authenticated');
         return;
       }
@@ -194,6 +242,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setTenant(null);
     setStatus('unauthenticated');
+    try {
+      localStorage.removeItem('app:user');
+    } catch {}
   }, []);
 
   const value = useMemo<AuthContextValue>(

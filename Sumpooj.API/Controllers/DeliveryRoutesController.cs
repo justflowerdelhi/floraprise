@@ -25,7 +25,7 @@ public class DeliveryRoutesController : ControllerBase
     }
 
     [HttpPut("{id}/assign-driver")]
-    public async Task<IActionResult> AssignDriver(Guid id, [FromBody] AssignDriverRequest request)
+    public async Task<IActionResult> AssignDriver(Guid id, [FromBody] AssignRouteDriverRequest request)
     {
         try
         {
@@ -68,7 +68,7 @@ public class DeliveryRoutesController : ControllerBase
     }
 }
 
-public class AssignDriverRequest
+public class AssignRouteDriverRequest
 {
     public Guid DriverId { get; set; }
 }

@@ -28,6 +28,7 @@ public class Delivery : BaseEntity
     public DateTime DeliveryDate { get; private set; }
     public string TimeSlot { get; private set; } = string.Empty;
     public string DeliveryAddress { get; private set; } = string.Empty;
+    public string? PostalCode { get; private set; }
     public Guid? DeliveryPersonId { get; private set; }
     public DeliveryStatus Status { get; private set; }
 

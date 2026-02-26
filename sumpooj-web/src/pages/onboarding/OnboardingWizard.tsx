@@ -182,7 +182,7 @@ export default function OnboardingWizard() {
           <Box sx={{ textAlign: 'center', mb: 3 }}>
             <LocalFlorist sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
             <Typography variant="h5" fontWeight={700}>
-              Welcome to FloraEdge
+              Welcome to FloraPrice
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Let's set up your floral business in under a minute.

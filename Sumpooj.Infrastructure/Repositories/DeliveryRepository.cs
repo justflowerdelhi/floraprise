@@ -42,4 +42,11 @@ public class DeliveryRepository : IDeliveryRepository
         _db.Deliveries.Update(delivery);
         await _db.SaveChangesAsync();
     }
+
+    public async Task<List<Delivery>> GetByIdsAsync(List<Guid> ids)
+    {
+        return await _db.Deliveries
+            .Where(d => ids.Contains(d.Id))
+            .ToListAsync();
+    }
 }

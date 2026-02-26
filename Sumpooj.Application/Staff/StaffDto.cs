@@ -31,6 +31,7 @@ public class StaffListDto
     public bool IsActive { get; set; }
     public string? CommissionType { get; set; }
     public decimal? CommissionRate { get; set; }
+    public string DriverStatus { get; set; } = "Available";
 }
 
 public class CreateStaffRequest

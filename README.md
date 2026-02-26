@@ -670,6 +670,10 @@ npm run dev
 | Suppliers | /api/suppliers | CRUD |
 | Purchases | /api/purchases | CRUD + submit, receive |
 | Lookup | /api/lookup | enum references |
+| Production | /api/production | recipes, finished-goods, runs, on-demand, custom, maintenance, wastage |
+| Production Jobs | /api/production-jobs | CRUD + start, complete |
+| Material Usage | /api/production-material-usage | add material to job |
+| Barcodes | /api/barcodes | generate, validate, search |
 
 ---
 

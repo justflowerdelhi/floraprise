@@ -23,12 +23,17 @@ import {
   LocationOn as LocationIcon,
 } from '@mui/icons-material';
 import { useShift } from './ShiftContext';
+import { useAuth } from '../../auth/AuthContext';
 
 const ShiftOpenModal: React.FC = () => {
   const { activeShift, loading, error, openShift, locationId } = useShift();
+  const { user } = useAuth();
   const [openingCash, setOpeningCash] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+
+  // Don't show shift modal to platform admins
+  if (user?.role === 'PLATFORMSUPERADMIN') return null;
 
   const handleOpen = useCallback(async () => {
     const amount = parseFloat(openingCash);
@@ -57,7 +62,7 @@ const ShiftOpenModal: React.FC = () => {
     [handleOpen, submitting],
   );
 
-  // Don't show if already open or still loading
+  // Don't show if already open, still loading, or user is a platform admin
   if (loading || activeShift) return null;
 
   // No location selected — show "select location" blocker

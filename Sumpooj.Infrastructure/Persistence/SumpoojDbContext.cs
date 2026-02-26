@@ -67,6 +67,18 @@ public class SumpoojDbContext
     public DbSet<SalesOrder> SalesOrders => Set<SalesOrder>();
     public DbSet<SalesOrderItem> SalesOrderItems => Set<SalesOrderItem>();
 
+    // Delivery Routes
+    public DbSet<DeliveryRoute> DeliveryRoutes => Set<DeliveryRoute>();
+
+    // Production
+    public DbSet<FloralRecipe> FloralRecipes => Set<FloralRecipe>();
+    public DbSet<RecipeComponent> RecipeComponents => Set<RecipeComponent>();
+    public DbSet<FinishedGoodsBatch> FinishedGoodsBatches => Set<FinishedGoodsBatch>();
+    public DbSet<ProductionJob> ProductionJobs => Set<ProductionJob>();
+    public DbSet<ProductionMaterialUsage> ProductionMaterialUsages => Set<ProductionMaterialUsage>();
+    public DbSet<ProductionMaintenanceLog> ProductionMaintenanceLogs => Set<ProductionMaintenanceLog>();
+    public DbSet<ProductionWastageLog> ProductionWastageLogs => Set<ProductionWastageLog>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -185,6 +197,36 @@ public class SumpoojDbContext
                 !_tenantContext.CompanyId.HasValue ||
                 u.CompanyId == _tenantContext.CompanyId);
 
+        modelBuilder.Entity<FloralRecipe>()
+            .HasQueryFilter(r =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                r.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<FinishedGoodsBatch>()
+            .HasQueryFilter(b =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                b.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<ProductionJob>()
+            .HasQueryFilter(j =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                j.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<ProductionMaintenanceLog>()
+            .HasQueryFilter(l =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                l.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<ProductionWastageLog>()
+            .HasQueryFilter(l =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                l.CompanyId == _tenantContext.CompanyId);
+
         // Apply entity type configurations from assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(SumpoojDbContext).Assembly);
 
@@ -250,6 +292,25 @@ public class SumpoojDbContext
         // UserDashboardPreference: one per user per company
         modelBuilder.Entity<UserDashboardPreference>()
             .HasIndex(u => new { u.CompanyId, u.UserId })
+            .IsUnique();
+
+        // ===============================
+        // Production entities
+        // ===============================
+        modelBuilder.Entity<FloralRecipe>()
+            .HasMany(r => r.Components)
+            .WithOne()
+            .HasForeignKey(c => c.RecipeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProductionJob>()
+            .HasMany(j => j.MaterialUsages)
+            .WithOne()
+            .HasForeignKey(m => m.JobId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<FinishedGoodsBatch>()
+            .HasIndex(b => new { b.CompanyId, b.BatchCode })
             .IsUnique();
 
         // ===============================

@@ -50,4 +50,7 @@ public class LocationRepository : ILocationRepository
     {
         return _db.Locations.FirstOrDefaultAsync(l => l.IsDefault && l.IsActive);
     }
+
+    public Task<Location?> GetByIdAsync(Guid companyId, Guid id)
+        => _db.Locations.FirstOrDefaultAsync(l => l.CompanyId == companyId && l.Id == id);
 }

@@ -56,12 +56,12 @@ public class StaffController : ControllerBase
     {
         var staff = await _staffService.GetAllActiveAsync(CompanyId);
         var drivers = staff
-            .Where(s => (s.Role == StaffRole.Delivery || s.Role == StaffRole.Driver)
-                && s.DriverStatus == DriverStatus.Available)
+            .Where(s => (s.Role == "Delivery" || s.Role == "Driver")
+                && s.DriverStatus == "Available")
             .Select(s => new {
                 id = s.Id,
                 name = s.Name,
-                driverStatus = s.DriverStatus.ToString()
+                driverStatus = s.DriverStatus
             })
             .ToList();
         return Ok(drivers);

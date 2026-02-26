@@ -21,6 +21,7 @@ import type { UserRole } from '../rbac/RBACTypes';
 // ─── Location Access by Role ────────────────────────────────
 
 const ROLE_LOCATION_ACCESS: Record<UserRole, LocationAccessLevel> = {
+  PLATFORMSUPERADMIN: 'ALL',
   ADMIN: 'ALL',
   MANAGER: 'MULTIPLE',
   CASHIER: 'SINGLE',

@@ -16,6 +16,8 @@ public interface IOrderRepository
     Task UpdateAsync(Order order);
     Task<string> GetNextOrderNumberAsync(Guid companyId);
 
+    Task<List<Order>> GetByIdsAsync(Guid companyId, List<Guid> ids);
+
     // Dashboard stats
     Task<int> GetTodaysOrderCountAsync(Guid companyId);
     Task<decimal> GetTodaysSalesAsync(Guid companyId);

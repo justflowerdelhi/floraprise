@@ -1,5 +1,5 @@
 /**
- * POSPaymentDrawer.tsx — Slide-in payment drawer for FloraEdge POS
+ * POSPaymentDrawer.tsx — Slide-in payment drawer for FloraPrice POS
  * Supports partial and split payments with billing info
  */
 import React, { useState, useMemo, useEffect, useCallback } from 'react';

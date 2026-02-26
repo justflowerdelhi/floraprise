@@ -20,6 +20,12 @@ export interface DiscountPermission {
 }
 
 export const DISCOUNT_PERMISSIONS: Record<UserRole, DiscountPermission> = {
+  PLATFORMSUPERADMIN: {
+    maxOrderPercent: null,
+    maxLinePercent: null,
+    requiresApproval: false,
+    canApproveDiscounts: true,
+  },
   ADMIN: {
     maxOrderPercent: null,
     maxLinePercent: null,
@@ -51,7 +57,7 @@ export const DISCOUNT_PERMISSIONS: Record<UserRole, DiscountPermission> = {
     canApproveDiscounts: false,
   },
   STAFF: {
-    maxOrderPercent: 5,
+    maxOrderPercent: 10,
     maxLinePercent: 5,
     requiresApproval: true,
     canApproveDiscounts: false,

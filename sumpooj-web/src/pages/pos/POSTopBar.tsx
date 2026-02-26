@@ -1,5 +1,5 @@
 /**
- * POSTopBar.tsx — Top transaction bar for FloraEdge POS
+ * POSTopBar.tsx — Top transaction bar for FloraPrice POS
  * Fixed 64px height with search, customer selector, order type, location, and grand total
  */
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';

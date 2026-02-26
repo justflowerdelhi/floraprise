@@ -178,20 +178,19 @@ import {
   PointOfSale as CashierIcon,
   LocalFlorist as DesignerIcon,
   LocalShipping as DriverIcon,
+  Person as StaffIcon,
 } from '@mui/icons-material';
 import { ROLE_CONFIG } from './RBACTypes';
 import { useState } from 'react';
 
-
-import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
-
 const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
+  PLATFORMSUPERADMIN: <AdminIcon />,
   ADMIN: <AdminIcon />,
   MANAGER: <ManagerIcon />,
   CASHIER: <CashierIcon />,
   DESIGNER: <DesignerIcon />,
   DRIVER: <DriverIcon />,
-  STAFF: <SupervisorAccountIcon />,
+  STAFF: <StaffIcon />,
 };
 
 /**

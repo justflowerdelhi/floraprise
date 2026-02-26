@@ -7,6 +7,7 @@ public enum DriverStatus
 }
 
 public class Staff : BaseEntity
+{
     public DriverStatus DriverStatus { get; private set; } = DriverStatus.Available;
 
     public void SetAvailable()
@@ -23,7 +24,7 @@ public class Staff : BaseEntity
     {
         DriverStatus = DriverStatus.OffDuty;
     }
-{
+
     private Staff() { }
 
     public Staff(

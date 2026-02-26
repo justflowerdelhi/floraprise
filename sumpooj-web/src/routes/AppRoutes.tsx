@@ -4,6 +4,7 @@
 import { Navigate, Routes, Route } from 'react-router-dom';
 import Login from '../pages/auth/Login';
 import RequireAuth from '../auth/RequireAuth';
+import RequireTenantAccess from '../auth/RequireTenantAccess';
 import CustomerList from '../pages/customers/CustomerList';
 import OrderForm from '../pages/orders/OrderForm';
 import AddProductForm from '../pages/products/AddProductForm';
@@ -71,6 +72,7 @@ import SuppliersPage from '../pages/suppliers/SuppliersPage';
 
 // Admin
 import AuditLogsPage from '../pages/admin/AuditLogsPage';
+import PlatformAdminDashboard from '../pages/admin/PlatformAdminDashboard';
 
 // Categories
 import { CategoryManagementPage } from '../pages/categories';
@@ -160,7 +162,14 @@ export default function AppRoutes() {
           <Route path="/dashboard" element={<DashboardPage />} />
 
           {/* ─── Sales / POS ────────────────────────────── */}
-          <Route path="/pos" element={<POSWithShift />} />
+          <Route 
+            path="/pos" 
+            element={
+              <RequireTenantAccess>
+                <POSWithShift />
+              </RequireTenantAccess>
+            } 
+          />
 
           {/* ─── Orders ─────────────────────────────────── */}
           <Route path="/external-orders" element={<ExternalOrdersInbox />} />
@@ -255,6 +264,7 @@ export default function AppRoutes() {
           <Route path="/day-close" element={<DayCloseScreen />} />
 
           {/* ─── Admin ──────────────────────────────────── */}
+          <Route path="/admin/dashboard" element={<PlatformAdminDashboard />} />
           <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
 
           {/* ─── CRM & Customer Intelligence ────────────── */}

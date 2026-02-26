@@ -6,6 +6,7 @@ namespace Sumpooj.Application.Interfaces;
 public interface IStaffRepository
 {
     Task<Domain.Entities.Staff?> GetByIdAsync(Guid companyId, Guid id);
+    Task<Domain.Entities.Staff?> GetByIdAsync(Guid id);
     Task<PagedResult<StaffListDto>> SearchAsync(Guid companyId, StaffSearchRequest request);
     Task<List<StaffListDto>> GetAllActiveAsync(Guid companyId);
     Task<List<StaffListDto>> GetByRoleAsync(Guid companyId, string role);

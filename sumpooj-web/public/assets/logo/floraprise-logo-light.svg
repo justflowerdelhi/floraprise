@@ -1,0 +1,18 @@
+<svg width="380" height="80" viewBox="0 0 380 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Flower Icon - Light version for dark backgrounds -->
+  <g id="flower-icon">
+    <!-- Left Leaf -->
+    <path d="M 25 35 Q 15 30 12 40 Q 15 50 25 45 Q 30 42 25 35" fill="#4CAF50"/>
+    <!-- Right Leaf -->
+    <path d="M 45 35 Q 55 30 58 40 Q 55 50 45 45 Q 40 42 45 35" fill="#66BB6A"/>
+    <!-- Center Bud -->
+    <ellipse cx="35" cy="25" rx="5" ry="8" fill="#F4C430"/>
+    <!-- Bud highlight -->
+    <ellipse cx="35" cy="22" rx="2" ry="3" fill="#FFD966"/>
+  </g>
+  
+  <!-- FloraPrice Text - Light for dark backgrounds -->
+  <text x="90" y="55" font-family="Arial, sans-serif" font-size="48" font-weight="700" fill="#FFFFFF" letter-spacing="-1">
+    Flora<tspan fill="#F4C430">prise</tspan>
+  </text>
+</svg>

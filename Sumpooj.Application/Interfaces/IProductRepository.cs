@@ -23,6 +23,9 @@ public interface IProductRepository
     Task<List<Product>> GetProductsNeedingReorderAsync();
     Task<bool> SkuExistsAsync(string sku, Guid? excludeProductId = null);
     Task<int> GetLowStockCountAsync(Guid companyId);
+    Task<Product?> GetByIdAsync(Guid companyId, Guid id);
+    Task<List<Product>> GetAllAsync(Guid companyId);
+    Task<Product?> GetByBarcodeAsync(string barcode);
 
     /// <summary>
     /// Fetch all products that have no CategoryId assigned (for migration).

@@ -150,4 +150,24 @@ public class ProductRepository : IProductRepository
             .Where(p => p.CategoryId == null)
             .ToListAsync();
     }
+
+    public Task<Product?> GetByIdAsync(Guid companyId, Guid id)
+        => _db.Products
+            .Include(p => p.ProductCategoryRef)
+            .Include(p => p.TaxRule)
+            .FirstOrDefaultAsync(p => p.CompanyId == companyId && p.Id == id);
+
+    public async Task<List<Product>> GetAllAsync(Guid companyId)
+    {
+        return await _db.Products
+            .AsNoTracking()
+            .Where(p => p.CompanyId == companyId && p.IsActive)
+            .OrderBy(p => p.Name)
+            .ToListAsync();
+    }
+
+    public Task<Product?> GetByBarcodeAsync(string barcode)
+        => _db.Products
+            .Include(p => p.ProductCategoryRef)
+            .FirstOrDefaultAsync(p => p.Barcode == barcode);
 }

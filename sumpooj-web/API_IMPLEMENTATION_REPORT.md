@@ -505,8 +505,8 @@ The **Profit Intelligence** page (`src/pages/profit-intelligence/ProfitDashboard
 
 ## API Documentation
 Full OpenAPI documentation is available at:
-- **Scalar UI:** https://floritribe.com/floraedgeapi/scalar/
-- **OpenAPI JSON:** https://floritribe.com/floraedgeapi/openapi/v1.json
+- **Scalar UI:** https://floritribe.com/florapriseapi/scalar/
+- **OpenAPI JSON:** https://floritribe.com/florapriseapi/openapi/v1.json
 
 ---
 

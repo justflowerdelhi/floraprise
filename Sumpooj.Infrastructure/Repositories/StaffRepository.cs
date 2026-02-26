@@ -60,7 +60,8 @@ public class StaffRepository : IStaffRepository
                 Phone = s.Phone,
                 IsActive = s.IsActive,
                 CommissionType = s.CommissionType != null ? s.CommissionType.ToString() : null,
-                CommissionRate = s.CommissionRate
+                CommissionRate = s.CommissionRate,
+                DriverStatus = s.DriverStatus.ToString()
             })
             .ToListAsync();
 
@@ -81,7 +82,8 @@ public class StaffRepository : IStaffRepository
                 Phone = s.Phone,
                 IsActive = s.IsActive,
                 CommissionType = s.CommissionType != null ? s.CommissionType.ToString() : null,
-                CommissionRate = s.CommissionRate
+                CommissionRate = s.CommissionRate,
+                DriverStatus = s.DriverStatus.ToString()
             })
             .ToListAsync();
     }
@@ -103,7 +105,8 @@ public class StaffRepository : IStaffRepository
                 Phone = s.Phone,
                 IsActive = s.IsActive,
                 CommissionType = s.CommissionType != null ? s.CommissionType.ToString() : null,
-                CommissionRate = s.CommissionRate
+                CommissionRate = s.CommissionRate,
+                DriverStatus = s.DriverStatus.ToString()
             })
             .ToListAsync();
     }
@@ -118,5 +121,10 @@ public class StaffRepository : IStaffRepository
     {
         _db.Staff.Update(staff);
         await _db.SaveChangesAsync();
+    }
+
+    public async Task<Domain.Entities.Staff?> GetByIdAsync(Guid id)
+    {
+        return await _db.Staff.FirstOrDefaultAsync(s => s.Id == id);
     }
 }

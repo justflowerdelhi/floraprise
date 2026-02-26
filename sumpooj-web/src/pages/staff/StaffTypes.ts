@@ -162,6 +162,17 @@ export interface StaffRoleConfig {
 }
 
 export const STAFF_ROLE_CONFIG: Record<StaffRole, StaffRoleConfig> = {
+  PLATFORMSUPERADMIN: {
+    label: 'Platform Admin',
+    color: '#d32f2f',
+    bgColor: 'rgba(211, 47, 47, 0.12)',
+    icon: '🔐',
+    description: 'Full platform access',
+    tracksSales: true,
+    tracksProduction: true,
+    tracksDeliveries: true,
+    tracksEvents: true,
+  },
   ADMIN: {
     label: 'Administrator',
     color: '#9c27b0',

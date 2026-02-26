@@ -1,5 +1,5 @@
 /**
- * POSCartPanel.tsx — Right-side cart panel for FloraEdge POS
+ * POSCartPanel.tsx — Right-side cart panel for FloraPrice POS
  * Shows line items, quantity controls, totals, and payment buttons
  */
 import React, { useCallback } from 'react';

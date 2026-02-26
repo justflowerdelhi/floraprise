@@ -128,8 +128,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
           onClick={() => navigate('/dashboard')}
         >
           <img 
-            src="/assets/logo/floraedge-icon.svg"
-            alt="FloraEdge"
+            src="/assets/logo/floraprise-icon.svg"
+            alt="FloraPrice"
             style={{ height: '28px', width: '28px' }}
           />
         </Box>

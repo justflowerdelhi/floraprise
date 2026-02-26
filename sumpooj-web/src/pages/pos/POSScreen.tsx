@@ -93,7 +93,7 @@ const POSScreen: React.FC = () => {
       // Fallback: ensure availableStock is set for all products
       const normalizedProducts = MOCK_PRODUCTS.map(p => ({
         ...p,
-        availableStock: typeof p.availableStock === 'number' ? p.availableStock : (p.currentStock ?? 999)
+        availableStock: typeof p.availableStock === 'number' ? p.availableStock : 999
       }));
       setProducts(normalizedProducts);
     } catch (err) {

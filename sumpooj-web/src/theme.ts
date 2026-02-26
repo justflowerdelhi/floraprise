@@ -1,7 +1,7 @@
 import { createTheme } from "@mui/material/styles";
 
 /**
- * FloraEdge Brand Theme
+ * FloraPrice Brand Theme
  * 
  * Brand Colors:
  * - Primary Purple: #5B2E91 (main brand color)
@@ -13,7 +13,7 @@ const theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: "#5B2E91",      // FloraEdge Purple
+      main: "#5B2E91",      // FloraPrice Purple
       light: "#7B4DB1",
       dark: "#3B1E71",
       contrastText: "#FFFFFF",

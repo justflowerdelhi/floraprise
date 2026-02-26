@@ -5,6 +5,7 @@ export interface Delivery {
   customerName: string;
   timeSlot: string;
   postalCode: string;
+  status?: 'Pending' | 'Delivered' | 'Failed';
 }
 
 export interface Driver {
@@ -16,6 +17,7 @@ export interface RouteDetail {
   id: string;
   name: string;
   status: 'Draft' | 'Assigned' | 'InProgress' | 'Completed';
+  routeDate?: string;
   deliveryPersonName?: string;
   deliveries: Delivery[];
 }

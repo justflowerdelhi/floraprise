@@ -8,6 +8,7 @@ using Sumpooj.API.Authorization;
 using Sumpooj.API.Infrastructure;
 using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Companies;
+using Sumpooj.Application.Deliveries;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Payments;
 using Sumpooj.Application.UseCases;
@@ -237,8 +238,13 @@ builder.Services.AddScoped<ProfitDashboardService>();
 // Sales Orders & Deliveries
 builder.Services.AddScoped<ISalesOrderRepository, SalesOrderRepository>();
 builder.Services.AddScoped<IDeliveryRepository, DeliveryRepository>();
+builder.Services.AddScoped<IDeliveryRouteRepository, DeliveryRouteRepository>();
 builder.Services.AddScoped<ScheduleDeliveryHandler>();
 builder.Services.AddScoped<AssignDeliveryPersonHandler>();
+builder.Services.AddScoped<CreateRouteHandler>();
+builder.Services.AddScoped<AssignDriverToRouteHandler>();
+builder.Services.AddScoped<CompleteRouteHandler>();
+builder.Services.AddScoped<StartRouteHandler>();
 
 // Payment Gateway Services
 builder.Services.AddHttpClient(); // For gateway HTTP calls
@@ -248,11 +254,29 @@ builder.Services.AddScoped<IPaymentGatewayFactory, PaymentGatewayFactory>();
 builder.Services.AddScoped<PaymentGatewayConfigService>();
 builder.Services.AddScoped<GatewayPaymentService>();
 
+// Production
+builder.Services.AddScoped<IFloralRecipeRepository, FloralRecipeRepository>();
+builder.Services.AddScoped<IFinishedGoodsBatchRepository, FinishedGoodsBatchRepository>();
+builder.Services.AddScoped<IProductionJobRepository, ProductionJobRepository>();
+builder.Services.AddScoped<IProductionMaterialUsageRepository, ProductionMaterialUsageRepository>();
+builder.Services.AddScoped<IProductionMaintenanceLogRepository, ProductionMaintenanceLogRepository>();
+builder.Services.AddScoped<IProductionWastageLogRepository, ProductionWastageLogRepository>();
+builder.Services.AddScoped<ProductionService>();
+
+// Barcodes
+builder.Services.AddScoped<BarcodeService>();
+
+// Audit Action Filter (auto-logs all mutating API actions)
+builder.Services.AddScoped<AuditActionFilter>();
+
 #endregion
 
 #region Controllers & OpenAPI
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.AddService<AuditActionFilter>();
+});
 
 // Built-in OpenAPI (no Swagger UI headaches)
 builder.Services.AddOpenApi();

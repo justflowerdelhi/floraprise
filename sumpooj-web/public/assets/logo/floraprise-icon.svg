@@ -1,0 +1,11 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Flower Icon Only -->
+  <!-- Left Leaf -->
+  <path d="M 28 36 Q 16 30 12 42 Q 16 54 28 48 Q 34 44 28 36" fill="#1B5E20"/>
+  <!-- Right Leaf -->
+  <path d="M 36 36 Q 48 30 52 42 Q 48 54 36 48 Q 30 44 36 36" fill="#2E7D32"/>
+  <!-- Center Bud -->
+  <ellipse cx="32" cy="24" rx="6" ry="10" fill="#F4C430"/>
+  <!-- Bud highlight -->
+  <ellipse cx="32" cy="20" rx="3" ry="4" fill="#FFD966"/>
+</svg>

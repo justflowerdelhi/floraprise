@@ -13,7 +13,19 @@ const api = axios.create({
 // ─── Module-level token (primary source for interceptor) ────
 // Keeps token in JS memory so the interceptor always has it
 // immediately after login — eliminates localStorage timing issues.
-let _authToken: string | null = localStorage.getItem('auth_token');
+let _authToken: string | null = (() => {
+  try {
+    const token = localStorage.getItem('auth_token');
+    if (token && token !== 'undefined' && token !== 'null') {
+      console.log(`🔐 [axios init] Token restored from localStorage: ${token.substring(0, 20)}...`);
+      return token;
+    }
+    return null;
+  } catch {
+    console.warn('⚠️ [axios init] Could not read localStorage');
+    return null;
+  }
+})();
 
 /** Call after login to make the token available to every request */
 export function setAuthToken(token: string): void {
