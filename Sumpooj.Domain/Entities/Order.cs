@@ -17,7 +17,7 @@ public class Order : BaseEntity
         CustomerId = customerId;
         OrderNumber = GenerateOrderNumber();
         OrderDate = DateTime.UtcNow;
-        DeliveryDate = deliveryDate;
+        DeliveryDate = EnsureUtc(deliveryDate);
         DeliveryAddress = deliveryAddress;
         RecipientName = recipientName;
         RecipientPhone = recipientPhone;

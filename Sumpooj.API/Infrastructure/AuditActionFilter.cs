@@ -47,11 +47,12 @@ public class AuditActionFilter : IAsyncActionFilter
         // Fire-and-forget audit logging — don't let it break the response
         try
         {
-            var companyId = _tenantContext.CompanyId ?? Guid.Empty;
-            if (companyId == Guid.Empty)
+            var companyId = _tenantContext.CompanyId;
+            if (!companyId.HasValue || companyId.Value == Guid.Empty)
             {
-                // For platform-level or anonymous actions (login/register), still log
-                // but under a zero-GUID company
+                // Skip audit for requests without a valid company context (e.g. login, platform endpoints)
+                // Login audit is handled explicitly in AuthController
+                return;
             }
 
             var user = context.HttpContext.User;
@@ -73,7 +74,7 @@ public class AuditActionFilter : IAsyncActionFilter
             var errorMessage = executedContext.Exception?.Message;
 
             await _auditLogService.LogAsync(
-                companyId,
+                companyId.Value,
                 userId,
                 userName,
                 userRole,

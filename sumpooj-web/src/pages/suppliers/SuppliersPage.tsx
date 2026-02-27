@@ -182,25 +182,25 @@ const SupplierCard: React.FC<SupplierCardProps> = ({
         <Stack direction="row" spacing={2} mb={2}>
           <Box>
             <Typography variant="caption" color="text.secondary">Orders</Typography>
-            <Typography variant="h6" fontWeight={600}>{supplier.totalOrdersCount}</Typography>
+            <Typography variant="h6" fontWeight={600}>{supplier.totalOrdersCount ?? 0}</Typography>
           </Box>
           <Box>
             <Typography variant="caption" color="text.secondary">Total Spent</Typography>
             <Typography variant="h6" fontWeight={600}>
-              ${supplier.totalSpentAmount.toLocaleString()}
+              ${(supplier.totalSpentAmount ?? 0).toLocaleString()}
             </Typography>
           </Box>
           <Box>
             <Typography variant="caption" color="text.secondary">Terms</Typography>
-            <Typography variant="h6" fontWeight={600}>{supplier.paymentTermsDays}d</Typography>
+            <Typography variant="h6" fontWeight={600}>{supplier.paymentTermsDays ?? 0}d</Typography>
           </Box>
         </Stack>
 
         {/* Rating */}
         <Stack direction="row" alignItems="center" spacing={1} mb={2}>
-          <Rating value={supplier.rating} readOnly size="small" />
+          <Rating value={Number(supplier.rating) || 0} readOnly size="small" />
           <Typography variant="body2" color="text.secondary">
-            ({supplier.rating}/5)
+            ({Number(supplier.rating) || 0}/5)
           </Typography>
         </Stack>
 

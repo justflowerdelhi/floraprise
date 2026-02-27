@@ -18,7 +18,7 @@ public class Delivery : BaseEntity
             throw new ArgumentException("DeliveryAddress is required.", nameof(deliveryAddress));
 
         SalesOrderId = salesOrderId;
-        DeliveryDate = deliveryDate;
+        DeliveryDate = EnsureUtc(deliveryDate);
         TimeSlot = timeSlot;
         DeliveryAddress = deliveryAddress;
         Status = DeliveryStatus.Scheduled;

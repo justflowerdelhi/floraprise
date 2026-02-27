@@ -85,6 +85,13 @@ public class SumpoojDbContext
         base.OnModelCreating(modelBuilder);
 
         // ===============================
+        // Column mappings
+        // ===============================
+        modelBuilder.Entity<Delivery>()
+            .Property(d => d.SalesOrderId)
+            .HasColumnName("OrderId");
+
+        // ===============================
         // Identity composite keys (REQUIRED)
         // ===============================
 

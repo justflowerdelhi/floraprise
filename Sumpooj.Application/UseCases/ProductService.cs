@@ -70,12 +70,12 @@ public class ProductService
         var categoryEntity = await _categoryRepo.GetByIdAsync(request.CategoryId.Value)
             ?? throw new InvalidOperationException($"Category '{request.CategoryId}' not found.");
 
-        // ── TaxRuleId is required ───────────────────
-        if (!request.TaxRuleId.HasValue || request.TaxRuleId == Guid.Empty)
-            throw new InvalidOperationException("TaxRuleId is required when creating a product.");
-
-        var taxRule = await _taxRuleRepo.GetByIdAsync(_tenant.CompanyId!.Value, request.TaxRuleId.Value)
-            ?? throw new InvalidOperationException($"TaxRule '{request.TaxRuleId}' not found.");
+        // ── TaxRuleId is optional (exempt products don't need one) ───────
+        if (request.TaxRuleId.HasValue && request.TaxRuleId != Guid.Empty)
+        {
+            var taxRule = await _taxRuleRepo.GetByIdAsync(_tenant.CompanyId!.Value, request.TaxRuleId.Value)
+                ?? throw new InvalidOperationException($"TaxRule '{request.TaxRuleId}' not found.");
+        }
 
         // Check if SKU already exists
         if (await _repo.SkuExistsAsync(request.Sku))
@@ -98,8 +98,11 @@ public class ProductService
         // Assign dynamic CategoryId (category is source of truth for IsPerishable)
         product.SetCategoryId(request.CategoryId.Value);
 
-        // Assign TaxRule
-        product.SetTaxRuleId(request.TaxRuleId!.Value);
+        // Assign TaxRule (optional for exempt products)
+        if (request.TaxRuleId.HasValue && request.TaxRuleId != Guid.Empty)
+        {
+            product.SetTaxRuleId(request.TaxRuleId.Value);
+        }
 
         // Set additional properties
         product.UpdateBasicInfo(request.ProductName, request.Sku, request.Barcode, request.Brand, request.Description);

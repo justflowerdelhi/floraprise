@@ -482,7 +482,7 @@ const OrderList: React.FC = () => {
                       )}
                     </TableCell>
                     <TableCell align="right">
-                      <Typography variant="body2">{o.items.length}</Typography>
+                      <Typography variant="body2">{o.items.length || o.totals?.itemCount || 0}</Typography>
                     </TableCell>
                     <TableCell align="center">
                       <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap' }}>

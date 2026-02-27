@@ -33,12 +33,13 @@ public class DeliveriesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetDeliveries([FromQuery] DateTime? date)
     {
-        var targetDate = date?.Date ?? DateTime.UtcNow.Date;
+        var targetDate = (date?.Date ?? DateTime.UtcNow.Date);
+        targetDate = DateTime.SpecifyKind(targetDate, DateTimeKind.Utc);
 
         var deliveries = await (
             from d in _db.Deliveries
-            join so in _db.SalesOrders on d.SalesOrderId equals so.Id
-            join c in _db.Customers on so.CustomerId equals c.Id
+            join o in _db.Orders on d.SalesOrderId equals o.Id
+            join c in _db.Customers on o.CustomerId equals c.Id
             join s in _db.Staff on d.DeliveryPersonId equals s.Id into staffJoin
             from s in staffJoin.DefaultIfEmpty()
             where d.DeliveryDate.Date == targetDate
@@ -46,7 +47,7 @@ public class DeliveriesController : ControllerBase
             select new DeliveryListDto
             {
                 DeliveryId = d.Id,
-                OrderNumber = so.OrderNumber,
+                OrderNumber = o.OrderNumber,
                 CustomerName = c.Name,
                 Phone = c.Phone,
                 DeliveryDate = d.DeliveryDate,

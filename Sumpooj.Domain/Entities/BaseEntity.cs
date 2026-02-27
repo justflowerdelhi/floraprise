@@ -11,4 +11,17 @@ public abstract class BaseEntity
     {
         UpdatedAtUtc = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// Ensures a DateTime has Kind=Utc. Treats Unspecified as UTC.
+    /// Required because PostgreSQL timestamptz columns reject Kind=Unspecified.
+    /// </summary>
+    protected static DateTime EnsureUtc(DateTime dt) =>
+        dt.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : dt.ToUniversalTime();
+
+    /// <summary>
+    /// Ensures a nullable DateTime has Kind=Utc.
+    /// </summary>
+    protected static DateTime? EnsureUtc(DateTime? dt) =>
+        dt.HasValue ? EnsureUtc(dt.Value) : null;
 }

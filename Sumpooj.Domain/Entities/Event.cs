@@ -16,7 +16,7 @@ public class Event : BaseEntity
         CompanyId = companyId;
         EventName = eventName;
         EventType = eventType;
-        EventDate = eventDate;
+        EventDate = EnsureUtc(eventDate);
         ClientName = clientName;
         ClientPhone = clientPhone;
         VenueName = venueName;
@@ -65,7 +65,7 @@ public class Event : BaseEntity
     {
         EventName = eventName;
         EventType = eventType;
-        EventDate = eventDate;
+        EventDate = EnsureUtc(eventDate);
         VenueName = venueName;
         VenueAddress = venueAddress;
         MarkUpdated();

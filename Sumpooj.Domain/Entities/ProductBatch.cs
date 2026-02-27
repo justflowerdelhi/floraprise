@@ -22,8 +22,8 @@ public class ProductBatch : BaseEntity
         QuantityReceived = quantityReceived;
         QuantityRemaining = quantityReceived;
         CostPerUnit = costPerUnit;
-        ReceivedDate = receivedDate;
-        ExpiryDate = expiryDate;
+        ReceivedDate = EnsureUtc(receivedDate);
+        ExpiryDate = EnsureUtc(expiryDate);
         SupplierId = supplierId;
         LocationId = locationId;
         StorageLocation = storageLocation;
@@ -120,6 +120,9 @@ public class ProductBatch : BaseEntity
         if (!product.IsMultiUnit)
             return UsedUnits;
 
+        if (product.AvgUnitsPerStem <= 0)
+            return UsedUnits;
+
         return (int)Math.Ceiling((double)UsedUnits / product.AvgUnitsPerStem);
     }
 
@@ -138,6 +141,9 @@ public class ProductBatch : BaseEntity
     public int GetPartialUsedUnits(Product product)
     {
         if (!product.IsMultiUnit)
+            return 0;
+
+        if (product.AvgUnitsPerStem <= 0)
             return 0;
 
         var remainder = UsedUnits % product.AvgUnitsPerStem;
@@ -160,6 +166,9 @@ public class ProductBatch : BaseEntity
     public int GetEffectiveRemainingStems(Product product)
     {
         if (!product.IsMultiUnit)
+            return StemsInStock - UsedUnits - DamagedUnits;
+
+        if (product.AvgUnitsPerStem <= 0)
             return StemsInStock - UsedUnits - DamagedUnits;
 
         var effectiveUnits = GetEffectiveRemainingUnits(product);

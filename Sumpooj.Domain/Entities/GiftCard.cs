@@ -86,7 +86,7 @@ public class GiftCard : BaseEntity
 
     public void SetExpiry(DateTime expiryDate)
     {
-        ExpiresAt = expiryDate;
+        ExpiresAt = EnsureUtc(expiryDate);
         MarkUpdated();
     }
 

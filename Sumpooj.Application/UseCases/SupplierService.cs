@@ -16,7 +16,7 @@ public class SupplierService
         _tenant = tenant;
     }
 
-    public async Task<PagedResult<SupplierListDto>> SearchAsync(SupplierSearchRequest request)
+    public async Task<PagedResult<SupplierDto>> SearchAsync(SupplierSearchRequest request)
     {
         var (items, total) = await _repo.SearchAsync(
             request.Query,
@@ -24,19 +24,19 @@ public class SupplierService
             request.Page,
             request.PageSize);
 
-        return new PagedResult<SupplierListDto>
+        return new PagedResult<SupplierDto>
         {
-            Items = items.Select(ToListDto).ToList(),
+            Items = items.Select(ToDto).ToList(),
             TotalCount = total,
             Page = request.Page,
             PageSize = request.PageSize
         };
     }
 
-    public async Task<List<SupplierListDto>> GetAllActiveAsync()
+    public async Task<List<SupplierDto>> GetAllActiveAsync()
     {
         var suppliers = await _repo.GetAllActiveAsync();
-        return suppliers.Select(ToListDto).ToList();
+        return suppliers.Select(ToDto).ToList();
     }
 
     public async Task<SupplierDto?> GetAsync(Guid id)

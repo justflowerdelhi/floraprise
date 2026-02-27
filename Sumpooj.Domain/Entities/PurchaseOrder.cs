@@ -14,7 +14,7 @@ public class PurchaseOrder : BaseEntity
         SupplierId = supplierId;
         OrderNumber = GeneratePurchaseOrderNumber();
         OrderDate = DateTime.UtcNow;
-        ExpectedDeliveryDate = expectedDeliveryDate;
+        ExpectedDeliveryDate = EnsureUtc(expectedDeliveryDate);
         Status = PurchaseOrderStatus.Draft;
         IsActive = true;
     }
@@ -69,7 +69,7 @@ public class PurchaseOrder : BaseEntity
 
     public void UpdateExpectedDeliveryDate(DateTime date)
     {
-        ExpectedDeliveryDate = date;
+        ExpectedDeliveryDate = EnsureUtc(date);
         MarkUpdated();
     }
 
@@ -108,7 +108,7 @@ public class PurchaseOrder : BaseEntity
             throw new InvalidOperationException("Only approved purchase orders can be marked as received");
 
         Status = PurchaseOrderStatus.Received;
-        ActualDeliveryDate = actualDeliveryDate ?? DateTime.UtcNow;
+        ActualDeliveryDate = actualDeliveryDate.HasValue ? EnsureUtc(actualDeliveryDate.Value) : DateTime.UtcNow;
         MarkUpdated();
     }
 
@@ -179,7 +179,11 @@ public class PurchaseOrderItem
     public void SetBatchInfo(string batchNumber, DateTime? expiryDate, string? storageLocation)
     {
         BatchNumber = batchNumber;
-        ExpiryDate = expiryDate;
+        ExpiryDate = expiryDate.HasValue
+            ? (expiryDate.Value.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(expiryDate.Value, DateTimeKind.Utc)
+                : expiryDate.Value.ToUniversalTime())
+            : null;
         StorageLocation = storageLocation;
     }
 
