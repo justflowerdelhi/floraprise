@@ -2,12 +2,12 @@
  * OrderList.tsx — Unified order list with source badges, search & status filters
  * Supports: WALK_IN, PHONE, WEBSITE, FTD, BLOOMNATION
  */
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Paper, Chip, TextField, FormControl, InputLabel, Select, MenuItem,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  InputAdornment, useTheme, alpha, Button, Snackbar, Alert,
+  InputAdornment, useTheme, alpha, Button, Snackbar, Alert, CircularProgress, IconButton, Tooltip,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import {
@@ -20,6 +20,7 @@ import {
   AddTask as AddTaskIcon,
   Payment as PayIcon,
   MoneyOff as RefundIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import type { Order, OrderSource, FulfillmentStatus, OrderPaymentStatus, OrderType, OrderPaymentEntry, OrderStatus, InventoryActionStatus } from './OrderTypes';
 import { ORDER_SOURCE_CONFIG, FULFILLMENT_STATUS_CONFIG, PAYMENT_STATUS_CONFIG, ORDER_STATUS_CONFIG, INVENTORY_STATUS_CONFIG, resolveOrderStatus } from './OrderTypes';
@@ -54,7 +55,7 @@ const OrderList: React.FC = () => {
   const dk = theme.palette.mode === 'dark';
   const bg = dk ? '#0f0f0f' : '#f8f9fa';
   const navigate = useNavigate();
-  const { getAllOrders, updateOrder } = useOrders();
+  const { getAllOrders, updateOrder, loading, refreshOrders } = useOrders();
   const { hasFeature } = useTenant();
   const wireEnabled = hasFeature('WIRE_MANAGEMENT');
 
@@ -70,6 +71,11 @@ const OrderList: React.FC = () => {
   // ─── Balance Collection State ────────────────────────────
   const [collectOrder, setCollectOrder] = useState<Order | null>(null);
   const [snackMsg, setSnackMsg] = useState('');
+
+  // Refresh orders when the page is visited
+  useEffect(() => {
+    refreshOrders();
+  }, [refreshOrders]);
 
   const filtered = useMemo(() => {
     let list: Order[] = getAllOrders();
@@ -147,7 +153,14 @@ const OrderList: React.FC = () => {
     <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: bg, minHeight: '100vh' }}>
       {/* Title */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>All Orders</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="h4" sx={{ fontWeight: 800 }}>All Orders</Typography>
+          <Tooltip title="Refresh orders">
+            <IconButton onClick={() => refreshOrders()} disabled={loading} size="small">
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
         <PermissionGate permission="tasks:manage">
           <Button
             variant="outlined"
@@ -334,7 +347,14 @@ const OrderList: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filtered.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={wireEnabled ? 14 : 13} align="center" sx={{ py: 8 }}>
+                  <CircularProgress size={36} sx={{ mb: 2 }} />
+                  <Typography color="text.secondary" display="block">Loading orders…</Typography>
+                </TableCell>
+              </TableRow>
+            ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={wireEnabled ? 14 : 13} align="center" sx={{ py: 6 }}>
                   <Typography color="text.disabled">No orders match the current filters</Typography>

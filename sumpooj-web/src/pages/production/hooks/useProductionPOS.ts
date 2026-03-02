@@ -26,6 +26,7 @@ import {
   createOnDemandAssembly,
 } from '../api/production.api';
 import { isBatchSellable, isExpired } from '../utils/production.utils';
+import api from '../../../api/axios';
 
 // ─── Hook: POS Finished Goods ───────────────────────────────
 
@@ -97,16 +98,21 @@ export function useFinishedGoodsPOS(locationId?: string): UseFinishedGoodsPOSRes
 
   const deductFromBatch = useCallback(
     async (batchId: string, quantity: number): Promise<boolean> => {
-      // TODO: Replace with real API call
-      // await api.post(`/production/finished-goods/${batchId}/deduct`, { quantity });
-      setBatches((prev) =>
-        prev.map((b) => {
-          if (b.id !== batchId) return b;
-          const newQty = Math.max(0, b.quantityAvailable - quantity);
-          return { ...b, quantityAvailable: newQty };
-        }),
-      );
-      return true;
+      try {
+        await api.post(`/production/finished-goods/${batchId}/deduct`, { quantity });
+        // Optimistic local update
+        setBatches((prev) =>
+          prev.map((b) => {
+            if (b.id !== batchId) return b;
+            const newQty = Math.max(0, b.quantityAvailable - quantity);
+            return { ...b, quantityAvailable: newQty };
+          }),
+        );
+        return true;
+      } catch (err) {
+        console.error('Failed to deduct from batch:', err);
+        return false;
+      }
     },
     [],
   );

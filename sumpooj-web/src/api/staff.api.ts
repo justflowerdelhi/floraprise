@@ -115,3 +115,19 @@ export const resetStaffPassword = async (staffId: string, data: ResetPasswordReq
 export const disableStaffLogin = async (staffId: string): Promise<void> => {
   await api.post(`/Staff/${staffId}/disable-login`);
 };
+
+export const getStaffPerformance = async (
+  staffId: string,
+  from?: string,
+  to?: string,
+) => {
+  const res = await api.get(`/Staff/${staffId}/performance`, {
+    params: { from, to },
+  });
+  return res.data;
+};
+
+export const checkStaffHasOrders = async (staffId: string): Promise<{ hasOrders: boolean; orderCount: number }> => {
+  const res = await api.get(`/Staff/${staffId}/has-orders`);
+  return res.data;
+};

@@ -11,4 +11,5 @@ public interface ILocationRepository
     Task<List<Location>> GetAllAsync();
     Task<List<Location>> GetActiveLocationsAsync();
     Task<Location?> GetDefaultLocationAsync();
+    Task<Location?> GetDefaultAsync(Guid companyId);
 }

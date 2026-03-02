@@ -149,18 +149,26 @@ export const createProduct = async (
 };
 
 /**
- * Save as draft — uses create with draft status
+ * Save as draft — creates product with IsActive = false (draft state)
  */
 export const saveDraft = async (
   formData: Partial<ProductFormData>
 ): Promise<ApiResponse<{ draftId: string }>> => {
-  // TODO: Implement draft endpoint when available
-  console.log('📝 Draft data:', formData);
-  return {
-    success: true,
-    data: { draftId: `draft-${Date.now()}` },
-    message: 'Draft saved successfully',
-  };
+  try {
+    const payload = transformToApiPayload(formData as ProductFormData);
+    const result = await createProductApi({ ...payload, isActive: false } as any);
+    return {
+      success: true,
+      data: { draftId: result?.id ?? `draft-${Date.now()}` },
+      message: 'Draft saved successfully',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      data: { draftId: '' },
+      message: err?.message ?? 'Failed to save draft',
+    };
+  }
 };
 
 /**

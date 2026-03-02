@@ -49,4 +49,20 @@ public class DeliveryRepository : IDeliveryRepository
             .Where(d => ids.Contains(d.Id))
             .ToListAsync();
     }
+
+    public async Task<int> GetDeliveryCountByDriverAsync(Guid driverId, DateTime from, DateTime to)
+    {
+        return await _db.Deliveries
+            .CountAsync(d => d.DeliveryPersonId == driverId &&
+                            d.DeliveryDate >= from && d.DeliveryDate <= to &&
+                            d.Status != DeliveryStatus.Cancelled);
+    }
+
+    public async Task<int> GetCompletedDeliveryCountByDriverAsync(Guid driverId, DateTime from, DateTime to)
+    {
+        return await _db.Deliveries
+            .CountAsync(d => d.DeliveryPersonId == driverId &&
+                            d.DeliveryDate >= from && d.DeliveryDate <= to &&
+                            d.Status == DeliveryStatus.Delivered);
+    }
 }

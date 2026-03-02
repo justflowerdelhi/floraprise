@@ -8,6 +8,7 @@
 import React, { useEffect } from 'react';
 import { usePOS } from './POSContext';
 import POSPaymentDrawerV2 from './POSPaymentDrawerV2';
+import { formatCurrency } from '../../core/i18n';
 
 // ─── Props ──────────────────────────────────────────────────
 
@@ -42,9 +43,7 @@ const PaymentTab: React.FC<PaymentTabProps> = ({ onBack }) => {
         <div className="text-right">
           <p className="text-xs text-gray-500 uppercase tracking-wide">Total Due</p>
           <p className="text-2xl font-bold text-purple-700">
-            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
-              state.totals.grandTotal,
-            )}
+            {formatCurrency(state.totals.grandTotal)}
           </p>
         </div>
       </div>

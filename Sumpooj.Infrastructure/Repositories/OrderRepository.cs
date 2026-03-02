@@ -236,4 +236,24 @@ public class OrderRepository : IOrderRepository
                             o.Status != OrderStatus.Delivered &&
                             o.Status != OrderStatus.Cancelled);
     }
+
+    public async Task<int> GetOrderCountByStaffAsync(Guid companyId, Guid staffId, DateTime from, DateTime to)
+    {
+        return await _db.Orders
+            .CountAsync(o => o.CompanyId == companyId &&
+                            o.IsActive &&
+                            o.AssignedToUserId == staffId &&
+                            o.OrderDate >= from && o.OrderDate <= to);
+    }
+
+    public async Task<decimal> GetRevenueByCashierAsync(Guid companyId, Guid staffId, DateTime from, DateTime to)
+    {
+        return await _db.Orders
+            .Where(o => o.CompanyId == companyId &&
+                        o.IsActive &&
+                        o.AssignedToUserId == staffId &&
+                        o.OrderDate >= from && o.OrderDate <= to &&
+                        o.Status != OrderStatus.Cancelled)
+            .SumAsync(o => o.TotalAmount);
+    }
 }

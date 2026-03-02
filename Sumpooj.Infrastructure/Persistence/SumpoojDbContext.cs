@@ -79,6 +79,12 @@ public class SumpoojDbContext
     public DbSet<ProductionMaintenanceLog> ProductionMaintenanceLogs => Set<ProductionMaintenanceLog>();
     public DbSet<ProductionWastageLog> ProductionWastageLogs => Set<ProductionWastageLog>();
 
+    // Auth
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    // AI Usage Tracking
+    public DbSet<AIUsageRecord> AIUsageRecords => Set<AIUsageRecord>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -87,9 +93,23 @@ public class SumpoojDbContext
         // ===============================
         // Column mappings
         // ===============================
-        modelBuilder.Entity<Delivery>()
-            .Property(d => d.SalesOrderId)
-            .HasColumnName("OrderId");
+        modelBuilder.Entity<Delivery>(entity =>
+        {
+            entity.Property(d => d.SalesOrderId).HasColumnName("OrderId");
+            entity.Property(d => d.DeliveryDate).HasColumnName("ScheduledDateTime");
+        });
+
+        // ===============================
+        // RefreshToken configuration
+        // ===============================
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("RefreshTokens");
+            entity.HasKey(r => r.Id);
+            entity.HasIndex(r => r.Token).IsUnique();
+            entity.HasIndex(r => r.UserId);
+            entity.Property(r => r.Token).HasMaxLength(256).IsRequired();
+        });
 
         // ===============================
         // Identity composite keys (REQUIRED)

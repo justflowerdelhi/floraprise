@@ -95,11 +95,21 @@ public partial class CustomerService
         await _repo.UpdateAsync(customer);
     }
 
+    public async Task UpdateNotesAsync(Guid id, string? notes)
+    {
+        var customer = await _repo.GetByIdAsync(id)
+            ?? throw new KeyNotFoundException("Customer not found");
+
+        customer.UpdateNotes(notes);
+        await _repo.UpdateAsync(customer);
+    }
+
     private static CustomerDto ToDto(Customer c) => new()
     {
         Id = c.Id,
         Name = c.Name,
         Email = c.Email,
-        Phone = c.Phone
+        Phone = c.Phone,
+        Notes = c.Notes
     };
 }

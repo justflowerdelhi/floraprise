@@ -226,3 +226,8 @@ public class InventoryProductDto
     public decimal UnitCost { get; set; }
     public Guid LocationId { get; set; }
 }
+
+public class DeductBatchRequest
+{
+    public int Quantity { get; set; }
+}

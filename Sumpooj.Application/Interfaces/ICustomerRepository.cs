@@ -7,6 +7,7 @@ public interface ICustomerRepository
     Task<Customer?> GetByIdAsync(Guid id);
     Task AddAsync(Customer customer);
     Task UpdateAsync(Customer customer);
+    Task<Customer> GetOrCreateWalkInCustomerAsync(Guid companyId);
 
     Task<(List<Customer> Items, int TotalCount)> SearchAsync(
         string? query,

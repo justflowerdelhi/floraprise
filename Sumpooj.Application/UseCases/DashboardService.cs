@@ -42,10 +42,42 @@ public class DashboardService
         var deliveriesScheduled = await _orderRepository.GetPendingDeliveriesCountAsync(companyId, DateTime.Today);
         var lowStockItems = await _productRepository.GetLowStockCountAsync(companyId);
         var expiringBatches = (await _batchRepository.GetExpiryAlertsAsync(companyId, 7)).Count;
+
+        // Build 7-day sales trend
+        var salesTrend = new List<SalesTrendPoint>();
+        for (int i = 6; i >= 0; i--)
+        {
+            var date = DateTime.Today.AddDays(-i);
+            var label = i == 0 ? "Today" : date.ToString("ddd");
+            // Reuse today's figure for today; for past days, approximate
+            var daySales = i == 0 ? todaysSales : 0m;
+            salesTrend.Add(new SalesTrendPoint { Day = label, Sales = daySales });
+        }
+
+        return new AdminDashboardDto
+        {
+            TodaySales = todaysSales,
+            MonthRevenue = todaysSales, // Simplified — would need monthly aggregate
+            GrossProfitToday = todaysSales * 0.35m,
+            InventoryValue = 0, // Would need inventory valuation query
+            WastageToday = 0,
+            NetworkOrdersPending = 0,
+            ExpiringBouquets = expiringBatches,
+            UpcomingWeddings = 0, // Would need events query
+            SalesTrend = salesTrend
+        };
+    }
+
+    private async Task<ManagerDashboardDto> GetManagerDashboardAsync(Guid companyId)
+    {
+        var ordersToday = await _orderRepository.GetTodaysOrderCountAsync(companyId);
+        var deliveriesScheduled = await _orderRepository.GetPendingDeliveriesCountAsync(companyId, DateTime.Today);
+        var lowStockItems = await _productRepository.GetLowStockCountAsync(companyId);
+        var expiringBatches = (await _batchRepository.GetExpiryAlertsAsync(companyId, 7)).Count;
         var pendingTasks = await _taskRepository.GetPendingTaskCountAsync(companyId);
 
         var alerts = new List<AlertDto>();
-        
+
         if (lowStockItems > 0)
         {
             alerts.Add(new AlertDto
@@ -70,32 +102,15 @@ public class DashboardService
             });
         }
 
-        return new AdminDashboardDto
+        return new ManagerDashboardDto
         {
-            TodaySales = todaysSales,
-            SalesTrend = 0, // Would need historical data
-            OrdersToday = ordersToday,
+            OrdersToFulfill = ordersToday,
             DeliveriesScheduled = deliveriesScheduled,
-            GrossProfit = todaysSales * 0.35m, // Simplified - would need actual calculation
-            LowStockItems = lowStockItems,
+            ProductionPending = 0,
+            LowStockAlerts = lowStockItems,
             ExpiringBatches = expiringBatches,
             StaffTasksPending = pendingTasks,
             TopAlerts = alerts
-        };
-    }
-
-    private async Task<ManagerDashboardDto> GetManagerDashboardAsync(Guid companyId)
-    {
-        var admin = await GetAdminDashboardAsync(companyId);
-        return new ManagerDashboardDto
-        {
-            TodaySales = admin.TodaySales,
-            OrdersToday = admin.OrdersToday,
-            DeliveriesScheduled = admin.DeliveriesScheduled,
-            LowStockItems = admin.LowStockItems,
-            ExpiringBatches = admin.ExpiringBatches,
-            StaffTasksPending = admin.StaffTasksPending,
-            TopAlerts = admin.TopAlerts
         };
     }
 

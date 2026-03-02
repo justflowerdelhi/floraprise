@@ -27,6 +27,7 @@ import {
   HIGH_DISCOUNT_THRESHOLD,
   type DiscountAuditEntry,
 } from './useRevenueGuard';
+import { formatCurrency } from '../../core/i18n';
 
 // ─── Component ──────────────────────────────────────────────
 
@@ -170,7 +171,7 @@ const RevenueGuardBanner: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className="text-[10px] font-mono text-gray-500">
-                    ${e.discountAmount.toFixed(2)}
+                    {formatCurrency(e.discountAmount)}
                   </span>
                   {e.isHighDiscount && (
                     <span

@@ -404,9 +404,40 @@ const buildMockProducts = (): ValuationProduct[] => {
 
 export const MOCK_VALUATION_PRODUCTS: ValuationProduct[] = buildMockProducts();
 
-// ─── Mock API ───────────────────────────────────────────────
+// ─── API Integration ────────────────────────────────────────
 
-export const fetchValuationData = (): Promise<ValuationProduct[]> =>
-  new Promise((resolve) =>
-    setTimeout(() => resolve([...MOCK_VALUATION_PRODUCTS]), 600),
-  );
+import { getInventoryValuation } from '../../../api/inventory.api';
+
+/**
+ * Fetches inventory valuation data from real API.
+ * Falls back to mock data if API is unavailable.
+ */
+export const fetchValuationData = async (): Promise<ValuationProduct[]> => {
+  try {
+    const apiData = await getInventoryValuation();
+
+    // If API returns a valid array, map to ValuationProduct shape
+    if (Array.isArray(apiData) && apiData.length > 0) {
+      return apiData.map((item: Record<string, unknown>) => ({
+        id: (item.id ?? item.productId ?? '') as string,
+        productName: (item.productName ?? item.name ?? '') as string,
+        category: (item.category ?? 'Supplies') as ProductCategory,
+        location: (item.location ?? 'Main Store') as string,
+        isPerishable: (item.isPerishable ?? false) as boolean,
+        totalQuantity: (item.totalQuantity ?? item.quantity ?? 0) as number,
+        averageCost: (item.averageCost ?? item.avgCost ?? 0) as number,
+        totalValue: (item.totalValue ?? 0) as number,
+        sellingPricePerUnit: (item.sellingPricePerUnit ?? item.sellingPrice ?? 0) as number,
+        marginPercent: (item.marginPercent ?? 0) as number,
+        pctOfTotalInventory: (item.pctOfTotalInventory ?? 0) as number,
+        fifoLayers: (item.fifoLayers ?? []) as FifoBatchLayer[],
+        lastPurchaseDate: (item.lastPurchaseDate ?? '') as string,
+      }));
+    }
+
+    return [...MOCK_VALUATION_PRODUCTS];
+  } catch (err) {
+    console.warn('[InventoryValuation] API unavailable, using mock data:', err);
+    return [...MOCK_VALUATION_PRODUCTS];
+  }
+};

@@ -75,6 +75,7 @@ import {
   MOCK_CUSTOMER_EVENTS,
   MOCK_LOYALTY_TRANSACTIONS,
 } from './CRMTypes';
+import { updateCustomerNotes } from '../../api/customer.api';
 
 // -----------------------------------------------------------------------------
 // Tab Panel Component
@@ -496,9 +497,13 @@ export default function Customer360View({ customerId, onBack }: Customer360ViewP
   const tierConfig = LOYALTY_TIER_CONFIGS[customer.loyaltyTier];
   const lastOrderDays = daysSince(customer.lastOrderDate);
 
-  const handleSaveNotes = (notes: string) => {
-    console.log('Saving notes:', notes);
-    // TODO: API call to save notes
+  const handleSaveNotes = async (notes: string) => {
+    if (!customerId) return;
+    try {
+      await updateCustomerNotes(customerId, notes || null);
+    } catch (err) {
+      console.error('Failed to save notes:', err);
+    }
   };
 
   return (

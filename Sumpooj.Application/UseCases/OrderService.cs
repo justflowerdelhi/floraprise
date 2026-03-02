@@ -63,7 +63,14 @@ public class OrderService
     {
         // Validate LocationId is provided
         if (request.LocationId == Guid.Empty)
-            throw new InvalidOperationException("LocationId is required when creating an order.");
+        {
+            // Auto-assign default location if not provided
+            var defaultLocation = await _locationRepository.GetDefaultAsync(companyId);
+            if (defaultLocation != null)
+                request.LocationId = defaultLocation.Id;
+            else
+                throw new InvalidOperationException("LocationId is required when creating an order.");
+        }
 
         // Validate Location exists and belongs to the same company
         var location = await _locationRepository.GetByIdAsync(request.LocationId)
@@ -80,14 +87,26 @@ public class OrderService
         if (activeShift == null)
             throw new InvalidOperationException("No active shift for this location. Please open a shift before creating orders.");
 
-        // Validate customer exists
-        var customer = await _customerRepository.GetByIdAsync(request.CustomerId)
-            ?? throw new KeyNotFoundException("Customer not found");
+        // Resolve customer — use walk-in customer if not provided
+        var customerId = request.CustomerId.GetValueOrDefault();
+        if (customerId == Guid.Empty)
+        {
+            var walkInCustomer = await _customerRepository.GetOrCreateWalkInCustomerAsync(companyId);
+            customerId = walkInCustomer.Id;
+        }
+        else
+        {
+            _ = await _customerRepository.GetByIdAsync(customerId)
+                ?? throw new KeyNotFoundException("Customer not found");
+        }
+
+        // Default delivery date to now for walk-in / take-now orders
+        var deliveryDate = request.DeliveryDate ?? DateTime.UtcNow;
 
         var order = new Order(
             companyId,
-            request.CustomerId,
-            request.DeliveryDate,
+            customerId,
+            deliveryDate,
             request.DeliveryAddress,
             request.RecipientName,
             request.RecipientPhone);
@@ -99,10 +118,13 @@ public class OrderService
         if (!string.IsNullOrEmpty(request.CardMessage))
             order.SetCardMessage(request.CardMessage);
 
-        if (Enum.TryParse<DeliveryPriority>(request.DeliveryPriority, true, out var priority))
+        // Normalize frontend enum formats (WALK_IN → WalkIn, NORMAL → Standard)
+        var priorityStr = NormalizeEnumString(request.DeliveryPriority);
+        if (Enum.TryParse<DeliveryPriority>(priorityStr, true, out var priority))
             order.SetDeliveryPriority(priority);
 
-        if (Enum.TryParse<OrderSource>(request.OrderSource, true, out var source))
+        var sourceStr = NormalizeEnumString(request.OrderSource);
+        if (Enum.TryParse<OrderSource>(sourceStr, true, out var source))
             order.SetOrderSource(source);
 
         if (!string.IsNullOrEmpty(request.TimeSlot))
@@ -125,6 +147,27 @@ public class OrderService
 
         await _orderRepository.AddAsync(order);
         return order.Id;
+    }
+
+    /// <summary>
+    /// Converts SCREAMING_SNAKE_CASE to PascalCase for enum parsing.
+    /// e.g. "WALK_IN" → "WalkIn", "SAME_DAY" → "SameDay", "NORMAL" → "Normal"
+    /// </summary>
+    private static string NormalizeEnumString(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+
+        // If it contains underscores, convert SCREAMING_SNAKE_CASE → PascalCase
+        if (value.Contains('_'))
+        {
+            return string.Concat(
+                value.Split('_')
+                     .Where(s => s.Length > 0)
+                     .Select(s => char.ToUpper(s[0]) + s[1..].ToLower()));
+        }
+
+        // Already PascalCase or single word — return as-is
+        return value;
     }
 
     public async Task UpdateStatusAsync(Guid companyId, Guid id, string status)

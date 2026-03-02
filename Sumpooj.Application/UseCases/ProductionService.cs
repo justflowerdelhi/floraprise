@@ -120,6 +120,15 @@ public class ProductionService
         return batch == null ? null : MapBatch(batch);
     }
 
+    public async Task DeductFromBatchAsync(Guid companyId, Guid batchId, int quantity)
+    {
+        var batch = await _batchRepo.GetByIdAsync(companyId, batchId)
+            ?? throw new InvalidOperationException("Batch not found");
+
+        batch.Deduct(quantity);
+        await _batchRepo.UpdateAsync(batch);
+    }
+
     // ─── Production Runs ────────────────────────────────────
 
     public async Task<ProductionRunResult> CreateProductionRunAsync(Guid companyId, ProductionRunRequest request)

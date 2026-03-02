@@ -44,6 +44,7 @@ import {
   CURRENCY_SYMBOL_MAP,
 } from '../../core/tenant/TenantTypes';
 import { formatCurrency } from '../../core/i18n';
+import api from '../../api/axios';
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -130,27 +131,10 @@ export default function OnboardingWizard() {
     setSaving(true);
     setError('');
     try {
-      // TODO: POST /api/tenant/onboarding {
-      //   businessName,
-      //   country,
-      //   currency: derived.currency,
-      //   locale: derived.locale,
-      //   taxSystem: derived.taxSystem,
-      //   dateFormat: derived.dateFormat,
-      //   timeFormat: derived.timeFormat,
-      // }
-      console.log('[Onboarding] Saving tenant settings:', {
-        businessName,
-        country,
-        currency: derived.currency,
-        locale: derived.locale,
-        taxSystem: derived.taxSystem,
+      await api.post('/tenant/settings', {
+        currencyCode: derived.currency,
       });
 
-      // Simulate API delay
-      await new Promise((r) => setTimeout(r, 800));
-
-      // After success, redirect to dashboard
       navigate('/dashboard', { replace: true });
     } catch {
       setError('Failed to save settings. Please try again.');

@@ -7,18 +7,24 @@ public class DashboardResponse
     public object Data { get; set; } = default!;
 }
 
-// Admin Dashboard
+public class SalesTrendPoint
+{
+    public string Day { get; set; } = default!;
+    public decimal Sales { get; set; }
+}
+
+// Admin Dashboard — matches frontend AdminDashboardData
 public class AdminDashboardDto
 {
     public decimal TodaySales { get; set; }
-    public decimal SalesTrend { get; set; }
-    public int OrdersToday { get; set; }
-    public int DeliveriesScheduled { get; set; }
-    public decimal GrossProfit { get; set; }
-    public int LowStockItems { get; set; }
-    public int ExpiringBatches { get; set; }
-    public int StaffTasksPending { get; set; }
-    public List<AlertDto> TopAlerts { get; set; } = new();
+    public decimal MonthRevenue { get; set; }
+    public decimal GrossProfitToday { get; set; }
+    public decimal InventoryValue { get; set; }
+    public decimal WastageToday { get; set; }
+    public int NetworkOrdersPending { get; set; }
+    public int ExpiringBouquets { get; set; }
+    public int UpcomingWeddings { get; set; }
+    public List<SalesTrendPoint> SalesTrend { get; set; } = new();
 }
 
 public class AlertDto
@@ -30,13 +36,13 @@ public class AlertDto
     public string? Href { get; set; }
 }
 
-// Manager Dashboard
+// Manager Dashboard — matches frontend ManagerDashboardData
 public class ManagerDashboardDto
 {
-    public decimal TodaySales { get; set; }
-    public int OrdersToday { get; set; }
+    public int OrdersToFulfill { get; set; }
     public int DeliveriesScheduled { get; set; }
-    public int LowStockItems { get; set; }
+    public int ProductionPending { get; set; }
+    public int LowStockAlerts { get; set; }
     public int ExpiringBatches { get; set; }
     public int StaffTasksPending { get; set; }
     public List<AlertDto> TopAlerts { get; set; } = new();

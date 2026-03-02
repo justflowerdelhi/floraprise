@@ -59,6 +59,15 @@ public class CustomersController : ControllerBase
         return NoContent();
     }
 
+    [HttpPut("{id:guid}/notes")]
+    public async Task<IActionResult> UpdateNotes(
+        Guid id,
+        [FromBody] string? notes)
+    {
+        await _service.UpdateNotesAsync(id, notes);
+        return NoContent();
+    }
+
     [HttpPut("{id:guid}/deactivate")]
     public async Task<IActionResult> Deactivate(Guid id)
     {

@@ -6,6 +6,7 @@ import React, { memo } from 'react';
 import { Add as AddIcon, AccessTime as ExpiryIcon } from '@mui/icons-material';
 import type { Product } from './POSTypes';
 import { getStockStatus, STOCK_STATUS_CONFIG } from './POSTypes';
+import { formatCurrency } from '../../core/i18n';
 
 interface ProductCardProps {
   product: Product;
@@ -16,14 +17,6 @@ const ProductCard: React.FC<ProductCardProps> = memo(({ product, onAdd }) => {
   const stockStatus = getStockStatus(product.availableStock);
   const stockConfig = STOCK_STATUS_CONFIG[stockStatus];
   const isDisabled = stockStatus === 'out-of-stock';
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const handleClick = () => {
     if (!isDisabled) {

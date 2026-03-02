@@ -46,7 +46,7 @@ export default function Login() {
         ...res.user,
         role: normalizeRole(res.user.role),
       };
-      await auth.login(res.access_token, normalizedUser as any, res.tenant as any);
+      await auth.login(res.access_token, normalizedUser as any, res.tenant as any, res.refresh_token);
       toast.success('Welcome back!');
       // Role-based landing page
       const landing = DEFAULT_LANDING[normalizedUser.role] ?? '/home';

@@ -25,11 +25,11 @@ import type { POSCustomer } from './POSCustomerTypes';
 import type { Product } from '../orders/OrderTypes';
 import { searchCustomers } from '../../api/customer.api';
 import { getOrdersByCustomer } from '../../api/order.api';
+import { formatCurrency } from '../../core/i18n';
 
 // ─── Helpers ──────────────────────────────────────────────
 
-const fmt = (n: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+const fmt = (n: number) => formatCurrency(n);
 
 const fmtDate = (d: string | undefined | null) => {
   if (!d) return '—';

@@ -65,6 +65,10 @@ import type { Proposal, ProposalStatus } from './ProposalTypes';
 import { PROPOSAL_STATUS_CONFIG, getMarginColor } from './ProposalTypes';
 import { MOCK_PROPOSALS, getProposalStats } from './ProposalMockData';
 import { formatCurrency } from '../../core/i18n';
+import {
+  sendProposal as sendProposalApi,
+  createProposalRevision,
+} from '../../api/proposal.api';
 
 // ─── Styling Constants ──────────────────────────────────────
 
@@ -335,19 +339,26 @@ const ProposalList: React.FC = () => {
     navigate(`/proposals/${proposal.id}/edit`);
   };
 
-  const handleDuplicate = (proposal: Proposal) => {
-    console.log('Duplicate proposal:', proposal.id);
-    // TODO: Implement duplication
+  const handleDuplicate = async (proposal: Proposal) => {
+    try {
+      await createProposalRevision(proposal.id);
+      navigate(`/proposals/${proposal.id}/edit`);
+    } catch (err) {
+      console.error('Failed to duplicate proposal:', err);
+    }
   };
 
-  const handleSend = (proposal: Proposal) => {
-    console.log('Send proposal:', proposal.id);
-    // TODO: Implement send
+  const handleSend = async (proposal: Proposal) => {
+    try {
+      await sendProposalApi(proposal.id);
+    } catch (err) {
+      console.error('Failed to send proposal:', err);
+    }
   };
 
   const handleDelete = (proposal: Proposal) => {
-    console.log('Delete proposal:', proposal.id);
-    // TODO: Implement delete
+    // Backend doesn't have a delete endpoint — navigate away
+    console.warn('Proposal deletion not yet supported on backend:', proposal.id);
   };
 
   const handleNewProposal = () => {

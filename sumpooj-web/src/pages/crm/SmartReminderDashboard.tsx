@@ -339,11 +339,32 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
   };
 
   const handleAction = (id: string, action: string) => {
-    console.log('Action:', action, 'on reminder:', id);
-    if (action === 'done') {
-      handleDismiss(id);
+    const reminder = reminders.find(r => r.id === id);
+    if (!reminder) return;
+
+    switch (action) {
+      case 'call':
+        if (reminder.customerPhone) {
+          window.open(`tel:${reminder.customerPhone}`, '_self');
+        }
+        break;
+      case 'whatsapp':
+        if (reminder.customerPhone) {
+          const phone = reminder.customerPhone.replace(/[^0-9]/g, '');
+          window.open(`https://wa.me/${phone}`, '_blank');
+        }
+        break;
+      case 'snooze':
+        // Snooze = hide for 24 hours (local only)
+        setReminders(prev =>
+          prev.map(r => r.id === id ? { ...r, dismissed: true } : r)
+        );
+        break;
+      case 'done':
+      default:
+        handleDismiss(id);
+        break;
     }
-    // TODO: Implement actual actions
   };
 
   const handleViewCustomer = (customerId: string) => {

@@ -105,8 +105,13 @@ public class StaffPerformanceDto
 {
     public Guid StaffId { get; set; }
     public string StaffName { get; set; } = default!;
-    public string Role { get; set; } = default!;
+    public string StaffRole { get; set; } = default!;
+    public string PeriodStart { get; set; } = default!;
+    public string PeriodEnd { get; set; } = default!;
     public SalesMetricsDto Sales { get; set; } = new();
+    public EventMetricsDto Events { get; set; } = new();
+    public ProductionMetricsDto Production { get; set; } = new();
+    public DeliveryMetricsDto Deliveries { get; set; } = new();
     public CommissionMetricsDto Commission { get; set; } = new();
 }
 
@@ -118,6 +123,38 @@ public class SalesMetricsDto
     public decimal GrossProfit { get; set; }
     public decimal MarginPercent { get; set; }
     public decimal AverageOrderValue { get; set; }
+    public decimal TotalDiscountsGiven { get; set; }
+    public int WalkInSales { get; set; }
+    public int PhoneSales { get; set; }
+    public int OnlineSales { get; set; }
+}
+
+public class EventMetricsDto
+{
+    public int EventsAssigned { get; set; }
+    public int EventsCompleted { get; set; }
+    public int ProposalsCreated { get; set; }
+    public int ProposalsApproved { get; set; }
+    public decimal EventRevenue { get; set; }
+    public decimal EventProfit { get; set; }
+}
+
+public class ProductionMetricsDto
+{
+    public int ItemsAssigned { get; set; }
+    public int ItemsCompleted { get; set; }
+    public int ItemsInProgress { get; set; }
+    public decimal ProductionCompletionRate { get; set; }
+    public decimal? AverageCompletionTime { get; set; }
+}
+
+public class DeliveryMetricsDto
+{
+    public int DeliveriesAssigned { get; set; }
+    public int DeliveriesCompleted { get; set; }
+    public int DeliveriesOnTime { get; set; }
+    public decimal OnTimeRate { get; set; }
+    public decimal? TotalDistance { get; set; }
 }
 
 public class CommissionMetricsDto
@@ -125,4 +162,6 @@ public class CommissionMetricsDto
     public decimal CommissionBase { get; set; }
     public decimal CommissionRate { get; set; }
     public decimal CommissionEarned { get; set; }
+    public string? PeriodStart { get; set; }
+    public string? PeriodEnd { get; set; }
 }

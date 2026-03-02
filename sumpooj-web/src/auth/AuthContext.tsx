@@ -8,8 +8,8 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../core/rbac/RBACTypes';
 import type { Tenant } from '../core/tenant/TenantTypes';
-import { fetchMe } from '../api/auth.api';
-import { setAuthToken, clearAuthToken } from '../api/axios';
+import { fetchMe, revokeToken } from '../api/auth.api';
+import { setAuthToken, setRefreshToken, clearAuthToken, getRefreshToken } from '../api/axios';
 
 // ─── Dev Bypass ─────────────────────────────────────────────
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true';
@@ -81,7 +81,7 @@ interface AuthContextValue {
   isLoading: boolean;
 
   /** Store token + user/tenant from login response */
-  login: (token: string, user?: User, tenant?: Tenant | null) => Promise<void>;
+  login: (token: string, user?: User, tenant?: Tenant | null, refreshToken?: string) => Promise<void>;
 
   /** Clear token + reset state */
   logout: () => void;
@@ -111,13 +111,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     try {
       const data: AuthMeResponse = await fetchMe();
-      setUser(data.user);
-      // Use PLATFORM_ADMIN_TENANT for platform admins (no company)
-      setTenant(data.tenant ?? PLATFORM_ADMIN_TENANT);
+      const resolvedUser = data.user;
+      const resolvedTenant = data.tenant ?? PLATFORM_ADMIN_TENANT;
+      setUser(resolvedUser);
+      setTenant(resolvedTenant);
       setStatus('authenticated');
+      // Persist for next refresh
+      try {
+        localStorage.setItem('app:user', JSON.stringify(resolvedUser));
+        localStorage.setItem('app:tenant', JSON.stringify(resolvedTenant));
+      } catch { /* quota */ }
       return true;
     } catch {
-      // Token invalid / expired / missing
+      // /auth/me failed — try to restore from localStorage before giving up
+      try {
+        const storedUser = localStorage.getItem('app:user');
+        const storedTenant = localStorage.getItem('app:tenant');
+        const token = localStorage.getItem('auth_token');
+        if (storedUser && token && token !== 'undefined' && token !== 'null') {
+          const parsedUser = JSON.parse(storedUser);
+          const parsedTenant = storedTenant ? JSON.parse(storedTenant) : PLATFORM_ADMIN_TENANT;
+          setUser(parsedUser);
+          setTenant(parsedTenant);
+          setStatus('authenticated');
+          return true;
+        }
+      } catch { /* invalid JSON */ }
+      // No stored session either — go to login
       clearAuthToken();
       setUser(null);
       setTenant(null);
@@ -143,12 +163,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        // 1. Try to restore user from localStorage
+        // 1. Try to restore user + tenant from localStorage
         const storedUserJson = localStorage.getItem('app:user');
+        const storedTenantJson = localStorage.getItem('app:tenant');
         if (storedUserJson) {
           try {
             const storedUser = JSON.parse(storedUserJson);
             if (isMounted) setUser(storedUser);
+          } catch {
+            // Invalid JSON, ignore
+          }
+        }
+        if (storedTenantJson) {
+          try {
+            const storedTenant = JSON.parse(storedTenantJson);
+            if (isMounted) setTenant(storedTenant);
           } catch {
             // Invalid JSON, ignore
           }
@@ -205,7 +234,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   /** Store token then call /auth/me */
   const login = useCallback(
-    async (token: string, userData?: User, tenantData?: Tenant | null) => {
+    async (token: string, userData?: User, tenantData?: Tenant | null, refreshTokenValue?: string) => {
       if (!DEV_BYPASS_AUTH) {
         // Validate token before storing
         if (!token || token === 'undefined' || token === 'null') {
@@ -214,16 +243,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
         setAuthToken(token);
+        if (refreshTokenValue) {
+          setRefreshToken(refreshTokenValue);
+        }
       }
 
       // If user/tenant provided from login response, use directly (no extra API call)
       if (userData) {
         setUser(userData);
         // Use PLATFORM_ADMIN_TENANT for platform admins (no company)
-        setTenant(tenantData ?? PLATFORM_ADMIN_TENANT);
-        // Store user for session persistence
+        const resolvedTenant = tenantData ?? PLATFORM_ADMIN_TENANT;
+        setTenant(resolvedTenant);
+        // Store user + tenant for session persistence across page refreshes
         try {
           localStorage.setItem('app:user', JSON.stringify(userData));
+          localStorage.setItem('app:tenant', JSON.stringify(resolvedTenant));
         } catch {}
         setStatus('authenticated');
         return;
@@ -236,14 +270,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [resolveIdentity],
   );
 
-  /** Clear everything */
+  /** Clear everything and revoke refresh token */
   const logout = useCallback(() => {
+    const rt = getRefreshToken();
+    if (rt) {
+      revokeToken(rt).catch(() => { /* best-effort */ });
+    }
     clearAuthToken();
     setUser(null);
     setTenant(null);
     setStatus('unauthenticated');
     try {
       localStorage.removeItem('app:user');
+      localStorage.removeItem('app:tenant');
     } catch {}
   }, []);
 

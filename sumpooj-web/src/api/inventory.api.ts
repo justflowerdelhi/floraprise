@@ -138,3 +138,46 @@ export const getBatchSummary = async (): Promise<BatchSummaryItem[]> => {
   const res = await api.get('/inventory/batch-summary');
   return res.data;
 };
+
+// ─── Inventory Health Dashboard ─────────────────────────────
+
+export interface HealthDashboardParams {
+  fromDate?: string;
+  toDate?: string;
+  locationId?: string;
+}
+
+export const getInventoryHealthDashboard = async (params: HealthDashboardParams = {}) => {
+  const res = await api.get('/inventory/health-dashboard', { params });
+  return res.data;
+};
+
+// ─── Inventory Valuation ────────────────────────────────────
+
+export interface ValuationParams {
+  asOfDate?: string;
+  locationId?: string;
+  category?: string;
+}
+
+export const getInventoryValuation = async (params: ValuationParams = {}) => {
+  const res = await api.get('/inventory/valuation', { params });
+  return res.data;
+};
+
+// ─── Stock Movements / Ledger ───────────────────────────────
+
+export interface StockMovementParams {
+  productId?: string;
+  locationId?: string;
+  referenceType?: string;
+  fromDate?: string;
+  toDate?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export const getStockMovements = async (params: StockMovementParams = {}) => {
+  const res = await api.get('/inventory/movements', { params });
+  return res.data;
+};

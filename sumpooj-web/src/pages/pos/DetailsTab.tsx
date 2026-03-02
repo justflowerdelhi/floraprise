@@ -20,6 +20,7 @@ import DeliveryDetailsForm from './DeliveryDetailsForm';
 import PickupDetailsForm from './PickupDetailsForm';
 import { usePOS } from './POSContext';
 import type { OrderIntent } from './POSTypes';
+import { formatCurrency } from '../../core/i18n';
 
 // ─── Props ──────────────────────────────────────────────────
 
@@ -52,8 +53,7 @@ const DetailsTab: React.FC<DetailsTabProps> = ({ onNext, onBack }) => {
   const isLocked = !canEditCart;
   const hasErrors = intentErrors.length > 0;
 
-  const formatCurrency = (n: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+
 
   return (
     <div className="h-full flex overflow-hidden">

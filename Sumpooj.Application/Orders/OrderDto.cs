@@ -75,9 +75,9 @@ public class OrderListDto
 
 public class CreateOrderRequest
 {
-    public Guid CustomerId { get; set; }
+    public Guid? CustomerId { get; set; }
     public Guid LocationId { get; set; }
-    public DateTime DeliveryDate { get; set; }
+    public DateTime? DeliveryDate { get; set; }
     public string? DeliveryAddress { get; set; }
     public string? RecipientName { get; set; }
     public string? RecipientPhone { get; set; }
@@ -85,6 +85,7 @@ public class CreateOrderRequest
     public string DeliveryPriority { get; set; } = "Standard";
     public string? TimeSlot { get; set; }
     public string OrderSource { get; set; } = "WalkIn";
+    public string? OrderIntent { get; set; }
     public decimal DeliveryFee { get; set; }
     public decimal DiscountAmount { get; set; }
     public string? InternalNotes { get; set; }

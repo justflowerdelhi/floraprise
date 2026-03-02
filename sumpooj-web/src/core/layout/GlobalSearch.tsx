@@ -16,7 +16,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box, Typography, TextField, InputAdornment, Dialog, Chip, List,
   ListItem, ListItemButton, ListItemIcon, ListItemText, Divider,
-  IconButton, useTheme, alpha, Fade,
+  IconButton, useTheme, alpha, Fade, CircularProgress,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -29,6 +29,9 @@ import {
   Keyboard as KeyboardIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { searchProducts } from '../../api/product.api';
+import { searchCustomers } from '../../api/customer.api';
+import { searchOrders } from '../../api/order.api';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -42,28 +45,6 @@ interface SearchResult {
   path: string;
   icon: React.ReactNode;
 }
-
-// ─── Mock Search Data ───────────────────────────────────────
-
-const MOCK_PRODUCTS: SearchResult[] = [
-  { id: 'p1', type: 'product', title: 'Red Rose Bouquet', subtitle: 'SKU: RRB-001 • ₹1,500', path: '/products/p1', icon: <ProductIcon /> },
-  { id: 'p2', type: 'product', title: 'White Lily Arrangement', subtitle: 'SKU: WLA-002 • ₹2,200', path: '/products/p2', icon: <ProductIcon /> },
-  { id: 'p3', type: 'product', title: 'Mixed Flower Basket', subtitle: 'SKU: MFB-003 • ₹1,800', path: '/products/p3', icon: <ProductIcon /> },
-  { id: 'p4', type: 'product', title: 'Orchid Plant', subtitle: 'SKU: ORC-004 • ₹3,500', path: '/products/p4', icon: <ProductIcon /> },
-  { id: 'p5', type: 'product', title: 'Sunflower Bunch', subtitle: 'SKU: SFB-005 • ₹800', path: '/products/p5', icon: <ProductIcon /> },
-];
-
-const MOCK_ORDERS: SearchResult[] = [
-  { id: 'o1', type: 'order', title: 'Order #1234', subtitle: 'Rahul Sharma • Delivery Today', path: '/order-list?id=1234', icon: <OrderIcon /> },
-  { id: 'o2', type: 'order', title: 'Order #1235', subtitle: 'Priya Patel • Ready for Pickup', path: '/order-list?id=1235', icon: <OrderIcon /> },
-  { id: 'o3', type: 'order', title: 'Order #1236', subtitle: 'Ankit Singh • Being Made', path: '/order-list?id=1236', icon: <OrderIcon /> },
-];
-
-const MOCK_CUSTOMERS: SearchResult[] = [
-  { id: 'c1', type: 'customer', title: 'Rahul Sharma', subtitle: '+91 98765 43210 • 12 orders', path: '/customers?id=c1', icon: <CustomerIcon /> },
-  { id: 'c2', type: 'customer', title: 'Priya Patel', subtitle: '+91 87654 32109 • 8 orders', path: '/customers?id=c2', icon: <CustomerIcon /> },
-  { id: 'c3', type: 'customer', title: 'Ankit Singh', subtitle: '+91 76543 21098 • 3 orders', path: '/customers?id=c3', icon: <CustomerIcon /> },
-];
 
 // ─── Component ──────────────────────────────────────────────
 
@@ -80,11 +61,13 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ onClose }) => {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<SearchCategory>('all');
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [recentSearches, setRecentSearches] = useState<string[]>([
-    'Rose Bouquet',
-    'Order 1234',
-    'Rahul',
-  ]);
+  const [loading, setLoading] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('globalSearch:recent');
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   // Focus input on mount
@@ -92,36 +75,101 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ onClose }) => {
     inputRef.current?.focus();
   }, []);
 
-  // Search logic (mock)
+  // Persist recent searches
+  useEffect(() => {
+    try { localStorage.setItem('globalSearch:recent', JSON.stringify(recentSearches)); } catch { /* quota */ }
+  }, [recentSearches]);
+
+  // Debounced search against real APIs
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
       return;
     }
 
-    const q = query.toLowerCase();
-    let filtered: SearchResult[] = [];
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      const q = query.trim();
+      const mapped: SearchResult[] = [];
 
-    if (category === 'all' || category === 'products') {
-      filtered = [...filtered, ...MOCK_PRODUCTS.filter(
-        (p) => p.title.toLowerCase().includes(q) || p.subtitle.toLowerCase().includes(q)
-      )];
-    }
+      try {
+        const promises: Promise<void>[] = [];
 
-    if (category === 'all' || category === 'orders') {
-      filtered = [...filtered, ...MOCK_ORDERS.filter(
-        (o) => o.title.toLowerCase().includes(q) || o.subtitle.toLowerCase().includes(q)
-      )];
-    }
+        if (category === 'all' || category === 'products') {
+          promises.push(
+            searchProducts({ Query: q, PageSize: 5 })
+              .then((res: any) => {
+                const items = res.items ?? res ?? [];
+                items.forEach((p: any) => {
+                  mapped.push({
+                    id: p.id,
+                    type: 'product',
+                    title: p.name,
+                    subtitle: `SKU: ${p.sku ?? '—'}`,
+                    path: `/products`,
+                    icon: <ProductIcon />,
+                  });
+                });
+              })
+              .catch(() => {})
+          );
+        }
 
-    if (category === 'all' || category === 'customers') {
-      filtered = [...filtered, ...MOCK_CUSTOMERS.filter(
-        (c) => c.title.toLowerCase().includes(q) || c.subtitle.toLowerCase().includes(q)
-      )];
-    }
+        if (category === 'all' || category === 'orders') {
+          promises.push(
+            searchOrders({ Query: q, PageSize: 5 })
+              .then((res: any) => {
+                const items = res.items ?? res ?? [];
+                items.forEach((o: any) => {
+                  mapped.push({
+                    id: o.id,
+                    type: 'order',
+                    title: `Order ${o.orderNumber ?? o.id}`,
+                    subtitle: o.customerName ?? o.recipientName ?? '',
+                    path: `/order-list`,
+                    icon: <OrderIcon />,
+                  });
+                });
+              })
+              .catch(() => {})
+          );
+        }
 
-    setResults(filtered);
-    setSelectedIndex(0);
+        if (category === 'all' || category === 'customers') {
+          promises.push(
+            searchCustomers({ Query: q, PageSize: 5 })
+              .then((res: any) => {
+                const items = res.items ?? res ?? [];
+                items.forEach((c: any) => {
+                  mapped.push({
+                    id: c.id,
+                    type: 'customer',
+                    title: c.name,
+                    subtitle: c.phone ?? c.email ?? '',
+                    path: `/customers`,
+                    icon: <CustomerIcon />,
+                  });
+                });
+              })
+              .catch(() => {})
+          );
+        }
+
+        await Promise.all(promises);
+        if (!controller.signal.aborted) {
+          setResults(mapped);
+          setSelectedIndex(0);
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
   }, [query, category]);
 
   // Keyboard navigation

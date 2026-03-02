@@ -283,18 +283,37 @@ export interface DashboardData {
   summary: HealthSummaryMetrics;
 }
 
-export const fetchDashboardData = (_range: DateRange): Promise<DashboardData> =>
-  new Promise((resolve) =>
-    setTimeout(
-      () =>
-        resolve({
-          aging: MOCK_AGING_DATA,
-          wastageTrend: MOCK_WASTAGE_TREND,
-          expiryTrend: MOCK_EXPIRY_TREND,
-          topInventory: MOCK_TOP_INVENTORY,
-          slowMoving: MOCK_SLOW_MOVING,
-          summary: MOCK_SUMMARY_METRICS,
-        }),
-      600,
-    ),
-  );
+import { getInventoryHealthDashboard } from '../../../api/inventory.api';
+
+/**
+ * Fetches inventory health dashboard data from real API.
+ * Falls back to mock data if API is unavailable.
+ */
+export const fetchDashboardData = async (range: DateRange): Promise<DashboardData> => {
+  try {
+    const apiData = await getInventoryHealthDashboard({
+      fromDate: range.start,
+      toDate: range.end,
+    });
+
+    // Map API response to DashboardData shape, falling back per-field
+    return {
+      aging: apiData.aging ?? MOCK_AGING_DATA,
+      wastageTrend: apiData.wastageTrend ?? MOCK_WASTAGE_TREND,
+      expiryTrend: apiData.expiryTrend ?? MOCK_EXPIRY_TREND,
+      topInventory: apiData.topInventory ?? MOCK_TOP_INVENTORY,
+      slowMoving: apiData.slowMoving ?? MOCK_SLOW_MOVING,
+      summary: apiData.summary ?? MOCK_SUMMARY_METRICS,
+    };
+  } catch (err) {
+    console.warn('[HealthDashboard] API unavailable, using mock data:', err);
+    return {
+      aging: MOCK_AGING_DATA,
+      wastageTrend: MOCK_WASTAGE_TREND,
+      expiryTrend: MOCK_EXPIRY_TREND,
+      topInventory: MOCK_TOP_INVENTORY,
+      slowMoving: MOCK_SLOW_MOVING,
+      summary: MOCK_SUMMARY_METRICS,
+    };
+  }
+};

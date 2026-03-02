@@ -13,11 +13,19 @@ public class StaffController : ControllerBase
 {
     private readonly StaffService _staffService;
     private readonly ITenantContext _tenantContext;
+    private readonly IOrderRepository _orderRepo;
+    private readonly IDeliveryRepository _deliveryRepo;
 
-    public StaffController(StaffService staffService, ITenantContext tenantContext)
+    public StaffController(
+        StaffService staffService,
+        ITenantContext tenantContext,
+        IOrderRepository orderRepo,
+        IDeliveryRepository deliveryRepo)
     {
         _staffService = staffService;
         _tenantContext = tenantContext;
+        _orderRepo = orderRepo;
+        _deliveryRepo = deliveryRepo;
     }
 
     private Guid CompanyId => _tenantContext.CompanyId 
@@ -116,5 +124,64 @@ public class StaffController : ControllerBase
     {
         await _staffService.DisableLoginAsync(CompanyId, id);
         return NoContent();
+    }
+
+    // ── Performance endpoint ─────────────────────────────────
+
+    [HttpGet("{id:guid}/has-orders")]
+    public async Task<IActionResult> HasOrders(Guid id)
+    {
+        var count = await _orderRepo.GetOrderCountByStaffAsync(CompanyId, id, DateTime.MinValue, DateTime.MaxValue);
+        return Ok(new { hasOrders = count > 0, orderCount = count });
+    }
+
+    [HttpGet("{id:guid}/performance")]
+    public async Task<IActionResult> GetPerformance(
+        Guid id,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to)
+    {
+        var staff = await _staffService.GetByIdAsync(CompanyId, id);
+        if (staff == null) return NotFound();
+
+        var periodStart = from ?? DateTime.Today.AddDays(-30);
+        var periodEnd = to ?? DateTime.Today.AddDays(1);
+
+        // Sales metrics
+        var orderCount = await _orderRepo.GetOrderCountByStaffAsync(CompanyId, id, periodStart, periodEnd);
+        var revenue = await _orderRepo.GetRevenueByCashierAsync(CompanyId, id, periodStart, periodEnd);
+        var avgOrder = orderCount > 0 ? revenue / orderCount : 0;
+        var grossProfit = revenue * 0.35m; // simplified
+
+        // Delivery metrics
+        var deliveriesAssigned = await _deliveryRepo.GetDeliveryCountByDriverAsync(id, periodStart, periodEnd);
+        var deliveriesCompleted = await _deliveryRepo.GetCompletedDeliveryCountByDriverAsync(id, periodStart, periodEnd);
+        var onTimeRate = deliveriesAssigned > 0 ? (decimal)deliveriesCompleted / deliveriesAssigned * 100 : 0;
+
+        var result = new StaffPerformanceDto
+        {
+            StaffId = id,
+            StaffName = staff.Name,
+            StaffRole = staff.Role,
+            PeriodStart = periodStart.ToString("yyyy-MM-dd"),
+            PeriodEnd = periodEnd.ToString("yyyy-MM-dd"),
+            Sales = new SalesMetricsDto
+            {
+                TotalOrders = orderCount,
+                TotalRevenue = revenue,
+                GrossProfit = grossProfit,
+                MarginPercent = revenue > 0 ? grossProfit / revenue * 100 : 0,
+                AverageOrderValue = avgOrder,
+            },
+            Deliveries = new DeliveryMetricsDto
+            {
+                DeliveriesAssigned = deliveriesAssigned,
+                DeliveriesCompleted = deliveriesCompleted,
+                DeliveriesOnTime = deliveriesCompleted,
+                OnTimeRate = onTimeRate,
+            },
+        };
+
+        return Ok(result);
     }
 }

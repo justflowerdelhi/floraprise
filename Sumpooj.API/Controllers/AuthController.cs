@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Sumpooj.Application.UseCases;
 using Sumpooj.Domain.Entities;
 using Sumpooj.Infrastructure.Identity;
+using Sumpooj.Infrastructure.Persistence;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -16,17 +18,20 @@ public class AuthController : ControllerBase
     private readonly IConfiguration _config;
     private readonly ILogger<AuthController> _logger;
     private readonly AuditLogService _auditLogService;
+    private readonly SumpoojDbContext _db;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         IConfiguration config,
         ILogger<AuthController> logger,
-        AuditLogService auditLogService)
+        AuditLogService auditLogService,
+        SumpoojDbContext db)
     {
         _userManager = userManager;
         _config = config;
         _logger = logger;
         _auditLogService = auditLogService;
+        _db = db;
     }
 
     [HttpPost("login")]
@@ -40,7 +45,6 @@ public class AuthController : ControllerBase
             if (user == null)
             {
                 _logger.LogWarning("User not found: {Email}", request.Email);
-
                 return Unauthorized(new { message = "Invalid email or password" });
             }
 
@@ -93,34 +97,13 @@ public class AuthController : ControllerBase
             var primaryRole = roles.FirstOrDefault() ?? "Staff";
             _logger.LogInformation("User {Email} has roles: {Roles}", request.Email, string.Join(", ", roles));
 
-            var claims = new List<Claim>
-            {
-                new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new(JwtRegisteredClaimNames.Email, user.Email!),
-                new("company_id", user.CompanyId?.ToString() ?? ""),
-            };
+            var accessToken = GenerateAccessToken(user, roles);
 
-            foreach (var role in roles)
-                claims.Add(new Claim(ClaimTypes.Role, role));
+            // Generate refresh token
+            var refreshToken = new RefreshToken(user.Id, expiryDays: 7);
+            _db.RefreshTokens.Add(refreshToken);
+            await _db.SaveChangesAsync();
 
-            var jwtKey = _config["Jwt:Key"];
-            if (string.IsNullOrEmpty(jwtKey))
-            {
-                _logger.LogError("JWT Key is not configured!");
-                return StatusCode(500, new { message = "Server configuration error" });
-            }
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-
-            var token = new JwtSecurityToken(
-                issuer: _config["Jwt:Issuer"],
-                audience: _config["Jwt:Issuer"],
-                claims: claims,
-                expires: DateTime.UtcNow.AddHours(8),
-                signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
-            );
-
-            var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
             _logger.LogInformation("Login successful for: {Email}", request.Email);
 
             // Audit: successful login
@@ -142,35 +125,12 @@ public class AuthController : ControllerBase
                     httpMethod: "POST");
             }
 
-            // Return token + user + tenant in single response
             return Ok(new
             {
                 access_token = accessToken,
-                user = new
-                {
-                    id = user.Id.ToString(),
-                    name = user.UserName,
-                    email = user.Email,
-                    role = primaryRole.ToUpperInvariant(),
-                    primaryLocationId = (string?)null,
-                    assignedLocationIds = Array.Empty<string>()
-                },
-                tenant = user.CompanyId.HasValue ? new
-                {
-                    id = user.CompanyId.Value.ToString(),
-                    name = "Company",
-                    slug = "company",
-                    plan = "PRO",
-                    subscriptionStatus = "ACTIVE",
-                    country = "IN",
-                    currency = "INR",
-                    taxSystem = "GST",
-                    dateFormat = "DD/MM/YYYY",
-                    timeFormat = "12H",
-                    locale = "en-IN",
-                    isActive = true,
-                    createdAt = DateTime.UtcNow.ToString("o")
-                } : null
+                refresh_token = refreshToken.Token,
+                user = BuildUserResponse(user, primaryRole),
+                tenant = BuildTenantResponse(user)
             });
         }
         catch (Exception ex)
@@ -181,6 +141,78 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Exchange a valid refresh token for a new access token + refresh token pair.
+    /// The old refresh token is revoked (rotation).
+    /// </summary>
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+            return BadRequest(new { message = "Refresh token is required" });
+
+        var existing = await _db.RefreshTokens
+            .FirstOrDefaultAsync(r => r.Token == request.RefreshToken);
+
+        if (existing == null)
+            return Unauthorized(new { message = "Invalid refresh token" });
+
+        if (!existing.IsActive)
+        {
+            // Possible token reuse attack — revoke entire family
+            if (existing.IsRevoked && !string.IsNullOrEmpty(existing.ReplacedByToken))
+            {
+                _logger.LogWarning("Refresh token reuse detected for user {UserId}", existing.UserId);
+                await RevokeTokenFamilyAsync(existing.UserId);
+            }
+            return Unauthorized(new { message = "Refresh token expired or revoked" });
+        }
+
+        var user = await _userManager.FindByIdAsync(existing.UserId.ToString());
+        if (user == null || !user.IsActive)
+            return Unauthorized(new { message = "User not found or inactive" });
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var primaryRole = roles.FirstOrDefault() ?? "Staff";
+
+        // Generate new tokens (rotation)
+        var newRefreshToken = new RefreshToken(user.Id, expiryDays: 7);
+        existing.Revoke(replacedByToken: newRefreshToken.Token);
+        _db.RefreshTokens.Add(newRefreshToken);
+        await _db.SaveChangesAsync();
+
+        var accessToken = GenerateAccessToken(user, roles);
+
+        return Ok(new
+        {
+            access_token = accessToken,
+            refresh_token = newRefreshToken.Token,
+            user = BuildUserResponse(user, primaryRole),
+            tenant = BuildTenantResponse(user)
+        });
+    }
+
+    /// <summary>
+    /// Revoke a refresh token (used on logout).
+    /// </summary>
+    [HttpPost("revoke")]
+    public async Task<IActionResult> Revoke([FromBody] RefreshRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+            return BadRequest(new { message = "Refresh token is required" });
+
+        var existing = await _db.RefreshTokens
+            .FirstOrDefaultAsync(r => r.Token == request.RefreshToken);
+
+        if (existing == null || !existing.IsActive)
+            return Ok(new { message = "Token already revoked or invalid" });
+
+        existing.Revoke();
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = "Token revoked" });
+    }
+
+    /// <summary>
     /// Get current user info from token. Used for session refresh/validation.
     /// </summary>
     [HttpGet("me")]
@@ -188,7 +220,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> GetMe()
     {
         var userId = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-        if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var userGuid))
+        if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out _))
         {
             return Unauthorized(new { message = "Invalid token" });
         }
@@ -204,33 +236,105 @@ public class AuthController : ControllerBase
 
         return Ok(new
         {
-            user = new
-            {
-                id = user.Id.ToString(),
-                name = user.UserName,
-                email = user.Email,
-                role = primaryRole.ToUpperInvariant(),
-                primaryLocationId = (string?)null,
-                assignedLocationIds = Array.Empty<string>()
-            },
-            tenant = user.CompanyId.HasValue ? new
-            {
-                id = user.CompanyId.Value.ToString(),
-                name = "Company",
-                slug = "company",
-                plan = "PRO",
-                subscriptionStatus = "ACTIVE",
-                country = "IN",
-                currency = "INR",
-                taxSystem = "GST",
-                dateFormat = "DD/MM/YYYY",
-                timeFormat = "12H",
-                locale = "en-IN",
-                isActive = true,
-                createdAt = DateTime.UtcNow.ToString("o")
-            } : null
+            user = BuildUserResponse(user, primaryRole),
+            tenant = BuildTenantResponse(user)
         });
+    }
+
+    // ── Private helpers ──────────────────────────────────────────
+
+    private string GenerateAccessToken(ApplicationUser user, IList<string> roles)
+    {
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(JwtRegisteredClaimNames.Email, user.Email!),
+            new("company_id", user.CompanyId?.ToString() ?? ""),
+        };
+
+        foreach (var role in roles)
+            claims.Add(new Claim(ClaimTypes.Role, role));
+
+        var jwtKey = _config["Jwt:Key"]
+            ?? throw new InvalidOperationException("JWT Key is not configured");
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+        var token = new JwtSecurityToken(
+            issuer: _config["Jwt:Issuer"],
+            audience: _config["Jwt:Issuer"],
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(30),
+            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private static object BuildUserResponse(ApplicationUser user, string role) => new
+    {
+        id = user.Id.ToString(),
+        name = user.UserName,
+        email = user.Email,
+        role = role.ToUpperInvariant(),
+        primaryLocationId = (string?)null,
+        assignedLocationIds = Array.Empty<string>()
+    };
+
+    private static object? BuildTenantResponse(ApplicationUser user) =>
+        user.CompanyId.HasValue ? new
+        {
+            id = user.CompanyId.Value.ToString(),
+            name = "Company",
+            slug = "company",
+            plan = "PRO",
+            subscriptionStatus = "ACTIVE",
+            country = "IN",
+            currency = "INR",
+            taxSystem = "GST",
+            dateFormat = "DD/MM/YYYY",
+            timeFormat = "12H",
+            locale = "en-IN",
+            isActive = true,
+            createdAt = DateTime.UtcNow.ToString("o")
+        } : null;
+
+    /// <summary>
+    /// Revoke all active refresh tokens for a user (token reuse detection).
+    /// </summary>
+    private async Task RevokeTokenFamilyAsync(Guid userId)
+    {
+        var activeTokens = await _db.RefreshTokens
+            .Where(r => r.UserId == userId && !r.IsRevoked)
+            .ToListAsync();
+
+        foreach (var token in activeTokens)
+            token.Revoke();
+
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Verify the current user's password. Used for sensitive actions (e.g. currency change).
+    /// </summary>
+    [HttpPost("verify-password")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public async Task<IActionResult> VerifyPassword([FromBody] VerifyPasswordRequest request)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId == null) return Unauthorized();
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null) return Unauthorized();
+
+        var valid = await _userManager.CheckPasswordAsync(user, request.Password);
+        return Ok(new { verified = valid });
     }
 }
 
 public record LoginRequest(string Email, string Password);
+public record RefreshRequest(string RefreshToken);
+public class VerifyPasswordRequest
+{
+    public string Password { get; set; } = default!;
+}

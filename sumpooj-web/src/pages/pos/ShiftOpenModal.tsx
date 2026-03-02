@@ -21,13 +21,16 @@ import {
 import {
   PointOfSale as POSIcon,
   LocationOn as LocationIcon,
+  ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { useShift } from './ShiftContext';
 import { useAuth } from '../../auth/AuthContext';
 
 const ShiftOpenModal: React.FC = () => {
   const { activeShift, loading, error, openShift, locationId } = useShift();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [openingCash, setOpeningCash] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -97,6 +100,15 @@ const ShiftOpenModal: React.FC = () => {
             before opening the POS.
           </Typography>
         </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/')}
+          >
+            Go Back
+          </Button>
+        </DialogActions>
       </Dialog>
     );
   }

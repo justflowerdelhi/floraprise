@@ -41,35 +41,16 @@ export interface LocationFilter {
 
 // ─── Mock Locations ─────────────────────────────────────────
 
-// IDs match remote DB locations for the demo company
-export const MOCK_LOCATIONS: Location[] = [
-  {
-    id: '795f4658-53aa-4016-8484-94cc5d40a7f4',
-    name: 'Main Store',
-    code: 'MAIN-01',
-    address: 'Main Store Location',
-    city: 'Delhi NCR',
-    phone: '+91 11 1234 5678',
-    email: 'main@demoflorist.com',
-    isActive: true,
-    timezone: 'Asia/Kolkata',
-    createdAt: '2020-01-15T10:00:00Z',
-    updatedAt: '2026-01-01T10:00:00Z',
-  },
-  {
-    id: 'ce51c174-be15-4691-92f9-f4be76fb58eb',
-    name: 'Gurugram',
-    code: 'GGN-01',
-    address: 'Gurugram Location',
-    city: 'Gurugram',
-    phone: '+91 124 456 7890',
-    email: 'gurugram@demoflorist.com',
-    isActive: true,
-    timezone: 'Asia/Kolkata',
-    createdAt: '2021-06-01T10:00:00Z',
-    updatedAt: '2026-01-01T10:00:00Z',
-  },
-];
+// Kept as fallback — LocationContext fetches real data from GET /locations
+export const MOCK_LOCATIONS: Location[] = [];
+
+// ─── Location State (populated at runtime by LocationContext) ──
+
+let _locations: Location[] = [];
+
+export function setLocationsData(locations: Location[]) {
+  _locations = locations;
+}
 
 // ─── Location Helper Functions ──────────────────────────────
 
@@ -77,19 +58,19 @@ export const MOCK_LOCATIONS: Location[] = [
  * Get all active locations
  */
 export const getActiveLocations = (): Location[] => 
-  MOCK_LOCATIONS.filter(loc => loc.isActive);
+  _locations.filter(loc => loc.isActive);
 
 /**
  * Get location by ID
  */
 export const getLocationById = (id: string): Location | null => 
-  MOCK_LOCATIONS.find(loc => loc.id === id) || null;
+  _locations.find(loc => loc.id === id) || null;
 
 /**
  * Get locations by IDs
  */
 export const getLocationsByIds = (ids: string[]): Location[] => 
-  MOCK_LOCATIONS.filter(loc => ids.includes(loc.id));
+  _locations.filter(loc => ids.includes(loc.id));
 
 /**
  * Get location display name (short)

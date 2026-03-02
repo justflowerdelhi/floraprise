@@ -10,6 +10,7 @@ import OrderForm from '../pages/orders/OrderForm';
 import AddProductForm from '../pages/products/AddProductForm';
 import ProductsListPage from '../pages/products/ProductsListPage';
 import PurchaseEntryForm from '../pages/purchases/PurchaseEntryForm';
+import PurchaseListPage from '../pages/purchases/PurchaseListPage';
 import InventoryBatchDashboard from '../pages/inventory/InventoryBatchDashboard';
 import AdjustmentEntryPage from '../pages/adjustments/AdjustmentEntryPage';
 import ExpiryAlertCenter from '../pages/expiry-alerts/ExpiryAlertCenter';
@@ -73,6 +74,9 @@ import SuppliersPage from '../pages/suppliers/SuppliersPage';
 // Admin
 import AuditLogsPage from '../pages/admin/AuditLogsPage';
 import PlatformAdminDashboard from '../pages/admin/PlatformAdminDashboard';
+import CompanyManagementPage from '../pages/admin/CompanyManagementPage';
+import PlatformAnalyticsPage from '../pages/admin/PlatformAnalyticsPage';
+import PlatformSettingsPage from '../pages/admin/PlatformSettingsPage';
 
 // Categories
 import { CategoryManagementPage } from '../pages/categories';
@@ -209,6 +213,7 @@ export default function AppRoutes() {
 
           {/* ─── Inventory ──────────────────────────────── */}
           <Route path="/inventory" element={<InventoryBatchDashboard />} />
+          <Route path="/purchases" element={<PurchaseListPage />} />
           <Route path="/purchases/new" element={<PurchaseEntryForm />} />
           <Route path="/adjustments/new" element={<AdjustmentEntryPage />} />
           <Route path="/expiry-alerts" element={<ExpiryAlertCenter />} />
@@ -266,6 +271,9 @@ export default function AppRoutes() {
           {/* ─── Admin ──────────────────────────────────── */}
           <Route path="/admin/dashboard" element={<PlatformAdminDashboard />} />
           <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
+          <Route path="/admin/companies" element={<CompanyManagementPage />} />
+          <Route path="/admin/analytics" element={<PlatformAnalyticsPage />} />
+          <Route path="/admin/settings" element={<PlatformSettingsPage />} />
 
           {/* ─── CRM & Customer Intelligence ────────────── */}
           <Route path="/crm/customers" element={<CustomerListPage />} />

@@ -11,65 +11,135 @@ const api = axios.create({
 });
 
 // ─── Module-level token (primary source for interceptor) ────
-// Keeps token in JS memory so the interceptor always has it
-// immediately after login — eliminates localStorage timing issues.
 let _authToken: string | null = (() => {
   try {
     const token = localStorage.getItem('auth_token');
-    if (token && token !== 'undefined' && token !== 'null') {
-      console.log(`🔐 [axios init] Token restored from localStorage: ${token.substring(0, 20)}...`);
-      return token;
-    }
+    if (token && token !== 'undefined' && token !== 'null') return token;
     return null;
   } catch {
-    console.warn('⚠️ [axios init] Could not read localStorage');
     return null;
   }
 })();
 
-/** Call after login to make the token available to every request */
+let _refreshToken: string | null = (() => {
+  try {
+    const token = localStorage.getItem('refresh_token');
+    if (token && token !== 'undefined' && token !== 'null') return token;
+    return null;
+  } catch {
+    return null;
+  }
+})();
+
+/** Call after login to store both tokens */
 export function setAuthToken(token: string): void {
   _authToken = token;
-  console.log(`🔐 [setAuthToken] Token stored in memory: ${token.substring(0, 30)}...`);
-  try { 
-    localStorage.setItem('auth_token', token);
-    console.log(`💾 [setAuthToken] Token also saved to localStorage`);
-  } catch { 
-    console.warn(`⚠️ [setAuthToken] Could not save to localStorage (quota or private mode)`);
-  }
+  try { localStorage.setItem('auth_token', token); } catch { /* quota */ }
 }
 
-/** Call on logout to clear the token everywhere */
+export function setRefreshToken(token: string): void {
+  _refreshToken = token;
+  try { localStorage.setItem('refresh_token', token); } catch { /* quota */ }
+}
+
+/** Call on logout to clear all tokens */
 export function clearAuthToken(): void {
   _authToken = null;
-  console.log(`🔓 [clearAuthToken] Token cleared from memory and localStorage`);
-  try { localStorage.removeItem('auth_token'); } catch { /* ignore */ }
+  _refreshToken = null;
+  try {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('refresh_token');
+  } catch { /* ignore */ }
+}
+
+export function getRefreshToken(): string | null {
+  return _refreshToken;
 }
 
 // ─── Request: attach Bearer token ───────────────────────────
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = _authToken;
-  console.log(`🔐 [Interceptor] Token present: ${!!token} | URL: ${config.url}`);
   if (token && token !== 'undefined' && token !== 'null') {
     config.headers.set('Authorization', `Bearer ${token}`);
-    console.log(`✅ [Interceptor] Authorization header set: Bearer ${token.substring(0, 20)}...`);
-  } else {
-    console.warn(`❌ [Interceptor] NO TOKEN - cannot attach Authorization header`);
   }
   return config;
 });
 
-// ─── Response: log and handle errors ────────────────────────
+// ─── Response: silent refresh on 401 ────────────────────────
+
+let isRefreshing = false;
+let refreshSubscribers: Array<(token: string) => void> = [];
+
+function onRefreshed(newToken: string) {
+  refreshSubscribers.forEach((cb) => cb(newToken));
+  refreshSubscribers = [];
+}
+
+function addRefreshSubscriber(cb: (token: string) => void) {
+  refreshSubscribers.push(cb);
+}
+
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
     const status = error.response?.status;
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (status === 401) {
-      const requestUrl = error.config?.url ?? '';
-      // Only force-logout when the auth-validation endpoint itself says
-      // the token is invalid.  Other endpoints returning 401 (e.g. missing
-      // company context for PlatformSuperAdmin) should NOT trigger logout.
+    // Only attempt refresh on 401 for non-auth endpoints
+    if (status === 401 && originalRequest && !originalRequest._retry) {
+      const requestUrl = originalRequest.url ?? '';
+
+      // Don't retry auth endpoints (login, refresh, revoke) — prevents loops
+      if (requestUrl.includes('/auth/login') ||
+          requestUrl.includes('/auth/refresh') ||
+          requestUrl.includes('/auth/revoke')) {
+        return Promise.reject(error);
+      }
+
+      // If we have a refresh token, attempt silent refresh
+      if (_refreshToken) {
+        if (isRefreshing) {
+          // Another refresh is in progress — queue this request
+          return new Promise((resolve) => {
+            addRefreshSubscriber((newToken: string) => {
+              originalRequest.headers.set('Authorization', `Bearer ${newToken}`);
+              resolve(api(originalRequest));
+            });
+          });
+        }
+
+        originalRequest._retry = true;
+        isRefreshing = true;
+
+        try {
+          // Call refresh endpoint directly (bypass interceptor to avoid loops)
+          const res = await axios.post(
+            `${import.meta.env.VITE_API_BASE_URL}/auth/refresh`,
+            { refreshToken: _refreshToken },
+            { headers: { 'Content-Type': 'application/json' } }
+          );
+
+          const { access_token, refresh_token } = res.data;
+          setAuthToken(access_token);
+          setRefreshToken(refresh_token);
+
+          isRefreshing = false;
+          onRefreshed(access_token);
+
+          // Retry the original request with the new token
+          originalRequest.headers.set('Authorization', `Bearer ${access_token}`);
+          return api(originalRequest);
+        } catch {
+          // Refresh failed — force logout
+          isRefreshing = false;
+          refreshSubscribers = [];
+          clearAuthToken();
+          window.dispatchEvent(new CustomEvent('auth:logout'));
+          return Promise.reject(error);
+        }
+      }
+
+      // No refresh token — check if it's /auth/me and force logout
       const isAuthEndpoint = requestUrl.includes('/auth/me');
       if (_authToken && isAuthEndpoint) {
         clearAuthToken();

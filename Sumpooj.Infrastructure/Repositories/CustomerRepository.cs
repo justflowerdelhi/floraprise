@@ -58,4 +58,19 @@ public class CustomerRepository : ICustomerRepository
         _db.Customers.Update(customer);
         await _db.SaveChangesAsync();
     }
+
+    public async Task<Customer> GetOrCreateWalkInCustomerAsync(Guid companyId)
+    {
+        const string walkInName = "Walk-In Customer";
+        var existing = await _db.Customers
+            .FirstOrDefaultAsync(c => c.CompanyId == companyId && c.Name == walkInName);
+
+        if (existing != null)
+            return existing;
+
+        var walkIn = new Customer(companyId, walkInName, null, null);
+        _db.Customers.Add(walkIn);
+        await _db.SaveChangesAsync();
+        return walkIn;
+    }
 }

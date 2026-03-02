@@ -11,4 +11,8 @@ public interface IDeliveryRepository
     Task<List<Delivery>> GetByIdsAsync(List<Guid> ids);
     Task AddAsync(Delivery delivery);
     Task UpdateAsync(Delivery delivery);
+
+    // Staff performance
+    Task<int> GetDeliveryCountByDriverAsync(Guid driverId, DateTime from, DateTime to);
+    Task<int> GetCompletedDeliveryCountByDriverAsync(Guid driverId, DateTime from, DateTime to);
 }

@@ -22,4 +22,8 @@ public interface IOrderRepository
     Task<int> GetTodaysOrderCountAsync(Guid companyId);
     Task<decimal> GetTodaysSalesAsync(Guid companyId);
     Task<int> GetPendingDeliveriesCountAsync(Guid companyId, DateTime date);
+
+    // Staff performance
+    Task<int> GetOrderCountByStaffAsync(Guid companyId, Guid staffId, DateTime from, DateTime to);
+    Task<decimal> GetRevenueByCashierAsync(Guid companyId, Guid staffId, DateTime from, DateTime to);
 }

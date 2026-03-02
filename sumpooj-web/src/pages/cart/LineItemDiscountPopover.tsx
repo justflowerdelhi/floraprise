@@ -32,6 +32,7 @@ import {
 import type { LineItemDiscount } from '../orders/OrderTypes';
 import { fmtCurrency } from './CartUtils';
 import { useDiscountPermissions } from '../../core/rbac/useDiscountPermissions';
+import { getCurrencySymbol } from '../../core/i18n';
 
 interface Props {
   anchorEl: HTMLElement | null;
@@ -170,7 +171,7 @@ const LineItemDiscountPopover: React.FC<Props> = ({
 
   const PresetButton = ({ preset }: { preset: number }) => {
     const isSelected = value === preset.toString();
-    const label = discountType === 'PERCENT' ? `${preset}%` : `$${preset}`;
+    const label = discountType === 'PERCENT' ? `${preset}%` : `${getCurrencySymbol()}${preset}`;
 
     return (
       <Button

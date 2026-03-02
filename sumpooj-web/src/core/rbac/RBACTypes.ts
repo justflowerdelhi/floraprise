@@ -501,6 +501,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         permissions: ['inventory:view'],
       },
       {
+        id: 'purchase-list',
+        label: 'Purchase Orders',
+        icon: 'AddShoppingCart',
+        path: '/purchases',
+        permissions: ['inventory:purchase'],
+      },
+      {
         id: 'purchases',
         label: 'New Purchase',
         icon: 'AddShoppingCart',
@@ -602,6 +609,7 @@ export const ROUTE_ACCESS: RouteConfig[] = [
   { path: '/events', permissions: ['events:view'] },
   { path: '/proposals', permissions: ['proposals:view'] },
   { path: '/inventory', permissions: ['inventory:view'] },
+  { path: '/purchases', permissions: ['inventory:purchase'] },
   { path: '/purchases/new', permissions: ['inventory:purchase'] },
   { path: '/adjustments/new', permissions: ['inventory:adjust'] },
   { path: '/expiry-alerts', permissions: ['inventory:view'] },

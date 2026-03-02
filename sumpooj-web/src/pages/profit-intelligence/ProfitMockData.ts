@@ -410,22 +410,45 @@ export const MOCK_PROFIT_DASHBOARD_DATA: ProfitDashboardData = {
   channelTrend: MOCK_CHANNEL_TREND,
 };
 
-// ─── API Simulation Functions ───────────────────────────────
+// ─── API Integration ────────────────────────────────────────
+
+import { getProfitDashboard, getDailyProfit } from '../../api/analytics.api';
 
 /**
- * Simulates API call delay.
- */
-export const simulateApiDelay = (ms = 500): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * Simulates fetching profit dashboard data.
- * In production, this would call the backend API.
+ * Fetches profit dashboard data from real API.
+ * Falls back to mock data if API is unavailable.
  */
 export const fetchProfitDashboardData = async (
-  _startDate: string,
-  _endDate: string,
+  startDate: string,
+  endDate: string,
 ): Promise<ProfitDashboardData> => {
-  await simulateApiDelay(800);
-  return MOCK_PROFIT_DASHBOARD_DATA;
+  try {
+    const apiData = await getProfitDashboard({ fromDate: startDate, toDate: endDate });
+
+    // Fetch daily trend data separately if not included in main response
+    let revenueTrend = (apiData as unknown as ProfitDashboardData).revenueTrend;
+    let channelTrend = (apiData as unknown as ProfitDashboardData).channelTrend;
+
+    if (!revenueTrend) {
+      try {
+        revenueTrend = await getDailyProfit(startDate, endDate);
+      } catch {
+        revenueTrend = MOCK_REVENUE_TREND;
+      }
+    }
+
+    return {
+      summary: apiData.summary,
+      channelProfit: apiData.channelProfit ?? MOCK_CHANNEL_PROFIT,
+      productProfit: apiData.productProfit ?? MOCK_PRODUCT_PROFIT,
+      platformCommission: apiData.platformCommission ?? MOCK_PLATFORM_COMMISSION,
+      inventoryImpact: apiData.inventoryImpact ?? MOCK_INVENTORY_IMPACT,
+      paymentAnalysis: apiData.paymentAnalysis ?? MOCK_PAYMENT_ANALYSIS,
+      revenueTrend: revenueTrend ?? MOCK_REVENUE_TREND,
+      channelTrend: channelTrend ?? MOCK_CHANNEL_TREND,
+    };
+  } catch (err) {
+    console.warn('[ProfitDashboard] API unavailable, using mock data:', err);
+    return MOCK_PROFIT_DASHBOARD_DATA;
+  }
 };

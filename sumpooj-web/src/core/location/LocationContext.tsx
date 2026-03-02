@@ -7,16 +7,18 @@
  * - Location access control
  * - Filtering utilities
  */
-import React, { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from 'react';
 import type { Location, LocationFilterValue, LocationAccessLevel } from './LocationTypes';
 import {
   MOCK_LOCATIONS,
+  setLocationsData,
   getActiveLocations,
   getLocationById,
   LOCATION_CONFIG,
 } from './LocationTypes';
 import { useRBAC } from '../rbac/RBACContext';
 import type { UserRole } from '../rbac/RBACTypes';
+import { getLocations } from '../../api/location.api';
 
 // ─── Location Access by Role ────────────────────────────────
 
@@ -28,21 +30,6 @@ const ROLE_LOCATION_ACCESS: Record<UserRole, LocationAccessLevel> = {
   DESIGNER: 'SINGLE',
   DRIVER: 'SINGLE',
   STAFF: 'SINGLE',
-};
-
-// ─── User Location Assignments (Mock) ───────────────────────
-// In production, this would come from the user profile/API
-
-// IDs match Database/005_demo_data_seed.sql Locations for Demo Florist
-const LOC_MAIN     = '795f4658-53aa-4016-8484-94cc5d40a7f4';
-const LOC_GURUGRAM = 'ce51c174-be15-4691-92f9-f4be76fb58eb';
-
-const USER_LOCATION_ASSIGNMENTS: Record<string, string[]> = {
-  'user-admin': [LOC_MAIN, LOC_GURUGRAM], // All active locations
-  'user-manager': [LOC_MAIN, LOC_GURUGRAM], // Both locations
-  'user-cashier': [LOC_MAIN], // Main Store only
-  'user-designer': [LOC_MAIN], // Main Store only
-  'user-driver': [LOC_MAIN, LOC_GURUGRAM], // Both (for deliveries)
 };
 
 // ─── Context Types ──────────────────────────────────────────
@@ -85,22 +72,61 @@ interface LocationProviderProps {
 
 export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) => {
   const { user, role } = useRBAC();
+  const [locations, setLocations] = useState<Location[]>(MOCK_LOCATIONS);
+
+  // Fetch real locations from API on mount
+  useEffect(() => {
+    let cancelled = false;
+    getLocations()
+      .then((data: any[]) => {
+        if (cancelled) return;
+        // Map backend shape to frontend Location type
+        const mapped: Location[] = data.map((loc: any) => ({
+          id: loc.id,
+          name: loc.name,
+          code: loc.code,
+          address: loc.address ?? '',
+          city: '',
+          isActive: loc.isActive ?? true,
+          createdAt: loc.createdAtUtc ?? '',
+          updatedAt: loc.updatedAtUtc ?? '',
+        }));
+        setLocations(mapped);
+        setLocationsData(mapped);
+      })
+      .catch(() => {
+        // Fallback — keep whatever was loaded
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   // Get user's accessible locations
   const accessibleLocations = useMemo(() => {
     if (!user || !role) return [];
 
     const accessLevel = ROLE_LOCATION_ACCESS[role];
-    const assignedIds = USER_LOCATION_ASSIGNMENTS[user.id] || [];
+    const assignedIds = user.assignedLocationIds ?? [];
 
     if (accessLevel === 'ALL') {
-      return getActiveLocations();
+      return locations.filter(loc => loc.isActive);
     }
 
-    return MOCK_LOCATIONS.filter(
-      (loc) => loc.isActive && assignedIds.includes(loc.id)
-    );
-  }, [user, role]);
+    if (assignedIds.length > 0) {
+      return locations.filter(
+        (loc) => loc.isActive && assignedIds.includes(loc.id)
+      );
+    }
+
+    // Fallback: user has a primary location
+    if (user.primaryLocationId) {
+      return locations.filter(
+        (loc) => loc.isActive && loc.id === user.primaryLocationId
+      );
+    }
+
+    // No assignment info — show all active locations
+    return locations.filter(loc => loc.isActive);
+  }, [user, role, locations]);
 
   // Determine access level
   const accessLevel = useMemo((): LocationAccessLevel => {
@@ -185,8 +211,8 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       switchToAllLocations,
       getFilteredItems,
       isLocationAccessible,
-      allLocations: MOCK_LOCATIONS,
-      activeLocations: getActiveLocations(),
+      allLocations: locations,
+      activeLocations: locations.filter(l => l.isActive),
       getLocation: getLocationById,
     }),
     [
@@ -201,6 +227,7 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       switchToAllLocations,
       getFilteredItems,
       isLocationAccessible,
+      locations,
     ]
   );
 

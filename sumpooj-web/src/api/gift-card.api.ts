@@ -50,6 +50,21 @@ export interface GenerateGiftCardBackgroundRequest {
   floralStyle: string;
 }
 
+export interface AIUsageInfo {
+  dailyUsed: number;
+  dailyLimit: number;
+  dailyRemaining: number;
+  monthlyUsed: number;
+  monthlyLimit: number;
+  monthlyRemaining: number;
+}
+
+export interface GenerateGiftCardBackgroundResponse {
+  imageUrl: string;
+  prompt: string;
+  usage: AIUsageInfo;
+}
+
 // ─── API Functions ──────────────────────────────────────────
 
 export const searchGiftCards = async (params: GiftCardSearchParams = {}) => {
@@ -87,7 +102,14 @@ export const addGiftCardBalance = async (id: string, data: AddBalanceRequest) =>
   return res.data;
 };
 
-export const generateGiftCardBackground = async (data: GenerateGiftCardBackgroundRequest) => {
+export const generateGiftCardBackground = async (
+  data: GenerateGiftCardBackgroundRequest
+): Promise<GenerateGiftCardBackgroundResponse> => {
   const res = await api.post('/ai/giftcard/background', data);
+  return res.data;
+};
+
+export const getAIGiftCardUsage = async (): Promise<AIUsageInfo> => {
+  const res = await api.get('/ai/giftcard/usage');
   return res.data;
 };

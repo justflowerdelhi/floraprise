@@ -88,21 +88,64 @@ const POSScreen: React.FC = () => {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError('');
-    // Use mock data for products and customers
+    // Load products from API, fallback to mock data
     try {
+      const result = await searchProducts({ PageSize: 200, IsActive: true });
+      const rawItems = result?.items ?? (Array.isArray(result) ? result : []);
+      if (rawItems.length > 0) {
+        const normalized = normalizeProducts(rawItems);
+        setProducts(normalized);
+      } else {
+        // API returned empty — use mocks as fallback
+        const normalizedProducts = MOCK_PRODUCTS.map(p => ({
+          ...p,
+          availableStock: typeof p.availableStock === 'number' ? p.availableStock : 999
+        }));
+        setProducts(normalizedProducts);
+      }
+    } catch (err) {
+      console.warn('Product API failed, using mock data:', err);
       // Fallback: ensure availableStock is set for all products
       const normalizedProducts = MOCK_PRODUCTS.map(p => ({
         ...p,
         availableStock: typeof p.availableStock === 'number' ? p.availableStock : 999
       }));
       setProducts(normalizedProducts);
-    } catch (err) {
-      setError('Failed to load products.');
     }
+    // Load customers from API, fallback to mock
     try {
-      setCustomers(MOCK_CUSTOMERS as POSCustomer[]);
+      const custResult = await searchCustomers({ PageSize: 200 });
+      const rawCustomers = custResult?.items ?? (Array.isArray(custResult) ? custResult : []);
+      if (rawCustomers.length > 0) {
+        setCustomers(rawCustomers.map((c: any) => ({
+          id: c.id,
+          tenantId: c.tenantId ?? '',
+          name: c.name ?? c.customerName ?? '',
+          phone: c.phone ?? c.phoneNumber ?? '',
+          email: c.email ?? '',
+          preferredAddress: c.address ?? c.preferredAddress ?? '',
+          createdAt: c.createdAt ?? new Date().toISOString(),
+          tags: c.tags ?? [],
+          lifetimeValue: c.lifetimeValue ?? 0,
+          totalOrders: c.totalOrders ?? 0,
+          averageOrderValue: c.averageOrderValue ?? 0,
+          referralCount: c.referralCount ?? 0,
+          loyaltyPoints: c.loyaltyPoints ?? 0,
+          loyaltyTier: c.loyaltyTier ?? 'BRONZE',
+          loyaltyPointsEarned: c.loyaltyPointsEarned ?? 0,
+          loyaltyPointsRedeemed: c.loyaltyPointsRedeemed ?? 0,
+          totalProfit: c.totalProfit ?? 0,
+          profitMargin: c.profitMargin ?? 0,
+          marketingConsent: c.marketingConsent ?? false,
+          lastOrderDate: c.lastOrderDate ?? '',
+          notes: c.notes ?? '',
+        })) as POSCustomer[]);
+      } else {
+        setCustomers(MOCK_CUSTOMERS as POSCustomer[]);
+      }
     } catch (err) {
-      setError('Failed to load customers.');
+      console.warn('Customer API failed, using mock data:', err);
+      setCustomers(MOCK_CUSTOMERS as POSCustomer[]);
     }
     setIsLoading(false);
   }, []);

@@ -115,6 +115,7 @@ interface OrderContextValue {
   setInventoryStatus: (orderId: string, inventoryStatus: InventoryActionStatus, reservations?: InventoryReservation[]) => void;
   getOrder: (orderId: string) => Order | undefined;
   getAllOrders: () => Order[];
+  refreshOrders: () => Promise<void>;
 }
 
 const OrderContext = createContext<OrderContextValue | null>(null);
@@ -181,26 +182,25 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [state, dispatch] = useReducer(orderReducer, initialState);
   const [loading, setLoading] = React.useState(true);
 
+  // Reusable load function
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await searchOrders({ PageSize: 200 });
+      const rawOrders = result?.items ?? (Array.isArray(result) ? result : []);
+      const orders = rawOrders.map(mapApiOrderToOrder);
+      dispatch({ type: 'LOAD_ORDERS', orders });
+    } catch (err) {
+      console.error('Failed to load orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Load orders from API on mount
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const result = await searchOrders({ PageSize: 200 });
-        if (!cancelled) {
-          const rawOrders = result?.items ?? (Array.isArray(result) ? result : []);
-          const orders = rawOrders.map(mapApiOrderToOrder);
-          dispatch({ type: 'LOAD_ORDERS', orders });
-        }
-      } catch (err) {
-        console.error('Failed to load orders:', err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, []);
+    loadOrders();
+  }, [loadOrders]);
 
   const addOrder        = useCallback((order: Order) => dispatch({ type: 'ADD_ORDER', order }), []);
   const updateOrder     = useCallback((order: Order) => dispatch({ type: 'UPDATE_ORDER', order }), []);
@@ -228,6 +228,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       value={{
         state, loading, addOrder, updateOrder, removeOrder,
         setFulfillment, setPaymentStatus, setInventoryStatus, getOrder, getAllOrders,
+        refreshOrders: loadOrders,
       }}
     >
       {children}

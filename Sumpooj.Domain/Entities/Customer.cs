@@ -32,6 +32,9 @@ public class Customer : BaseEntity
     public int TotalOrders { get; private set; }
     public Guid CompanyId { get; private set; }
 
+    // CRM – internal notes
+    public string? Notes { get; private set; }
+
     public void UpdateContact(string? email, string? phone)
     {
         Email = email;
@@ -42,6 +45,12 @@ public class Customer : BaseEntity
     public void UpdateDefaultCardMessage(string? message)
     {
         DefaultCardMessage = message;
+        MarkUpdated();
+    }
+
+    public void UpdateNotes(string? notes)
+    {
+        Notes = notes;
         MarkUpdated();
     }
 

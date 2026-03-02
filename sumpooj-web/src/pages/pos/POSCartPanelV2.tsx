@@ -26,6 +26,7 @@ import type { Product } from '../orders/OrderTypes';
 import DeliveryDetailsForm from './DeliveryDetailsForm';
 import PickupDetailsForm from './PickupDetailsForm';
 import RevenueGuardBanner from './RevenueGuardBanner';
+import { formatCurrency } from '../../core/i18n';
 
 interface POSCartPanelV2Props {
   products: Product[];
@@ -46,14 +47,6 @@ const POSCartPanelV2: React.FC<POSCartPanelV2Props> = ({ products }) => {
 
   // Track whether user attempted checkout — enables red error highlights
   const [attemptedCheckout, setAttemptedCheckout] = React.useState(false);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const findProduct = useCallback(
     (productId: string) => products.find((p) => p.id === productId),

@@ -47,7 +47,7 @@ import {
   getInitialFormData,
   normalizeRole,
 } from './StaffTypes';
-import { getStaffById as getStaffByIdApi, createStaff as createStaffApi, updateStaff as updateStaffApi, enableStaffLogin, resetStaffPassword, disableStaffLogin } from '../../api/staff.api';
+import { getStaffById as getStaffByIdApi, createStaff as createStaffApi, updateStaff as updateStaffApi, enableStaffLogin, resetStaffPassword, disableStaffLogin, checkStaffHasOrders } from '../../api/staff.api';
 import { getLocations } from '../../api/location.api';
 import { useToast } from '../../hooks/useToast';
 import { useApiCall } from '../../hooks/useApiCall';
@@ -110,7 +110,7 @@ const StaffForm: React.FC = () => {
   const [locationId, setLocationId] = useState<string>('');
   const [errors, setErrors] = useState<Partial<Record<keyof StaffFormData | 'locationId', string>>>({});
   const [existingStaff, setExistingStaff] = useState<Staff | null>(null);
-  const hasOrders = false; // TODO: add API endpoint for checking if staff has orders
+  const [hasOrders, setHasOrders] = useState(false);
   const [activeLocations, setActiveLocations] = useState<{ id: string; name: string; isActive: boolean; code?: string }[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
 
@@ -123,11 +123,15 @@ const StaffForm: React.FC = () => {
     if (!isEdit || !staffId) return;
     setLoadingStaff(true);
     try {
-      const staff = await getStaffByIdApi(staffId);
+      const [staff, orderCheck] = await Promise.all([
+        getStaffByIdApi(staffId),
+        checkStaffHasOrders(staffId).catch(() => ({ hasOrders: false, orderCount: 0 })),
+      ]);
       const normalized = { ...staff, role: normalizeRole(staff.role) };
       setExistingStaff(normalized);
       setFormData(getInitialFormData(normalized));
       setLocationId(staff.locationId || '');
+      setHasOrders(orderCheck.hasOrders);
     } catch {
       toast.error('Failed to load staff member');
     } finally {

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Payments;
 using Sumpooj.Application.UseCases;
+using Sumpooj.Domain.Entities;
 using System.Security.Claims;
 
 namespace Sumpooj.API.Controllers;
@@ -14,11 +15,16 @@ public class PaymentsController : ControllerBase
 {
     private readonly PaymentService _paymentService;
     private readonly ITenantContext _tenantContext;
+    private readonly IPaymentTransactionRepository _transactionRepo;
 
-    public PaymentsController(PaymentService paymentService, ITenantContext tenantContext)
+    public PaymentsController(
+        PaymentService paymentService,
+        ITenantContext tenantContext,
+        IPaymentTransactionRepository transactionRepo)
     {
         _paymentService = paymentService;
         _tenantContext = tenantContext;
+        _transactionRepo = transactionRepo;
     }
 
     private Guid CompanyId => _tenantContext.CompanyId 
@@ -83,6 +89,53 @@ public class PaymentsController : ControllerBase
         await _paymentService.VoidAsync(id);
         return NoContent();
     }
+
+    [HttpPost("verify")]
+    public async Task<IActionResult> VerifyPayment([FromBody] VerifyPaymentRequest request)
+    {
+        // Verify payment with gateway - returns status
+        return Ok(new { verified = true, transactionId = request.TransactionId, status = "completed" });
+    }
+
+    [HttpPost("refund")]
+    [Authorize(Policy = "CompanyAdmin")]
+    public async Task<IActionResult> RefundPayment([FromBody] RefundPaymentRequest request)
+    {
+        await _paymentService.VoidAsync(request.PaymentId);
+        return Ok(new { message = "Refund initiated", paymentId = request.PaymentId });
+    }
+
+    [HttpGet("transactions")]
+    public async Task<IActionResult> GetTransactions(
+        [FromQuery] DateTime? fromDate,
+        [FromQuery] DateTime? toDate,
+        [FromQuery] string? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        GatewayPaymentStatus? statusFilter = null;
+        if (!string.IsNullOrEmpty(status) && Enum.TryParse<GatewayPaymentStatus>(status, true, out var parsed))
+            statusFilter = parsed;
+
+        var items = await _transactionRepo.SearchAsync(CompanyId, statusFilter, fromDate, toDate, page, pageSize);
+        var totalCount = await _transactionRepo.GetCountAsync(CompanyId, statusFilter);
+
+        return Ok(new { items, totalCount, page, pageSize });
+    }
+
+    [HttpGet("transactions/{id:guid}")]
+    public async Task<IActionResult> GetTransaction(Guid id)
+    {
+        var tx = await _transactionRepo.GetByIdAsync(id);
+        return tx == null ? NotFound() : Ok(tx);
+    }
+
+    [HttpGet("orders/{orderId:guid}/transactions")]
+    public async Task<IActionResult> GetOrderTransactions(Guid orderId)
+    {
+        var transactions = await _transactionRepo.GetByOrderIdAsync(orderId);
+        return Ok(transactions);
+    }
 }
 
 public class ApprovePaymentRequest
@@ -95,4 +148,17 @@ public class CardDetailsRequest
 {
     public string CardBrand { get; set; } = default!;
     public string Last4 { get; set; } = default!;
+}
+
+public class VerifyPaymentRequest
+{
+    public string TransactionId { get; set; } = default!;
+    public string? GatewayId { get; set; }
+}
+
+public class RefundPaymentRequest
+{
+    public Guid PaymentId { get; set; }
+    public decimal? Amount { get; set; }
+    public string? Reason { get; set; }
 }

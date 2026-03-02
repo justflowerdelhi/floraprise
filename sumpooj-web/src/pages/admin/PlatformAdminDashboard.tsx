@@ -35,7 +35,7 @@ const PlatformAdminDashboard: React.FC = () => {
       description: 'View and manage all companies on the platform',
       icon: <CompanyIcon sx={{ fontSize: 48, color: '#1B5E20' }} />,
       action: () => navigate('/admin/companies'),
-      disabled: true, // TODO: Implement company management page
+      disabled: false,
     },
     {
       title: 'Audit Logs',
@@ -49,14 +49,14 @@ const PlatformAdminDashboard: React.FC = () => {
       description: 'Monitor platform performance and usage',
       icon: <AnalyticsIcon sx={{ fontSize: 48, color: '#F4C430' }} />,
       action: () => navigate('/admin/analytics'),
-      disabled: true, // TODO: Implement analytics page
+      disabled: false,
     },
     {
       title: 'System Settings',
       description: 'Configure platform-wide settings',
       icon: <SettingsIcon sx={{ fontSize: 48, color: '#9c27b0' }} />,
       action: () => navigate('/admin/settings'),
-      disabled: true, // TODO: Implement settings page
+      disabled: false,
     },
   ];
 

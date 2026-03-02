@@ -17,6 +17,7 @@ import type { POSCustomer } from './POSCustomerTypes';
 import { POS_SHORTCUTS } from './POSTypes';
 import OrderIntentSwitcher from './OrderIntentSwitcher';
 import type { Location } from '../../core/location/LocationTypes';
+import { formatCurrency } from '../../core/i18n';
 
 /** Compact shift summary for the POS header display */
 export interface ShiftHeaderData {
@@ -110,14 +111,6 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
       onSearchSubmit();
     }
   }, [onSearchSubmit]);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
 
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center px-2 gap-2 shrink-0">
@@ -240,13 +233,7 @@ const ShiftChip: React.FC<ShiftChipProps> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
 
-  const fmt = (v: number) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(v);
+  const fmt = (v: number) => formatCurrency(v);
 
   const hasVarianceWarning =
     shift.cashDifference !== null &&

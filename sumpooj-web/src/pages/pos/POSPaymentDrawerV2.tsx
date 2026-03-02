@@ -21,6 +21,8 @@ import {
 import { Drawer } from '@mui/material';
 import { usePOS } from './POSContext';
 import type { POSPaymentMethod, POSPaymentEntry, POSBillingInfo } from './POSTypes';
+import { formatCurrency } from '../../core/i18n';
+import { createOrder } from '../../api/order.api';
 
 const PAYMENT_METHODS: { method: POSPaymentMethod; label: string; icon: React.ReactElement }[] = [
   { method: 'CASH', label: 'Cash', icon: <CashIcon /> },
@@ -77,14 +79,6 @@ const POSPaymentDrawerV2: React.FC = () => {
     }
   }, [localBilling, setBillingInfo, isOpen]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
-
   const handleAddPayment = useCallback(() => {
     const amount = parseFloat(inputAmount);
     if (isNaN(amount) || amount <= 0) return;
@@ -107,24 +101,40 @@ const POSPaymentDrawerV2: React.FC = () => {
     setInputAmount(amount.toFixed(2));
   }, []);
 
-  const handleComplete = useCallback(() => {
-    // PICKUP_LATER allows partial payment (deposit), others require full payment
+  const handleComplete = useCallback(async () => {
     const canComplete = isFullyPaid || (state.orderIntent === 'PICKUP_LATER' && paidAmount > 0);
-    if (canComplete) {
-      // TODO: Call API to create order
-      console.log('Completing transaction:', {
-        items: state.items,
-        totals: state.totals,
-        payments: state.payments,
-        billingInfo: state.billingInfo,
-        customer: state.customer,
-        orderIntent: state.orderIntent,
-        orderStatus: state.orderIntent === 'PICKUP_LATER' ? 'RESERVED' : 'COMPLETED',
-        deliveryDetails: state.orderIntent === 'DELIVERY' ? state.deliveryDetails : undefined,
-        pickupDetails: state.orderIntent === 'PICKUP_LATER' ? state.pickupDetails : undefined,
+    if (!canComplete) return;
+
+    try {
+      await createOrder({
+        customerId: state.customer?.id ?? null,
+        deliveryDate: state.deliveryDetails?.deliveryDate ?? null,
+        deliveryAddress: state.deliveryDetails?.address ?? null,
+        recipientName: state.billingInfo?.name ?? null,
+        recipientPhone: state.billingInfo?.phone ?? null,
+        cardMessage: null,
+        deliveryPriority: 'STANDARD',
+        timeSlot: state.deliveryDetails?.deliveryTimeSlot ?? state.pickupDetails?.pickupTimeSlot ?? null,
+        orderSource: 'POS',
+        orderIntent: state.orderIntent ?? 'TAKE_NOW',
+        pickupDate: state.pickupDetails?.pickupDate ?? null,
+        pickupTimeSlot: state.pickupDetails?.pickupTimeSlot ?? null,
+        deliveryFee: 0,
+        discountAmount: state.totals.discountTotal,
+        internalNotes: null,
+        items: state.items.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          unit: 'pcs',
+        })),
       });
-      completeTransaction();
+    } catch (err) {
+      console.error('Failed to create order:', err);
     }
+
+    completeTransaction();
   }, [isFullyPaid, paidAmount, state, completeTransaction]);
 
   const handleClose = useCallback(() => {

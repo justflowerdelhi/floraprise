@@ -36,7 +36,7 @@ import {
   confirmPhoneOutstationOrder,
   cancelPhoneLocalOrder,
   startProductionForPhoneLocalOrder,
-} from '../../api/phoneOrders.api';
+} from '../../modules/phone-orders/phoneOrders.api';
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -101,7 +101,7 @@ const PhoneOrderPage: React.FC = () => {
     setFetching(true);
     try {
       const data = await getPhoneOrder(orderId);
-      setOrder(data);
+      setOrder(data as unknown as SalesOrder);
     } catch {
       toast.error('Failed to load order');
     } finally {

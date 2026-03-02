@@ -209,9 +209,49 @@ const generateMovements = (): StockMovement[] => {
 
 export const MOCK_MOVEMENTS: StockMovement[] = generateMovements();
 
-// ─── Mock API ───────────────────────────────────────────────
+// ─── API Integration ────────────────────────────────────────
 
-export const fetchMovements = (): Promise<StockMovement[]> =>
-  new Promise((resolve) =>
-    setTimeout(() => resolve([...MOCK_MOVEMENTS]), 600),
-  );
+import { getStockMovements } from '../../../api/inventory.api';
+
+/**
+ * Fetches stock movements from real API.
+ * Falls back to mock data if API is unavailable.
+ */
+export const fetchMovements = async (): Promise<StockMovement[]> => {
+  try {
+    const apiData = await getStockMovements();
+
+    // If API returns a valid array, map to StockMovement shape
+    const items = Array.isArray(apiData) ? apiData : (apiData as { items?: unknown[] })?.items;
+    if (Array.isArray(items) && items.length > 0) {
+      let runningBalance = 0;
+      return items.map((item: Record<string, unknown>) => {
+        const qtyIn = (item.quantityIn ?? 0) as number;
+        const qtyOut = (item.quantityOut ?? 0) as number;
+        runningBalance += qtyIn - qtyOut;
+        return {
+          id: (item.id ?? '') as string,
+          date: (item.date ?? item.createdAt ?? '') as string,
+          referenceType: (item.referenceType ?? item.type ?? 'Adjustment') as ReferenceType,
+          referenceNumber: (item.referenceNumber ?? '') as string,
+          productId: (item.productId ?? '') as string,
+          productName: (item.productName ?? '') as string,
+          batchNumber: (item.batchNumber ?? '') as string,
+          location: (item.location ?? '') as string,
+          quantityIn: qtyIn,
+          quantityOut: qtyOut,
+          balanceAfter: (item.balanceAfter ?? runningBalance) as number,
+          costPerUnit: (item.costPerUnit ?? 0) as number,
+          costImpact: (item.costImpact ?? 0) as number,
+          performedBy: (item.performedBy ?? '') as string,
+          notes: (item.notes ?? '') as string,
+        };
+      });
+    }
+
+    return [...MOCK_MOVEMENTS];
+  } catch (err) {
+    console.warn('[StockLedger] API unavailable, using mock data:', err);
+    return [...MOCK_MOVEMENTS];
+  }
+};

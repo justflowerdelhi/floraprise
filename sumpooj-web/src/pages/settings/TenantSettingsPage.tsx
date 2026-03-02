@@ -55,6 +55,7 @@ import {
   deriveTenantSettings,
 } from '../../core/tenant/TenantTypes';
 import { getCurrencySymbol } from '../../core/i18n';
+import api from '../../api/axios';
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -185,10 +186,12 @@ export default function TenantSettingsPage() {
       setPasswordError('Admin password is required to change currency.');
       return;
     }
-    // TODO: POST /api/auth/verify-password { password: adminPassword }
-    // For now accept any non-empty password; wire to real endpoint.
     try {
-      console.log('[TenantSettings] Verifying admin password for currency change...');
+      const res = await api.post('/auth/verify-password', { password: adminPassword });
+      if (!res.data?.verified) {
+        setPasswordError('Incorrect password. Please try again.');
+        return;
+      }
       if (pendingCurrency) {
         setCurrency(pendingCurrency);
       }
@@ -214,22 +217,17 @@ export default function TenantSettingsPage() {
     setLocale(newLocale);
   }, []);
 
-  // ── Save handler (stub — wire to API) ──
+  // ── Save handler ──
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      // TODO: POST /api/tenant/settings { country, currency, locale, taxSystem, dateFormat, timeFormat }
-      console.warn('[TenantSettings] Save called — wire to API', {
-        country,
-        currency,
-        locale,
-        taxSystem,
-        dateFormat,
-        timeFormat,
+      await api.post('/tenant/settings', {
+        currencyCode: currency,
       });
-      await new Promise((r) => setTimeout(r, 600));
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      console.error('Failed to save tenant settings:', err);
     } finally {
       setSaving(false);
     }

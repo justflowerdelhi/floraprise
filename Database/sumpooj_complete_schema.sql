@@ -11,6 +11,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- DROP EXISTING TABLES (for fresh start)
 -- =====================================================
 DROP TABLE IF EXISTS "AuditLogs" CASCADE;
+DROP TABLE IF EXISTS "RefreshTokens" CASCADE;
 DROP TABLE IF EXISTS "Shifts" CASCADE;
 DROP TABLE IF EXISTS "DayCloses" CASCADE;
 DROP TABLE IF EXISTS "RefundItems" CASCADE;
@@ -200,6 +201,7 @@ CREATE TABLE "Customers" (
     "Address" TEXT NULL,
     "IsActive" BOOLEAN NOT NULL DEFAULT TRUE,
     "DefaultCardMessage" TEXT NULL,
+    "Notes" TEXT NULL,
     "TotalOrders" INTEGER NOT NULL DEFAULT 0,
     "CreatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "UpdatedAtUtc" TIMESTAMPTZ NULL,
@@ -443,6 +445,7 @@ CREATE TABLE "Orders" (
     "TotalAmount" DECIMAL(18,2) NOT NULL DEFAULT 0,
     "AssignedToUserId" UUID NULL,
     "DeliveryPersonId" UUID NULL,
+    "LocationId" UUID NULL,
     "InternalNotes" TEXT NULL,
     "CreatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "UpdatedAtUtc" TIMESTAMPTZ NULL,
@@ -451,6 +454,7 @@ CREATE TABLE "Orders" (
     CONSTRAINT "FK_Orders_Customers" FOREIGN KEY ("CustomerId") REFERENCES "Customers" ("Id") ON DELETE RESTRICT,
     CONSTRAINT "FK_Orders_AssignedUser" FOREIGN KEY ("AssignedToUserId") REFERENCES "AspNetUsers" ("Id") ON DELETE SET NULL,
     CONSTRAINT "FK_Orders_DeliveryPerson" FOREIGN KEY ("DeliveryPersonId") REFERENCES "AspNetUsers" ("Id") ON DELETE SET NULL,
+    CONSTRAINT "FK_Orders_Locations" FOREIGN KEY ("LocationId") REFERENCES "Locations" ("Id") ON DELETE SET NULL,
     CONSTRAINT "UQ_Orders_CompanyOrderNumber" UNIQUE ("CompanyId", "OrderNumber")
 );
 
@@ -482,10 +486,12 @@ CREATE TABLE "Deliveries" (
     "OrderId" UUID NOT NULL,
     "DeliveryPersonId" UUID NULL,
     "ScheduledDateTime" TIMESTAMPTZ NOT NULL,
+    "TimeSlot" VARCHAR(50) NULL,
     "ActualDeliveryDateTime" TIMESTAMPTZ NULL,
     "Status" INTEGER NOT NULL DEFAULT 0,
     "IsActive" BOOLEAN NOT NULL DEFAULT TRUE,
     "DeliveryAddress" TEXT NOT NULL,
+    "PostalCode" VARCHAR(20) NULL,
     "RecipientName" VARCHAR(200) NULL,
     "RecipientPhone" VARCHAR(50) NULL,
     "DeliveryProofPhotoPath" TEXT NULL,
@@ -493,6 +499,8 @@ CREATE TABLE "Deliveries" (
     "DeliveryNotes" TEXT NULL,
     "DeliveryLatitude" DOUBLE PRECISION NULL,
     "DeliveryLongitude" DOUBLE PRECISION NULL,
+    "DeliveryRouteId" UUID NULL,
+    "StopOrder" INTEGER NULL,
     "CreatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "UpdatedAtUtc" TIMESTAMPTZ NULL,
     CONSTRAINT "PK_Deliveries" PRIMARY KEY ("Id"),
@@ -782,6 +790,23 @@ CREATE TABLE "AuditLogs" (
 );
 
 -- =====================================================
+-- REFRESH TOKEN TABLE (JWT Refresh Tokens)
+-- =====================================================
+
+CREATE TABLE "RefreshTokens" (
+    "Id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "UserId" UUID NOT NULL,
+    "Token" VARCHAR(256) NOT NULL,
+    "ExpiresAtUtc" TIMESTAMPTZ NOT NULL,
+    "CreatedAtUtc" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "RevokedAtUtc" TIMESTAMPTZ NULL,
+    "IsRevoked" BOOLEAN NOT NULL DEFAULT FALSE,
+    "ReplacedByToken" VARCHAR(256) NULL,
+    CONSTRAINT "PK_RefreshTokens" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_RefreshTokens_AspNetUsers" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
+);
+
+-- =====================================================
 -- INDEXES
 -- =====================================================
 
@@ -810,6 +835,7 @@ CREATE INDEX "IX_Orders_CompanyId" ON "Orders" ("CompanyId");
 CREATE INDEX "IX_Orders_CustomerId" ON "Orders" ("CustomerId");
 CREATE INDEX "IX_Orders_OrderDate" ON "Orders" ("OrderDate" DESC);
 CREATE INDEX "IX_Orders_DeliveryDate" ON "Orders" ("DeliveryDate");
+CREATE INDEX "IX_Orders_LocationId" ON "Orders" ("LocationId");
 CREATE INDEX "IX_Payments_OrderId" ON "Payments" ("OrderId");
 CREATE INDEX "IX_Events_CompanyId" ON "Events" ("CompanyId");
 CREATE INDEX "IX_Events_EventDate" ON "Events" ("EventDate");
@@ -828,6 +854,10 @@ CREATE INDEX "IX_AuditLogs_UserId" ON "AuditLogs" ("UserId");
 CREATE INDEX "IX_AuditLogs_Timestamp" ON "AuditLogs" ("Timestamp" DESC);
 CREATE INDEX "IX_AuditLogs_EntityType_EntityId" ON "AuditLogs" ("EntityType", "EntityId");
 CREATE INDEX "IX_AuditLogs_Action" ON "AuditLogs" ("Action");
+
+-- Refresh Tokens
+CREATE UNIQUE INDEX "IX_RefreshTokens_Token" ON "RefreshTokens" ("Token");
+CREATE INDEX "IX_RefreshTokens_UserId" ON "RefreshTokens" ("UserId");
 
 -- =====================================================
 -- SEED DATA - ROLES

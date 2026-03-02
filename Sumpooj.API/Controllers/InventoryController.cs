@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sumpooj.Application.Authorization;
+using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Inventory;
 using Sumpooj.Application.UseCases;
 using System.Security.Claims;
@@ -13,10 +14,12 @@ namespace Sumpooj.API.Controllers;
 public class InventoryController : ControllerBase
 {
     private readonly InventoryService _service;
+    private readonly IProductRepository _productRepository;
 
-    public InventoryController(InventoryService service)
+    public InventoryController(InventoryService service, IProductRepository productRepository)
     {
         _service = service;
+        _productRepository = productRepository;
     }
 
     #region Batches
@@ -100,6 +103,29 @@ public class InventoryController : ControllerBase
     }
 
     #endregion
+
+    [HttpGet("available-flowers")]
+    public async Task<IActionResult> GetAvailableFlowers()
+    {
+        var tenantContext = HttpContext.RequestServices.GetRequiredService<ITenantContext>();
+        var companyId = tenantContext.CompanyId
+            ?? throw new UnauthorizedAccessException("Company context required");
+
+        var products = await _productRepository.GetAllAsync(companyId);
+        var available = products
+            .Where(p => p.IsActive && p.StockQuantity > 0)
+            .Select(p => new
+            {
+                productId = p.Id.ToString(),
+                productName = p.Name,
+                availableUnits = p.StockQuantity,
+                unitPrice = p.RetailPrice,
+                consumptionUnit = p.UnitOfMeasure.ToString().ToLower()
+            })
+            .ToList();
+
+        return Ok(available);
+    }
 
     private Guid GetCurrentUserId()
     {

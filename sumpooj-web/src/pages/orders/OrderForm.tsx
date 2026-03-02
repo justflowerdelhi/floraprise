@@ -15,6 +15,8 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 import { formatCurrency } from '../../core/i18n';
+import { createOrder } from '../../api/order.api';
+import { useNavigate } from 'react-router-dom';
 
 const cities = [
   "Delhi",
@@ -30,6 +32,7 @@ const cities = [
 ];
 
 export default function OrderForm() {
+  const navigate = useNavigate();
   const [deliveryCity, setDeliveryCity] = useState("Delhi");
   const [recipientName, setRecipientName] = useState("");
   const [recipientAddress, setRecipientAddress] = useState("");
@@ -40,26 +43,37 @@ export default function OrderForm() {
   const [cardMessage, setCardMessage] = useState("");
   const [messageOnCake, setMessageOnCake] = useState("");
   const [specialInstruction, setSpecialInstruction] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const orderData = {
-      deliveryCity,
-      recipientName,
-      recipientAddress,
-      pinCode,
-      mobilePhone,
-      deliveryDate,
-      deliveryTime,
-      cardMessage,
-      messageOnCake,
-      specialInstruction
-    };
-    
-    console.log("Order submitted:", orderData);
-    // TODO: Implement API call to submit order
-    alert("Order submitted successfully!");
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await createOrder({
+        customerId: null,
+        deliveryDate: deliveryDate || null,
+        deliveryAddress: `${recipientAddress}, ${pinCode}, ${deliveryCity}`,
+        recipientName: recipientName || null,
+        recipientPhone: mobilePhone || null,
+        cardMessage: cardMessage || null,
+        deliveryPriority: deliveryTime === 'midnight' ? 'EXPRESS' : 'STANDARD',
+        timeSlot: deliveryTime,
+        orderSource: 'WEB_FORM',
+        orderIntent: 'DELIVERY',
+        deliveryFee: 0,
+        discountAmount: 0,
+        internalNotes: [messageOnCake ? `Cake: ${messageOnCake}` : '', specialInstruction].filter(Boolean).join(' | ') || null,
+        items: [],
+      });
+      navigate('/order-list');
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? err?.message ?? 'Failed to submit order');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -257,14 +271,16 @@ export default function OrderForm() {
           </Box>
 
           {/* Submit Button */}
+          {error && <Alert severity="error">{error}</Alert>}
           <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
             <Button
               type="submit"
               variant="contained"
               size="large"
+              disabled={submitting}
               sx={{ minWidth: 200 }}
             >
-              Submit Order
+              {submitting ? 'Submitting…' : 'Submit Order'}
             </Button>
           </Box>
         </Stack>

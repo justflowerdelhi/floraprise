@@ -60,16 +60,8 @@ import {
   normalizeRole,
 } from './StaffTypes';
 import { getStaffById } from '../../api/staff.api';
+import { getStaffPerformance } from '../../api/staff.api';
 import { useApiCall } from '../../hooks/useApiCall';
-
-// TODO: Replace with real API endpoint when staff performance API is available
-const getStaffPerformance = async (
-  _staffId: string,
-  _periodStart: string,
-  _periodEnd: string,
-): Promise<StaffPerformance | null> => {
-  return null;
-};
 
 // ─── Currency Formatter (tenant-aware) ───────────────────────
 

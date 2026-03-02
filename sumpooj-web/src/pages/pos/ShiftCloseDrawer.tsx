@@ -36,6 +36,7 @@ import {
   Remove as DashIcon,
 } from '@mui/icons-material';
 import { useShift } from './ShiftContext';
+import { formatCurrency } from '../../core/i18n';
 
 // ─── Summary Row ────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ const SummaryRow: React.FC<SummaryRowProps> = ({ icon, label, value, color, bold
       variant="body2"
       sx={{ fontWeight: bold ? 700 : 500, fontFamily: 'monospace', color: color || 'text.primary' }}
     >
-      ${value.toFixed(2)}
+      {formatCurrency(value)}
     </Typography>
   </Box>
 );
@@ -218,7 +219,7 @@ const ShiftCloseDrawer: React.FC = () => {
             <Chip
               size="small"
               icon={difference > 0 ? <TrendingUp fontSize="small" /> : difference < 0 ? <TrendingDown fontSize="small" /> : undefined}
-              label={`${difference >= 0 ? '+' : ''}$${difference.toFixed(2)}`}
+              label={`${difference >= 0 ? '+' : ''}${formatCurrency(Math.abs(difference))}`}
               color={difference === 0 ? 'success' : Math.abs(difference) <= 5 ? 'warning' : 'error'}
               variant="outlined"
             />

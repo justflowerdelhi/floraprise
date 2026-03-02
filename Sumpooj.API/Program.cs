@@ -8,6 +8,7 @@ using Sumpooj.API.Authorization;
 using Sumpooj.API.Infrastructure;
 using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Companies;
+using Sumpooj.Application.AI;
 using Sumpooj.Application.Deliveries;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Payments;
@@ -33,7 +34,7 @@ builder.Services.AddCors(options =>
     {
         if (corsOrigins.Length == 0)
         {
-            // Development: allow any origin
+            // Development: allow any origin (credentials not supported with *)
             policy.AllowAnyOrigin()
                   .AllowAnyHeader()
                   .AllowAnyMethod();
@@ -42,7 +43,8 @@ builder.Services.AddCors(options =>
         {
             policy.WithOrigins(corsOrigins)
                   .AllowAnyHeader()
-                  .AllowAnyMethod();
+                  .AllowAnyMethod()
+                  .AllowCredentials();
         }
     });
 });
@@ -158,6 +160,12 @@ builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<CustomerService>();
 
 builder.Services.AddScoped<ICompanyService, CompanyService>();
+
+// AI Services
+var openAISettings = builder.Configuration.GetSection("OpenAI").Get<OpenAISettings>() ?? new OpenAISettings();
+builder.Services.AddSingleton(openAISettings);
+builder.Services.AddScoped<IAIUsageRepository, AIUsageRepository>();
+builder.Services.AddScoped<GiftCardAIService>();
 
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ProductService>();
@@ -295,11 +303,11 @@ var app = builder.Build();
 
 app.UseHttpsRedirection();
 
+// CORS must run before auth so preflight OPTIONS requests get proper headers
+app.UseCors("DefaultCorsPolicy");
+
 app.UseAuthentication();
 app.UseAuthorization();
-
-// Enable CORS using the configured policy
-app.UseCors("DefaultCorsPolicy");
 
 app.MapControllers();
 

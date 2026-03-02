@@ -26,6 +26,7 @@ import {
 import { setCurrentCurrency } from '../i18n/currency';
 import { CurrencyProvider } from '../i18n/CurrencyContext';
 import { useAuth } from '../../auth/AuthContext';
+import api from '../../api/axios';
 
 // -----------------------------------------------------------------------------
 // Context Types
@@ -54,10 +55,10 @@ interface TenantContextValue {
   getUpgradePlan: (feature: FeatureFlag) => TenantPlan | null;
   getFeatureRequiredPlan: (feature: FeatureFlag) => TenantPlan;
 
-  // Subscription actions (API-backed stubs — TODO: wire to real endpoints)
-  upgradePlan: (newPlan: TenantPlan) => void;
-  cancelSubscription: () => void;
-  resumeSubscription: () => void;
+  // Subscription actions
+  upgradePlan: (newPlan: TenantPlan) => Promise<void>;
+  cancelSubscription: () => Promise<void>;
+  resumeSubscription: () => Promise<void>;
   
   // UI helpers
   showUpgradeModal: boolean;
@@ -136,24 +137,31 @@ export function TenantProvider({ children }: TenantProviderProps) {
     setShowUpgradeModal(true);
   }, []);
 
-  // Subscription mutation stubs — these will call real API endpoints.
-  // For now they are no-ops; the backend must be the authority.
-  const upgradePlan = useCallback((_newPlan: TenantPlan) => {
-    // TODO: POST /api/subscription/upgrade { plan: newPlan }
-    // After success, re-fetch /auth/me to get updated tenant
-    console.warn('[TenantContext] upgradePlan called — wire to API');
+  // Subscription actions — call backend, then close modal.
+  const upgradePlan = useCallback(async (newPlan: TenantPlan) => {
+    try {
+      await api.post('/subscription/upgrade', { plan: newPlan });
+    } catch (err) {
+      console.error('Upgrade failed:', err);
+    }
     setShowUpgradeModal(false);
     setUpgradeFeature(null);
   }, []);
 
-  const cancelSubscription = useCallback(() => {
-    // TODO: POST /api/subscription/cancel
-    console.warn('[TenantContext] cancelSubscription called — wire to API');
+  const cancelSubscription = useCallback(async () => {
+    try {
+      await api.post('/subscription/cancel');
+    } catch (err) {
+      console.error('Cancel failed:', err);
+    }
   }, []);
 
-  const resumeSubscription = useCallback(() => {
-    // TODO: POST /api/subscription/resume
-    console.warn('[TenantContext] resumeSubscription called — wire to API');
+  const resumeSubscription = useCallback(async () => {
+    try {
+      await api.post('/subscription/resume');
+    } catch (err) {
+      console.error('Resume failed:', err);
+    }
   }, []);
   
   // Context value

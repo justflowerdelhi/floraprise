@@ -76,6 +76,7 @@ import {
 } from './CRMTypes';
 import { LoyaltyTierBadge, PointsDisplay } from './LoyaltyComponents';
 import { getCurrencySymbol } from '../../core/i18n';
+import { createCustomer } from '../../api/customer.api';
 
 // -----------------------------------------------------------------------------
 // Filter Panel
@@ -619,9 +620,16 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
     console.log('Edit customer:', id);
   };
 
-  const handleCreateCustomer = (customer: Partial<Customer>) => {
-    console.log('Create customer:', customer);
-    // TODO: API call
+  const handleCreateCustomer = async (customer: Partial<Customer>) => {
+    try {
+      await createCustomer({
+        name: customer.name ?? '',
+        email: customer.email,
+        phone: customer.phone,
+      });
+    } catch (err) {
+      console.error('Failed to create customer:', err);
+    }
   };
 
   const theme = useTheme();

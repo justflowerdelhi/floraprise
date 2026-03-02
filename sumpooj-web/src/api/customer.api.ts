@@ -60,6 +60,13 @@ export const updateCardMessage = async (id: string, message: string | null) => {
   return res.data;
 };
 
+export const updateCustomerNotes = async (id: string, notes: string | null) => {
+  const res = await api.put(`/customers/${id}/notes`, JSON.stringify(notes), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return res.data;
+};
+
 export const deactivateCustomer = async (id: string) => {
   const res = await api.put(`/customers/${id}/deactivate`);
   return res.data;

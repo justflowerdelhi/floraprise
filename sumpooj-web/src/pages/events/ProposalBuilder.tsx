@@ -8,7 +8,7 @@
  * - Integrated Profit Summary Panel
  * - Versioning support
  */
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -68,6 +68,12 @@ import { PRODUCT_OPTIONS, MOCK_PROPOSALS, MOCK_VERSION_HISTORY } from './Proposa
 import { MOCK_EVENTS } from './EventMockData';
 import ProfitSummaryPanel from './ProfitSummaryPanel';
 import { formatCurrency } from '../../core/i18n';
+import {
+  createProposal,
+  updateProposal,
+  sendProposal as sendProposalApi,
+  getProposalById,
+} from '../../api/proposal.api';
 
 // ─── Styling Constants ──────────────────────────────────────
 
@@ -516,23 +522,73 @@ const ProposalBuilder: React.FC = () => {
   };
 
   // Save
-  const handleSave = () => {
-    console.log('Saving proposal:', { items, discountType, discountValue, taxRate, totals, notes, versionName });
-    setHasChanges(false);
-    // TODO: API integration
+  const handleSave = async () => {
+    const payload = {
+      eventId: linkedEvent?.id ?? eventId ?? '',
+      title: versionName,
+      clientName: linkedEvent?.clientName ?? '',
+      clientEmail: '',
+      items: items.map((item, idx) => ({
+        type: item.type,
+        name: item.name,
+        category: '',
+        description: item.description,
+        linkedProductId: item.linkedProductId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        unitCost: item.unitCost,
+        sortOrder: idx,
+      })),
+      discountType,
+      discountValue,
+      taxRate,
+      notes,
+      versionName,
+    };
+    try {
+      if (proposalId) {
+        await updateProposal(proposalId, payload);
+      } else {
+        await createProposal(payload);
+      }
+      setHasChanges(false);
+    } catch (err) {
+      console.error('Failed to save proposal:', err);
+    }
   };
 
   // Send to client
-  const handleSend = () => {
-    console.log('Sending proposal to client');
-    // TODO: API integration
+  const handleSend = async () => {
+    if (!proposalId) {
+      await handleSave();
+    }
+    try {
+      if (proposalId) {
+        await sendProposalApi(proposalId);
+      }
+    } catch (err) {
+      console.error('Failed to send proposal:', err);
+    }
   };
 
   // Restore version
-  const handleRestoreVersion = (versionId: string) => {
-    console.log('Restoring version:', versionId);
+  const handleRestoreVersion = async (versionId: string) => {
     setShowVersionHistory(false);
-    // TODO: Implement version restore
+    if (!proposalId) return;
+    try {
+      const restored = await getProposalById(proposalId);
+      if (restored?.items) {
+        setItems(restored.items);
+        setDiscountType(restored.discountType ?? 'PERCENTAGE');
+        setDiscountValue(restored.discountValue ?? 0);
+        setTaxRate(restored.taxRate ?? 18);
+        setNotes(restored.notes ?? '');
+        setVersionName(restored.versionName ?? `Restored from ${versionId}`);
+        setHasChanges(true);
+      }
+    } catch (err) {
+      console.error('Failed to restore version:', err);
+    }
   };
 
   // Low margin warning check

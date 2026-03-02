@@ -71,6 +71,13 @@ public class ProductionController : ControllerBase
         return batch == null ? NotFound() : Ok(batch);
     }
 
+    [HttpPost("finished-goods/{id:guid}/deduct")]
+    public async Task<IActionResult> DeductFromBatch(Guid id, [FromBody] DeductBatchRequest request)
+    {
+        await _service.DeductFromBatchAsync(CompanyId, id, request.Quantity);
+        return NoContent();
+    }
+
     // ─── Production Runs ────────────────────────────────────
 
     [HttpPost("runs")]

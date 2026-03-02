@@ -16,6 +16,7 @@ import {
 import { Drawer } from '@mui/material';
 import type { POSPaymentMethod, POSPaymentEntry, POSBillingInfo } from './POSTypes';
 import type { POSCustomer } from './POSCustomerTypes';
+import { formatCurrency } from '../../core/i18n';
 
 interface POSPaymentDrawerProps {
   open: boolean;
@@ -82,14 +83,6 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
       }
     }
   }, [open, initialMethod, grandTotal]);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const paidTotal = useMemo(
     () => payments.reduce((sum, p) => sum + p.amount, 0),

@@ -206,7 +206,7 @@ export const normalizeProduct = (apiData: any): Product => {
     taxRuleId: apiData.taxRuleId,
     taxRuleName: apiData.taxRuleName,
     taxIsInclusive: apiData.taxIsInclusive ?? false,
-    availableStock: Number(apiData.availableStock) || 0,
+    availableStock: Number(apiData.availableStock ?? apiData.stockQuantity ?? apiData.currentStock ?? apiData.stockOnHand ?? apiData.quantityOnHand ?? apiData.openingStock) || 0,
     isPerishable: apiData.isPerishable ?? false,
     trackBatch: apiData.trackBatch ?? false,
     imageUrl: apiData.imageUrl,

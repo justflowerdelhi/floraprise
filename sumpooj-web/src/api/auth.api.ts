@@ -28,6 +28,7 @@ export function normalizeRole(backendRole: string): UserRole {
 /** Login response from backend */
 export interface LoginResponse {
   access_token: string;
+  refresh_token: string;
   user: {
     id: string;
     name: string;
@@ -67,4 +68,15 @@ export const login = async (email: string, password: string): Promise<LoginRespo
 export const fetchMe = async () => {
   const res = await api.get('/auth/me');
   return res.data;
+};
+
+/** POST /auth/refresh — exchange refresh token for new access + refresh tokens */
+export const refreshTokens = async (refreshToken: string): Promise<LoginResponse> => {
+  const res = await api.post<LoginResponse>('/auth/refresh', { refreshToken });
+  return res.data;
+};
+
+/** POST /auth/revoke — revoke a refresh token (on logout) */
+export const revokeToken = async (refreshToken: string): Promise<void> => {
+  await api.post('/auth/revoke', { refreshToken });
 };

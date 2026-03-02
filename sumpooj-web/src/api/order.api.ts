@@ -42,8 +42,9 @@ export interface OrderItemRequest {
 }
 
 export interface CreateOrderRequest {
-  customerId: string;
-  deliveryDate: string;
+  customerId: string | null;
+  locationId?: string | null;
+  deliveryDate: string | null;
   deliveryAddress?: string | null;
   recipientName?: string | null;
   recipientPhone?: string | null;

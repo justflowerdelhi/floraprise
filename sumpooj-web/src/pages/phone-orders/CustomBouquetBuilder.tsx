@@ -26,8 +26,8 @@ import { useApiCall } from '../../hooks/useApiCall';
 import {
   getAvailableFlowers,
   addItemToPhoneOrder,
-  type AvailableFlower,
-} from '../../api/phoneOrders.api';
+  type AvailableFlowerResponse,
+} from '../../modules/phone-orders/phoneOrders.api';
 
 // ── Props ────────────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ const CustomBouquetBuilder: React.FC<CustomBouquetBuilderProps> = ({ orderId, on
   const toast = useToast();
   const { loading, execute } = useApiCall();
 
-  const [flowers, setFlowers] = useState<AvailableFlower[]>([]);
+  const [flowers, setFlowers] = useState<AvailableFlowerResponse[]>([]);
   const [fetching, setFetching] = useState(true);
   const [search, setSearch] = useState('');
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -75,7 +75,7 @@ const CustomBouquetBuilder: React.FC<CustomBouquetBuilderProps> = ({ orderId, on
 
   // ── Add item handler ─────────────────────────────────────────────────
 
-  const handleAdd = async (flower: AvailableFlower) => {
+  const handleAdd = async (flower: AvailableFlowerResponse) => {
     const qty = parseInt(quantities[flower.productId] || '1', 10);
     if (isNaN(qty) || qty <= 0) {
       toast.error('Quantity must be greater than zero');
@@ -90,9 +90,8 @@ const CustomBouquetBuilder: React.FC<CustomBouquetBuilderProps> = ({ orderId, on
       () =>
         addItemToPhoneOrder(orderId, {
           productId: flower.productId,
-          productName: flower.productName,
           quantity: qty,
-          unitPrice: flower.pricePerUnit,
+          unitPrice: flower.unitPrice,
         }),
       {
         successMessage: `Added ${qty}× ${flower.productName}`,
@@ -192,7 +191,7 @@ const CustomBouquetBuilder: React.FC<CustomBouquetBuilderProps> = ({ orderId, on
                       }}
                     />
                   </TableCell>
-                  <TableCell align="right">${flower.pricePerUnit.toFixed(2)}</TableCell>
+                  <TableCell align="right">${flower.unitPrice.toFixed(2)}</TableCell>
                   <TableCell align="center" sx={{ width: 90 }}>
                     <TextField
                       type="number"

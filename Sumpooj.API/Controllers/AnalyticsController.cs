@@ -108,4 +108,70 @@ public class AnalyticsController : ControllerBase
         var dashboard = await _profitService.GetDashboardAsync(companyId, request);
         return Ok(dashboard.PlatformCommission);
     }
+
+    [HttpGet("profit-by-category")]
+    [Authorize(Policy = PolicyNames.CompanyAdmin)]
+    public async Task<IActionResult> GetProfitByCategory(
+        [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
+    {
+        var companyId = _tenant.CompanyId ?? throw new UnauthorizedAccessException();
+        var dashboard = await _profitService.GetDashboardAsync(companyId, new ProfitDashboardRequest { FromDate = fromDate, ToDate = toDate });
+        return Ok(dashboard.ProductProfit?.GroupBy(p => p.Category ?? "Other")
+            .Select(g => new { category = g.Key, revenue = g.Sum(p => p.GrossRevenue), profit = g.Sum(p => p.NetProfit) })
+            .ToList() ?? []);
+    }
+
+    [HttpGet("top-products")]
+    [Authorize(Policy = PolicyNames.CompanyAdmin)]
+    public async Task<IActionResult> GetTopProducts(
+        [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] int limit = 10)
+    {
+        var companyId = _tenant.CompanyId ?? throw new UnauthorizedAccessException();
+        var dashboard = await _profitService.GetDashboardAsync(companyId, new ProfitDashboardRequest { FromDate = fromDate, ToDate = toDate });
+        return Ok(dashboard.ProductProfit?.OrderByDescending(p => p.GrossRevenue).Take(limit).ToList() ?? []);
+    }
+
+    [HttpGet("low-margin-products")]
+    [Authorize(Policy = PolicyNames.CompanyAdmin)]
+    public async Task<IActionResult> GetLowMarginProducts(
+        [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] int limit = 10)
+    {
+        var companyId = _tenant.CompanyId ?? throw new UnauthorizedAccessException();
+        var dashboard = await _profitService.GetDashboardAsync(companyId, new ProfitDashboardRequest { FromDate = fromDate, ToDate = toDate });
+        return Ok(dashboard.ProductProfit?.OrderBy(p => p.EffectiveMarginPercent).Take(limit).ToList() ?? []);
+    }
+
+    [HttpGet("profit-by-source")]
+    [Authorize(Policy = PolicyNames.CompanyAdmin)]
+    public async Task<IActionResult> GetProfitBySource(
+        [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
+    {
+        var companyId = _tenant.CompanyId ?? throw new UnauthorizedAccessException();
+        var dashboard = await _profitService.GetDashboardAsync(companyId, new ProfitDashboardRequest { FromDate = fromDate, ToDate = toDate });
+        return Ok(dashboard.ChannelProfit ?? []);
+    }
+
+    [HttpGet("daily-profit")]
+    [Authorize(Policy = PolicyNames.CompanyAdmin)]
+    public async Task<IActionResult> GetDailyProfit(
+        [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
+    {
+        return Ok(new List<object>());
+    }
+
+    [HttpGet("wire-order-profit")]
+    [Authorize(Policy = PolicyNames.CompanyAdmin)]
+    public async Task<IActionResult> GetWireOrderProfit(
+        [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
+    {
+        return Ok(new List<object>());
+    }
+
+    [HttpGet("event-profit")]
+    [Authorize(Policy = PolicyNames.CompanyAdmin)]
+    public async Task<IActionResult> GetEventProfit(
+        [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
+    {
+        return Ok(new List<object>());
+    }
 }

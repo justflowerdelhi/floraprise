@@ -45,8 +45,8 @@ export function inferFulfillmentMode(order: Partial<Order>): OrderFulfillmentMod
     return 'SCHEDULED';
   }
 
-  // TODO: detect event linkage when event module integration is done
-  // if (order.eventId) return 'EVENT';
+  // Event-linked orders → EVENT fulfillment mode
+  if ((order as any).eventId) return 'EVENT';
 
   // Walk-in partial → IMMEDIATE (customer takes items)
   if (order.orderSource === 'WALK_IN') {

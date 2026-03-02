@@ -61,4 +61,38 @@ public class CompanyService : ICompanyService
 
         await _db.SaveChangesAsync();
     }
+
+    public async Task<CompanyDto?> GetByIdAsync(Guid companyId)
+    {
+        return await _db.Companies
+            .Where(c => c.Id == companyId)
+            .Select(c => new CompanyDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Region = c.Region,
+                IsActive = c.IsActive
+            })
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task UpdateSettingsAsync(Guid companyId, UpdateCompanySettingsRequest request)
+    {
+        var company = await _db.Companies.FindAsync(companyId)
+            ?? throw new InvalidOperationException("Company not found");
+
+        if (request.TimeZone != null || request.CurrencyCode != null)
+        {
+            company.UpdateLocalization(
+                request.TimeZone ?? company.TimeZone,
+                request.CurrencyCode ?? company.CurrencyCode);
+        }
+
+        if (request.TaxIdentifier != null)
+        {
+            company.UpdateTax(request.TaxIdentifier);
+        }
+
+        await _db.SaveChangesAsync();
+    }
 }

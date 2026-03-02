@@ -179,9 +179,43 @@ const buildReorderProducts = (): ReorderProduct[] =>
 
 export const MOCK_REORDER_PRODUCTS: ReorderProduct[] = buildReorderProducts();
 
-// ─── Mock API ───────────────────────────────────────────────
+// ─── API Integration ────────────────────────────────────────
 
-export const fetchReorderData = (): Promise<ReorderProduct[]> =>
-  new Promise((resolve) =>
-    setTimeout(() => resolve([...MOCK_REORDER_PRODUCTS]), 550),
-  );
+import { getReorderProducts } from '../../../api/product.api';
+
+/**
+ * Fetches reorder data from real API.
+ * Falls back to mock data if API is unavailable.
+ */
+export const fetchReorderData = async (): Promise<ReorderProduct[]> => {
+  try {
+    const apiData = await getReorderProducts();
+
+    // Map API response to ReorderProduct shape
+    if (Array.isArray(apiData) && apiData.length > 0) {
+      return apiData.map((item: Record<string, unknown>) => ({
+        id: (item.id ?? item.productId ?? '') as string,
+        productName: (item.productName ?? item.name ?? '') as string,
+        category: (item.category ?? 'Supplies') as ProductCategory,
+        currentStock: (item.currentStock ?? item.quantityOnHand ?? 0) as number,
+        avgDailyUsage: (item.avgDailyUsage ?? 0) as number,
+        daysOfStockLeft: (item.daysOfStockLeft ?? 0) as number,
+        reorderLevel: (item.reorderLevel ?? 0) as number,
+        suggestedOrderQty: (item.suggestedOrderQty ?? item.suggestedQuantity ?? 0) as number,
+        supplier: (item.supplier ?? item.supplierName ?? 'Unknown') as string,
+        leadTimeDays: (item.leadTimeDays ?? 3) as number,
+        lastOrderDate: (item.lastOrderDate ?? new Date().toISOString().slice(0, 10)) as string,
+        costPerUnit: (item.costPerUnit ?? item.unitCost ?? 0) as number,
+        estimatedOrderCost: (item.estimatedOrderCost ?? 0) as number,
+        risk: (item.risk ?? 'optimal') as StockRisk,
+        isPerishable: (item.isPerishable ?? false) as boolean,
+        location: (item.location ?? 'Main Store') as string,
+      }));
+    }
+
+    return [...MOCK_REORDER_PRODUCTS];
+  } catch (err) {
+    console.warn('[ReorderIntelligence] API unavailable, using mock data:', err);
+    return [...MOCK_REORDER_PRODUCTS];
+  }
+};

@@ -14,6 +14,7 @@ import {
   ShoppingCart as CartIcon,
 } from '@mui/icons-material';
 import type { CartItem, CartSummary, Product } from './POSTypes';
+import { formatCurrency } from '../../core/i18n';
 
 interface POSCartPanelProps {
   items: CartItem[];
@@ -32,14 +33,6 @@ const POSCartPanel: React.FC<POSCartPanelProps> = ({
   onRemoveItem,
   onPayment,
 }) => {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
-
   const findProduct = useCallback((productId: string) => {
     return products.find((p) => p.id === productId);
   }, [products]);
