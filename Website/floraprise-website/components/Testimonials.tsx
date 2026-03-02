@@ -1,9 +1,9 @@
 export default function Testimonials() {
   return (
-    <section className="py-20 bg-[#f8f8f6]">
+    <section className="py-10 bg-[#f8f8f6]">
       <div className="max-w-6xl mx-auto px-6 text-center">
 
-        <h2 className="text-3xl font-semibold mb-12">
+        <h2 className="text-3xl font-semibold mb-6">
           Trusted by Operationally Focused Florists
         </h2>
 

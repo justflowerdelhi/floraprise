@@ -13,9 +13,9 @@ export default function Navbar() {
             width={36}
             height={36}
           />
-          <span className="text-lg font-semibold tracking-tight text-[var(--brand-charcoal)]">
-            Floraprise
-          </span>
+            <span className="text-lg font-semibold tracking-tight">
+              <span style={{ color: '#14532d' }}>Flora</span><span style={{ color: '#ff8800' }}>Prise</span>
+            </span>
         </Link>
 
         <div className="hidden md:flex items-center gap-8 text-sm text-gray-600">

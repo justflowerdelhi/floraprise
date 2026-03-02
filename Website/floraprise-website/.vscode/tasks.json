@@ -11,6 +11,113 @@
 			],
 			"isBackground": true,
 			"group": "build"
+		},
+		{
+			"label": "Build Next.js App",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Install Next.js",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install",
+				"next"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Build Next.js App",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Install All Dependencies",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Build Next.js App",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Install All Dependencies",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Build Next.js App",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Delete node_modules",
+			"type": "shell",
+			"command": "rmdir",
+			"args": [
+				"/s",
+				"/q",
+				"node_modules"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Delete package-lock.json",
+			"type": "shell",
+			"command": "del",
+			"args": [
+				"package-lock.json"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Build Next.js app",
+			"type": "shell",
+			"command": "npm run build",
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
 		}
 	]
 }

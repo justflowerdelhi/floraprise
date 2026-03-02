@@ -1,13 +1,13 @@
 export default function ProductShowcase() {
   return (
-    <section className="py-20 bg-white">
+    <section className="py-10 bg-white">
       <div className="max-w-6xl mx-auto px-6 text-center">
 
         <h2 className="text-3xl font-semibold mb-4">
           Operational Control in Action.
         </h2>
 
-        <p className="text-gray-600 max-w-3xl mx-auto mb-16">
+        <p className="text-gray-600 max-w-3xl mx-auto mb-8">
           Floraprise centralizes billing, inventory, production, and payment
           workflows into one structured operational interface built
           specifically for professional flower businesses.

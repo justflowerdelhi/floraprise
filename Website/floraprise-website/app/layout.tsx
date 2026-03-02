@@ -4,24 +4,28 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: "Floraprise | Florist POS & ERP Software",
-  description:
-    "Floraprise is an inventory-first florist POS and ERP software built for modern flower shops. Manage POS, delivery routing, inventory, and online orders in one system.",
-  keywords: [
-    "Florist POS",
-    "Florist ERP",
-    "Flower shop software",
-    "Delivery routing software",
-    "Florist inventory management",
-  ],
-  openGraph: {
-    title: "Floraprise | Florist POS & ERP",
+    title: "Floraprise | Operational Intelligence Platform for Florists",
     description:
-      "The operating system for modern florists.",
-    url: "https://www.floraprise.com",
-    siteName: "Floraprise",
-    type: "website",
-  },
+      "Floraprise is an advanced florist POS and ERP platform designed for inventory-first flower shop management, production workflows, delivery routing, and multi-location operations.",
+    keywords: [
+      "Florist POS",
+      "Florist ERP",
+      "Flower shop software",
+      "Inventory management",
+      "Production workflows",
+      "Delivery routing",
+      "Multi-location florist",
+      "Operational intelligence",
+      "Florist business platform"
+    ],
+    openGraph: {
+      title: "Floraprise | Operational Intelligence Platform for Florists",
+      description:
+        "Floraprise is an advanced florist POS and ERP platform designed for inventory-first flower shop management, production workflows, delivery routing, and multi-location operations.",
+      url: "https://www.floraprise.com",
+      siteName: "Floraprise",
+      type: "website",
+    },
 };
 
 export default function RootLayout({
@@ -31,6 +35,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+      </head>
       <body className="bg-white text-gray-900">
         <Navbar />
         {children}

@@ -1,6 +1,6 @@
 export default function Integrations() {
   return (
-    <section className="py-16 bg-white border-t border-gray-100">
+    <section className="py-8 bg-white border-t border-gray-100">
       <div className="max-w-6xl mx-auto px-6 text-center">
 
         <h3 className="text-sm tracking-widest text-green-700 font-semibold mb-4">
@@ -11,22 +11,22 @@ export default function Integrations() {
           Connect Your Entire Business Ecosystem
         </h2>
 
-        <p className="text-gray-600 max-w-2xl mx-auto mb-12">
+        <p className="text-gray-600 max-w-2xl mx-auto mb-6">
           Floraprise integrates with leading accounting, payment,
           delivery, and marketplace platforms — ensuring your
           operations stay synchronized across every channel.
         </p>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-10 items-center grayscale hover:grayscale-0 transition duration-300 mb-12">
-          <img src="/images/integrations/quickbooks.png" alt="QuickBooks Integration" />
-          <img src="/images/integrations/stripe.png" alt="Stripe Integration" />
-          <img src="/images/integrations/doordash.png" alt="DoorDash Integration" />
-          <img src="/images/integrations/ftd.png" alt="FTD Integration" />
-          <img src="/images/integrations/bloomnation.png" alt="BloomNation Integration" />
-          <img src="/images/integrations/tally.png" alt="Tally Integration" />
-          <img src="/images/integrations/uc.png" alt="Uncle Delivery Integration" />
-          <img src="/images/integrations/dunzo.png" alt="Dunzo Integration" />
-          <img src="/images/integrations/porter.png" alt="Porter Integration" />
+        <div className="flex flex-row flex-wrap gap-10 items-center justify-center grayscale op">
+           <img src="/images/integrations/quickbooks.png" alt="QuickBooks Integration" width="60" height="60" />
+           <img src="/images/integrations/stripe.png" alt="Stripe Integration" width="60" height="60" />
+           <img src="/images/integrations/doordash.png" alt="DoorDash Integration" width="60" height="60" />
+           <img src="/images/integrations/ftd.png" alt="FTD Integration" width="60" height="60" />
+           <img src="/images/integrations/bloomnation.png" alt="BloomNation Integration" width="60" height="60" />
+           <img src="/images/integrations/tally.png" alt="Tally Integration" width="60" height="60" />
+           <img src="/images/integrations/uc.png" alt="Uncle Delivery Integration" width="60" height="60" />
+           <img src="/images/integrations/dunzo.png" alt="Dunzo Integration" width="60" height="60" />
+           <img src="/images/integrations/porter.png" alt="Porter Integration" width="60" height="60" />
         </div>
 
         {/* API Ready Line */}
