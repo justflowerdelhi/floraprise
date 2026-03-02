@@ -1,7 +1,19 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 export default function HeroPremium() {
+  const [isIndia, setIsIndia] = useState(false);
+
+  useEffect(() => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (timezone.includes("Asia/Kolkata")) {
+      setIsIndia(true);
+    }
+  }, []);
+
   return (
     <section className="bg-white pt-20 pb-24">
 
@@ -33,6 +45,12 @@ export default function HeroPremium() {
             <br />
             A Complete Florist ERP.
           </h1>
+
+          {isIndia && (
+            <p className="text-lg text-green-800 mt-4 font-bold">
+              आपके फूलों के व्यवसाय का स्मार्ट साथी।
+            </p>
+          )}
 
           <p className="mt-6 text-lg text-gray-600 leading-relaxed text-justify">
   Floraprise is an advanced florist POS and ERP software designed for modern flower shops and multi-location floral businesses. From real-time inventory management and perishable batch tracking to bouquet production workflows, delivery routing, staff scheduling, and profit analytics, Floraprise centralizes every operational process into one intelligent, cloud-based platform built specifically for professional florists.
