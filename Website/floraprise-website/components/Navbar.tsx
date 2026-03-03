@@ -8,7 +8,7 @@ export default function Navbar() {
 
         <Link href="/" className="flex items-center gap-3">
           <Image
-            src="/floraprise-logo1.png"
+            src="/logo.png"
             alt="Floraprise Logo"
             width={36}
             height={36}
