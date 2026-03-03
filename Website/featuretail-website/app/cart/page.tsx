@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCart } from "../../src/context/CartContext";
 
 export default function CartPage() {
@@ -140,9 +141,12 @@ export default function CartPage() {
             </div>
           </div>
 
-          <button className="w-full mt-6 bg-pink-600 hover:bg-pink-700 text-white py-3 rounded font-semibold">
+          <Link
+            href="/checkout"
+            className="inline-block w-full mt-6 bg-pink-600 hover:bg-pink-700 text-white text-center py-3 rounded font-semibold"
+          >
             Proceed to Checkout
-          </button>
+          </Link>
         </div>
       </div>
     </div>
