@@ -36,6 +36,13 @@ export default function Hero() {
             Explore Platform
           </Link>
         </div>
+        {/* Trust Signals / Badges */}
+        <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-600 mt-6">
+          <span>🇮🇳 Made for Indian Florists</span>
+          <span>✔ GST Ready Billing</span>
+          <span>✔ UPI & Card Payments</span>
+          <span>✔ Secure Cloud Platform</span>
+        </div>
       </div>
 
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black opacity-30"></div>

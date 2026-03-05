@@ -1,42 +1,98 @@
-import Image from "next/image";
-import Link from "next/link";
+"use client"
 
-export default function Navbar() {
+import { useState } from "react"
+import Link from "next/link"
+import Image from "next/image"
+
+export default function Header() {
+  const [menuOpen, setMenuOpen] = useState(false)
+
   return (
-    <nav className="w-full bg-[#fafaf8]/90 backdrop-blur-md border-b border-[#eaeaea] sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between items-center">
+    <header className="sticky top-0 z-50 bg-white border-b">
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
 
-        <Link href="/" className="flex items-center gap-3">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2">
           <Image
             src="/logo.png"
-            alt="Floraprise Logo"
-            width={36}
-            height={36}
+            alt="Floraprise"
+            width={40}
+            height={40}
           />
-            <span className="text-lg font-semibold tracking-tight">
-              <span style={{ color: '#14532d' }}>Flora</span><span style={{ color: '#ff8800' }}>Prise</span>
-            </span>
+          <span className="text-xl font-semibold">
+            Flora<span className="text-green-700">Prise</span>
+          </span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-8 text-sm text-gray-600">
-          <Link href="/features" className="text-gray-700 hover:text-[var(--brand-green)] transition font-semibold tracking-wide">
+        {/* Desktop Menu */}
+        <nav className="hidden md:flex items-center gap-8 text-gray-700 font-medium">
+          <Link href="/features" className="hover:text-green-700">
             Features
           </Link>
-          <Link href="/pricing" className="text-gray-700 hover:text-[var(--brand-green)] transition font-semibold tracking-wide">
+
+          <Link href="/pricing" className="hover:text-green-700">
             Pricing
           </Link>
-          <Link href="/contact" className="text-gray-700 hover:text-[var(--brand-green)] transition font-semibold tracking-wide">
+
+          <Link href="/contact" className="hover:text-green-700">
             Contact
           </Link>
+
           <Link
             href="/demo"
-            className="bg-[var(--brand-orange)] hover:opacity-90 text-white px-4 py-2 rounded-lg font-semibold transition"
+            className="bg-orange-500 text-white px-5 py-2 rounded-lg hover:opacity-90 transition"
           >
             Book Demo
           </Link>
-        </div>
+        </nav>
 
+        {/* Mobile Hamburger */}
+        <button
+          className="md:hidden text-2xl"
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          ☰
+        </button>
       </div>
-    </nav>
-  );
+
+      {/* Mobile Menu */}
+      {menuOpen && (
+        <div className="md:hidden border-t bg-white px-6 py-4 space-y-4">
+
+          <Link
+            href="/features"
+            className="block text-gray-700"
+            onClick={() => setMenuOpen(false)}
+          >
+            Features
+          </Link>
+
+          <Link
+            href="/pricing"
+            className="block text-gray-700"
+            onClick={() => setMenuOpen(false)}
+          >
+            Pricing
+          </Link>
+
+          <Link
+            href="/contact"
+            className="block text-gray-700"
+            onClick={() => setMenuOpen(false)}
+          >
+            Contact
+          </Link>
+
+          <Link
+            href="/demo"
+            className="block bg-orange-500 text-white text-center py-2 rounded-lg"
+            onClick={() => setMenuOpen(false)}
+          >
+            Book Demo
+          </Link>
+
+        </div>
+      )}
+    </header>
+  )
 }

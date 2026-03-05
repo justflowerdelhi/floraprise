@@ -39,6 +39,23 @@ export default function MainSiteLayout({
       <body className={`${inter.className} bg-white text-gray-900`}>
         <Navbar />
         {children}
+        {/* Sticky Book Demo CTA for mobile */}
+        <div className="fixed bottom-4 left-0 right-0 flex justify-center gap-4 md:hidden z-50">
+          <a
+            href="/demo"
+            className="bg-green-600 text-white px-6 py-3 rounded-full shadow-lg font-semibold"
+          >
+            Book Free Demo
+          </a>
+          <a
+            href="https://wa.me/919810392755"
+            className="bg-green-500 text-white px-6 py-3 rounded-full shadow-lg font-semibold"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            WhatsApp Us
+          </a>
+        </div>
         <Footer />
       </body>
     </html>
