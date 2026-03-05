@@ -3,61 +3,87 @@ export interface Product {
   name: string;
   slug: string;
   price: number;
-  image: string;
+  images: string[];
   category: string;
   stock: number;
-  isBestSeller: boolean;
-  salesCount?: number; // reserved for analytics
-  createdAt: string; // used to sort New Arrivals
+  tags?: string[];
+  createdAt: string;
+  description: string;
+  features?: string[];
 }
 
 export const products: Product[] = [
   {
     id: "1",
-    name: "Colorful Pipe Cleaners - Mixed Shades (100 pcs)",
-    slug: "pipe-cleaners-mixed-100",
+    name: "Colorful Pipe Cleaners - Mixed Shades",
+    slug: "pipe-cleaners-mixed",
     price: 149,
-    image: "/products/pipecleaner.jpg",
+    images: ["/products/pipecleaner.jpg"],
     category: "pipecleaners",
     stock: 50,
-    isBestSeller: true,
-    salesCount: 120,
+    tags: ["home", "best-seller"],
     createdAt: "2026-03-01",
+    description:
+      "High-quality colorful pipe cleaners perfect for DIY crafts, school projects, decorations and creative art activities.",
+    features: [
+      "Soft and flexible material",
+      "Bright mixed colors",
+      "Ideal for school projects",
+      "Pack of 100 pieces",
+    ],
   },
   {
     id: "2",
     name: "Birthday Balloon Decoration Set",
     slug: "birthday-balloon-set",
     price: 299,
-    image: "/products/balloons.jpg",
+    images: ["/products/balloons.jpg"],
     category: "birthday-supplies",
     stock: 40,
-    isBestSeller: true,
-    salesCount: 90,
+    tags: ["best-seller"],
     createdAt: "2026-03-02",
+    description: "Complete birthday balloon decoration set for quick and colorful party setups.",
+    features: [
+      "Assorted balloons and ribbons",
+      "Easy setup for home parties",
+      "Bright festive colors",
+      "Great for birthdays and events",
+    ],
   },
   {
     id: "3",
-    name: "Premium Gift Wrap Paper Pack (10 sheets)",
-    slug: "gift-wrap-pack-10",
+    name: "Premium Gift Wrap Paper Pack",
+    slug: "gift-wrap-pack",
     price: 199,
-    image: "/products/giftwrap.jpg",
+    images: ["/products/giftwrap.jpg"],
     category: "gift-packaging",
     stock: 30,
-    isBestSeller: false,
-    salesCount: 30,
+    tags: ["new", "home"],
     createdAt: "2026-03-03",
+    description: "Premium gift wrap paper pack to elevate the look of your presents.",
+    features: [
+      "High-quality finish",
+      "Multiple designs",
+      "Vibrant prints",
+      "Tear-resistant paper",
+    ],
   },
   {
     id: "4",
-    name: "DIY Art & Craft Starter Kit",
+    name: "DIY Craft Starter Kit",
     slug: "diy-craft-kit",
     price: 349,
-    image: "/products/diykit.jpg",
+    images: ["/products/diykit.jpg"],
     category: "art-craft",
     stock: 25,
-    isBestSeller: false,
-    salesCount: 10,
+    tags: ["new"],
     createdAt: "2026-03-04",
+    description: "DIY craft starter kit with essential tools and materials for beginners and hobbyists.",
+    features: [
+      "Curated assortment of tools",
+      "Beginner-friendly materials",
+      "Great for gifting",
+      "Includes idea inspirations",
+    ],
   },
 ];

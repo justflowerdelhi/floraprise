@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
-import { Product } from "@/data/products";
+import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { Product } from "../data/products";
 
-interface CartItem extends Product {
+export interface CartItem extends Product {
+  id: string; // ensure cart items always carry a unique identifier
   quantity: number;
 }
 
@@ -12,9 +13,14 @@ interface CartContextType {
   addToCart: (product: Product) => void;
   removeFromCart: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
+  clearCart: () => void;
   subtotal: number;
   shipping: number;
   discount: number;
+  couponCode: string;
+  setCouponCode: (code: string) => void;
+  couponDiscount: number;
+  setCouponDiscount: (amount: number) => void;
   total: number;
   paymentMethod: "cod" | "prepaid";
   setPaymentMethod: (method: "cod" | "prepaid") => void;
@@ -24,6 +30,19 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
+
+  // Load cart from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("cart");
+    if (stored) setCart(JSON.parse(stored));
+  }, []);
+
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "prepaid">("cod");
 
   const addToCart = (product: Product) => {
@@ -62,7 +81,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const shipping = subtotal >= 200 ? 0 : subtotal > 0 ? 49 : 0;
 
-  const total = subtotal - discount + shipping;
+  const total = subtotal - discount - couponDiscount + shipping;
+
+  const clearCart = () => {
+    setCart([]);
+    setCouponCode("");
+    setCouponDiscount(0);
+  };
 
   return (
     <CartContext.Provider
@@ -71,9 +96,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
         addToCart,
         removeFromCart,
         updateQuantity,
+        clearCart,
         subtotal,
         shipping,
         discount,
+        couponCode,
+        setCouponCode,
+        couponDiscount,
+        setCouponDiscount,
         total,
         paymentMethod,
         setPaymentMethod,

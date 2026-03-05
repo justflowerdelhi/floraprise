@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Order" ADD COLUMN     "gstAmount" DOUBLE PRECISION NOT NULL DEFAULT 0;

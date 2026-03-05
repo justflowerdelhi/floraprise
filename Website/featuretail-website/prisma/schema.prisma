@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  createdAt       DateTime    @default(now())
+  paymentMethod   String
+  paymentStatus   String      @default("pending")
+  orderStatus     String      @default("pending")
+  subtotal        Float
+  shipping        Float
+  discount        Float
+  total           Float
+  shippingName    String
+  shippingPhone   String
+  shippingEmail   String
+  shippingAddress String
+  shippingCity    String
+  shippingState   String
+  shippingPincode String
+  billingName     String
+  billingPhone    String
+  billingEmail    String
+  billingAddress  String
+  billingCity     String
+  billingState    String
+  billingPincode  String
+  companyName     String?
+  gstNumber       String?
+  gstAmount       Float       @default(0)
+  items           OrderItem[]
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String
+  name      String
+  price     Float
+  quantity  Int
+  order     Order  @relation(fields: [orderId], references: [id])
+}
+
+model Coupon {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  type        String
+  value       Float
+  minOrder    Float?
+  maxDiscount Float?
+  usageLimit  Int?
+  usedCount   Int       @default(0)
+  isActive    Boolean   @default(true)
+  expiryDate  DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model Category {
+  id            String        @id @default(cuid())
+  name          String
+  slug          String        @unique
+  products      Product[]
+  subCategories SubCategory[]
+}
+
+model SubCategory {
+  id         String    @id @default(cuid())
+  name       String
+  slug       String    @unique
+  categoryId String
+  products   Product[]
+  category   Category  @relation(fields: [categoryId], references: [id])
+}
+
+model Tag {
+  id       String       @id @default(cuid())
+  name     String       @unique
+  products ProductTag[]
+}
+
+model ProductTag {
+  productId String
+  tagId     String
+  product   Product @relation(fields: [productId], references: [id])
+  tag       Tag     @relation(fields: [tagId], references: [id])
+
+  @@id([productId, tagId])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  url       String
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Product {
+  id            String         @id @default(cuid())
+  name          String
+  slug          String         @unique
+  description   String
+  price         Float
+  stock         Int
+  status        String         @default("draft")
+  featured      Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  categoryId    String
+  subCategoryId String?
+  category      Category       @relation(fields: [categoryId], references: [id])
+  subCategory   SubCategory?   @relation(fields: [subCategoryId], references: [id])
+  images        ProductImage[]
+  tags          ProductTag[]
+  variants      Variant[]
+}
+
+model Variant {
+  id        String          @id @default(cuid())
+  name      String
+  productId String
+  product   Product         @relation(fields: [productId], references: [id])
+  options   VariantOption[]
+}
+
+model VariantOption {
+  id        String  @id @default(cuid())
+  value     String
+  price     Float?
+  stock     Int?
+  variantId String
+  variant   Variant @relation(fields: [variantId], references: [id])
+}

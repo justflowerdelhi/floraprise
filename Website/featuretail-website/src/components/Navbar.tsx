@@ -14,18 +14,23 @@ export default function Navbar() {
       <div className="bg-pink-600 text-white text-center text-sm py-2 px-4">
         🚚 Free Shipping on Orders Above ₹200 | 💳 Get 5% Extra Off on Prepaid Orders
       </div>
+      {/* Navigation Bar */}
       <nav className="bg-white shadow-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
           
           {/* Logo */}
-          <Link href="/" className="flex items-center">
+          <Link href="/" className="flex items-center gap-3">
             <Image
               src="/logo.png"
               alt="3A Featuretail"
-              width={120}
-              height={50}
+              width={60}
+              height={60}
               priority
             />
+            <div className="flex flex-col">
+              <span className="font-bold text-xl text-pink-700">3A Featuretail</span>
+              <span className="text-xs text-gray-500">Craft & Celebration Supplies</span>
+            </div>
           </Link>
           {/* Desktop Menu */}
           <div className="hidden md:flex space-x-6 font-medium">
