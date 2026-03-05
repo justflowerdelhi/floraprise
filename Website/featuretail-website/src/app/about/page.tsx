@@ -3,150 +3,187 @@ import Footer from "@/components/Footer";
 export default function AboutPage() {
   return (
     <>
-      <div className="max-w-6xl mx-auto px-6 py-12 space-y-12">
+      <div className="max-w-6xl mx-auto px-6 py-12 space-y-16">
 
-      <h1 className="text-3xl font-bold text-center">
-        About 3A Featuretail
-      </h1>
+        {/* Hero */}
+        <section className="text-center space-y-6">
 
-      <p className="text-lg text-gray-700 leading-relaxed">
-        Established in 2016, <b>3A Featuretail</b> is an innovation-driven
-        organization dedicated to enhancing the lifestyles of our customers
-        through thoughtful design and premium quality. We pride ourselves on
-        being a forward-thinking brand that bridges the gap between
-        contemporary trends and practical utility.
-      </p>
+          <h1 className="text-4xl font-bold">
+            About 3A Featuretail
+          </h1>
 
-      <p className="text-lg text-gray-700 leading-relaxed">
-        Through our signature brands, <b>"3A Featuretail"</b> and
-        <b> "Pandeji"</b>, we have rapidly emerged as a trusted name in the
-        e-commerce landscape, recognized for delivering export-quality
-        products that combine aesthetic appeal with affordability.
-      </p>
+          <p className="text-lg text-gray-700 max-w-3xl mx-auto">
+            Established in 2016, <b>3A Featuretail</b> is an innovation-driven
+            organization dedicated to enhancing lifestyles through thoughtful
+            design and premium quality products.
+          </p>
 
-      {/* Philosophy */}
-      <section className="space-y-4">
-        <h2 className="text-2xl font-semibold">Our Philosophy</h2>
+          <p className="text-gray-600 max-w-3xl mx-auto">
+            Through our signature brands <b>3A Featuretail</b> and <b>Pandeji</b>,
+            we combine contemporary design trends with practical everyday
+            utility to deliver export-quality products at accessible prices.
+          </p>
 
-        <p className="text-gray-700 leading-relaxed">
-          At the core of our business is a commitment to continuous research
-          and development. We believe that every product should make our
-          customers' lives easier. By staying ahead of global design trends,
-          we ensure that our catalog remains fresh, functional, and superior
-          in quality.
-        </p>
-      </section>
+        </section>
 
-      {/* Product Portfolio */}
-      <section className="space-y-4">
-        <h2 className="text-2xl font-semibold">Our Product Portfolio</h2>
+        {/* Brand Section */}
+        <section className="text-center space-y-6">
 
-        <p className="text-gray-700">
-          We offer an unrivalled range of products across several lifestyle
-          and creative categories:
-        </p>
+          <h2 className="text-2xl font-semibold">
+            Our Brands
+          </h2>
 
-        <ul className="list-disc pl-6 space-y-2 text-gray-700">
-          <li>
-            <b>Arts & Crafts:</b> Specialized supplies including our popular
-            Pipe Cleaner Craft range.
-          </li>
+          <div className="flex justify-center gap-10">
 
-          <li>
-            <b>Home & Festive Decor:</b> Unique pieces designed to elevate
-            living spaces and celebrate traditions.
-          </li>
+            <div className="border p-6 rounded-lg w-48">
+              <p className="font-semibold">3A Featuretail</p>
+              <p className="text-sm text-gray-500">
+                Lifestyle & Celebration Products
+              </p>
+            </div>
 
-          <li>
-            <b>Gift Packaging:</b> Premium solutions to make every gesture
-            memorable.
-          </li>
+            <div className="border p-6 rounded-lg w-48">
+              <p className="font-semibold">Pandeji</p>
+              <p className="text-sm text-gray-500">
+                Creative Craft Supplies
+              </p>
+            </div>
 
-          <li>
-            <b>Birthday & Party Supplies:</b> Comprehensive essentials for
-            seamless celebrations.
-          </li>
-        </ul>
-      </section>
-
-      {/* Trusted Excellence */}
-      <section className="space-y-4">
-        <h2 className="text-2xl font-semibold">Trusted Excellence</h2>
-
-        <p className="text-gray-700">
-          We have solidified our reputation as a leading supplier by
-          maintaining rigorous quality standards.
-        </p>
-
-        <ul className="list-disc pl-6 space-y-2 text-gray-700">
-          <li>
-            <b>Premium Level Seller Status:</b> A testament to our service and
-            quality on Amazon.in.
-          </li>
-
-          <li>
-            <b>Multi-Platform Availability:</b> Proudly serving customers
-            across Flipkart and Meesho.
-          </li>
-
-          <li>
-            <b>Regulatory Compliance:</b> Fully registered and compliant with
-            food safety standards where applicable (FSSAI No.
-            23322005001716).
-          </li>
-        </ul>
-      </section>
-
-      {/* Why Featuretail */}
-      <section className="space-y-4">
-
-        <h2 className="text-2xl font-semibold">
-          Why Choose 3A Featuretail?
-        </h2>
-
-        <div className="grid md:grid-cols-2 gap-6">
-
-          <div className="border p-5 rounded-lg">
-            <h3 className="font-semibold">Innovation-First</h3>
-            <p className="text-gray-600">
-              Access to the latest global designs and trends.
-            </p>
           </div>
 
-          <div className="border p-5 rounded-lg">
-            <h3 className="font-semibold">Premium Quality</h3>
-            <p className="text-gray-600">
-              Export-grade materials used across all product lines.
-            </p>
+        </section>
+
+        {/* Product Portfolio */}
+        <section className="space-y-6">
+
+          <h2 className="text-2xl font-semibold">
+            Our Product Portfolio
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-6">
+
+            <div className="border p-5 rounded-lg">
+              <h3 className="font-semibold">Arts & Crafts</h3>
+              <p className="text-gray-600">
+                Specialized craft supplies including our popular
+                Pipe Cleaner Craft range.
+              </p>
+            </div>
+
+            <div className="border p-5 rounded-lg">
+              <h3 className="font-semibold">Home & Festive Decor</h3>
+              <p className="text-gray-600">
+                Unique decorative products designed to elevate living spaces
+                and celebrations.
+              </p>
+            </div>
+
+            <div className="border p-5 rounded-lg">
+              <h3 className="font-semibold">Gift Packaging</h3>
+              <p className="text-gray-600">
+                Premium packaging solutions to make every gift memorable.
+              </p>
+            </div>
+
+            <div className="border p-5 rounded-lg">
+              <h3 className="font-semibold">Birthday & Party Supplies</h3>
+              <p className="text-gray-600">
+                Complete essentials for seamless celebrations.
+              </p>
+            </div>
+
           </div>
 
-          <div className="border p-5 rounded-lg">
-            <h3 className="font-semibold">Affordability</h3>
-            <p className="text-gray-600">
-              High-end aesthetics at accessible price points.
-            </p>
+        </section>
+
+        {/* Marketplace Presence */}
+        <section className="space-y-6 text-center">
+
+          <h2 className="text-2xl font-semibold">
+            Marketplace Presence
+          </h2>
+
+          <p className="text-gray-700">
+            We proudly serve customers across India's leading marketplaces.
+          </p>
+
+          <div className="flex justify-center gap-8">
+
+            <div className="border p-4 rounded-lg">Amazon</div>
+            <div className="border p-4 rounded-lg">Flipkart</div>
+            <div className="border p-4 rounded-lg">Meesho</div>
+
           </div>
 
-          <div className="border p-5 rounded-lg">
-            <h3 className="font-semibold">Customer Centric</h3>
-            <p className="text-gray-600">
-              Products designed specifically to simplify daily life.
-            </p>
+        </section>
+
+        {/* Why Featuretail */}
+        <section className="space-y-6">
+
+          <h2 className="text-2xl font-semibold text-center">
+            Why Choose 3A Featuretail?
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-6">
+
+            <div className="border p-5 rounded-lg">
+              <h3 className="font-semibold">Innovation First</h3>
+              <p className="text-gray-600">
+                Access to the latest global designs and trends.
+              </p>
+            </div>
+
+            <div className="border p-5 rounded-lg">
+              <h3 className="font-semibold">Premium Quality</h3>
+              <p className="text-gray-600">
+                Export-grade materials used across our product lines.
+              </p>
+            </div>
+
+            <div className="border p-5 rounded-lg">
+              <h3 className="font-semibold">Affordable Excellence</h3>
+              <p className="text-gray-600">
+                Premium aesthetics at accessible price points.
+              </p>
+            </div>
+
+            <div className="border p-5 rounded-lg">
+              <h3 className="font-semibold">Customer Centric</h3>
+              <p className="text-gray-600">
+                Products designed to simplify daily life.
+              </p>
+            </div>
+
           </div>
 
-        </div>
+        </section>
 
-      </section>
+        {/* Compliance */}
+        <section className="text-center space-y-3">
 
-      {/* Mission */}
-      <section className="text-center bg-gray-100 p-8 rounded-lg">
-        <p className="text-xl italic text-gray-700">
-          "Our mission is to bring joy and convenience to every household
-          through creativity and quality craftsmanship."
-        </p>
-      </section>
+          <h2 className="text-xl font-semibold">
+            Regulatory Compliance
+          </h2>
+
+          <p className="text-gray-600">
+            Fully registered and compliant with applicable food safety
+            regulations (FSSAI No. 23322005001716).
+          </p>
+
+        </section>
+
+        {/* Mission */}
+        <section className="bg-gray-100 p-10 rounded-lg text-center">
+
+          <p className="text-xl italic text-gray-700">
+            "Our mission is to bring joy and convenience to every household
+            through creativity and quality craftsmanship."
+          </p>
+
+        </section>
+
       </div>
       <Footer />
     </>
-  )
+  );
 }

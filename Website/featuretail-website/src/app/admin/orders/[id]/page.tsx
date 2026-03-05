@@ -25,6 +25,13 @@ export default function OrderDetailPage(){
       <h1 className="text-2xl font-bold">
         Order {order.orderNumber}
       </h1>
+      <a
+        href={`/api/admin/orders/${order.id}/invoice`}
+        target="_blank"
+        className="bg-blue-600 text-white px-4 py-2 rounded"
+      >
+        Download Invoice
+      </a>
 
       {/* Order Summary */}
       <div className="bg-white p-6 border rounded grid grid-cols-3 gap-6">

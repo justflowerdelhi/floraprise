@@ -1,5 +1,5 @@
 "use client";
-
+import { useEffect, useState } from "react";
 import {
   ShoppingCart,
   Users,
@@ -12,6 +12,20 @@ import Link from "next/link";
 import SalesChart from "@/components/admin/SalesChart";
 
 export default function AdminDashboard() {
+  const [stats, setStats] = useState({
+    revenue: 0,
+    orders: 0,
+    customers: 0,
+    products: 0,
+    messages: 0,
+  });
+
+  useEffect(() => {
+    fetch("/api/admin/dashboard")
+      .then((res) => res.json())
+      .then((data) => setStats(data));
+  }, []);
+
   return (
     <div className="space-y-8">
 
@@ -24,7 +38,7 @@ export default function AdminDashboard() {
           <div className="flex justify-between items-center">
             <div>
               <p className="text-sm text-gray-500">Total Revenue</p>
-              <h2 className="text-2xl font-bold mt-1">₹0</h2>
+              <h2 className="text-2xl font-bold mt-1">₹{stats.revenue}</h2>
             </div>
             <IndianRupee className="text-pink-600" size={32} />
           </div>
@@ -34,7 +48,7 @@ export default function AdminDashboard() {
           <div className="flex justify-between items-center">
             <div>
               <p className="text-sm text-gray-500">Total Orders</p>
-              <h2 className="text-2xl font-bold mt-1">0</h2>
+              <h2 className="text-2xl font-bold mt-1">{stats.orders}</h2>
             </div>
             <ShoppingCart className="text-blue-600" size={32} />
           </div>
@@ -44,7 +58,7 @@ export default function AdminDashboard() {
           <div className="flex justify-between items-center">
             <div>
               <p className="text-sm text-gray-500">Customers</p>
-              <h2 className="text-2xl font-bold mt-1">0</h2>
+              <h2 className="text-2xl font-bold mt-1">{stats.customers}</h2>
             </div>
             <Users className="text-green-600" size={32} />
           </div>
@@ -54,7 +68,7 @@ export default function AdminDashboard() {
           <div className="flex justify-between items-center">
             <div>
               <p className="text-sm text-gray-500">Products</p>
-              <h2 className="text-2xl font-bold mt-1">0</h2>
+              <h2 className="text-2xl font-bold mt-1">{stats.products}</h2>
             </div>
             <Package className="text-yellow-600" size={32} />
           </div>

@@ -43,7 +43,7 @@ export default function ProductCard({ product }: Props) {
               alt={product.name}
               fill
               sizes="(max-width: 768px) 100vw, 25vw"
-              className="object-cover rounded-lg"
+              className="object-cover rounded-lg transition-transform duration-300 hover:scale-105"
               priority={false}
             />
           </div>

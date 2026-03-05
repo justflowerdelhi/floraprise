@@ -3,16 +3,27 @@ import Header from "@/components/Header";
 import HomeCategories from "@/components/HomeCategories";
 import BestSellers from "@/components/BestSellers";
 import NewArrivals from "@/components/NewArrivals";
+import Newsletter from "@/components/Newsletter";
+import MarketplaceLogos from "@/components/MarketplaceLogos";
 import CustomerReviews from "@/components/CustomerReviews";
 import Footer from "@/components/Footer";
+import FeaturedCollections from "@/components/FeaturedCollections";
 import TrustBar from "@/components/TrustBar";
+
+import FeatureHighlights from "@/components/FeatureHighlights";
+
+export const metadata = {
+  title: "3A Featuretail | Craft & Celebration Supplies",
+  description:
+    "Shop premium craft supplies, birthday decorations, gift packaging and festive decor online in India.",
+};
 
 export default function Home() {
   return (
     <>
      
       {/* Hero Banner */}
-      <section className="w-full h-[220px] md:h-auto object-contain bg-white">
+      <section className="w-full h-[220px] md:h-auto object-contain bg-white mb-4 md:mb-8">
         <Image
           src="/hero.jpg"
           alt="3A Featuretail Banner"
@@ -22,14 +33,22 @@ export default function Home() {
           className="w-full h-auto object-cover"
         />
       </section>
+      <FeatureHighlights />
 
-      {/* Shop by Category */}
-      <HomeCategories />
+      <div className="my-4 md:my-8">
+        <MarketplaceLogos />
+      </div>
+      <div className="my-4 md:my-8">
+        <FeaturedCollections />
+      </div>
+      
 
-      <TrustBar />
+      <div className="my-4 md:my-8">
+        <TrustBar />
+      </div>
 
       {/* About / Trust Section */}
-      <section className="pt-2 pb-2 bg-white text-center px-4">
+      <section className="pt-6 pb-6 md:pt-10 md:pb-10 bg-white text-center px-4 mb-4 md:mb-8">
         <h1 className="text-2xl md:text-4xl font-bold text-gray-800 mb-6">
           Craft Your Creativity. Celebrate Every Moment.
         </h1>
@@ -54,13 +73,22 @@ export default function Home() {
       </section>
 
       {/* Best Sellers */}
-      <BestSellers />
+      <div className="my-4 md:my-8">
+        <BestSellers />
+      </div>
+      <div className="my-4 md:my-8">
+        <Newsletter />
+      </div>
 
       {/* New Arrivals */}
-      <NewArrivals />
+      <div className="my-4 md:my-8">
+        <NewArrivals />
+      </div>
 
       {/* Customer Reviews */}
-      <CustomerReviews />
+      <div className="my-4 md:my-8">
+        <CustomerReviews />
+      </div>
 
       <Footer />
     </>
