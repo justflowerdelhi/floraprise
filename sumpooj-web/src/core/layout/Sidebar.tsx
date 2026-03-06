@@ -96,14 +96,15 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 const SECTION_COLORS: Record<string, string> = {
   sales: '#2E7D32',      // Flora Green
   orders: '#2196f3',
-  events: '#e91e63',
   inventory: '#ff9800',
-  reports: '#5B2E91',    // FloraPrice Purple
   catalog: '#00bcd4',
-  crm: '#5B2E91',        // FloraPrice Purple
   production: '#00897b', // Teal
   'gift-cards': '#9c27b0', // Purple accent
+  accounting: '#1976d2', // Blue for accounting
+  events: '#e91e63',
   staff: '#ff5722',
+  crm: '#5B2E91',        // FloraPrice Purple
+  reports: '#5B2E91',    // FloraPrice Purple
   settings: '#F4C430',   // Accent Yellow
 };
 
@@ -343,6 +344,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }))
       .filter(section => section.items.length > 0);
   }
+
+  // Rearranged menu order
+  const desiredOrder = [
+    'sales',
+    'orders',
+    'inventory',
+    'catalog',
+    'production',
+    'gift-cards',
+    'accounting',
+    'events',
+    'staff',
+    'crm',
+    'reports',
+    'settings',
+  ];
+  menuSections = menuSections.sort((a, b) => {
+    const ai = desiredOrder.indexOf(a.id);
+    const bi = desiredOrder.indexOf(b.id);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 
   return (
     <Box

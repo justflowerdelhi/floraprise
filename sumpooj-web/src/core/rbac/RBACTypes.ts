@@ -467,6 +467,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         path: '/production/wastage',
         permissions: ['production:view'],
       },
+      {
+        id: 'production-intelligence',
+        label: 'Production Intelligence',
+        icon: 'TrendingUp',
+        path: '/production/intelligence',
+        permissions: ['production:view'],
+      },
     ],
   },
   {
@@ -583,6 +590,20 @@ export const MENU_SECTIONS: MenuSection[] = [
         path: '/admin/audit-logs',
         permissions: ['settings:edit'],
       },
+    ],
+  },
+  {
+    id: 'accounting',
+    title: 'Accounting',
+    icon: 'AccountBalance',
+    items: [
+      { id: 'accounting-dashboard', label: 'Dashboard', icon: 'AccountBalance', path: '/accounting/dashboard', permissions: ['reports:view'] },
+      { id: 'chart-of-accounts', label: 'Chart of Accounts', icon: 'ListAlt', path: '/accounting/chart-of-accounts', permissions: ['reports:view'] },
+      { id: 'account-ledger', label: 'Account Ledger', icon: 'MenuBook', path: '/accounting/account-ledger', permissions: ['reports:view'] },
+      { id: 'expenses', label: 'Expenses', icon: 'AttachMoney', path: '/accounting/expenses', permissions: ['reports:view'] },
+      { id: 'journal', label: 'Journal', icon: 'ReceiptLong', path: '/accounting/journal', permissions: ['reports:view'] },
+      { id: 'profit-loss', label: 'Profit & Loss', icon: 'TrendingUp', path: '/accounting/profit-loss', permissions: ['reports:view'] },
+      { id: 'tax-summary', label: 'Tax Summary', icon: 'Percent', path: '/accounting/tax-summary', permissions: ['reports:view'] },
     ],
   },
 ];

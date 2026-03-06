@@ -34,5 +34,38 @@ export const MENU_CONFIG: MenuSection[] = [
       { id: 'phone-orders', label: 'Phone Orders', icon: 'Phone', path: '/phone-orders' },
     ],
   },
+  {
+    id: 'reports',
+    label: 'Reports',
+    items: [
+      { id: 'health-dashboard', label: 'Dashboard', icon: 'Dashboard', path: '/health-dashboard' },
+      { id: 'profit-intelligence', label: 'Profit Analysis', icon: 'TrendingUp', path: '/profit-intelligence' },
+      { id: 'valuation', label: 'Stock Value', icon: 'Assessment', path: '/valuation' },
+      { id: 'stock-ledger', label: 'Stock History', icon: 'History', path: '/stock-ledger' },
+      { id: 'reorder', label: 'Reorder Alerts', icon: 'NotificationsActive', path: '/reorder' },
+    ],
+  },
+  {
+    id: 'accounting',
+    label: 'Accounting',
+    permissions: ['Admin', 'Accountant', 'Manager'],
+    items: [
+      { id: 'accounting-dashboard', label: 'Dashboard', icon: 'AccountBalance', path: '/accounting/dashboard' },
+      { id: 'chart-of-accounts', label: 'Chart of Accounts', icon: 'ListAlt', path: '/accounting/chart-of-accounts' },
+      { id: 'account-ledger', label: 'Account Ledger', icon: 'MenuBook', path: '/accounting/account-ledger' },
+      { id: 'expenses', label: 'Expenses', icon: 'AttachMoney', path: '/accounting/expenses' },
+      { id: 'journal', label: 'Journal', icon: 'ReceiptLong', path: '/accounting/journal' },
+      { id: 'profit-loss', label: 'Profit & Loss', icon: 'TrendingUp', path: '/accounting/profit-loss' },
+      { id: 'tax-summary', label: 'Tax Summary', icon: 'Percent', path: '/accounting/tax-summary' },
+    ],
+  },
+  {
+    id: 'staff',
+    label: 'Staff',
+    items: [
+      { id: 'staff-list', label: 'All Staff', icon: 'People', path: '/staff' },
+      { id: 'tasks', label: 'Tasks', icon: 'Assignment', path: '/tasks' },
+    ],
+  },
   // Add more sections/items as needed
 ];

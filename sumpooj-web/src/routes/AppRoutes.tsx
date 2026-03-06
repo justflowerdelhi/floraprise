@@ -117,6 +117,18 @@ import { MasterLayout } from '../core/layout/MasterLayout';
 import { FeatureGate } from '../core/tenant';
 import { DiscountApprovalProvider } from '../core/rbac/DiscountApprovalModal';
 
+// Accounting
+import AccountingDashboard from "../modules/accounting/pages/AccountingDashboard";
+import ChartOfAccounts from "../modules/accounting/pages/ChartOfAccounts";
+import AccountLedger from "../modules/accounting/pages/AccountLedger";
+import ExpenseManager from "../modules/accounting/pages/ExpenseManager";
+import JournalViewer from "../modules/accounting/pages/JournalViewer";
+import ProfitLossReport from "../modules/accounting/pages/ProfitLossReport";
+import TaxSummary from "../modules/accounting/pages/TaxSummary";
+
+// Production Intelligence
+import ProductionIntelligenceDashboard from "../modules/production/ProductionIntelligenceDashboard";
+
 /** Wrapper that wires ShiftProvider (reads location from LocationContext) + POSLayout */
 function POSWithShift() {
   return (
@@ -298,6 +310,17 @@ export default function AppRoutes() {
           {/* ─── Delivery Routes ───────────────────────────── */}
           <Route path="/delivery-routes" element={<DeliveryRoutesPage />} />
           <Route path="/delivery-routes/:routeId" element={<DeliveryRouteDetailPage />} />
+          <Route path="/accounting/dashboard" element={<AccountingDashboard />} />
+          <Route path="/accounting/chart-of-accounts" element={<ChartOfAccounts />} />
+          <Route path="/accounting/account-ledger" element={<AccountLedger />} />
+          <Route path="/accounting/expenses" element={<ExpenseManager />} />
+          <Route path="/accounting/journal" element={<JournalViewer />} />
+          <Route path="/accounting/profit-loss" element={<ProfitLossReport />} />
+          <Route path="/accounting/tax-summary" element={<TaxSummary />} />
+          <Route
+            path="/production/intelligence"
+            element={<ProductionIntelligenceDashboard />}
+          />
         </Route>
       </Routes>
       </DiscountApprovalProvider>

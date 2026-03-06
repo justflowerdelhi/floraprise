@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../auth/AuthContext';
 import CustomizeDashboardDrawer, { type ModuleItem } from './CustomizeDashboardDrawer';
+import FinancialSnapshotWidget from './FinancialSnapshotWidget';
 import {
   getDashboardPreference,
   saveDashboardPreference,
@@ -188,62 +189,32 @@ const HomeDashboard: React.FC = () => {
 
   return (
     <div className="min-h-full bg-gray-50 p-4 sm:p-6 lg:p-8">
-      {/* ── Header ─────────────────────────────────── */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            Control Center
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            FloraPrice — your business at a glance
-          </p>
-        </div>
-        <Tooltip title="Customize Dashboard">
-          <IconButton
-            onClick={() => setDrawerOpen(true)}
-            sx={{
-              bgcolor: 'white',
-              border: '1px solid',
-              borderColor: 'divider',
-              '&:hover': { bgcolor: 'action.hover' },
-            }}
-          >
-            <CustomizeIcon />
-          </IconButton>
-        </Tooltip>
-      </div>
-
       {/* ── KPI Strip ──────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
         {KPI_ITEMS.map((kpi) => (
           <div
             key={kpi.label}
-            className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-3
-                       shadow-sm hover:shadow-md transition-shadow"
+            className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-3 shadow-sm hover:shadow-md transition-shadow"
           >
             {/* Icon circle */}
-            <div
-              className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${kpi.bgColor} ${kpi.color}`}
-            >
+            <div className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${kpi.bgColor} ${kpi.color}`}>
               {kpi.icon}
             </div>
-
             {/* Text */}
             <div className="min-w-0">
-              <p className="text-xs text-gray-500 uppercase tracking-wide leading-tight truncate">
-                {kpi.label}
-              </p>
-              <p className="text-lg font-bold text-gray-900 leading-tight mt-0.5">
-                {kpi.value}
-              </p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide leading-tight truncate">{kpi.label}</p>
+              <p className="text-lg font-bold text-gray-900 leading-tight mt-0.5">{kpi.value}</p>
               {kpi.subtext && (
-                <p className="text-[11px] text-gray-400 leading-tight mt-0.5 truncate">
-                  {kpi.subtext}
-                </p>
+                <p className="text-[11px] text-gray-400 leading-tight mt-0.5 truncate">{kpi.subtext}</p>
               )}
             </div>
           </div>
         ))}
+      </div>
+
+      {/* ── Financial Snapshot Widget ───────────────────────────── */}
+      <div className="mb-8">
+        <FinancialSnapshotWidget />
       </div>
 
       {/* ── Feature Tiles ──────────────────────────── */}
@@ -252,50 +223,50 @@ const HomeDashboard: React.FC = () => {
           <CircularProgress size={32} />
         </div>
       ) : (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
-        {displayTiles.map((tile) => (
-          <button
-            key={tile.key}
-            onClick={() => navigate(tile.route)}
-            className="group relative bg-white rounded-2xl border border-gray-200 p-5 sm:p-6
-                       flex flex-col items-center text-center
-                       shadow-sm hover:shadow-lg active:scale-[0.97]
-                       transition-all duration-200 ease-out
-                       min-h-[140px] sm:min-h-[160px]
-                       touch-manipulation cursor-pointer
-                       focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2"
-          >
-            {/* Badge */}
-            {tile.badge && (
-              <span
-                className="absolute top-2.5 right-2.5 bg-red-500 text-white text-[10px] font-bold
-                           leading-none px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
-              >
-                {tile.badge}
-              </span>
-            )}
-
-            {/* Icon Container */}
-            <div
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${tile.color}
-                          flex items-center justify-center text-white mb-3 sm:mb-4
-                          group-hover:scale-110 transition-transform duration-200`}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
+          {displayTiles.map((tile) => (
+            <button
+              key={tile.key}
+              onClick={() => navigate(tile.route)}
+              className="group relative bg-white rounded-2xl border border-gray-200 p-5 sm:p-6
+                         flex flex-col items-center text-center
+                         shadow-sm hover:shadow-lg active:scale-[0.97]
+                         transition-all duration-200 ease-out
+                         min-h-[140px] sm:min-h-[160px]
+                         touch-manipulation cursor-pointer
+                         focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2"
             >
-              {tile.icon}
-            </div>
+              {/* Badge */}
+              {tile.badge && (
+                <span
+                  className="absolute top-2.5 right-2.5 bg-red-500 text-white text-[10px] font-bold
+                             leading-none px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
+                >
+                  {tile.badge}
+                </span>
+              )}
 
-            {/* Title */}
-            <span className="text-sm sm:text-base font-semibold text-gray-900 leading-tight">
-              {tile.title}
-            </span>
+              {/* Icon Container */}
+              <div
+                className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${tile.color}
+                            flex items-center justify-center text-white mb-3 sm:mb-4
+                            group-hover:scale-110 transition-transform duration-200`}
+              >
+                {tile.icon}
+              </div>
 
-            {/* Description */}
-            <span className="text-[11px] sm:text-xs text-gray-400 mt-1 leading-tight">
-              {tile.description}
-            </span>
-          </button>
-        ))}
-      </div>
+              {/* Title */}
+              <span className="text-sm sm:text-base font-semibold text-gray-900 leading-tight">
+                {tile.title}
+              </span>
+
+              {/* Description */}
+              <span className="text-[11px] sm:text-xs text-gray-400 mt-1 leading-tight">
+                {tile.description}
+              </span>
+            </button>
+          ))}
+        </div>
       )}
 
       {/* ── Customize Drawer ───────────────────────── */}
