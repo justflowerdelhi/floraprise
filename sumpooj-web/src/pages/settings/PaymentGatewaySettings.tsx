@@ -885,7 +885,7 @@ const PaymentGatewaySettings: React.FC = () => {
             const isConfigured = configs.some((c) => c.gatewayType === gateway.type);
             const brand = GATEWAY_BRAND[gateway.type];
             return (
-              <Grid key={gateway.type} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+              <Grid key={gateway.type} xs={12} sm={6} md={4} lg={3}>
                 <Paper
                   variant="outlined"
                   sx={{

@@ -132,14 +132,19 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, collapsed, sectionColor, onNa
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isActive = item.path ? location.pathname === item.path : false;
+    const isActive = item.path
+      ? location.pathname === item.path || location.pathname.startsWith(item.path + "/")
+      : false;
   const icon = ICON_MAP[item.icon] ?? <Dashboard />;
 
   const handleClick = () => {
-    if (item.path) {
+    if (!item.path) return;
+
+    if (location.pathname !== item.path) {
       navigate(item.path);
-      onNavigate?.();
     }
+
+    onNavigate?.();
   };
 
   const button = (
@@ -277,7 +282,7 @@ const Section: React.FC<SectionProps> = ({ section, collapsed, defaultExpanded =
       )}
 
       {/* Section Items */}
-      <Collapse in={expanded || collapsed} timeout="auto" unmountOnExit={false}>
+        <Collapse in={collapsed ? true : expanded} timeout="auto">
         <List disablePadding>
           {section.items.map((item) => (
             <MenuItem
@@ -349,6 +354,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         bgcolor: dk ? '#0f0f0f' : '#fff',
         borderRight: `1px solid ${dk ? 'rgba(255,255,255,0.06)' : '#e0e0e0'}`,
         transition: 'width 0.3s ease',
+          willChange: 'width',
         overflow: 'hidden',
       }}
     >

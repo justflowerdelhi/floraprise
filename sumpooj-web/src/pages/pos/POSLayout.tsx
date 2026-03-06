@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Alert, Snackbar } from '@mui/material';
 import POSTopBar from './POSTopBar';
-import CategorySidebar from './CategorySidebar';
+
 import ProductGrid from './ProductGrid';
 import POSCartPanel from './POSCartPanel';
 import POSPaymentDrawer from './POSPaymentDrawer';
@@ -277,11 +277,7 @@ const POSLayout: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Category Sidebar */}
-        <CategorySidebar
-          selectedCategory={selectedCategory}
-          onCategorySelect={setSelectedCategory}
-        />
+        
 
         {/* Product Grid */}
         <ProductGrid

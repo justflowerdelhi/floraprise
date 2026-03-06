@@ -400,7 +400,7 @@ const StaffForm: React.FC = () => {
         {/* ─── Basic Information ──────────────────────── */}
         <FormSection title="Basic Information" icon={<PersonIcon fontSize="small" />}>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid xs={12} md={6}>
               <TextField
                 label="Full Name"
                 value={formData.name}
@@ -419,7 +419,7 @@ const StaffForm: React.FC = () => {
                 }}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid xs={12} md={6}>
               <FormControl fullWidth required disabled={!canEditRole}>
                 <InputLabel>Role</InputLabel>
                 <Select
@@ -443,7 +443,7 @@ const StaffForm: React.FC = () => {
                 </Typography>
               )}
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid xs={12} md={6}>
               <FormControl fullWidth disabled={!canEditRole}>
                 <InputLabel>Location</InputLabel>
                 <Select
@@ -480,7 +480,7 @@ const StaffForm: React.FC = () => {
         {/* ─── Contact Information ────────────────────── */}
         <FormSection title="Contact Information" icon={<PhoneIcon fontSize="small" />}>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid xs={12} md={6}>
               <TextField
                 label="Phone"
                 value={formData.phone}
@@ -498,7 +498,7 @@ const StaffForm: React.FC = () => {
                 }}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid xs={12} md={6}>
               <TextField
                 label="Email"
                 value={formData.email}
@@ -524,7 +524,7 @@ const StaffForm: React.FC = () => {
         {/* ─── Compensation ───────────────────────────── */}
         <FormSection title="Compensation" icon={<MoneyIcon fontSize="small" />}>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid xs={12} md={4}>
               <FormControl fullWidth>
                 <InputLabel>Commission Type</InputLabel>
                 <Select
@@ -543,7 +543,7 @@ const StaffForm: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid xs={12} md={4}>
               <TextField
                 label="Commission Rate (%)"
                 value={formData.commissionRate}
@@ -563,7 +563,7 @@ const StaffForm: React.FC = () => {
                 }}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid xs={12} md={4}>
               <TextField
                 label="Hourly Rate"
                 value={formData.hourlyRate}
@@ -797,7 +797,7 @@ const StaffForm: React.FC = () => {
 
                   {formData.enableLogin && (
                     <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid size={{ xs: 12, md: 6 }}>
+                      <Grid xs={12} md={6}>
                         <TextField
                           label="Login Identifier (Email or Phone)"
                           value={formData.loginIdentifier}
@@ -816,7 +816,7 @@ const StaffForm: React.FC = () => {
                           }}
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, md: 6 }}>
+                      <Grid xs={12} md={6}>
                         <FormControl fullWidth required error={Boolean(errors.loginRole)}>
                           <InputLabel>Login Role</InputLabel>
                           <Select
@@ -843,7 +843,7 @@ const StaffForm: React.FC = () => {
                         </FormControl>
                       </Grid>
 
-                      <Grid size={{ xs: 12, md: 6 }}>
+                      <Grid xs={12} md={6}>
                         <TextField
                           label="Password"
                           value={formData.password}
@@ -863,7 +863,7 @@ const StaffForm: React.FC = () => {
                           }}
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, md: 6 }}>
+                      <Grid xs={12} md={6}>
                         <TextField
                           label="Confirm Password"
                           value={formData.confirmPassword}
@@ -884,7 +884,7 @@ const StaffForm: React.FC = () => {
                         />
                       </Grid>
 
-                      <Grid size={12}>
+                      <Grid xs={12}>
                         <Button
                           variant="contained"
                           startIcon={<LoginIcon />}
@@ -950,7 +950,7 @@ const StaffForm: React.FC = () => {
 
                   {formData.enableLogin && (
                     <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid size={{ xs: 12, md: 6 }}>
+                      <Grid xs={12} md={6}>
                         <TextField
                           label="Login Identifier (Email or Phone)"
                           value={formData.loginIdentifier}
@@ -969,7 +969,7 @@ const StaffForm: React.FC = () => {
                           }}
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, md: 6 }}>
+                      <Grid xs={12} md={6}>
                         <FormControl fullWidth required error={Boolean(errors.loginRole)}>
                           <InputLabel>Login Role</InputLabel>
                           <Select
@@ -996,7 +996,7 @@ const StaffForm: React.FC = () => {
                         </FormControl>
                       </Grid>
 
-                      <Grid size={{ xs: 12, md: 6 }}>
+                      <Grid xs={12} md={6}>
                         <TextField
                           label="Password"
                           value={formData.password}
@@ -1016,7 +1016,7 @@ const StaffForm: React.FC = () => {
                           }}
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, md: 6 }}>
+                      <Grid xs={12} md={6}>
                         <TextField
                           label="Confirm Password"
                           value={formData.confirmPassword}

@@ -140,7 +140,7 @@ const PhoneOrderPage: React.FC = () => {
   // ── Render ───────────────────────────────────────────────────────────
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: bg, minHeight: '100vh' }}>
+    <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: bg, minHeight: '100vh', overflow: 'auto' }}>
       {/* ── Header ──────────────────────────────────────────────────── */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1, flexWrap: 'wrap' }}>
         <Typography variant="h4" sx={{ fontWeight: 800 }}>
