@@ -35,7 +35,7 @@ export default function CategoryPage({ params }: Props) {
 
   if (!categoryData) {
     return (
-      <div className="max-w-6xl mx-auto px-4 py-16 text-center">
+      <div className="max-w-6xl mx-auto px-4 py-4 text-center">
         <h1 className="text-2xl font-bold">Category Not Found</h1>
       </div>
     );

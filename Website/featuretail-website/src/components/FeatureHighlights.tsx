@@ -7,7 +7,7 @@ export default function FeatureHighlights() {
   ];
 
   return (
-    <section className="py-6 bg-gray-50">
+    <section className="py-4 bg-gray-50">
       <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
         {items.map((item) => (
           <div key={item.title}>

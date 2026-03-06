@@ -27,11 +27,11 @@ return(
 				<img
 					src={cat.image}
 					className="w-full h-44 object-cover"
-				/>
 				<div className="p-4 text-center font-medium">
+
 					{cat.name}
 				</div>
-			</div>
+				<h2 className="text-2xl font-bold mb-4 text-center">
 		</Link>
 	))}
 </div>

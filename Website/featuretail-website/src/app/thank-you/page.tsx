@@ -9,7 +9,7 @@ function ThankYouContent() {
   const orderNumber = searchParams.get("order");
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-16 text-center">
+    <div className="max-w-4xl mx-auto px-4 py-4 text-center">
       <h1 className="text-3xl font-bold mb-4">
         🎉 Order Placed Successfully!
       </h1>
@@ -40,7 +40,7 @@ function ThankYouContent() {
 
 export default function ThankYouPage() {
   return (
-    <Suspense fallback={<div className="max-w-4xl mx-auto px-4 py-16 text-center">Loading...</div>}>
+    <Suspense fallback={<div className="max-w-4xl mx-auto px-4 py-4 text-center">Loading...</div>}>
       <ThankYouContent />
     </Suspense>
   );

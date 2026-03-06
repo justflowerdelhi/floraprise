@@ -74,7 +74,7 @@ export default function CartPage() {
 
   if (cart.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
+      <div className="max-w-4xl mx-auto px-4 py-4 text-center">
         <h1 className="text-2xl font-bold mb-4">Your Cart is Empty</h1>
         <p className="text-gray-600">Start shopping to add products.</p>
       </div>

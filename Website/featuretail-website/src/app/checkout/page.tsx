@@ -61,7 +61,7 @@ export default function CheckoutPage() {
 
   if (cart.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
+      <div className="max-w-4xl mx-auto px-4 py-4 text-center">
         <h1 className="text-2xl font-bold">Your cart is empty</h1>
       </div>
     );

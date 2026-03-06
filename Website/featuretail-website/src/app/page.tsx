@@ -9,7 +9,6 @@ import CustomerReviews from "@/components/CustomerReviews";
 import Footer from "@/components/Footer";
 import FeaturedCollections from "@/components/FeaturedCollections";
 import TrustBar from "@/components/TrustBar";
-
 import FeatureHighlights from "@/components/FeatureHighlights";
 
 export const metadata = {
@@ -21,9 +20,8 @@ export const metadata = {
 export default function Home() {
   return (
     <>
-     
       {/* Hero Banner */}
-      <section className="w-full h-[220px] md:h-auto object-contain bg-white mb-4 md:mb-8">
+      <section className="w-full h-[220px] md:h-auto object-contain bg-white mb-4 md:mb-6">
         <Image
           src="/hero.jpg"
           alt="3A Featuretail Banner"
@@ -33,23 +31,26 @@ export default function Home() {
           className="w-full h-auto object-cover"
         />
       </section>
-      <FeatureHighlights />
 
-      <div className="my-4 md:my-8">
+      <section className="py-4 md:py-6">
+        <FeatureHighlights />
+      </section>
+
+      <section className="py-4 md:py-6 bg-gray-50">
         <MarketplaceLogos />
-      </div>
-      <div className="my-4 md:my-8">
-        <FeaturedCollections />
-      </div>
-      
+      </section>
 
-      <div className="my-4 md:my-8">
+      <section className="py-4 md:py-6">
+        <FeaturedCollections />
+      </section>
+
+      <section className="py-4 md:py-6 bg-gray-50">
         <TrustBar />
-      </div>
+      </section>
 
       {/* About / Trust Section */}
-      <section className="pt-6 pb-6 md:pt-10 md:pb-10 bg-white text-center px-4 mb-4 md:mb-8">
-        <h1 className="text-2xl md:text-4xl font-bold text-gray-800 mb-6">
+      <section className="py-4 md:py-6 bg-white text-center px-4">
+        <h1 className="text-2xl md:text-4xl font-bold text-gray-800 mb-4">
           Craft Your Creativity. Celebrate Every Moment.
         </h1>
         <p className="text-gray-600 max-w-3xl mx-auto text-base md:text-lg leading-relaxed">
@@ -60,10 +61,10 @@ export default function Home() {
           supplying curated art, decor, gift packaging, and festive solutions with
           professional service and timely delivery.
         </p>
-        <div className="mt-6 text-pink-600 font-semibold text-lg">
+        <div className="mt-4 text-pink-600 font-semibold text-lg">
           ⭐ Trusted by 10,000+ Happy Customers Across India
         </div>
-        <div className="mt-6">
+        <div className="mt-5">
           <a href="/shop">
             <button className="bg-pink-600 hover:bg-pink-700 text-white px-8 py-3 rounded-md font-semibold transition">
               Shop Now
@@ -72,24 +73,21 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Best Sellers */}
-      <div className="my-4 md:my-8">
+      <section className="py-4 md:py-6">
         <BestSellers />
-      </div>
-      <div className="my-4 md:my-8">
+      </section>
+
+      <section className="py-4 md:py-6">
         <Newsletter />
-      </div>
+      </section>
 
-      {/* New Arrivals */}
-      <div className="my-4 md:my-8">
+      <section className="py-4 md:py-6">
         <NewArrivals />
-      </div>
+      </section>
 
-      {/* Customer Reviews */}
-      <div className="my-4 md:my-8">
+      <section className="py-4 md:py-6">
         <CustomerReviews />
-      </div>
-
+      </section>
       <Footer />
     </>
   );

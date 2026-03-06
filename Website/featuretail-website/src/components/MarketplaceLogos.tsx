@@ -1,6 +1,6 @@
 export default function MarketplaceLogos() {
   return (
-    <section className="py-10 bg-gray-50 text-center">
+    <section className="py-4 bg-gray-50 text-center">
       <h2 className="text-xl font-semibold mb-6">
         Available On Leading Marketplaces
       </h2>

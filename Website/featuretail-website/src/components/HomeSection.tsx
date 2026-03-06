@@ -10,10 +10,10 @@ export default function HomeSection() {
   if (homeProducts.length === 0) return null;
 
   return (
-    <section className="py-12">
+    <section className="py-6">
       <div className="max-w-7xl mx-auto px-4">
 
-        <h2 className="text-3xl font-bold mb-8">
+      <h2 className="text-3xl font-bold mb-4">
           Featured Products
         </h2>
 

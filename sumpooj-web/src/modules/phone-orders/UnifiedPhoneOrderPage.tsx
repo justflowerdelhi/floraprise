@@ -1,6 +1,15 @@
 import React, { useState } from "react";
+import { confirmPhoneLocalOrder } from "./phoneOrders.api";
+import { createPayment } from "./phoneOrders.api";
 
 const UnifiedPhoneOrderPage: React.FC = () => {
+      // Dummy orderId for demonstration; replace with actual orderId logic
+      const orderId = "phone_order_" + Date.now();
+    // Advance payment modal state
+    const [showAdvancePrompt, setShowAdvancePrompt] = useState(false);
+    const [advanceAmount, setAdvanceAmount] = useState(0);
+    // Full payment modal state
+    const [showFullPrompt, setShowFullPrompt] = useState(false);
   const [orderDescription, setOrderDescription] = useState("");
   const [amount, setAmount] = useState<number | "">("");
   const [phone, setPhone] = useState("");
@@ -10,6 +19,10 @@ const UnifiedPhoneOrderPage: React.FC = () => {
   const [paid, setPaid] = useState(0);
   const [orderType, setOrderType] = useState<string>("delivery");
   const [timeSlot, setTimeSlot] = useState<string>("");
+  const [paymentMode, setPaymentMode] = useState<string>("Cash");
+  const paymentModes = ["Cash", "Card", "UPI", "Cheque"];
+  const [splitPayments, setSplitPayments] = useState<{mode: string, amount: number}[]>([]);
+  const [showSplitPrompt, setShowSplitPrompt] = useState(false);
 
   const repeatOrder = (order: any) => {
     setOrderDescription(order.description);
@@ -250,23 +263,196 @@ const UnifiedPhoneOrderPage: React.FC = () => {
         {/* PAYMENT BUTTONS */}
         <div className="mt-6 space-y-3">
           <button
-            onClick={() => setPaid(total)}
+            onClick={() => setShowAdvancePrompt(true)}
+            className="w-full py-3 rounded-lg bg-yellow-500 text-white text-lg"
+          >
+            🏦 Advance Payment
+          </button>
+          <button
+            onClick={() => setShowFullPrompt(true)}
             className="w-full py-3 rounded-lg bg-green-500 text-white text-lg"
           >
-            💵 Cash
+            💵 Full Payment
           </button>
           <button
-            onClick={() => setPaid(total)}
-            className="w-full py-3 rounded-lg bg-blue-500 text-white text-lg"
-          >
-            💳 Card
-          </button>
-          <button
+            onClick={() => setShowSplitPrompt(true)}
             className="w-full py-3 rounded-lg bg-orange-400 text-white text-lg"
           >
             🔀 Split Payment
           </button>
         </div>
+        {/* Advance Payment Prompt */}
+        {showAdvancePrompt && (
+          <div className="mt-4 p-4 bg-white border rounded-lg">
+            <div className="mb-2 font-semibold">Advance Payment</div>
+            <div className="space-y-2">
+              <input
+                type="number"
+                placeholder="Advance Amount"
+                className="border rounded p-2 w-full"
+                value={advanceAmount}
+                onChange={e => setAdvanceAmount(Number(e.target.value))}
+              />
+              <select
+                className="border rounded p-2 w-full"
+                value={paymentMode}
+                onChange={e => setPaymentMode(e.target.value)}
+              >
+                {paymentModes.map(mode => (
+                  <option key={mode} value={mode}>{mode}</option>
+                ))}
+              </select>
+              <button
+                className="mt-2 w-full py-2 rounded bg-yellow-500 text-white"
+                onClick={async () => {
+                  setPaid(advanceAmount);
+                  setShowAdvancePrompt(false);
+                  await createPayment({
+                    orderId,
+                    amount: advanceAmount,
+                    paymentMode
+                  });
+                }}
+              >
+                Confirm Advance Payment
+              </button>
+              <button
+                className="mt-2 w-full py-2 rounded bg-gray-300 text-black"
+                onClick={() => setShowAdvancePrompt(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+        {/* Full Payment Prompt */}
+        {showFullPrompt && (
+          <div className="mt-4 p-4 bg-white border rounded-lg">
+            <div className="mb-2 font-semibold">Full Payment</div>
+            <div className="space-y-2">
+              <input
+                type="number"
+                placeholder="Full Payment Amount"
+                className="border rounded p-2 w-full"
+                value={total}
+                readOnly
+              />
+              <select
+                className="border rounded p-2 w-full"
+                value={paymentMode}
+                onChange={e => setPaymentMode(e.target.value)}
+              >
+                {paymentModes.map(mode => (
+                  <option key={mode} value={mode}>{mode}</option>
+                ))}
+              </select>
+              <button
+                className="mt-2 w-full py-2 rounded bg-green-500 text-white"
+                onClick={async () => {
+                  setPaid(total);
+                  setShowFullPrompt(false);
+                  await createPayment({
+                    orderId,
+                    amount: total,
+                    paymentMode
+                  });
+                }}
+              >
+                Confirm Full Payment
+              </button>
+              <button
+                className="mt-2 w-full py-2 rounded bg-gray-300 text-black"
+                onClick={() => setShowFullPrompt(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+        {/* Split Payment Prompt */}
+        {showSplitPrompt && (
+          <div className="mt-4 p-4 bg-white border rounded-lg">
+            <div className="mb-2 font-semibold">Split Payment</div>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder="Amount 1"
+                  className="border rounded p-2 w-full"
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    setSplitPayments(payments => [{...payments[0], amount: val, mode: payments[0]?.mode || "Cash"}, payments[1] || {mode: "Card", amount: 0}]);
+                  }}
+                />
+                <select
+                  className="border rounded p-2 w-full"
+                  value={splitPayments[0]?.mode || "Cash"}
+                  onChange={e => {
+                    setSplitPayments(payments => [{...payments[0], mode: e.target.value, amount: payments[0]?.amount || 0}, payments[1] || {mode: "Card", amount: 0}]);
+                  }}
+                >
+                  {paymentModes.map(mode => (
+                    <option key={mode} value={mode}>{mode}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder="Amount 2"
+                  className="border rounded p-2 w-full"
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    setSplitPayments(payments => [payments[0] || {mode: "Cash", amount: 0}, {...payments[1], amount: val, mode: payments[1]?.mode || "Card"}]);
+                  }}
+                />
+                <select
+                  className="border rounded p-2 w-full"
+                  value={splitPayments[1]?.mode || "Card"}
+                  onChange={e => {
+                    setSplitPayments(payments => [payments[0] || {mode: "Cash", amount: 0}, {...payments[1], mode: e.target.value, amount: payments[1]?.amount || 0}]);
+                  }}
+                >
+                  {paymentModes.map(mode => (
+                    <option key={mode} value={mode}>{mode}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                className="mt-2 w-full py-2 rounded bg-purple-600 text-white"
+                onClick={async () => {
+                  const totalPaid = (splitPayments[0]?.amount || 0) + (splitPayments[1]?.amount || 0);
+                  setPaid(totalPaid);
+                  setPaymentMode("Split");
+                  setShowSplitPrompt(false);
+                  // Send both payments to backend
+                  if (splitPayments[0]?.amount) {
+                    await createPayment({
+                      orderId,
+                      amount: splitPayments[0].amount,
+                      paymentMode: splitPayments[0].mode
+                    });
+                  }
+                  if (splitPayments[1]?.amount) {
+                    await createPayment({
+                      orderId,
+                      amount: splitPayments[1].amount,
+                      paymentMode: splitPayments[1].mode
+                    });
+                  }
+                }}
+              >
+                Confirm Split Payment
+              </button>
+              <button
+                className="mt-2 w-full py-2 rounded bg-gray-300 text-black"
+                onClick={() => setShowSplitPrompt(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
         {/* PAYMENT INFO */}
         <div className="mt-6 text-sm space-y-1">
           <div className="flex justify-between">
@@ -281,6 +467,20 @@ const UnifiedPhoneOrderPage: React.FC = () => {
         {/* CHECKOUT */}
         <button
           className="mt-6 w-full py-4 rounded-xl bg-purple-600 text-white text-lg"
+          disabled={balance > 0}
+          onClick={async () => {
+            if (balance > 0) {
+              alert("Please complete payment before finishing the order.");
+              return;
+            }
+            try {
+              const res = await confirmPhoneLocalOrder(orderId);
+              alert("Order completed successfully!");
+              // Optionally reset form or redirect
+            } catch (err) {
+              alert("Order completion failed. Please try again.");
+            }
+          }}
         >
           Complete Order ₹{total}
         </button>
