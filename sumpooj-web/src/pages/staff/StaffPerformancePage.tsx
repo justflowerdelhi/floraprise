@@ -503,10 +503,10 @@ const StaffPerformancePage: React.FC = () => {
         <Grid container spacing={3}>
           {/* Sales Metrics (if role tracks sales) */}
           {roleConfig?.tracksSales && (
-            <Grid xs={12}>
+            <Grid item xs={12}>
               <SectionCard title="Sales Performance" icon={<OrderIcon />} color="#2196f3">
                 <Grid container spacing={2}>
-                  <Grid xs={6} sm={4} md={2}>
+                  <Grid item xs={6} sm={4} md={2}>
                     <MetricCard
                       label="Total Orders"
                       value={performance.sales.totalOrders}
@@ -514,7 +514,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<ReceiptIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid xs={6} sm={4} md={2}>
+                  <Grid item xs={6} sm={4} md={2}>
                     <MetricCard
                       label="Total Revenue"
                       value={fmtCurrency(performance.sales.totalRevenue)}
@@ -522,7 +522,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<TrendingUpIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid xs={6} sm={4} md={2}>
+                  <Grid item xs={6} sm={4} md={2}>
                     <MetricCard
                       label="Gross Profit"
                       value={fmtCurrency(performance.sales.grossProfit)}
@@ -530,7 +530,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<MoneyIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid xs={6} sm={4} md={2}>
+                  <Grid item xs={6} sm={4} md={2}>
                     <MetricCard
                       label="Avg Order Value"
                       value={fmtCurrency(performance.sales.averageOrderValue)}
@@ -538,7 +538,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<ShoppingCart fontSize="small" />}
                     />
                   </Grid>
-                  <Grid xs={6} sm={4} md={2}>
+                  <Grid item xs={6} sm={4} md={2}>
                     <MetricCard
                       label="Margin %"
                       value={fmtPercent(performance.sales.marginPercent)}
@@ -546,7 +546,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<TrendingUpIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid xs={6} sm={4} md={2}>
+                  <Grid item xs={6} sm={4} md={2}>
                     <MetricCard
                       label="Discounts Given"
                       value={fmtCurrency(performance.sales.totalDiscountsGiven)}
@@ -562,7 +562,7 @@ const StaffPerformancePage: React.FC = () => {
                   Sales by Channel
                 </Typography>
                 <Grid container spacing={2}>
-                  <Grid xs={4}>
+                  <Grid item xs={4}>
                     <Box sx={{ textAlign: 'center' }}>
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#fdd835' }}>
                         {fmtCurrency(performance.sales.walkInSales || 0)}
@@ -570,7 +570,7 @@ const StaffPerformancePage: React.FC = () => {
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>Walk-in</Typography>
                     </Box>
                   </Grid>
-                  <Grid xs={4}>
+                  <Grid item xs={4}>
                     <Box sx={{ textAlign: 'center' }}>
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#03a9f4' }}>
                         {fmtCurrency(performance.sales.phoneSales || 0)}
@@ -578,7 +578,7 @@ const StaffPerformancePage: React.FC = () => {
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>Phone</Typography>
                     </Box>
                   </Grid>
-                  <Grid xs={4}>
+                  <Grid item xs={4}>
                     <Box sx={{ textAlign: 'center' }}>
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#e91e63' }}>
                         {fmtCurrency(performance.sales.onlineSales || 0)}
@@ -593,10 +593,10 @@ const StaffPerformancePage: React.FC = () => {
 
           {/* Event Metrics (if role tracks events) */}
           {roleConfig?.tracksEvents && (
-            <Grid xs={12} md={6}>
+            <Grid item xs={12} md={6}>
               <SectionCard title="Events Performance" icon={<EventIcon />} color="#e91e63">
                 <Grid container spacing={2}>
-                  <Grid xs={6}>
+                  <Grid item xs={6}>
                     <MetricCard
                       label="Events Assigned"
                       value={performance.events.eventsAssigned}
@@ -604,7 +604,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<AssignmentIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid xs={6}>
+                  <Grid item xs={6}>
                     <MetricCard
                       label="Events Completed"
                       value={performance.events.eventsCompleted}
@@ -612,14 +612,14 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<CheckIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid xs={6}>
+                  <Grid item xs={6}>
                     <MetricCard
                       label="Proposals Created"
                       value={performance.events.proposalsCreated}
                       color="#ff9800"
                     />
                   </Grid>
-                  <Grid xs={6}>
+                  <Grid item xs={6}>
                     <MetricCard
                       label="Proposals Approved"
                       value={performance.events.proposalsApproved}
@@ -631,7 +631,7 @@ const StaffPerformancePage: React.FC = () => {
                 <Divider sx={{ my: 2 }} />
 
                 <Grid container spacing={2}>
-                  <Grid xs={6}>
+                  <Grid item xs={6}>
                     <MetricCard
                       label="Event Revenue"
                       value={fmtCurrency(performance.events.eventRevenue)}

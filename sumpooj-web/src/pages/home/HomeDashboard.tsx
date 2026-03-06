@@ -1,295 +1,147 @@
-/**
- * HomeDashboard.tsx — FloraPrice Control Center
- *
- * Main landing page after login.
- * Top KPI strip + responsive grid of feature tiles.
- * Loads user dashboard preferences from API and allows customization.
- */
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
-import { IconButton, Tooltip, CircularProgress, Snackbar, Alert } from '@mui/material';
-import {
-  PointOfSale as POSIcon,
-  ShoppingCart as OrdersIcon,
-  Inventory2 as InventoryIcon,
-  People as CRMIcon,
-  LocalFlorist as ProductionIcon,
-  Event as EventsIcon,
-  Payment as PaymentsIcon,
-  BarChart as ReportsIcon,
-  Settings as SettingsIcon,
-  TrendingUp,
-  PendingActions,
-  WarningAmber,
-  AccessTime,
-  Celebration,
-  Tune as CustomizeIcon,
-} from '@mui/icons-material';
-import { useAuth } from '../../auth/AuthContext';
-import CustomizeDashboardDrawer, { type ModuleItem } from './CustomizeDashboardDrawer';
-import FinancialSnapshotWidget from './FinancialSnapshotWidget';
-import {
-  getDashboardPreference,
-  saveDashboardPreference,
-} from '../../api/dashboard-preference.api';
+import React from "react";
+import { Link } from "react-router-dom";
 
-// ─── KPI Data ───────────────────────────────────────────────
+import Box from "@mui/material/Box";
+import Grid from "@mui/material/Grid";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
 
-interface KpiItem {
-  label: string;
-  value: string;
-  subtext?: string;
-  icon: React.ReactNode;
-  color: string;          // tailwind text color for the icon bg
-  bgColor: string;        // tailwind bg for the icon circle
-}
+/* Icons */
+import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import Inventory2Icon from "@mui/icons-material/Inventory2";
+import PeopleIcon from "@mui/icons-material/People";
+import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing";
+import EventIcon from "@mui/icons-material/Event";
+import PaymentsIcon from "@mui/icons-material/Payments";
+import BarChartIcon from "@mui/icons-material/BarChart";
+import SettingsIcon from "@mui/icons-material/Settings";
 
-const KPI_ITEMS: KpiItem[] = [
-  {
-    label: 'Today Sales',
-    value: '$0.00',
-    subtext: '0 transactions',
-    icon: <TrendingUp className="w-5 h-5" />,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-  },
-  {
-    label: 'Pending Orders',
-    value: '0',
-    subtext: 'Needs attention',
-    icon: <PendingActions className="w-5 h-5" />,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-50',
-  },
-  {
-    label: 'Low Stock Items',
-    value: '0',
-    subtext: 'Below threshold',
-    icon: <WarningAmber className="w-5 h-5" />,
-    color: 'text-red-600',
-    bgColor: 'bg-red-50',
-  },
-  {
-    label: 'Active Shift',
-    value: 'No Shift',
-    subtext: 'Tap POS to open',
-    icon: <AccessTime className="w-5 h-5" />,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
-  },
-  {
-    label: 'Upcoming Events',
-    value: '0',
-    subtext: 'Next 7 days',
-    icon: <Celebration className="w-5 h-5" />,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
-  },
-];
+/* Panels */
+import OperationsPanel from "../../components/dashboard/OperationsPanel";
+import MorningSetupPanel from "../../components/dashboard/MorningSetupPanel";
 
-// ─── Feature Tiles ──────────────────────────────────────────
+const HomeDashboard = () => {
 
-interface FeatureTile {
-  key: string;
-  title: string;
-  icon: React.ReactNode;
-  route: string;
-  color: string;
-  badge?: string | null;
-  description: string;
-}
+  const topStats = [
+    { title: "Today Sales", value: "$0.00", subtitle: "0 transactions" },
+    { title: "Pending Orders", value: "0", subtitle: "Needs attention" },
+    { title: "Low Stock Items", value: "0", subtitle: "Below threshold" },
+    { title: "Active Shift", value: "No Shift", subtitle: "Tap POS to open" },
+    { title: "Upcoming Events", value: "0", subtitle: "Next 7 days" }
+  ];
 
-const FEATURE_TILES: FeatureTile[] = [
-  { key: 'POS', title: 'POS', description: 'Point of Sale', icon: <POSIcon sx={{ fontSize: 36 }} />, route: '/pos', color: 'from-purple-600 to-purple-700', badge: null },
-  { key: 'Orders', title: 'Orders', description: 'Manage orders', icon: <OrdersIcon sx={{ fontSize: 36 }} />, route: '/order-list', color: 'from-indigo-500 to-indigo-600', badge: null },
-  { key: 'Inventory', title: 'Inventory', description: 'Stock & batches', icon: <InventoryIcon sx={{ fontSize: 36 }} />, route: '/inventory', color: 'from-emerald-500 to-emerald-600', badge: null },
-  { key: 'CRM', title: 'CRM', description: 'Customer intelligence', icon: <CRMIcon sx={{ fontSize: 36 }} />, route: '/crm/customers', color: 'from-sky-500 to-sky-600', badge: null },
-  { key: 'Production', title: 'Production', description: 'Floral recipes & build', icon: <ProductionIcon sx={{ fontSize: 36 }} />, route: '/production/recipes', color: 'from-pink-500 to-pink-600', badge: null },
-  { key: 'Events', title: 'Events', description: 'Weddings & events', icon: <EventsIcon sx={{ fontSize: 36 }} />, route: '/events', color: 'from-amber-500 to-amber-600', badge: null },
-  { key: 'Payments', title: 'Payments', description: 'Day close & shifts', icon: <PaymentsIcon sx={{ fontSize: 36 }} />, route: '/day-close', color: 'from-teal-500 to-teal-600', badge: null },
-  { key: 'Reports', title: 'Reports', description: 'Profit & analytics', icon: <ReportsIcon sx={{ fontSize: 36 }} />, route: '/profit-intelligence', color: 'from-cyan-600 to-cyan-700', badge: null },
-  { key: 'Settings', title: 'Settings', description: 'Store configuration', icon: <SettingsIcon sx={{ fontSize: 36 }} />, route: '/settings/tenant', color: 'from-gray-500 to-gray-600', badge: null },
-];
-
-/** Lookup map: key → tile definition */
-const TILE_MAP = new Map(FEATURE_TILES.map((t) => [t.key, t]));
-
-/** Default module keys (all visible, default order) */
-const DEFAULT_KEYS = FEATURE_TILES.map((t) => t.key);
-
-// ─── Component ──────────────────────────────────────────────
-
-const HomeDashboard: React.FC = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-
-  // Redirect platform admins to their dedicated dashboard
-  if (user?.role === 'PLATFORMSUPERADMIN') {
-    return <Navigate to="/admin/dashboard" replace />;
-  }
-
-  // ── Single source of truth: ordered module list with visibility ──
-  const [modules, setModules] = useState<ModuleItem[]>(
-    DEFAULT_KEYS.map((k) => ({ key: k, visible: true })),
-  );
-  const [prefLoading, setPrefLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-
-  // Load preferences on mount
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const pref = await getDashboardPreference();
-        if (cancelled) return;
-        if (!pref.isDefault && pref.moduleOrder.length > 0) {
-          const visSet = new Set(pref.visibleModules);
-          // Merge: keep any new modules the server doesn't know about
-          const serverOrder = pref.moduleOrder.filter((k) => TILE_MAP.has(k));
-          const missing = DEFAULT_KEYS.filter((k) => !serverOrder.includes(k));
-          const allKeys = [...serverOrder, ...missing];
-          setModules(allKeys.map((k) => ({ key: k, visible: visSet.has(k) })));
-        }
-      } catch {
-        // Use defaults silently
-      } finally {
-        if (!cancelled) setPrefLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  // Derive visible tiles for rendering
-  const displayTiles = useMemo(() => {
-    return modules
-      .filter((m) => m.visible)
-      .map((m) => TILE_MAP.get(m.key)!)
-      .filter(Boolean);
-  }, [modules]);
-
-  // Save handler — updates local state immediately on success
-  const handleSave = useCallback(async (updated: ModuleItem[]) => {
-    setSaving(true);
-    try {
-      const vis = updated.filter((m) => m.visible).map((m) => m.key);
-      const ord = updated.map((m) => m.key);
-      await saveDashboardPreference({ visibleModules: vis, moduleOrder: ord });
-      // Apply to local state immediately — no reload needed
-      setModules(updated);
-      setDrawerOpen(false);
-    } catch (err) {
-      console.error('Failed to save dashboard preference:', err);
-      setErrorMsg('Failed to save preferences. Please try again.');
-    } finally {
-      setSaving(false);
-    }
-  }, []);
+  const financeStats = [
+    { title: "Revenue Today", value: "₹1,250" },
+    { title: "Expenses Today", value: "₹180" },
+    { title: "Profit Today", value: "₹1,070" },
+    { title: "Cash Balance", value: "₹3,400" }
+  ];
 
   return (
-    <div className="min-h-full bg-gray-50 p-4 sm:p-6 lg:p-8">
-      {/* ── KPI Strip ──────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
-        {KPI_ITEMS.map((kpi) => (
-          <div
-            key={kpi.label}
-            className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-3 shadow-sm hover:shadow-md transition-shadow"
-          >
-            {/* Icon circle */}
-            <div className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${kpi.bgColor} ${kpi.color}`}>
-              {kpi.icon}
-            </div>
-            {/* Text */}
-            <div className="min-w-0">
-              <p className="text-xs text-gray-500 uppercase tracking-wide leading-tight truncate">{kpi.label}</p>
-              <p className="text-lg font-bold text-gray-900 leading-tight mt-0.5">{kpi.value}</p>
-              {kpi.subtext && (
-                <p className="text-[11px] text-gray-400 leading-tight mt-0.5 truncate">{kpi.subtext}</p>
-              )}
-            </div>
-          </div>
+    <Box p={3}>
+
+      {/* TOP STATS */}
+      <Grid container spacing={2} mb={2}>
+        {topStats.map((stat, index) => (
+          <Grid item xs={12} md={2} key={index}>
+            <Paper sx={{ p:2, borderRadius:2 }}>
+              <Typography fontSize={13} color="text.secondary">
+                {stat.title}
+              </Typography>
+              <Typography fontWeight={700} fontSize={18}>
+                {stat.value}
+              </Typography>
+              <Typography fontSize={12} color="text.secondary">
+                {stat.subtitle}
+              </Typography>
+            </Paper>
+          </Grid>
         ))}
-      </div>
+      </Grid>
 
-      {/* ── Financial Snapshot Widget ───────────────────────────── */}
-      <div className="mb-8">
-        <FinancialSnapshotWidget />
-      </div>
 
-      {/* ── Feature Tiles ──────────────────────────── */}
-      {prefLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <CircularProgress size={32} />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
-          {displayTiles.map((tile) => (
-            <button
-              key={tile.key}
-              onClick={() => navigate(tile.route)}
-              className="group relative bg-white rounded-2xl border border-gray-200 p-5 sm:p-6
-                         flex flex-col items-center text-center
-                         shadow-sm hover:shadow-lg active:scale-[0.97]
-                         transition-all duration-200 ease-out
-                         min-h-[140px] sm:min-h-[160px]
-                         touch-manipulation cursor-pointer
-                         focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2"
-            >
-              {/* Badge */}
-              {tile.badge && (
-                <span
-                  className="absolute top-2.5 right-2.5 bg-red-500 text-white text-[10px] font-bold
-                             leading-none px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
-                >
-                  {tile.badge}
-                </span>
-              )}
+      {/* FINANCE STATS */}
+      <Grid container spacing={2} mb={3}>
+        {financeStats.map((stat, index) => (
+          <Grid item xs={12} md={3} key={index}>
+            <Paper sx={{ p:2, borderRadius:2 }}>
+              <Typography fontSize={13} color="text.secondary">
+                {stat.title}
+              </Typography>
+              <Typography fontWeight={700} fontSize={20}>
+                {stat.value}
+              </Typography>
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
 
-              {/* Icon Container */}
-              <div
-                className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${tile.color}
-                            flex items-center justify-center text-white mb-3 sm:mb-4
-                            group-hover:scale-110 transition-transform duration-200`}
-              >
-                {tile.icon}
-              </div>
 
-              {/* Title */}
-              <span className="text-sm sm:text-base font-semibold text-gray-900 leading-tight">
-                {tile.title}
-              </span>
+      {/* MORNING SETUP PANEL */}
+      <MorningSetupPanel />
 
-              {/* Description */}
-              <span className="text-[11px] sm:text-xs text-gray-400 mt-1 leading-tight">
-                {tile.description}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
 
-      {/* ── Customize Drawer ───────────────────────── */}
-      <CustomizeDashboardDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        modules={modules}
-        saving={saving}
-        onSave={handleSave}
-      />
-
-      {/* ── Error Snackbar ─────────────────────────── */}
-      <Snackbar
-        open={!!errorMsg}
-        autoHideDuration={4000}
-        onClose={() => setErrorMsg('')}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      {/* OPERATIONS */}
+      <Typography
+        variant="subtitle1"
+        fontWeight={600}
+        sx={{ mt: 3, mb: 2 }}
       >
-        <Alert severity="error" onClose={() => setErrorMsg('')} sx={{ minWidth: 280 }}>
-          {errorMsg}
-        </Alert>
-      </Snackbar>
-    </div>
+        Operations
+      </Typography>
+
+      <OperationsPanel />
+
+
+      {/* SYSTEM MODULES */}
+      <Typography
+        variant="subtitle1"
+        fontWeight={600}
+        sx={{ mt: 4, mb: 2 }}
+      >
+        System Modules
+      </Typography>
+
+      <Grid container spacing={2} justifyContent="flex-start" alignItems="stretch">
+        {([
+          { icon: <PointOfSaleIcon sx={{ fontSize:32, color:'#7b1fa2', mb:1 }} />, label: 'POS', desc: 'Point of Sale', to: '/pos' },
+          { icon: <ShoppingCartIcon sx={{ fontSize:32, color:'#3949ab', mb:1 }} />, label: 'Orders', desc: 'Manage orders', to: '/orders' },
+          { icon: <Inventory2Icon sx={{ fontSize:32, color:'#2e7d32', mb:1 }} />, label: 'Inventory', desc: 'Stock & batches', to: '/inventory' },
+          { icon: <PeopleIcon sx={{ fontSize:32, color:'#0288d1', mb:1 }} />, label: 'CRM', desc: 'Customer intelligence', to: '/crm' },
+          { icon: <PrecisionManufacturingIcon sx={{ fontSize:32, color:'#d81b60', mb:1 }} />, label: 'Production', desc: 'Floral recipes & build', to: '/production' },
+          { icon: <EventIcon sx={{ fontSize:32, color:'#fb8c00', mb:1 }} />, label: 'Events', desc: 'Weddings & events', to: '/events' },
+          { icon: <PaymentsIcon sx={{ fontSize:32, color:'#00897b', mb:1 }} />, label: 'Payments', desc: 'Day close & shifts', to: '/payments' },
+          { icon: <BarChartIcon sx={{ fontSize:32, color:'#5e35b1', mb:1 }} />, label: 'Reports', desc: 'Profit & analytics', to: '/reports' },
+          { icon: <SettingsIcon sx={{ fontSize:32, color:'#6d4c41', mb:1 }} />, label: 'Settings', desc: 'Store configuration', to: '/settings' }
+        ]).map((mod, idx) => (
+          <Grid item xs={12} sm={6} md={3} lg={2} key={mod.label} sx={{ display: 'flex' }}>
+            <Paper
+              component={Link}
+              to={mod.to}
+              sx={{
+                p: 3,
+                textAlign: 'center',
+                borderRadius: 2,
+                minWidth: 140,
+                flexGrow: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                height: '100%'
+              }}
+            >
+              {mod.icon}
+              <Typography fontWeight={600}>{mod.label}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {mod.desc}
+              </Typography>
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+
+    </Box>
   );
 };
 
