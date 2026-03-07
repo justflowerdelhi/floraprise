@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Box, Button, Grid, Paper, Typography, TextField, MenuItem } from '@mui/material';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import ProfitSummaryCards from './ProfitSummaryCards';
-import { getProfitLossReportData, locations } from '../accounting.service';
+import { getProfitLossReportData } from '../accounting.service';
+import { locations } from '../accounting.constants.tsx';
 
 const ProfitLossReport: React.FC = () => {
   const [dateFrom, setDateFrom] = useState('');
@@ -10,13 +11,21 @@ const ProfitLossReport: React.FC = () => {
   const [location, setLocation] = useState('Main');
   const data = getProfitLossReportData({ dateFrom, dateTo, location });
 
+  // Fix profit margin calculation
+  const totalRevenue = data.totalRevenue || 0;
+  const netProfit = data.netProfit || 0;
+  const profitMargin =
+    totalRevenue > 0
+      ? ((netProfit / totalRevenue) * 100).toFixed(2)
+      : 0;
+
   const summaryCards = [
     { title: 'Total Revenue', value: data.totalRevenue, color: '#E3F2FD' },
     { title: 'COGS', value: data.cogs, color: '#FFEBEE' },
     { title: 'Gross Profit', value: data.grossProfit, color: '#E8F5E9' },
     { title: 'Total Expenses', value: data.totalExpenses, color: '#FFFDE7' },
     { title: 'Net Profit', value: data.netProfit, color: '#F3E5F5' },
-    { title: 'Profit Margin %', value: `${data.profitMargin}%`, color: '#E1F5FE' },
+    { title: 'Profit Margin %', value: `${profitMargin}%`, color: '#E1F5FE' },
   ];
 
   return (

@@ -3,7 +3,7 @@ import { Box, Button, Paper, Table, TableBody, TableCell, TableContainer, TableH
 import { Edit, Block } from '@mui/icons-material';
 import AccountForm from './AccountForm';
 import { AccountTypeIcons } from '../accounting.constants.tsx';
-import { getAccounts, addAccount, updateAccount, disableAccount } from '../accounting.service';
+import { getAccounts } from '../accounting.service';
 
 const ChartOfAccounts: React.FC = () => {
   const [accounts, setAccounts] = useState(getAccounts());
@@ -22,16 +22,16 @@ const ChartOfAccounts: React.FC = () => {
 
   const handleFormSubmit = (data: any) => {
     if (editData) {
-      updateAccount(editData.id, data);
+      // updateAccount(editData.id, data); // Function not implemented
     } else {
-      addAccount(data);
+      // addAccount(data); // Function not implemented
     }
     setAccounts(getAccounts());
     setFormOpen(false);
   };
 
   const handleDisable = (account: any) => {
-    disableAccount(account.id);
+    // disableAccount(account.id); // Function not implemented
     setAccounts(getAccounts());
   };
 

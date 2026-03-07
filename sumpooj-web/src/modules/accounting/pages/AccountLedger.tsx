@@ -1,7 +1,8 @@
 // ...existing code...
 import React, { useState } from 'react';
 import { Box, Button, Grid, Paper, Typography, TextField, MenuItem } from '@mui/material';
-import { getAccounts, getAccountLedgerData, locations } from '../accounting.service';
+import { getAccounts, getAccountLedgerData } from '../accounting.service';
+import { locations } from '../accounting.constants.tsx';
 
 const AccountLedger: React.FC = () => {
 

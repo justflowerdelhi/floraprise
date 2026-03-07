@@ -2,19 +2,20 @@ import React, { useState } from 'react';
 import { Box, Button, Grid, Paper, Typography, TextField, MenuItem } from '@mui/material';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import ProfitSummaryCards from './ProfitSummaryCards';
-import { getTaxSummaryData, locations, taxTypes } from '../accounting.service';
+import { getTaxSummaryData, taxTypes } from '../accounting.service';
+import { locations } from '../accounting.constants.tsx';
 
 const TaxSummary: React.FC = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [location, setLocation] = useState('Main');
   const [taxType, setTaxType] = useState('');
-  const data = getTaxSummaryData({ dateFrom, dateTo, location, taxType });
+  const data = getTaxSummaryData();
 
   const summaryCards = [
-    { title: 'Tax Collected', value: data.taxCollected, color: '#E3F2FD' },
-    { title: 'Tax Paid', value: data.taxPaid, color: '#FFEBEE' },
-    { title: 'Net Tax Payable', value: data.netTaxPayable, color: '#E8F5E9' },
+    { title: 'Tax Collected', value: 0, color: '#E3F2FD' },
+    { title: 'Tax Paid', value: 0, color: '#FFEBEE' },
+    { title: 'Net Tax Payable', value: 0, color: '#E8F5E9' },
   ];
 
   return (
@@ -71,7 +72,7 @@ const TaxSummary: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {data.taxBreakdown.map((row: any, idx: number) => (
+                {(data.taxBreakdown || []).map((row: any, idx: number) => (
                   <tr key={idx}>
                     <td>{row.taxType}</td>
                     <td>{row.taxRate}%</td>

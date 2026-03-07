@@ -13,6 +13,7 @@ export interface MenuItem {
 export interface MenuSection {
   id: string;
   label: string;
+  permissions?: string[];
   items: MenuItem[];
 }
 
@@ -26,7 +27,6 @@ export const MENU_CONFIG: MenuSection[] = [
       { id: 'phone-order', label: 'Phone Order', icon: 'Phone', path: '/sales/phone-order' },
       { id: 'online-orders', label: 'Online Orders', icon: 'ShoppingCart', path: '/sales/online-orders' },
       { id: 'day-close', label: 'Day Close', icon: 'Event', path: '/sales/day-close' },
-      { id: 'manual-sale', label: 'Manual Sale Entry', icon: 'PointOfSale', path: '/pos/manual-sale' },
     ],
   },
   {
@@ -66,11 +66,13 @@ export const MENU_CONFIG: MenuSection[] = [
   {
     id: 'accounting',
     label: 'Accounting',
-    permissions: ['Admin', 'Accountant', 'Manager'],
+    permissions: ['Admin', 'Accountant'],
     items: [
       { id: 'accounting-dashboard', label: 'Dashboard', icon: 'AccountBalance', path: '/accounting/dashboard' },
       { id: 'chart-of-accounts', label: 'Chart of Accounts', icon: 'ListAlt', path: '/accounting/chart-of-accounts' },
       { id: 'account-ledger', label: 'Account Ledger', icon: 'MenuBook', path: '/accounting/account-ledger' },
+      { id: 'trial-balance', label: 'Trial Balance', icon: 'Balance', path: '/accounting/trial-balance' },
+      { id: 'balance-sheet', label: 'Balance Sheet', icon: 'Assessment', path: '/accounting/balance-sheet' },
       { id: 'expenses', label: 'Expenses', icon: 'AttachMoney', path: '/accounting/expenses' },
       { id: 'journal', label: 'Journal', icon: 'ReceiptLong', path: '/accounting/journal' },
       { id: 'profit-loss', label: 'Profit & Loss', icon: 'TrendingUp', path: '/accounting/profit-loss' },

@@ -127,6 +127,8 @@ import ExpenseManager from "../modules/accounting/pages/ExpenseManager";
 import JournalViewer from "../modules/accounting/pages/JournalViewer";
 import ProfitLossReport from "../modules/accounting/pages/ProfitLossReport";
 import TaxSummary from "../modules/accounting/pages/TaxSummary";
+import TrialBalance from "../modules/accounting/pages/TrialBalance";
+import BalanceSheet from "../modules/accounting/pages/BalanceSheet";
 
 // Production Intelligence
 import ProductionIntelligenceDashboard from "../modules/production/ProductionIntelligenceDashboard";
@@ -320,6 +322,8 @@ export default function AppRoutes() {
           <Route path="/accounting/dashboard" element={<AccountingDashboard />} />
           <Route path="/accounting/chart-of-accounts" element={<ChartOfAccounts />} />
           <Route path="/accounting/account-ledger" element={<AccountLedger />} />
+          <Route path="/accounting/trial-balance" element={<TrialBalance />} />
+          <Route path="/accounting/balance-sheet" element={<BalanceSheet />} />
           <Route path="/accounting/expenses" element={<ExpenseManager />} />
           <Route path="/accounting/journal" element={<JournalViewer />} />
           <Route path="/accounting/profit-loss" element={<ProfitLossReport />} />

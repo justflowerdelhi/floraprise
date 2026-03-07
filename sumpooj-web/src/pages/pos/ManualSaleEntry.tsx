@@ -1,3 +1,4 @@
+import axios from "axios";
 import React, { useState } from "react";
 import {
   Box,
@@ -11,7 +12,7 @@ import {
   Alert
 } from "@mui/material";
 
-import { postWalkInSale } from '../../modules/accounting/accounting.service';
+import { postAccountingEvent } from '../../modules/accounting/accountingEvents';
 
 const paymentMethods = ["Cash", "Card", "UPI"];
 
@@ -34,29 +35,45 @@ const ManualSaleEntry: React.FC = () => {
     });
   };
 
-  const handleSubmit = () => {
-    const orderTotal = Number(form.price) * Number(form.quantity);
-    const selectedLocation = 'Main'; // Replace with actual location selection logic if needed
+  const handleSubmit = async () => {
+    const orderPayload = {
+      orderSource: "MANUAL",
+      orderDate: form.orderDate,
+      paymentMethod: form.paymentMethod,
 
-    postWalkInSale({
-      amount: orderTotal,
-      location: selectedLocation
-    });
+      items: [
+        {
+          productName: form.product,
+          quantity: Number(form.quantity),
+          price: Number(form.price)
+        }
+      ]
+    };
 
-    console.log("Manual Sale Entered:", {
-      ...form,
-      source: "Manual"
-    });
+    try {
 
-    setSuccess(true);
+      const response = await axios.post(
+        "/api/orders",
+        orderPayload
+      );
 
-    setForm({
-      orderDate: "",
-      product: "",
-      quantity: 1,
-      price: "",
-      paymentMethod: "Cash"
-    });
+      console.log("Manual order created:", response.data);
+
+      setSuccess(true);
+
+      setForm({
+        orderDate: "",
+        product: "",
+        quantity: 1,
+        price: "",
+        paymentMethod: "Cash"
+      });
+
+    } catch (error) {
+
+      console.error("Manual sale failed:", error);
+
+    }
   };
 
   return (

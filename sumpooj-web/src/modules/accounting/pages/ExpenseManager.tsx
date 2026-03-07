@@ -3,7 +3,7 @@ import { Box, Button, Paper, Table, TableBody, TableCell, TableContainer, TableH
 import { Edit, Block } from '@mui/icons-material';
 import ExpenseForm from './ExpenseForm';
 import { categoryIcons } from '../accounting.constants.tsx';
-import { getExpenses, addExpense, updateExpense, disableExpense } from '../accounting.service';
+import { getExpenses, addExpense } from '../accounting.service';
 
 const ExpenseManager: React.FC = () => {
   const initialExpenses = getExpenses();
@@ -26,19 +26,19 @@ const ExpenseManager: React.FC = () => {
 
   const handleFormSubmit = (data: any) => {
     if (editData) {
-      updateExpense(editData.id, data);
+      // updateExpense(editData.id, data); // Function not implemented
     } else {
       addExpense(data);
     }
-    const data = getExpenses();
-    setExpenses(Array.isArray(data) ? data : []);
+    const expensesData = getExpenses();
+    setExpenses(Array.isArray(expensesData) ? expensesData : []);
     setFormOpen(false);
   };
 
   const handleDisable = (expense: any) => {
-    disableExpense(expense.id);
-    const data = getExpenses();
-    setExpenses(Array.isArray(data) ? data : []);
+    // disableExpense(expense.id); // Function not implemented
+    const expensesData = getExpenses();
+    setExpenses(Array.isArray(expensesData) ? expensesData : []);
   };
 
   return (

@@ -257,6 +257,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         path: '/day-close',
         permissions: ['pos:day_close'],
       },
+      {
+        id: 'manual-sale-entry',
+        label: 'Manual Sale Entry',
+        icon: 'PointOfSale',
+        path: '/pos/manual-sale',
+        permissions: ['pos:access'],
+      },
     ],
   },
   {
@@ -602,16 +609,16 @@ export const MENU_SECTIONS: MenuSection[] = [
   {
     id: 'accounting',
     title: 'Accounting',
-    icon: 'AccountBalance',
     items: [
       { id: 'accounting-dashboard', label: 'Dashboard', icon: 'AccountBalance', path: '/accounting/dashboard', permissions: ['reports:view'] },
       { id: 'chart-of-accounts', label: 'Chart of Accounts', icon: 'ListAlt', path: '/accounting/chart-of-accounts', permissions: ['reports:view'] },
       { id: 'account-ledger', label: 'Account Ledger', icon: 'MenuBook', path: '/accounting/account-ledger', permissions: ['reports:view'] },
+      { id: 'trial-balance', label: 'Trial Balance', icon: 'Balance', path: '/accounting/trial-balance', permissions: ['reports:view'] },
+      { id: 'balance-sheet', label: 'Balance Sheet', icon: 'Assessment', path: '/accounting/balance-sheet', permissions: ['reports:view'] },
       { id: 'expenses', label: 'Expenses', icon: 'AttachMoney', path: '/accounting/expenses', permissions: ['reports:view'] },
       { id: 'journal', label: 'Journal', icon: 'ReceiptLong', path: '/accounting/journal', permissions: ['reports:view'] },
       { id: 'profit-loss', label: 'Profit & Loss', icon: 'TrendingUp', path: '/accounting/profit-loss', permissions: ['reports:view'] },
       { id: 'tax-summary', label: 'Tax Summary', icon: 'Percent', path: '/accounting/tax-summary', permissions: ['reports:view'] },
-        { id: 'manual-account', label: 'Manual Account', icon: 'PointOfSale', path: '/pos/manual-account', permissions: ['pos:access'] },
     ],
   },
 ];

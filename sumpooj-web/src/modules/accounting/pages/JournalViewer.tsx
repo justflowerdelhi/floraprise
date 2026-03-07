@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, TextField, MenuItem, Grid } from '@mui/material';
 import JournalEntryModal from './JournalEntryModal';
-import { getJournalEntries, referenceTypes } from '../accounting.service';
+import { getJournalEntries } from '../accounting.service';
 
 const JournalViewer: React.FC = () => {
   const [entries, setEntries] = useState(getJournalEntries());
@@ -37,7 +37,7 @@ const JournalViewer: React.FC = () => {
         <Grid item xs={12} sm={4}>
           <TextField label="Reference Type" select value={refType} onChange={e => setRefType(e.target.value)} fullWidth>
             <MenuItem value="">All</MenuItem>
-            {referenceTypes.map(rt => (
+            {['CASH', 'ACCOUNT', 'RECEIVABLE', 'PAYABLE', 'INCOME', 'EXPENSE'].map(rt => (
               <MenuItem key={rt} value={rt}>{rt}</MenuItem>
             ))}
           </TextField>

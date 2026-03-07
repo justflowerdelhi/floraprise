@@ -1,4 +1,22 @@
-import React from 'react';
+import React from "react";
+import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
+
+import AddIcon from "@mui/icons-material/Add";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+
+import type { VendorFlorist } from "../../modules/vendors/vendor.types";
+
+import VendorForm from "../../modules/vendors/components/VendorForm";
+
+import {
+  getVendors,
+  addVendor,
+  updateVendor,
+  deactivateVendor
+} from "../../modules/vendors/vendor.service";
+
 import {
   Box,
   Typography,
@@ -12,10 +30,28 @@ import {
   Chip,
   useTheme,
   alpha,
-} from '@mui/material';
+} from "@mui/material";
 import { MOCK_VENDOR_FLORISTS } from './WireMockData';
 
 const WireVendorsPage: React.FC = () => {
+  const handleSaveVendor = (data: any) => {
+    if (editingVendor) {
+      updateVendor({
+        ...editingVendor,
+        ...data
+      });
+    } else {
+      addVendor({
+        id: Date.now().toString(),
+        status: "ACTIVE",
+        ...data
+      });
+    }
+    setVendors(getVendors());
+  };
+  const [vendors, setVendors] = React.useState(getVendors());
+  const [openForm, setOpenForm] = React.useState(false);
+  const [editingVendor, setEditingVendor] = React.useState<any>(null);
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const bg = dk ? '#0f0f0f' : '#f8f9fa';
@@ -40,6 +76,31 @@ const WireVendorsPage: React.FC = () => {
         Active vendors used for outgoing wire orders
       </Typography>
 
+      <Box sx={{ mb: 2 }}>
+        <Button
+          startIcon={<AddIcon />}
+          variant="contained"
+          onClick={() => {
+            setEditingVendor(null);
+            setOpenForm(true);
+          }}
+        >
+          Add Vendor
+        </Button>
+      </Box>
+      <VendorForm
+        open={openForm}
+        vendor={editingVendor}
+        onClose={() => setOpenForm(false)}
+        onSave={handleSaveVendor}
+      />
+      <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>
+        Vendor Florists
+      </Typography>
+      <Typography variant="body2" sx={{ color: dk ? 'rgba(255,255,255,0.5)' : 'text.secondary', mb: 3 }}>
+        Active vendors used for outgoing wire orders
+      </Typography>
+
       <TableContainer
         component={Paper}
         elevation={dk ? 0 : 1}
@@ -55,13 +116,15 @@ const WireVendorsPage: React.FC = () => {
               <TableCell sx={headerSx}>Vendor</TableCell>
               <TableCell sx={headerSx}>City</TableCell>
               <TableCell sx={headerSx}>State</TableCell>
+              <TableCell sx={headerSx}>Address</TableCell>
+              <TableCell sx={headerSx}>Zip</TableCell>
               <TableCell sx={headerSx}>Contact</TableCell>
               <TableCell sx={headerSx} align="right">Commission %</TableCell>
               <TableCell sx={headerSx} align="right">Status</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {MOCK_VENDOR_FLORISTS.map((vendor) => (
+            {vendors.map((vendor) => (
               <TableRow
                 key={vendor.id}
                 hover
@@ -74,6 +137,12 @@ const WireVendorsPage: React.FC = () => {
                 </TableCell>
                 <TableCell>{vendor.city}</TableCell>
                 <TableCell>{vendor.state}</TableCell>
+                                <TableCell>
+                                  {vendor.address ?? "—"}
+                                </TableCell>
+                                <TableCell>
+                                  {vendor.zipCode ?? "—"}
+                                </TableCell>
                 <TableCell>
                   <Typography variant="body2">{vendor.phone ?? '—'}</Typography>
                   <Typography variant="caption" color="text.secondary">
@@ -91,6 +160,24 @@ const WireVendorsPage: React.FC = () => {
                     variant={dk ? 'outlined' : 'filled'}
                     sx={{ fontWeight: 700 }}
                   />
+                  {/* Edit Button */}
+                  <IconButton
+                    onClick={() => {
+                      setEditingVendor(vendor);
+                      setOpenForm(true);
+                    }}
+                  >
+                    <EditIcon />
+                  </IconButton>
+                  {/* Deactivate Button */}
+                  <IconButton
+                    onClick={() => {
+                      deactivateVendor(vendor.id);
+                      setVendors(getVendors());
+                    }}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
                 </TableCell>
               </TableRow>
             ))}

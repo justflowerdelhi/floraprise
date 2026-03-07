@@ -21,6 +21,8 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import OperationsPanel from "../../components/dashboard/OperationsPanel";
 import MorningSetupPanel from "../../components/dashboard/MorningSetupPanel";
 
+import { getDailyFinancialSummary } from "../../modules/accounting/accounting.service";
+
 const HomeDashboard = () => {
 
   const topStats = [
@@ -31,11 +33,13 @@ const HomeDashboard = () => {
     { title: "Upcoming Events", value: "0", subtitle: "Next 7 days" }
   ];
 
+  const financial = getDailyFinancialSummary();
+
   const financeStats = [
-    { title: "Revenue Today", value: "₹1,250" },
-    { title: "Expenses Today", value: "₹180" },
-    { title: "Profit Today", value: "₹1,070" },
-    { title: "Cash Balance", value: "₹3,400" }
+    { title: "Revenue Today", value: `₹${financial.salesToday}` },
+    { title: "Expenses Today", value: `₹${financial.expensesToday}` },
+    { title: "Profit Today", value: `₹${financial.profitToday}` },
+    { title: "Cash Balance", value: `₹${financial.cashInDrawer}` }
   ];
 
   return (

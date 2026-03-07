@@ -37,6 +37,7 @@ import { searchCustomers } from '../../api/customer.api';
 import { getAllSuppliers } from '../../api/supplier.api';
 import { GiftCardBuilderModal } from '../gift-cards';
 import type { SavedGiftCard } from '../gift-cards';
+import { postAccountingEvent } from "../accounting/accountingEngine";
 
 const WalkInPOS: React.FC = () => {
   const theme = useTheme();
@@ -213,6 +214,14 @@ const WalkInPOS: React.FC = () => {
           method: p.method,
           amount: p.amount,
         })),
+      });
+      postAccountingEvent("SALE", {
+        amount: state.totals.grandTotal,
+        location: "Main"
+      });
+      postAccountingEvent("INVENTORY_SALE", {
+        cost: state.totals.recipeCost,
+        location: "Main"
       });
       setPayModalOpen(false);
       setSnackMsg(`Order completed — ${fmtCurrency(state.totals.grandTotal)}`);
