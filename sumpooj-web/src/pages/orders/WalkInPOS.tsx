@@ -23,9 +23,8 @@ import {
   Phone as PhoneIcon,
 } from '@mui/icons-material';
 import { CardGiftcard as GiftCardIcon } from '@mui/icons-material';
-import type { Product, ProductCategory, OrderType, OrderPaymentEntry, Order } from './OrderTypes';
+import type { Product, ProductCategory, OrderType, OrderPaymentEntry } from './OrderTypes';
 import { PRODUCT_CATEGORIES } from './OrderMockData';
-import { processOrderInventory, inferFulfillmentMode } from '../inventory/InventoryMovementService';
 import { useCart } from '../cart/CartContext';
 import CartTable from '../cart/CartTable';
 import CartSummaryPanel from '../cart/CartSummaryPanel';
@@ -33,7 +32,6 @@ import { fmtCurrency } from '../cart/CartUtils';
 import PaymentModal from '../payments/PaymentModal';
 import { useTenant } from '../../core/tenant/TenantContext';
 import { type Customer } from '../crm/CRMTypes';
-import { useOrders } from './OrderContext';
 import { searchProducts, normalizeProducts } from '../../api/product.api';
 import { searchCustomers } from '../../api/customer.api';
 import { getAllSuppliers } from '../../api/supplier.api';
@@ -47,7 +45,6 @@ const WalkInPOS: React.FC = () => {
 
   const { hasFeature } = useTenant();
   const wireEnabled = hasFeature('WIRE_MANAGEMENT');
-  const { addOrder } = useOrders();
 
   const { state, addProduct, removeItem, updateQty, setDiscount, setLineDiscount, clearCart, holdOrder, resumeOrder, removeHeld, setOrderSource, setOrderDiscount, clearOrderDiscount } = useCart();
 
@@ -194,85 +191,85 @@ const WalkInPOS: React.FC = () => {
     setPayModalOpen(true);
   }, [orderType]);
 
-  const handleFullyPaid = useCallback((payments: OrderPaymentEntry[]) => {
-    const now = new Date().toISOString();
-    const orderId = paymentOrderId;
-    // Determine inventory mode: walk-in paid → IMMEDIATE (deduct now)
-    const mode = inferFulfillmentMode({ orderSource: 'WALK_IN', paymentStatus: 'PAID' });
-    const invResult = processOrderInventory(orderId, state.items, mode, 'loc_default');
-    const newOrder: Order = {
-      id: orderId,
-      orderNumber: `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
-      orderSource: 'WALK_IN',
-      orderType,
-      customerName: customerName || 'Walk-in Customer',
-      customerPhone: customerPhone || undefined,
-      fulfillmentStatus: 'CONFIRMED',
-      paymentStatus: 'PAID',
-      orderStatus: 'PAID',
-      isPriceEditable: false,
-      totalAmount: state.totals.grandTotal,
-      totalPaid: state.totals.grandTotal,
-      balanceDue: 0,
-      payments,
-      items: state.items,
-      totals: state.totals,
-      ...invResult,
-      createdAt: now,
-      updatedAt: now,
-    };
-    addOrder(newOrder);
-    setPayModalOpen(false);
-    setSnackMsg(`Order completed — ${fmtCurrency(state.totals.grandTotal)}`);
-    setCustomerName('');
-    setCustomerPhone('');
-    setSelectedCustomer(null);
-    setCustomerError(false);
-    clearCart();
-  }, [clearCart, addOrder, paymentOrderId, orderType, customerName, customerPhone, state.items, state.totals]);
+  const handleFullyPaid = useCallback(async (payments: OrderPaymentEntry[]) => {
+    try {
+      const { createOrder } = await import('../../api/order.api');
+      await createOrder({
+        customerId: selectedCustomer?.id || null,
+        locationId: null,
+        deliveryDate: null,
+        deliveryPriority: 'NORMAL',
+        orderSource: 'WALK_IN',
+        orderIntent: 'TAKE_NOW',
+        deliveryFee: 0,
+        discountAmount: state.totals.orderDiscountAmount ?? 0,
+        items: state.items.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        })),
+        payments: payments.map(p => ({
+          method: p.method,
+          amount: p.amount,
+        })),
+      });
+      setPayModalOpen(false);
+      setSnackMsg(`Order completed — ${fmtCurrency(state.totals.grandTotal)}`);
+      setCustomerName('');
+      setCustomerPhone('');
+      setSelectedCustomer(null);
+      setCustomerError(false);
+      clearCart();
+    } catch (err) {
+      console.error('Order creation failed:', err);
+      setPayModalOpen(false);
+      setSnackMsg('Order creation failed. Please try again.');
+    }
+  }, [clearCart, selectedCustomer, state.items, state.totals]);
 
-  const handlePartialSave = useCallback((payments: OrderPaymentEntry[], totalPaid: number, balanceDue: number) => {
+  const handlePartialSave = useCallback(async (payments: OrderPaymentEntry[], totalPaid: number, balanceDue: number) => {
     if (!isCustomerValid) {
       setCustomerError(true);
       setPayModalOpen(false);
       customerCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
-    const now = new Date().toISOString();
-    const orderId = paymentOrderId;
-    // Walk-in partial → IMMEDIATE (customer takes items now)
-    const mode = inferFulfillmentMode({ orderSource: 'WALK_IN', paymentStatus: 'PARTIAL' });
-    const invResult = processOrderInventory(orderId, state.items, mode, 'loc_default');
-    const newOrder: Order = {
-      id: orderId,
-      orderNumber: `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
-      orderSource: 'WALK_IN',
-      orderType,
-      customerName,
-      customerPhone,
-      fulfillmentStatus: 'CONFIRMED',
-      paymentStatus: 'PARTIAL',
-      orderStatus: 'PARTIALLY_PAID',
-      isPriceEditable: false,
-      totalAmount: state.totals.grandTotal,
-      totalPaid,
-      balanceDue,
-      payments,
-      items: state.items,
-      totals: state.totals,
-      ...invResult,
-      createdAt: now,
-      updatedAt: now,
-    };
-    addOrder(newOrder);
-    setPayModalOpen(false);
-    setSnackMsg(`Order saved — ${fmtCurrency(totalPaid)} paid, ${fmtCurrency(balanceDue)} due`);
-    setCustomerName('');
-    setCustomerPhone('');
-    setSelectedCustomer(null);
-    setCustomerError(false);
-    clearCart();
-  }, [clearCart, addOrder, paymentOrderId, orderType, customerName, customerPhone, state.items, state.totals]);
+    try {
+      const { createOrder } = await import('../../api/order.api');
+      await createOrder({
+        customerId: selectedCustomer?.id || null,
+        locationId: null,
+        deliveryDate: null,
+        deliveryPriority: 'NORMAL',
+        orderSource: 'WALK_IN',
+        orderIntent: 'TAKE_NOW',
+        deliveryFee: 0,
+        discountAmount: state.totals.orderDiscountAmount ?? 0,
+        items: state.items.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        })),
+        payments: payments.map(p => ({
+          method: p.method,
+          amount: p.amount,
+        })),
+      });
+      setPayModalOpen(false);
+      setSnackMsg(`Order saved — ${fmtCurrency(totalPaid)} paid, ${fmtCurrency(balanceDue)} due`);
+      setCustomerName('');
+      setCustomerPhone('');
+      setSelectedCustomer(null);
+      setCustomerError(false);
+      clearCart();
+    } catch (err) {
+      console.error('Order creation failed:', err);
+      setPayModalOpen(false);
+      setSnackMsg('Order creation failed. Please try again.');
+    }
+  }, [clearCart, selectedCustomer, isCustomerValid, state.items, state.totals]);
 
   const selectedVendor = useMemo(
     () => vendorFlorists.find((vendor) => vendor.id === vendorId) ?? null,

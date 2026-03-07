@@ -143,14 +143,49 @@ const PAYMENT_MAP: Record<string, OrderPaymentStatus> = {
   UNPAID: 'UNPAID', PARTIAL: 'PARTIAL', PAID: 'PAID',
 };
 
+/** Derive inventory status from order state (not stored in DB) */
+function deriveInventoryStatus(dto: any): 'NONE' | 'RESERVED' | 'DEDUCTED' | 'RELEASED' {
+  const fulfillment = FULFILLMENT_MAP[dto.fulfillmentStatus] ?? 'DRAFT';
+  const payment = PAYMENT_MAP[dto.paymentStatus] ?? 'UNPAID';
+  const status = dto.status ?? dto.orderStatus ?? '';
+
+  // Completed / Delivered orders → inventory already deducted
+  if (fulfillment === 'COMPLETED' || status === 'Delivered' || status === 'DELIVERED')
+    return 'DEDUCTED';
+
+  // Cancelled → inventory released
+  if (fulfillment === 'CANCELLED' || status === 'Cancelled' || status === 'CANCELLED')
+    return 'RELEASED';
+
+  // Confirmed + paid → deducted (walk-in take-now)
+  if (payment === 'PAID' && (fulfillment === 'CONFIRMED' || fulfillment === 'READY'))
+    return 'DEDUCTED';
+
+  // Confirmed but not fully paid → reserved
+  if (fulfillment === 'CONFIRMED' || fulfillment === 'IN_DESIGN' || fulfillment === 'OUT_FOR_DELIVERY')
+    return 'RESERVED';
+
+  return 'NONE';
+}
+
 /** Map an API OrderListDto to the frontend Order type */
 function mapApiOrderToOrder(dto: any): Order {
+  const fulfillment = FULFILLMENT_MAP[dto.fulfillmentStatus] ?? 'DRAFT';
+  const payment = PAYMENT_MAP[dto.paymentStatus] ?? 'UNPAID';
+  const orderStatus = dto.status ?? dto.orderStatus ?? '';
+
+  // Derive a display-friendly order status
+  let resolvedOrderStatus = dto.orderStatus;
+  if (orderStatus === 'Delivered' || fulfillment === 'COMPLETED') resolvedOrderStatus = 'PAID';
+  else if (payment === 'PAID') resolvedOrderStatus = 'PAID';
+  else if (payment === 'PARTIAL') resolvedOrderStatus = 'PARTIALLY_PAID';
+
   return {
     id: dto.id,
     orderNumber: dto.orderNumber ?? '',
     orderSource: SOURCE_MAP[dto.orderSource] ?? 'WALK_IN',
-    fulfillmentStatus: FULFILLMENT_MAP[dto.fulfillmentStatus] ?? 'DRAFT',
-    paymentStatus: PAYMENT_MAP[dto.paymentStatus] ?? 'UNPAID',
+    fulfillmentStatus: fulfillment,
+    paymentStatus: payment,
     customerName: dto.customerName ?? '',
     recipientName: dto.recipientName ?? undefined,
     deliveryDate: dto.deliveryDate,
@@ -170,11 +205,12 @@ function mapApiOrderToOrder(dto: any): Order {
       lineCount: dto.itemCount ?? 0,
       taxBreakdown: [],
     },
+    inventoryStatus: deriveInventoryStatus(dto),
     createdAt: dto.orderDate ?? dto.createdAt ?? new Date().toISOString(),
     updatedAt: dto.updatedAt ?? dto.orderDate ?? new Date().toISOString(),
     ...(dto.deliveryPriority && { deliveryPriority: dto.deliveryPriority }),
     ...(dto.orderType && { orderType: dto.orderType }),
-    ...(dto.orderStatus && { orderStatus: dto.orderStatus }),
+    ...(resolvedOrderStatus && { orderStatus: resolvedOrderStatus }),
   };
 }
 

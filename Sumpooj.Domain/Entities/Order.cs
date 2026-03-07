@@ -217,6 +217,16 @@ public class Order : BaseEntity
         MarkUpdated();
     }
 
+    /// <summary>
+    /// Marks an order as delivered without requiring the full delivery pipeline.
+    /// Used for walk-in / take-now orders where the customer takes items on the spot.
+    /// </summary>
+    public void MarkDeliveredDirect()
+    {
+        Status = OrderStatus.Delivered;
+        MarkUpdated();
+    }
+
     public void Cancel(string? reason)
     {
         if (Status == OrderStatus.Delivered || Status == OrderStatus.Cancelled)

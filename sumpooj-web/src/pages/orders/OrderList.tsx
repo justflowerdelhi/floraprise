@@ -109,6 +109,18 @@ const OrderList: React.FC = () => {
     setSnackMsg(`${order.orderNumber} — inventory deducted`);
   }, [updateOrder]);
 
+  const handleMarkCompleted = useCallback(async (order: Order) => {
+    try {
+      const { updateFulfillmentStatus } = await import('../../api/order.api');
+      await updateFulfillmentStatus(order.id, { status: 'Completed' });
+      refreshOrders();
+      setSnackMsg(`${order.orderNumber} — marked completed`);
+    } catch (err) {
+      console.error('Failed to mark completed:', err);
+      setSnackMsg('Failed to update order status');
+    }
+  }, [refreshOrders]);
+
   const handleOpenCollect = useCallback((order: Order) => {
     setCollectOrder(order);
   }, []);
@@ -506,6 +518,29 @@ const OrderList: React.FC = () => {
                     </TableCell>
                     <TableCell align="center">
                       <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap' }}>
+                        {/* Fulfillment actions — advance order through pipeline */}
+                        {o.fulfillmentStatus === 'DRAFT' && o.paymentStatus === 'PAID' && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="success"
+                            onClick={() => handleMarkCompleted(o)}
+                            sx={{ fontWeight: 700, fontSize: '0.72rem', textTransform: 'none', minHeight: 36 }}
+                          >
+                            ✓ Complete
+                          </Button>
+                        )}
+                        {o.fulfillmentStatus === 'CONFIRMED' && o.paymentStatus !== 'PAID' && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                            onClick={() => handleMarkCompleted(o)}
+                            sx={{ fontWeight: 700, fontSize: '0.72rem', textTransform: 'none', minHeight: 36 }}
+                          >
+                            Complete
+                          </Button>
+                        )}
                         {isPartial && (
                           <Button
                             size="small"

@@ -12,19 +12,22 @@ public class OrderService
     private readonly IProductRepository _productRepository;
     private readonly ILocationRepository _locationRepository;
     private readonly IShiftRepository _shiftRepository;
+    private readonly IPaymentRepository _paymentRepository;
 
     public OrderService(
         IOrderRepository orderRepository,
         ICustomerRepository customerRepository,
         IProductRepository productRepository,
         ILocationRepository locationRepository,
-        IShiftRepository shiftRepository)
+        IShiftRepository shiftRepository,
+        IPaymentRepository paymentRepository)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
         _productRepository = productRepository;
         _locationRepository = locationRepository;
         _shiftRepository = shiftRepository;
+        _paymentRepository = paymentRepository;
     }
 
     public async Task<OrderDto?> GetByIdAsync(Guid companyId, Guid id)
@@ -146,6 +149,56 @@ public class OrderService
         }
 
         await _orderRepository.AddAsync(order);
+
+        // ── Save payments (if provided from POS checkout) ──
+        if (request.Payments.Count > 0)
+        {
+            decimal totalPaid = 0;
+            foreach (var p in request.Payments)
+            {
+                var methodStr = NormalizeEnumString(p.Method);
+                if (!Enum.TryParse<PaymentMethod>(methodStr, true, out var method))
+                    method = PaymentMethod.Cash;
+
+                var payment = new Payment(companyId, order.Id, method, p.Amount);
+                payment.SetLocation(request.LocationId);
+
+                // Auto-approve cash; card payments are approved on terminal response
+                if (method == PaymentMethod.Cash)
+                    payment.Approve(null, null);
+
+                await _paymentRepository.AddAsync(payment);
+                totalPaid += p.Amount;
+            }
+
+            // Update order payment status
+            if (totalPaid >= order.TotalAmount)
+                order.MarkPaid();
+            else if (totalPaid > 0)
+                order.MarkPartiallyPaid(totalPaid);
+
+            await _orderRepository.UpdateAsync(order);
+        }
+
+        // Walk-in orders with full payment: auto-confirm + complete
+        // Customer takes items on the spot — no delivery/design pipeline needed
+        var isWalkIn = order.OrderSource == OrderSource.WalkIn;
+        var isTakeNow = string.Equals(request.OrderIntent, "TAKE_NOW", StringComparison.OrdinalIgnoreCase);
+
+        if (isWalkIn || isTakeNow)
+        {
+            if (order.Status == OrderStatus.Pending)
+                order.Confirm();
+
+            if (order.PaymentStatus == PaymentStatus.Paid)
+            {
+                order.SetFulfillmentStatus(FulfillmentStatus.Completed);
+                order.MarkDeliveredDirect();
+            }
+
+            await _orderRepository.UpdateAsync(order);
+        }
+
         return order.Id;
     }
 
@@ -208,6 +261,15 @@ public class OrderService
         if (Enum.TryParse<FulfillmentStatus>(status, true, out var fulfillmentStatus))
         {
             order.SetFulfillmentStatus(fulfillmentStatus);
+
+            // When fulfillment is completed, also mark the order as delivered
+            if (fulfillmentStatus == FulfillmentStatus.Completed
+                && order.Status != OrderStatus.Delivered
+                && order.Status != OrderStatus.Cancelled)
+            {
+                order.MarkDeliveredDirect();
+            }
+
             await _orderRepository.UpdateAsync(order);
         }
     }
