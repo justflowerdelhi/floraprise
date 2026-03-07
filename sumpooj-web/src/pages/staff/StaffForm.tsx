@@ -11,13 +11,7 @@
  * - Prevents deletion if staff has historical orders (deactivate instead)
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Box, Typography, TextField, Button, Card, Grid, MenuItem,
-  Select, FormControl, InputLabel, Switch, FormControlLabel,
-  useTheme, alpha, Divider, InputAdornment, CircularProgress, Alert,
-  Breadcrumbs, Link, Chip, Checkbox, Dialog, DialogTitle, DialogContent,
-  DialogActions,
-} from '@mui/material';
+import { Box, Typography, TextField, Button, Card, Grid, MenuItem, Select, FormControl, InputLabel, Switch, FormControlLabel, useTheme, alpha, Divider, InputAdornment, CircularProgress, Alert, Breadcrumbs, Link, Chip, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import {
   Save as SaveIcon,
   Cancel as CancelIcon,
@@ -155,9 +149,9 @@ const StaffForm: React.FC = () => {
 
   // Handlers
   const handleChange = (field: keyof StaffFormData) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string } },
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | React.ChangeEvent<{ value: unknown }>,
   ) => {
-    setFormData({ ...formData, [field]: e.target.value });
+    setFormData({ ...formData, [field]: (e.target as HTMLInputElement).value });
     if (errors[field]) {
       setErrors({ ...errors, [field]: undefined });
     }
@@ -400,7 +394,7 @@ const StaffForm: React.FC = () => {
         {/* ─── Basic Information ──────────────────────── */}
         <FormSection title="Basic Information" icon={<PersonIcon fontSize="small" />}>
           <Grid container spacing={2}>
-            <Grid xs={12} md={6}>
+            <Grid item xs={12} md={6}>
               <TextField
                 label="Full Name"
                 value={formData.name}
@@ -419,13 +413,16 @@ const StaffForm: React.FC = () => {
                 }}
               />
             </Grid>
-            <Grid xs={12} md={6}>
-              <FormControl fullWidth required disabled={!canEditRole}>
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth required disabled={!canEditRole} sx={{ minWidth: 220 }}>
                 <InputLabel>Role</InputLabel>
                 <Select
                   value={formData.role}
                   label="Role"
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as StaffRole })}
+                  onChange={(e: React.ChangeEvent<{ value: unknown }>) =>
+                    setFormData({ ...formData, role: e.target.value as StaffRole })
+                  }
+                  MenuProps={{ PaperProps: { sx: { minWidth: 220 } } }}
                 >
                   {STAFF_ROLES.map((r) => (
                     <MenuItem key={r} value={r}>
@@ -437,24 +434,15 @@ const StaffForm: React.FC = () => {
                   ))}
                 </Select>
               </FormControl>
-              {!canEditRole && (
-                <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>
-                  Only administrators can change roles
-                </Typography>
-              )}
             </Grid>
-            <Grid xs={12} md={6}>
-              <FormControl fullWidth disabled={!canEditRole}>
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth disabled={!canEditRole} sx={{ minWidth: 220 }}>
                 <InputLabel>Location</InputLabel>
                 <Select
                   value={locationId}
                   label="Location"
-                  onChange={(e) => setLocationId(e.target.value)}
-                  startAdornment={
-                    <InputAdornment position="start">
-                      <LocationIcon sx={{ color: 'text.secondary' }} />
-                    </InputAdornment>
-                  }
+                  onChange={(e: React.ChangeEvent<{ value: unknown }>) => setLocationId(e.target.value as string)}
+                  MenuProps={{ PaperProps: { sx: { minWidth: 220 } } }}
                 >
                   <MenuItem value="">
                     <em>No specific location</em>
@@ -466,11 +454,6 @@ const StaffForm: React.FC = () => {
                   ))}
                 </Select>
               </FormControl>
-              {!canEditRole && (
-                <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>
-                  Only administrators can change location
-                </Typography>
-              )}
             </Grid>
           </Grid>
         </FormSection>
@@ -480,7 +463,7 @@ const StaffForm: React.FC = () => {
         {/* ─── Contact Information ────────────────────── */}
         <FormSection title="Contact Information" icon={<PhoneIcon fontSize="small" />}>
           <Grid container spacing={2}>
-            <Grid xs={12} md={6}>
+            <Grid item xs={12} md={6}>
               <TextField
                 label="Phone"
                 value={formData.phone}
@@ -498,7 +481,7 @@ const StaffForm: React.FC = () => {
                 }}
               />
             </Grid>
-            <Grid xs={12} md={6}>
+            <Grid item xs={12} md={6}>
               <TextField
                 label="Email"
                 value={formData.email}
@@ -524,13 +507,95 @@ const StaffForm: React.FC = () => {
         {/* ─── Compensation ───────────────────────────── */}
         <FormSection title="Compensation" icon={<MoneyIcon fontSize="small" />}>
           <Grid container spacing={2}>
-            <Grid xs={12} md={4}>
-              <FormControl fullWidth>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth sx={{ minWidth: 220 }}>
+                <InputLabel>Salary Type</InputLabel>
+                <Select
+                  value={formData.salaryType || ''}
+                  label="Salary Type"
+                  onChange={(e: React.ChangeEvent<{ value: unknown }>) => setFormData({ ...formData, salaryType: e.target.value as 'MONTHLY' | 'HOURLY' | '' })}
+                  MenuProps={{ PaperProps: { sx: { minWidth: 220 } } }}
+                >
+                  <MenuItem value="MONTHLY">Monthly Salary</MenuItem>
+                  <MenuItem value="HOURLY">Hourly</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            {formData.salaryType === 'MONTHLY' && (
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Monthly Salary"
+                  fullWidth
+                  type="number"
+                  InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                  value={formData.monthlySalary}
+                  onChange={handleChange('monthlySalary')}
+                />
+              </Grid>
+            )}
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Overtime Rate"
+                type="number"
+                InputProps={{ endAdornment: <InputAdornment position="end">₹ / hr</InputAdornment> }}
+                value={formData.overtimeRate}
+                onChange={handleChange('overtimeRate')}
+                fullWidth
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth sx={{ minWidth: 220 }}>
+                <InputLabel>Weekly Off</InputLabel>
+                <Select
+                  multiple
+                  value={Array.isArray(formData.weeklyOff) ? formData.weeklyOff : []}
+                  onChange={(e: React.ChangeEvent<{ value: unknown }>) => setFormData({ ...formData, weeklyOff: typeof e.target.value === 'string' ? (e.target.value as string).split(',') : e.target.value as string[] })}
+                  MenuProps={{ PaperProps: { sx: { minWidth: 220 } } }}
+                >
+                  <MenuItem value="Sunday">Sunday</MenuItem>
+                  <MenuItem value="Monday">Monday</MenuItem>
+                  <MenuItem value="Tuesday">Tuesday</MenuItem>
+                  <MenuItem value="Wednesday">Wednesday</MenuItem>
+                  <MenuItem value="Thursday">Thursday</MenuItem>
+                  <MenuItem value="Friday">Friday</MenuItem>
+                  <MenuItem value="Saturday">Saturday</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <TextField
+                    label="Shift Start"
+                    type="time"
+                    InputLabelProps={{ shrink: true }}
+                    value={formData.shiftStart}
+                    onChange={handleChange('shiftStart')}
+                    fullWidth
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    label="Shift End"
+                    type="time"
+                    InputLabelProps={{ shrink: true }}
+                    value={formData.shiftEnd}
+                    onChange={handleChange('shiftEnd')}
+                    fullWidth
+                  />
+                </Grid>
+              </Grid>
+            </Grid>
+          </Grid>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth sx={{ minWidth: 220 }}>
                 <InputLabel>Commission Type</InputLabel>
                 <Select
                   value={formData.commissionType}
                   label="Commission Type"
-                  onChange={(e) => setFormData({ ...formData, commissionType: e.target.value as CommissionType | '' })}
+                  onChange={(e: React.ChangeEvent<{ value: unknown }>) => setFormData({ ...formData, commissionType: e.target.value as CommissionType | '' })}
+                  MenuProps={{ PaperProps: { sx: { minWidth: 220 } } }}
                 >
                   <MenuItem value="">
                     <em>None</em>
@@ -543,7 +608,7 @@ const StaffForm: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid xs={12} md={4}>
+            <Grid item xs={12} md={4}>
               <TextField
                 label="Commission Rate (%)"
                 value={formData.commissionRate}
@@ -563,7 +628,7 @@ const StaffForm: React.FC = () => {
                 }}
               />
             </Grid>
-            <Grid xs={12} md={4}>
+            <Grid item xs={12} md={4}>
               <TextField
                 label="Hourly Rate"
                 value={formData.hourlyRate}
@@ -684,7 +749,7 @@ const StaffForm: React.FC = () => {
 
                   {/* Action buttons */}
                   <Grid container spacing={2} sx={{ mt: 1 }}>
-                    <Grid size={{ xs: 12, md: 6 }}>
+                    <Grid item xs={12} md={6}>
                       <TextField
                         label="New Password"
                         value={formData.password}
@@ -703,7 +768,7 @@ const StaffForm: React.FC = () => {
                         }}
                       />
                     </Grid>
-                    <Grid size={{ xs: 12, md: 6 }}>
+                    <Grid item xs={12} md={6}>
                       <TextField
                         label="Confirm New Password"
                         value={formData.confirmPassword}
@@ -722,7 +787,7 @@ const StaffForm: React.FC = () => {
                         }}
                       />
                     </Grid>
-                    <Grid size={12}>
+                    <Grid item xs={12}>
                       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                         <Button
                           variant="outlined"
@@ -797,7 +862,7 @@ const StaffForm: React.FC = () => {
 
                   {formData.enableLogin && (
                     <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid xs={12} md={6}>
+                      <Grid item xs={12} md={6}>
                         <TextField
                           label="Login Identifier (Email or Phone)"
                           value={formData.loginIdentifier}
@@ -816,7 +881,7 @@ const StaffForm: React.FC = () => {
                           }}
                         />
                       </Grid>
-                      <Grid xs={12} md={6}>
+                      <Grid item xs={12} md={6}>
                         <FormControl fullWidth required error={Boolean(errors.loginRole)}>
                           <InputLabel>Login Role</InputLabel>
                           <Select
@@ -843,7 +908,7 @@ const StaffForm: React.FC = () => {
                         </FormControl>
                       </Grid>
 
-                      <Grid xs={12} md={6}>
+                      <Grid item xs={12} md={6}>
                         <TextField
                           label="Password"
                           value={formData.password}
@@ -863,7 +928,7 @@ const StaffForm: React.FC = () => {
                           }}
                         />
                       </Grid>
-                      <Grid xs={12} md={6}>
+                      <Grid item xs={12} md={6}>
                         <TextField
                           label="Confirm Password"
                           value={formData.confirmPassword}
@@ -884,7 +949,7 @@ const StaffForm: React.FC = () => {
                         />
                       </Grid>
 
-                      <Grid xs={12}>
+                      <Grid item xs={12}>
                         <Button
                           variant="contained"
                           startIcon={<LoginIcon />}
@@ -950,7 +1015,7 @@ const StaffForm: React.FC = () => {
 
                   {formData.enableLogin && (
                     <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid xs={12} md={6}>
+                      <Grid item xs={12} md={6}>
                         <TextField
                           label="Login Identifier (Email or Phone)"
                           value={formData.loginIdentifier}
@@ -969,7 +1034,7 @@ const StaffForm: React.FC = () => {
                           }}
                         />
                       </Grid>
-                      <Grid xs={12} md={6}>
+                      <Grid item xs={12} md={6}>
                         <FormControl fullWidth required error={Boolean(errors.loginRole)}>
                           <InputLabel>Login Role</InputLabel>
                           <Select
@@ -996,7 +1061,7 @@ const StaffForm: React.FC = () => {
                         </FormControl>
                       </Grid>
 
-                      <Grid xs={12} md={6}>
+                      <Grid item xs={12} md={6}>
                         <TextField
                           label="Password"
                           value={formData.password}
@@ -1016,7 +1081,7 @@ const StaffForm: React.FC = () => {
                           }}
                         />
                       </Grid>
-                      <Grid xs={12} md={6}>
+                      <Grid item xs={12} md={6}>
                         <TextField
                           label="Confirm Password"
                           value={formData.confirmPassword}
@@ -1035,6 +1100,22 @@ const StaffForm: React.FC = () => {
                             ),
                           }}
                         />
+                      </Grid>
+
+                      <Grid item xs={12}>
+                        <Button
+                          variant="contained"
+                          startIcon={<LoginIcon />}
+                          onClick={handleEnableLogin}
+                          disabled={loginActionLoading}
+                          sx={{
+                            bgcolor: '#7c4dff', '&:hover': { bgcolor: '#651fff' },
+                            fontWeight: 700, textTransform: 'none',
+                          }}
+                        >
+                          {loginActionLoading ? <CircularProgress size={16} sx={{ mr: 1, color: '#fff' }} /> : null}
+                          Enable Login
+                        </Button>
                       </Grid>
                     </Grid>
                   )}

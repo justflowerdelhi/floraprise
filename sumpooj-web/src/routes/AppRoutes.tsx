@@ -23,6 +23,7 @@ import { PaymentProvider } from '../pages/payments/PaymentContext';
 import { OrderProvider } from '../pages/orders/OrderContext';
 import { POSLayout } from '../pages/pos';
 import { ShiftProvider } from '../pages/pos/ShiftContext';
+import ManualSaleEntry from "../pages/pos/ManualSaleEntry";
 
 import ProfitDashboard from '../pages/profit-intelligence/ProfitDashboard';
 import ExternalOrdersInbox from '../pages/orders/ExternalOrdersInbox';
@@ -187,6 +188,7 @@ export default function AppRoutes() {
               </RequireTenantAccess>
             } 
           />
+            <Route path="/pos/manual-sale" element={<ManualSaleEntry />} />
 
           {/* ─── Orders ─────────────────────────────────── */}
           <Route path="/external-orders" element={<ExternalOrdersInbox />} />
@@ -261,11 +263,14 @@ export default function AppRoutes() {
           <Route path="/events/:eventId/proposals/new" element={<ProposalBuilder />} />
 
           {/* ─── Staff & Performance ────────────────────── */}
-          <Route path="/staff" element={<StaffList />} />
-          <Route path="/staff/new" element={<StaffForm />} />
-          <Route path="/staff/:staffId/edit" element={<StaffForm />} />
-          <Route path="/staff/:staffId" element={<StaffPerformancePage />} />
-          <Route path="/staff/attendance" element={<StaffAttendancePage />} />
+          <Route path="/staff">
+            <Route path="StaffAttendance" element={<Navigate to="/staff/attendance" replace />} />
+            <Route index element={<StaffList />} />
+            <Route path="new" element={<StaffForm />} />
+            <Route path="attendance" element={<StaffAttendancePage />} />
+            <Route path=":staffId/edit" element={<StaffForm />} />
+              <Route path="performance/:staffId" element={<StaffPerformancePage />} />
+          </Route>
 
           {/* ─── Tasks ──────────────────────────────────── */}
           <Route path="/tasks" element={<MyTasksPage />} />

@@ -40,6 +40,14 @@ export interface Staff {
   createdAt: string;
   updatedAt: string;
 
+  // ── Salary & Shift Info ────────────────────────────────
+  salaryType?: 'MONTHLY' | 'HOURLY';
+  monthlySalary?: number;
+  overtimeRate?: number;
+  weeklyOff?: string[];
+  shiftStart?: string;
+  shiftEnd?: string;
+
   // ── Identity / Login info ────────────────────────────────
   identityUserId?: string | null;
   loginIdentifier?: string | null;
@@ -63,6 +71,14 @@ export interface StaffFormData {
   loginRole: string;
   password: string;
   confirmPassword: string;
+
+  // Compensation fields
+  salaryType: 'MONTHLY' | 'HOURLY' | '';
+  monthlySalary: string;
+  overtimeRate: string;
+  weeklyOff: string[];
+  shiftStart: string;
+  shiftEnd: string;
 }
 
 // ─── Performance Metrics ────────────────────────────────────

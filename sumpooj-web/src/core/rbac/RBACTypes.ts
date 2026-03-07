@@ -379,6 +379,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         path: '/tasks',
         permissions: ['tasks:view'],
       },
+      {
+        id: 'attendance',
+        label: 'Attendance',
+        icon: 'Schedule',
+        path: '/staff/StaffAttendance',
+        permissions: ['staff:view'],
+      },
     ],
   },
   {
@@ -604,6 +611,7 @@ export const MENU_SECTIONS: MenuSection[] = [
       { id: 'journal', label: 'Journal', icon: 'ReceiptLong', path: '/accounting/journal', permissions: ['reports:view'] },
       { id: 'profit-loss', label: 'Profit & Loss', icon: 'TrendingUp', path: '/accounting/profit-loss', permissions: ['reports:view'] },
       { id: 'tax-summary', label: 'Tax Summary', icon: 'Percent', path: '/accounting/tax-summary', permissions: ['reports:view'] },
+        { id: 'manual-account', label: 'Manual Account', icon: 'PointOfSale', path: '/pos/manual-account', permissions: ['pos:access'] },
     ],
   },
 ];

@@ -1,5 +1,6 @@
+import React from 'react';
 import { AccountBalanceWallet, AccountTree, AttachMoney, TrendingUp, Receipt, Store, LocalShipping, People, Home, FlashOn } from '@mui/icons-material';
-import { People as StaffIcon, Home as RentIcon, FlashOn as UtilitiesIcon, LocalShipping as DeliveryIcon, Store as COGSIcon, Receipt as OtherIcon } from '@mui/icons-material';
+import { People as StaffIcon, Home as RentIcon, FlashOn as UtilitiesIcon, LocalShipping as DeliveryIcon, Store as COGSIcon, HelpOutline as OtherIcon } from '@mui/icons-material';
 
 export const accountTypes = [
   'Asset',
@@ -9,7 +10,7 @@ export const accountTypes = [
   'Equity',
 ];
 
-export const AccountTypeIcons: Record<string, JSX.Element> = {
+export const AccountTypeIcons: Record<string, React.ReactNode> = {
   Asset: <AccountBalanceWallet fontSize="small" />, // Cash/Bank
   Liability: <AccountTree fontSize="small" />, // Payable
   Income: <TrendingUp fontSize="small" />, // Revenue
@@ -26,7 +27,7 @@ export const expenseCategories = [
   'Other',
 ];
 
-export const categoryIcons: Record<string, JSX.Element> = {
+export const categoryIcons: Record<string, React.ReactNode> = {
   Staff: <StaffIcon fontSize="small" />,
   Rent: <RentIcon fontSize="small" />,
   Utilities: <UtilitiesIcon fontSize="small" />,

@@ -6,7 +6,11 @@ import { categoryIcons } from '../accounting.constants.tsx';
 import { getExpenses, addExpense, updateExpense, disableExpense } from '../accounting.service';
 
 const ExpenseManager: React.FC = () => {
-  const [expenses, setExpenses] = useState(getExpenses());
+  const initialExpenses = getExpenses();
+  const [expenses, setExpenses] = useState(
+    Array.isArray(initialExpenses) ? initialExpenses : []
+  );
+
   const [formOpen, setFormOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
 
@@ -26,13 +30,15 @@ const ExpenseManager: React.FC = () => {
     } else {
       addExpense(data);
     }
-    setExpenses(getExpenses());
+    const data = getExpenses();
+    setExpenses(Array.isArray(data) ? data : []);
     setFormOpen(false);
   };
 
   const handleDisable = (expense: any) => {
     disableExpense(expense.id);
-    setExpenses(getExpenses());
+    const data = getExpenses();
+    setExpenses(Array.isArray(data) ? data : []);
   };
 
   return (

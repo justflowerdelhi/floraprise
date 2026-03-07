@@ -1,3 +1,63 @@
+export function getTrialBalance() {
+  const balance: any = {};
+  journalEntries.forEach(entry => {
+    entry.lines.forEach(line => {
+      if (!balance[line.accountId])
+        balance[line.accountId] = 0;
+      balance[line.accountId] += line.debit - line.credit;
+    });
+  });
+  return balance;
+}
+export function postExpense({
+  amount,
+  expenseAccount,
+  location,
+  reference
+}: any) {
+  createJournalEntry({
+    date: new Date().toISOString().slice(0,10),
+    reference,
+    description: "Expense",
+    location,
+    lines: [
+      {
+        accountId: expenseAccount,
+        debit: amount,
+        credit: 0
+      },
+      {
+        accountId: "cash",
+        debit: 0,
+        credit: amount
+      }
+    ]
+  });
+}
+export function postWalkInSale({
+  amount,
+  location
+}: any) {
+  createJournalEntry({
+    date: new Date().toISOString().slice(0,10),
+    reference: "SALE-" + Date.now(),
+    description: "Walk-in sale",
+    location,
+    lines: [
+      {
+        accountId: "cash",
+        debit: amount,
+        credit: 0
+      },
+      {
+        accountId: "sales",
+        debit: 0,
+        credit: amount
+      }
+    ]
+  });
+}
+import type { JournalEntry, LedgerRow } from "./types";
 
 // ---------------- REFERENCE TYPES ----------------
 
@@ -68,11 +128,13 @@ export const locations = [
 
 // ---------------- ACCOUNTS ----------------
 
-export const getAccounts = async () => [
-  { id: 1, code: "1001", name: "Cash", type: "Asset", isActive: true },
-  { id: 2, code: "4001", name: "Retail Sales", type: "Income", isActive: true },
-  { id: 3, code: "5001", name: "Fuel Expense", type: "Expense", isActive: true }
-]
+export function getAccounts() {
+  return [
+    { id: "cash", code: "1000", name: "Cash" },
+    { id: "sales", code: "4000", name: "Sales Revenue" },
+    { id: "expense", code: "5000", name: "Expenses" }
+  ];
+}
 
 export const addAccount = async (data:any) => { console.log("addAccount", data) }
 export const createAccount = async (data:any) => { console.log("createAccount", data) }
@@ -84,10 +146,11 @@ export const deleteAccount = async (id:number) => { console.log("deleteAccount",
 
 // ---------------- EXPENSES ----------------
 
-export const getExpenses = async () => [
-  { id: 1, category: "Fuel", amount: 30 },
-  { id: 2, category: "Packaging", amount: 20 }
-]
+let expenses: any[] = [];
+
+export function getExpenses() {
+  return expenses;
+}
 
 export const addExpense = async (data:any) => { console.log("addExpense", data) }
 export const createExpense = async (data:any) => { console.log("createExpense", data) }
@@ -99,16 +162,17 @@ export const deleteExpense = async (id:number) => { console.log("deleteExpense",
 
 // ---------------- JOURNAL ----------------
 
-export const getJournalEntries = async () => [
-  {
-    id: 1,
-    date: "2026-03-12",
-    reference: "Sale #1021",
-    description: "Retail sale",
-    debit: 150,
-    credit: 0
-  }
-]
+export const getJournalEntries = async () => {
+  return journalEntries;
+};
+
+export const addJournalEntry = async (data: JournalEntry) => {
+  journalEntries.push(data);
+};
+
+export function postJournalEntry(entry: JournalEntry) {
+  journalEntries.push(entry);
+}
 
 // ---------------- PROFIT & LOSS ----------------
 
@@ -144,32 +208,94 @@ export const getTaxSummaryData = async () => {
 
 // ---------------- LEDGER ----------------
 
-export const getLedger = async () => [
-  {
-    date: "2026-03-12",
-    reference: "Sale #1021",
-    description: "Retail Sale",
-    debit: 150,
-    credit: 0,
-    balance: 150
-  }
-]
+export const getLedger = async () => {
+  return ledgerRows;
+};
 
-export const getAccountLedgerData = async () => [
-  {
-    date: "2026-03-12",
-    reference: "Sale #1021",
-    description: "Retail Sale",
-    debit: 150,
-    credit: 0,
-    balance: 150
-  },
-  {
-    date: "2026-03-12",
-    reference: "Expense #201",
-    description: "Fuel Expense",
-    debit: 0,
-    credit: 30,
-    balance: 120
-  }
-]
+export function getAccountLedgerData({
+  accountId,
+  dateFrom,
+  dateTo,
+  location
+}: any): LedgerRow[] {
+
+  let rows: LedgerRow[] = [];
+  let balance = 0;
+
+  journalEntries.forEach(entry => {
+    if (location && entry.location !== location) return;
+
+    entry.lines.forEach(line => {
+      if (line.accountId !== accountId) return;
+
+      balance += line.debit - line.credit;
+
+      rows.push({
+        date: entry.date,
+        reference: entry.reference,
+        description: entry.description,
+        debit: line.debit,
+        credit: line.credit,
+        balance
+      });
+    });
+  });
+
+  return rows;
+}
+
+let journalEntries: JournalEntry[] = [];
+let ledgerRows: LedgerRow[] = [];
+
+journalEntries.push({
+  id: "J1",
+  date: "2026-03-07",
+  reference: "SALE-1001",
+  description: "Walk-in sale",
+  location: "Main",
+  lines: [
+    {
+      accountId: "cash",
+      debit: 120,
+      credit: 0
+    }
+  ]
+});
+
+export function createJournalEntry({
+  date,
+  reference,
+  description,
+  location,
+  lines
+}: any) {
+  const entry = {
+    id: "J" + Date.now(),
+    date,
+    reference,
+    description,
+    location,
+    lines
+  };
+  journalEntries.push(entry);
+  return entry;
+}
+journalEntries.push({
+  id: "J1",
+  date: "2026-03-07",
+  reference: "SALE-1001",
+  description: "Walk-in sale",
+  location: "Main",
+  lines: [
+    {
+      accountId: "cash",
+      debit: 120,
+      credit: 0
+    },
+    {
+      accountId: "sales",
+      debit: 0,
+      credit: 120
+    }
+  ]
+});

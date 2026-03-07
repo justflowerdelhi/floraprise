@@ -49,6 +49,12 @@ export const MOCK_STAFF: Staff[] = [
     hireDate: '2021-03-10',
     createdAt: '2021-03-10T10:00:00Z',
     updatedAt: '2026-01-01T10:00:00Z',
+      salaryType: 'MONTHLY',
+      monthlySalary: 18000,
+      overtimeRate: 120,
+      weeklyOff: ['Sunday'],
+      shiftStart: '09:00',
+      shiftEnd: '18:00',
   },
   {
     id: 'staff-003',
@@ -572,3 +578,53 @@ const STAFF_WITH_ORDERS = new Set([
  */
 export const staffHasOrders = (staffId: string): boolean =>
   STAFF_WITH_ORDERS.has(staffId);
+
+// ─── Mock Attendance Data ────────────────────────────────
+export const STAFF_ATTENDANCE_MOCK = [
+  {
+    staffId: 'staff-001',
+    date: '2026-03-07',
+    status: 'Working',
+    checkIn: '09:00',
+    checkOut: null,
+  },
+  {
+    staffId: 'staff-002',
+    date: '2026-03-07',
+    status: 'Completed',
+    checkIn: '09:15',
+    checkOut: '18:10',
+  },
+  {
+    staffId: 'staff-003',
+    date: '2026-03-07',
+    status: 'Absent',
+    checkIn: null,
+    checkOut: null,
+  },
+];
+// Mock Attendance Data
+export const STAFF_ATTENDANCE_MOCK_NEW = [
+  {
+    id: 1,
+    name: "Raj Kumar",
+    role: "ADMIN",
+    checkIn: "09:00",
+    checkOut: "17:00",
+    status: "Working"
+  },
+  {
+    id: 2,
+    name: "Priya Sharma",
+    role: "MANAGER",
+    checkIn: "09:15",
+    checkOut: "17:10",
+    status: "Completed"
+  },
+  {
+    id: 3,
+    name: "Amit Singh",
+    role: "STAFF",
+    status: "Absent"
+  }
+];

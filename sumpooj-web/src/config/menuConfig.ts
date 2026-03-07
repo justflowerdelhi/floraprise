@@ -19,11 +19,29 @@ export interface MenuSection {
 export const MENU_CONFIG: MenuSection[] = [
   // Example structure
   {
+    id: 'sales',
+    label: 'Sales',
+    items: [
+      { id: 'walk-in-sales', label: 'Walk-In Sales', icon: 'Storefront', path: '/sales/walk-in' },
+      { id: 'phone-order', label: 'Phone Order', icon: 'Phone', path: '/sales/phone-order' },
+      { id: 'online-orders', label: 'Online Orders', icon: 'ShoppingCart', path: '/sales/online-orders' },
+      { id: 'day-close', label: 'Day Close', icon: 'Event', path: '/sales/day-close' },
+      { id: 'manual-sale', label: 'Manual Sale Entry', icon: 'PointOfSale', path: '/pos/manual-sale' },
+    ],
+  },
+  {
     id: 'catalogue',
     label: 'Catalogue',
     items: [
       { id: 'categories', label: 'Categories', icon: 'Category', path: '/catalogue/categories' },
       { id: 'products', label: 'Products', icon: 'Inventory', path: '/catalogue/products' },
+    ],
+  },
+  {
+    id: 'pos',
+    label: 'POS',
+    items: [
+      { id: 'manual-sale', label: 'Manual Sale', icon: 'PointOfSale', path: '/pos/manual-sale' }
     ],
   },
   {
@@ -65,6 +83,7 @@ export const MENU_CONFIG: MenuSection[] = [
     items: [
       { id: 'staff-list', label: 'All Staff', icon: 'People', path: '/staff' },
       { id: 'tasks', label: 'Tasks', icon: 'Assignment', path: '/tasks' },
+        { id: 'attendance', label: 'Attendance', icon: 'Schedule', path: '/staff/StaffAttendance' },
     ],
   },
   // Add more sections/items as needed

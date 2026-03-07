@@ -1,15 +1,20 @@
+// ...existing code...
 import React, { useState } from 'react';
 import { Box, Button, Grid, Paper, Typography, TextField, MenuItem } from '@mui/material';
 import { getAccounts, getAccountLedgerData, locations } from '../accounting.service';
 
 const AccountLedger: React.FC = () => {
-  const accounts = getAccounts();
+
+  const accountsData = getAccounts();
+  const accounts = Array.isArray(accountsData) ? accountsData : [];
+
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [location, setLocation] = useState('Main');
-  const data = getAccountLedgerData({ accountId, dateFrom, dateTo, location });
 
+  const ledgerData = getAccountLedgerData({ accountId, dateFrom, dateTo, location });
+  const data = Array.isArray(ledgerData) ? ledgerData : [];
   return (
     <Box sx={{ p: { xs: 1, sm: 2, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
       <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>Account Ledger</Typography>

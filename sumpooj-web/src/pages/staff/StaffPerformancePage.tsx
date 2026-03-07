@@ -245,17 +245,24 @@ const StaffPerformancePage: React.FC = () => {
   // Load staff data from API
   useEffect(() => {
     if (!staffId) return;
+
+    // Prevent invalid route values like "attendance"
+    if (!/^[a-zA-Z0-9-]+$/.test(staffId)) return;
+
     const load = async () => {
       const data = await execute(() => getStaffById(staffId), {
         errorMessage: 'Failed to load staff member',
       });
+
       if (data) {
         setStaff({ ...data, role: normalizeRole(data.role) });
       } else {
         setStaff(null);
       }
+
       setStaffLoaded(true);
     };
+
     load();
   }, [staffId, execute]);
 
