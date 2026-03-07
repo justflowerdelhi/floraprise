@@ -90,6 +90,13 @@ public class CreateOrderRequest
     public decimal DiscountAmount { get; set; }
     public string? InternalNotes { get; set; }
     public List<OrderItemRequest> Items { get; set; } = new();
+    public List<OrderPaymentRequest> Payments { get; set; } = new();
+}
+
+public class OrderPaymentRequest
+{
+    public string Method { get; set; } = "Cash";
+    public decimal Amount { get; set; }
 }
 
 public class OrderItemRequest

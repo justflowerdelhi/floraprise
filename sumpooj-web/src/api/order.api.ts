@@ -59,6 +59,12 @@ export interface CreateOrderRequest {
   discountAmount: number;
   internalNotes?: string | null;
   items: OrderItemRequest[];
+  payments?: OrderPaymentRequest[];
+}
+
+export interface OrderPaymentRequest {
+  method: string;
+  amount: number;
 }
 
 export interface UpdateStatusRequest {

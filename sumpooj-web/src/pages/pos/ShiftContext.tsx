@@ -58,7 +58,14 @@ interface ShiftProviderProps {
 
 export const ShiftProvider: React.FC<ShiftProviderProps> = ({ children }) => {
   // Read selected location from global LocationContext
-  const { currentLocation, currentLocationId, isAllLocations } = useLocationCtx();
+  const { currentLocation, currentLocationId, isAllLocations, accessibleLocations, setCurrentLocationId } = useLocationCtx();
+
+  // Auto-select first accessible location when POS opens with "ALL" or no location
+  useEffect(() => {
+    if ((isAllLocations || !currentLocation) && accessibleLocations.length > 0) {
+      setCurrentLocationId(accessibleLocations[0].id);
+    }
+  }, [isAllLocations, currentLocation, accessibleLocations, setCurrentLocationId]);
 
   // Derive the effective locationId (empty when "ALL" or no specific location)
   const selectedLocationId = (!isAllLocations && currentLocation?.id) ? currentLocation.id : '';

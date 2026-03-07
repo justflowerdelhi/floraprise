@@ -85,6 +85,14 @@ public class SumpoojDbContext
     // AI Usage Tracking
     public DbSet<AIUsageRecord> AIUsageRecords => Set<AIUsageRecord>();
 
+    // Accounting
+    public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<Expense> Expenses => Set<Expense>();
+    public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
+
+    // Staff Attendance
+    public DbSet<StaffAttendanceRecord> StaffAttendanceRecords => Set<StaffAttendanceRecord>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

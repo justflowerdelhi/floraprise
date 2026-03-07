@@ -169,6 +169,10 @@ const POSLayout: React.FC = () => {
             unitPrice: item.unitPrice,
             productName: item.productName,
           })),
+          payments: payments.map(p => ({
+            method: p.method,
+            amount: p.amount,
+          })),
         };
         await import('../../api/order.api').then(({ createOrder }) => createOrder(orderPayload));
         setPaymentDrawerOpen(false);
@@ -209,6 +213,10 @@ const POSLayout: React.FC = () => {
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             productName: item.productName,
+          })),
+          payments: payments.map(p => ({
+            method: p.method,
+            amount: p.amount,
           })),
         };
         await import('../../api/order.api').then(({ createOrder }) => createOrder(orderPayload));
