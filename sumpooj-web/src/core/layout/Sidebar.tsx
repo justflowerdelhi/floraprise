@@ -49,6 +49,7 @@ import {
   Settings,
   Store,
   AltRoute,
+  Schedule as ScheduleIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRBAC } from '../rbac/RBACContext';
@@ -89,6 +90,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Settings: <Settings />,
   Store: <Store />,
   AltRoute: <AltRoute />,
+  ScheduleIcon: <ScheduleIcon />,
 };
 
 // ─── Section Colors ─────────────────────────────────────────
@@ -334,16 +336,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }))
     .filter((section) => section.items.length > 0);
 
-  if (isPOS) {
-    // Only keep Walk-In Sales, Phone Order, Day Close
-    const allowedLabels = new Set(['Walk-In Sales', 'Phone Order', 'Day Close']);
-    menuSections = menuSections
-      .map(section => ({
-        ...section,
-        items: section.items.filter(item => allowedLabels.has(item.label)),
-      }))
-      .filter(section => section.items.length > 0);
-  }
+  
 
   // Rearranged menu order
   const desiredOrder = [

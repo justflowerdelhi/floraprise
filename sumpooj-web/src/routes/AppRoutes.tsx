@@ -54,6 +54,7 @@ import EventProductionPage from '../pages/events/EventProductionPage';
 import StaffList from '../pages/staff/StaffList';
 import StaffPerformancePage from '../pages/staff/StaffPerformancePage';
 import StaffForm from '../pages/staff/StaffForm';
+import StaffAttendancePage from "../pages/staff/StaffAttendance";
 
 // Tasks
 import { MyTasksPage } from '../pages/tasks';
@@ -264,6 +265,7 @@ export default function AppRoutes() {
           <Route path="/staff/new" element={<StaffForm />} />
           <Route path="/staff/:staffId/edit" element={<StaffForm />} />
           <Route path="/staff/:staffId" element={<StaffPerformancePage />} />
+          <Route path="/staff/attendance" element={<StaffAttendancePage />} />
 
           {/* ─── Tasks ──────────────────────────────────── */}
           <Route path="/tasks" element={<MyTasksPage />} />
