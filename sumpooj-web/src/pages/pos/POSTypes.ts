@@ -16,16 +16,13 @@ export interface POSCategory {
   color?: string;
 }
 
-export const POS_CATEGORIES: POSCategory[] = [
-  { id: 'all', name: 'All', icon: 'GridView' },
-  { id: 'fresh-flowers', name: 'Fresh Flowers', icon: 'LocalFlorist' },
-  { id: 'arrangements', name: 'Arrangements', icon: 'Spa' },
-  { id: 'bouquets', name: 'Bouquets', icon: 'Yard' },
-  { id: 'plants', name: 'Plants', icon: 'Park' },
-  { id: 'greens', name: 'Greens', icon: 'Grass' },
-  { id: 'supplies', name: 'Supplies', icon: 'Inventory2' },
-  { id: 'add-ons', name: 'Add-Ons', icon: 'Redeem' },
-  { id: 'gifts', name: 'Gifts', icon: 'CardGiftcard' },
+export const POS_CATEGORIES = [
+  { id: "all", name: "All" },
+  { id: "fresh-flowers", name: "Fresh Flowers" },
+  { id: "bouquets", name: "Bouquets" },
+  { id: "plants", name: "Plants" },
+  { id: "gifts", name: "Gift Items" },
+  { id: "supplies", name: "Supplies" }
 ];
 
 // ─── Order Intent ───────────────────────────────────────────

@@ -1,3 +1,5 @@
+import { usePOS } from '../pos/POSContext';
+import { generateBouquetName } from '../../utils/bouquetNameGenerator';
 /**
  * CustomBouquetBuilder.tsx — Custom Bouquet Builder Screen
  *
@@ -43,6 +45,7 @@ const CustomBouquetBuilder = () => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const navigate = useNavigate();
+  const { addProduct } = usePOS();
 
   // ── State ──────────────────────────────────────────────────
   const [inventoryProducts, setInventoryProducts] = useState<InventoryProduct[]>([]);
@@ -130,25 +133,27 @@ const CustomBouquetBuilder = () => {
   // ── Create & Sell Now ──────────────────────────────────────
   const handleSellNow = async () => {
     if (!isValid) return;
-    setProcessing(true);
-    setError('');
+
     try {
-      await createCustomBouquetAndSell({
-        components: components.map(({ _key, ...rest }) => rest),
-        sellingPrice,
-        laborCost: laborCost || undefined,
-        image: imageUrls[0] || undefined,
-      });
-      setSuccess('Custom bouquet created and sold! Component inventory deducted.');
-      // Reset form
-      setComponents([]);
-      setSellingPrice(0);
-      setLaborCost(0);
-      setImageUrls([]);
-    } catch {
-      setError('Failed to process. Please try again.');
-    } finally {
-      setProcessing(false);
+      const qty = components.reduce((sum, c) => sum + c.quantity, 0);
+      const product = {
+        id: `custom-bouquet-${Date.now()}`,
+        name: `${qty} Red Rose Bouquet`,
+        price: Number(sellingPrice),
+        cost: Number(totalCost),
+        sku: `CUSTOM-${Date.now()}`,
+        category: "Custom",
+        taxRuleId: null,
+        barcode: null,
+        imageUrl: imageUrls?.[0] ?? null,
+        trackInventory: false
+      };
+      addProduct(product as any, 1);
+      navigate("/pos");
+
+    } catch (err) {
+      console.error(err);
+      setError("Failed to create bouquet.");
     }
   };
 
@@ -197,6 +202,11 @@ const CustomBouquetBuilder = () => {
         </Box>
 
         {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError('')}>{error}</Alert>}
+        {error && inventoryProducts.length === 0 && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Using temporary mock inventory.
+          </Alert>
+        )}
         {success && <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
         <Grid container spacing={3}>
@@ -209,7 +219,13 @@ const CustomBouquetBuilder = () => {
                   <Typography variant="subtitle1" fontWeight={700}>
                     Select Components ({components.length})
                   </Typography>
-                  <Button size="small" startIcon={<AddIcon />} onClick={addComponent} sx={{ textTransform: 'none' }}>
+                  <Button
+                    size="small"
+                    startIcon={<AddIcon />}
+                    onClick={addComponent}
+                    disabled={error && inventoryProducts.length === 0}
+                    sx={{ textTransform: 'none' }}
+                  >
                     Add Item
                   </Button>
                 </Box>
@@ -251,9 +267,7 @@ const CustomBouquetBuilder = () => {
                                 >
                                   <MenuItem value="" disabled>Select item...</MenuItem>
                                   {comp.productId && (
-                                    <MenuItem value={comp.productId}>
-                                      {comp.productName}
-                                    </MenuItem>
+                                    <MenuItem value={comp.productId}>{comp.productName}</MenuItem>
                                   )}
                                   {availableProducts.map((p) => (
                                     <MenuItem key={p.id} value={p.id}>

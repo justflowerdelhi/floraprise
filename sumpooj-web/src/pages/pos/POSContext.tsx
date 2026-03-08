@@ -1,3 +1,4 @@
+// ...existing code...
 /**
  * POSContext.tsx — Global POS State Management
  * 

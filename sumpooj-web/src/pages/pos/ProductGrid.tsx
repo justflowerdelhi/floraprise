@@ -4,7 +4,10 @@
  */
 import React, { useMemo, useRef, useCallback } from 'react';
 import ProductCard from './ProductCard';
+import { Grid } from "react-window";
+import { AutoSizer } from "react-virtualized-auto-sizer";
 import type { Product } from './POSTypes';
+import { getPOSCatalogCache } from './utils/posCatalogCache';
 
 interface ProductGridProps {
   products: Product[];
@@ -39,28 +42,29 @@ const ProductGrid: React.FC<ProductGridProps> = ({
 
   // Filter products based on search and category
   const filteredProducts = useMemo(() => {
-    console.log('ProductGrid incoming products:', products);
     let result = products;
 
+    // Hide out of stock
+    result = result.filter((p) => p.availableStock > 0);
+
     // Category filter
-    const categoryNames = CATEGORY_MAP[selectedCategory];
-    if (categoryNames && categoryNames.length > 0) {
-      result = result.filter((p) => categoryNames.includes(p.category));
+    if (selectedCategory !== "all") {
+      result = result.filter(
+        (p) =>
+          p.category?.toLowerCase().replace(/\s/g, "-") === selectedCategory
+      );
     }
 
     // Search filter
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase();
       result = result.filter(
         (p) =>
-          p.name.toLowerCase().includes(query) ||
-          p.sku.toLowerCase().includes(query) ||
-          (p.barcode && p.barcode.includes(query)) ||
-          (p.internalBarcode && p.internalBarcode.includes(query))
+          p.name.toLowerCase().includes(q) ||
+          p.sku.toLowerCase().includes(q)
       );
     }
 
-    console.log('ProductGrid filteredProducts:', result);
     return result;
   }, [products, searchQuery, selectedCategory]);
 
@@ -97,19 +101,26 @@ const ProductGrid: React.FC<ProductGridProps> = ({
   }
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="flex-1 overflow-y-auto p-4"
     >
       {/* Product count */}
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs text-gray-500">
-          {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+          {filteredProducts.length} {filteredProducts.length === 1 ? "product" : "products"}
         </span>
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4">
+      <div className="grid 
+        grid-cols-2
+        sm:grid-cols-2
+        md:grid-cols-3
+        lg:grid-cols-4
+        xl:grid-cols-5
+        gap-3 sm:gap-4
+      ">
         {filteredProducts.map((product) => (
           <ProductCard
             key={product.id}

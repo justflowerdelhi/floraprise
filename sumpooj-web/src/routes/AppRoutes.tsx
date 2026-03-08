@@ -1,3 +1,4 @@
+import { POSProvider } from '../pages/pos/POSContext';
 /**
  * AppRoutes.tsx — Production-Ready Route Configuration
  */
@@ -311,7 +312,10 @@ export default function AppRoutes() {
           <Route path="/production/recipes/:id/edit" element={<FloralRecipeForm />} />
           <Route path="/production/produce" element={<ProductionScreen />} />
           <Route path="/production/finished-goods" element={<FinishedGoodsInventory />} />
-          <Route path="/production/custom-builder" element={<CustomBouquetBuilder />} />
+          <Route
+            path="/production/custom-builder"
+            element={<CustomBouquetBuilder />}
+          />
           <Route path="/production/wastage" element={<WastageLogPage />} />
 
             <Route path="/production/jobs/:jobId" element={<ProductionJobDetailPage jobId={":jobId"} />} />

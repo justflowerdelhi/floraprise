@@ -21,6 +21,9 @@ import OpenShiftModal from "../../components/pos/OpenShiftModal";
 import { getActiveShift } from "../../api/shift.api";
 import { useAuth } from "../../auth/AuthContext";
 import { Box } from "@mui/material";
+import { getFinishedBatches } from "../production/api/production.api";
+import { getPOSCatalog } from "./api/posCatalog.api";
+import { setPOSCatalogCache } from "./utils/posCatalogCache";
 const MOCK_CUSTOMERS: POSCustomer[] = [
   {
     id: 'cust_001',
@@ -95,29 +98,52 @@ const POSScreen: React.FC = () => {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError('');
-    // Load products from API, fallback to mock data
+    // Load products and finished goods batches from API
     try {
-      const result = await searchProducts({ PageSize: 200, IsActive: true });
-      const rawItems = result?.items ?? (Array.isArray(result) ? result : []);
-      if (rawItems.length > 0) {
-        const normalized = normalizeProducts(rawItems);
-        setProducts(normalized);
-      } else {
-        // API returned empty — use mocks as fallback
-        const normalizedProducts = MOCK_PRODUCTS.map(p => ({
-          ...p,
-          availableStock: typeof p.availableStock === 'number' ? p.availableStock : 999
-        }));
-        setProducts(normalizedProducts);
-      }
-    } catch (err) {
-      console.warn('Product API failed, using mock data:', err);
-      // Fallback: ensure availableStock is set for all products
-      const normalizedProducts = MOCK_PRODUCTS.map(p => ({
-        ...p,
-        availableStock: typeof p.availableStock === 'number' ? p.availableStock : 999
+      const [productResult, batchResult] = await Promise.all([
+        searchProducts({ PageSize: 200, IsActive: true }),
+        getFinishedBatches()
+      ]);
+      console.log("Products API result:", productResult);
+      console.log("Finished batches API result:", batchResult);
+
+      const rawProducts = productResult?.items ?? [];
+      const rawBatches = batchResult?.items ?? batchResult?.data ?? batchResult ?? [];
+      console.log("Finished batches:", rawBatches);
+
+      const normalizedProducts = normalizeProducts(rawProducts);
+
+      // Convert Finished Goods batches to POS products
+      const finishedGoodsProducts = rawBatches.map((b:any) => ({
+        id: "FG-" + b.id,
+        name: b.recipeName || b.name || "Ready Bouquet",
+        sku: b.batchCode || b.id,
+        barcode: b.barcode,
+        category: "Bouquets",
+        sellingPrice: b.price ?? 499,
+        costPrice: 0,
+        taxRate: 0,
+        availableStock: b.quantityAvailable ?? b.quantity ?? 1,
+        isPerishable: true,
+        trackBatch: false,
+        imageUrl: "",
+        batches: []
       }));
-      setProducts(normalizedProducts);
+      console.log("Finished goods mapped:", finishedGoodsProducts);
+
+      console.log("Final POS products:", [
+        ...normalizedProducts,
+        ...finishedGoodsProducts
+      ]);
+      const mergedProducts = [
+        ...normalizedProducts,
+        ...finishedGoodsProducts
+      ];
+      setPOSCatalogCache(mergedProducts);
+      setProducts(mergedProducts);
+
+    } catch (err) {
+      console.warn("POS catalog load failed:", err);
     }
     // Load customers from API, fallback to mock
     try {
@@ -158,8 +184,14 @@ const POSScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadCatalog();
+
+    const interval = setInterval(() => {
+      loadCatalog();
+    }, 600000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // ─── Tab State ────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<POSTab>(0);
