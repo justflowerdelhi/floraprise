@@ -17,6 +17,10 @@ import type { POSCustomer } from './POSCustomerTypes';
 import { searchProducts, normalizeProducts } from '../../api/product.api';
 import { MOCK_PRODUCTS } from '../orders/OrderMockData';
 import { searchCustomers } from '../../api/customer.api';
+import OpenShiftModal from "../../components/pos/OpenShiftModal";
+import { getActiveShift } from "../../api/shift.api";
+import { useAuth } from "../../auth/AuthContext";
+import { Box } from "@mui/material";
 const MOCK_CUSTOMERS: POSCustomer[] = [
   {
     id: 'cust_001',
@@ -78,6 +82,9 @@ const POSScreen: React.FC = () => {
     cancelPayment,
     intentErrors,
   } = usePOS();
+
+  const { user } = useAuth();
+  console.log("POS User:", user);
 
   // ─── Data Loading ─────────────────────────────────────────
   const [products, setProducts] = useState<Product[]>([]);
@@ -197,6 +204,28 @@ const POSScreen: React.FC = () => {
     }
   }, [state.lifecycle, state.items.length, activeTab]);
 
+  // ─── Active Shift ─────────────────────────────────────────
+  const [activeShift, setActiveShift] = useState<any>(null);
+  const [showShiftModal, setShowShiftModal] = useState(false);
+
+  useEffect(() => {
+    const checkShift = async () => {
+      try {
+        const shift = await getActiveShift();
+
+        if (shift) {
+          setActiveShift(shift);
+        } else {
+          setShowShiftModal(true);
+        }
+      } catch {
+        setShowShiftModal(true);
+      }
+    };
+
+    checkShift();
+  }, []);
+
   // ─── Render ───────────────────────────────────────────────
 
   return (
@@ -217,6 +246,27 @@ const POSScreen: React.FC = () => {
         >
           {error}
         </Alert>
+      )}
+
+      {showShiftModal && (
+        <Box
+          sx={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999
+          }}
+        >
+          <OpenShiftModal
+            onOpened={(shift: any) => {
+              setActiveShift(shift);
+              setShowShiftModal(false);
+            }}
+          />
+        </Box>
       )}
 
       <POSTabLayout

@@ -5,6 +5,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import theme from "./theme";
 import "./index.css";
+import { syncOfflineSales } from "./utils/offlineSalesSync";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -14,3 +15,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </ThemeProvider>
   </React.StrictMode>
 );
+
+window.addEventListener("online", () => {
+  console.log("Internet restored — syncing offline sales");
+  syncOfflineSales();
+});

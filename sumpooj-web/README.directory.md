@@ -1,0 +1,150 @@
+# Project Directory Structure
+
+This project is organized as follows:
+
+## Root Files
+- API_IMPLEMENTATION_REPORT.md
+- eslint.config.js
+- index.html
+- package.json
+- README.md
+- tsconfig.app.json
+- tsconfig.json
+- tsconfig.node.json
+- vite.config.ts
+
+## app/
+- api/
+  - customers/
+
+## public/
+- assets/
+  - logo/
+- gift-cards/
+  - backgrounds/
+
+## src/
+- App.css
+- App.tsx
+- index.css
+- main.tsx
+- theme.ts
+- api/
+  - analytics.api.ts
+  - audit-log.api.ts
+  - auth.api.ts
+  - axios.ts
+  - barcode.api.ts
+  - category.api.ts
+  - company.api.ts
+  - customer.api.ts
+  - dashboard-preference.api.ts
+  - dashboard.api.ts
+  - day-close.api.ts
+  - delivery-zone.api.ts
+  - event.api.ts
+  - gift-card.api.ts
+  - inventory.api.ts
+  - location.api.ts
+  - lookup.api.ts
+  - order.api.ts
+  - payment-gateway.api.ts
+  - payment.api.ts
+  - product.api.ts
+  - ProductionJobsController.cs
+  - proposal.api.ts
+  - purchase.api.ts
+  - refund.api.ts
+  - shift.api.ts
+  - staff.api.ts
+  - supplier.api.ts
+  - task.api.ts
+  - tax.api.ts
+  - types.ts
+  - wire-order.api.ts
+- application/
+  - RecordMaterialUsageCommand.cs
+- assets/
+- auth/
+  - AppBootGuard.tsx
+  - AuthContext.tsx
+  - RequireAuth.tsx
+  - RequireTenantAccess.tsx
+- components/
+  - AppLayout.tsx
+  - DashboardCard.tsx
+  - ImageUploader.tsx
+  - barcode/
+  - dashboard/
+  - payments/
+- config/
+  - menuConfig.ts
+- core/
+  - audit/
+  - i18n/
+  - invoice/
+  - layout/
+  - location/
+  - rbac/
+  - tax/
+  - tenant/
+  - ux/
+- domain/
+  - Account.cs
+  - PaymentCompletionHandler.cs
+  - ProductionJob.cs
+  - ProductionMaterialUsage.cs
+- hooks/
+  - useApiCall.ts
+  - useToast.tsx
+- modules/
+  - accounting/
+  - dashboard/
+  - deliveries/
+  - phone-orders/
+  - production/
+  - vendors/
+- pages/
+  - DeliveryRouteDetailPage.clean.tsx
+  - DeliveryRouteDetailPage.tsx
+  - DeliveryRouteMockData.ts
+  - DeliveryRoutesPage.tsx
+  - accounting/
+  - adjustments/
+  - admin/
+  - auth/
+  - cart/
+  - categories/
+  - crm/
+  - customers/
+  - dashboard/
+  - day-close/
+  - events/
+  - expiry-alerts/
+  - gift-cards/
+  - health-dashboard/
+  - home/
+  - inventory/
+  - onboarding/
+  - orders/
+  - payments/
+  - phone-orders/
+  - pos/
+  - production/
+  - products/
+  - profit-intelligence/
+  - purchases/
+  - refunds/
+  - reorder/
+  - settings/
+  - staff/
+  - stock-ledger/
+  - subscription/
+  - ...
+- routes/
+- types/
+- utils/
+
+---
+
+For a more detailed breakdown of any folder or file, please refer to the respective subfolder or ask for specifics.
