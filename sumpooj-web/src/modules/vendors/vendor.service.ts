@@ -1,44 +1,43 @@
 import type { VendorFlorist } from "./vendor.types"
+import { getAllSuppliers, createSupplier, updateSupplier as apiUpdateSupplier, deactivateSupplier } from "../../api/supplier.api"
 
-let vendors: VendorFlorist[] = [
-  {
-    id: "1",
-    name: "Rosewood Florals",
-    city: "Pune",
-    state: "MH",
-    phone: "020-4000-1111",
-    email: "orders@rosewoodflorals.com",
-    commission: 18,
-    status: "ACTIVE"
-  },
-  {
-    id: "2",
-    name: "Urban Petals",
-    city: "Mumbai",
-    state: "MH",
-    phone: "022-4555-2222",
-    email: "hello@urbanpetals.in",
-    commission: 20,
-    status: "ACTIVE"
+export async function getVendors(): Promise<VendorFlorist[]> {
+  try {
+    const data = await getAllSuppliers();
+    const items = Array.isArray(data) ? data : data.items ?? [];
+    return items.map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      city: s.city ?? '',
+      state: s.state ?? '',
+      phone: s.phone ?? '',
+      email: s.email ?? '',
+      defaultCommissionRate: s.commissionRate ?? 0,
+      isActive: s.isActive ?? true,
+    }));
+  } catch {
+    return [];
   }
-]
-
-export function getVendors() {
-  return vendors
 }
 
-export function addVendor(vendor: VendorFlorist) {
-  vendors.push(vendor)
+export async function addVendor(vendor: VendorFlorist) {
+  await createSupplier({
+    name: vendor.name,
+    email: vendor.email,
+    phone: vendor.phone,
+    address: vendor.address,
+  });
 }
 
-export function updateVendor(updated: VendorFlorist) {
-  vendors = vendors.map(v =>
-    v.id === updated.id ? updated : v
-  )
+export async function updateVendor(updated: VendorFlorist) {
+  await apiUpdateSupplier(updated.id, {
+    name: updated.name,
+    email: updated.email,
+    phone: updated.phone,
+    address: updated.address,
+  });
 }
 
-export function deactivateVendor(id: string) {
-  vendors = vendors.map(v =>
-    v.id === id ? { ...v, status: "INACTIVE" } : v
-  )
+export async function deactivateVendor(id: string) {
+  await deactivateSupplier(id);
 }

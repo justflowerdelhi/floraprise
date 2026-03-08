@@ -121,3 +121,31 @@ public class LedgerEntryDto
     public decimal Credit { get; set; }
     public decimal Balance { get; set; }
 }
+
+public class TrialBalanceRowDto
+{
+    public Guid AccountId { get; set; }
+    public string Code { get; set; } = default!;
+    public string Name { get; set; } = default!;
+    public string Type { get; set; } = default!;
+    public decimal Debit { get; set; }
+    public decimal Credit { get; set; }
+}
+
+public class ManualSaleRequest
+{
+    public string OrderSource { get; set; } = "MANUAL";
+    public string? SaleDate { get; set; }
+    public string PaymentMethod { get; set; } = "Cash";
+    public string? Reason { get; set; }
+    public decimal Total { get; set; }
+    public List<ManualSaleItemRequest> Items { get; set; } = new();
+}
+
+public class ManualSaleItemRequest
+{
+    public string ProductId { get; set; } = default!;
+    public string Name { get; set; } = default!;
+    public int Qty { get; set; }
+    public decimal Price { get; set; }
+}

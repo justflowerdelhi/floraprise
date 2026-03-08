@@ -238,4 +238,35 @@ public class AccountingController : ControllerBase
         var result = entries.Select(j => { balance += j.Debit - j.Credit; return new LedgerEntryDto { Date = j.EntryDate.ToString("yyyy-MM-dd"), Reference = j.Reference, Description = j.Description, Debit = j.Debit, Credit = j.Credit, Balance = balance }; }).ToList();
         return Ok(result);
     }
+
+    // ─── Trial Balance ──────────────────────────────────────
+
+    [HttpGet("trial-balance")]
+    public async Task<IActionResult> GetTrialBalance()
+    {
+        var cid = CompanyId;
+        var accounts = await _db.Accounts.Where(a => a.CompanyId == cid).ToListAsync();
+        var entries = await _db.JournalEntries.Where(j => j.CompanyId == cid).ToListAsync();
+
+        var grouped = entries
+            .Where(j => j.AccountId.HasValue)
+            .GroupBy(j => j.AccountId!.Value)
+            .ToDictionary(g => g.Key, g => new { Debit = g.Sum(j => j.Debit), Credit = g.Sum(j => j.Credit) });
+
+        var result = accounts.Select(a =>
+        {
+            grouped.TryGetValue(a.Id, out var totals);
+            return new TrialBalanceRowDto
+            {
+                AccountId = a.Id,
+                Code = a.Code,
+                Name = a.Name,
+                Type = a.Type,
+                Debit = totals?.Debit ?? 0,
+                Credit = totals?.Credit ?? 0,
+            };
+        }).Where(r => r.Debit != 0 || r.Credit != 0).OrderBy(r => r.Code).ToList();
+
+        return Ok(result);
+    }
 }

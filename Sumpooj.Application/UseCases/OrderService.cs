@@ -1,3 +1,4 @@
+using Sumpooj.Application.Accounting;
 using Sumpooj.Application.Common;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Orders;
@@ -299,6 +300,57 @@ public class OrderService
 
         order.Cancel(reason);
         await _orderRepository.UpdateAsync(order);
+    }
+
+    /// <summary>
+    /// Create an order from the Manual Sale Entry screen (offline/power-failure scenarios).
+    /// Auto-resolves walk-in customer, auto-confirms, marks paid + delivered.
+    /// </summary>
+    public async Task<Guid> CreateManualSaleAsync(Guid companyId, ManualSaleRequest request)
+    {
+        // Resolve default location
+        var defaultLocation = await _locationRepository.GetDefaultAsync(companyId);
+        var locationId = defaultLocation?.Id ?? Guid.Empty;
+
+        // Resolve walk-in customer
+        var walkIn = await _customerRepository.GetOrCreateWalkInCustomerAsync(companyId);
+
+        var saleDate = string.IsNullOrEmpty(request.SaleDate)
+            ? DateTime.UtcNow
+            : DateTime.Parse(request.SaleDate).ToUniversalTime();
+
+        var order = new Order(companyId, walkIn.Id, saleDate, null, null, null);
+        order.LocationId = locationId;
+        order.SetOrderSource(OrderSource.WalkIn);
+        order.AddInternalNote($"Manual sale — {request.Reason ?? "Offline"}");
+
+        foreach (var item in request.Items)
+        {
+            // Attempt to parse productId as Guid; fall back to generating one
+            var productId = Guid.TryParse(item.ProductId, out var pid) ? pid : Guid.NewGuid();
+            order.AddItem(productId, item.Name, item.Qty, item.Price);
+        }
+
+        await _orderRepository.AddAsync(order);
+
+        // Record payment
+        var methodStr = NormalizeEnumString(request.PaymentMethod);
+        if (!Enum.TryParse<PaymentMethod>(methodStr, true, out var method))
+            method = PaymentMethod.Cash;
+
+        var payment = new Payment(companyId, order.Id, method, order.TotalAmount);
+        payment.SetLocation(locationId);
+        if (method == PaymentMethod.Cash) payment.Approve(null, null);
+        await _paymentRepository.AddAsync(payment);
+
+        // Mark paid + delivered
+        order.MarkPaid();
+        order.Confirm();
+        order.SetFulfillmentStatus(FulfillmentStatus.Completed);
+        order.MarkDeliveredDirect();
+        await _orderRepository.UpdateAsync(order);
+
+        return order.Id;
     }
 
     private static OrderDto MapToDto(Order order) => new()

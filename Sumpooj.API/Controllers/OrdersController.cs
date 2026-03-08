@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Sumpooj.Application.Accounting;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Orders;
 using Sumpooj.Application.UseCases;
@@ -105,6 +106,13 @@ public class OrdersController : ControllerBase
     {
         await _orderService.CancelAsync(CompanyId, id, request?.Reason);
         return NoContent();
+    }
+
+    [HttpPost("manual-sale")]
+    public async Task<IActionResult> ManualSale([FromBody] ManualSaleRequest request)
+    {
+        var orderId = await _orderService.CreateManualSaleAsync(CompanyId, request);
+        return CreatedAtAction(nameof(GetById), new { id = orderId }, new { id = orderId });
     }
 }
 

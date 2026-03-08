@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../api/axios";
 import React, { useState } from "react";
 import {
   Box,
@@ -99,7 +99,7 @@ const ManualSaleEntry: React.FC = () => {
     };
 
     try {
-      await axios.post("/api/orders/manual-sale", payload);
+      await api.post("/orders/manual-sale", payload);
       alert("Sale saved successfully");
     } catch (error) {
       console.warn("Offline mode — saving locally");
