@@ -15,11 +15,16 @@ public class Expense : BaseEntity
     }
 
     public Guid CompanyId { get; private set; }
+    public Guid? LocationId { get; private set; }
+    public Guid? AccountId { get; private set; }
     public string Category { get; private set; } = default!;
     public decimal Amount { get; private set; }
     public string? Description { get; private set; }
     public DateTime ExpenseDate { get; private set; }
     public bool IsActive { get; private set; } = true;
+
+    public void SetLocation(Guid locationId) { LocationId = locationId; MarkUpdated(); }
+    public void SetAccount(Guid accountId) { AccountId = accountId; MarkUpdated(); }
 
     public void Update(string category, decimal amount, string? description)
     {

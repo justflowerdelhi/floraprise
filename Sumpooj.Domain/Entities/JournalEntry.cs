@@ -21,6 +21,7 @@ public class JournalEntry : BaseEntity
     }
 
     public Guid CompanyId { get; private set; }
+    public Guid? LocationId { get; private set; }
     public DateTime EntryDate { get; private set; }
     public string Reference { get; private set; } = default!;
     public string ReferenceType { get; private set; } = default!;
@@ -28,4 +29,6 @@ public class JournalEntry : BaseEntity
     public decimal Debit { get; private set; }
     public decimal Credit { get; private set; }
     public Guid? AccountId { get; private set; }
+
+    public void SetLocation(Guid locationId) { LocationId = locationId; MarkUpdated(); }
 }

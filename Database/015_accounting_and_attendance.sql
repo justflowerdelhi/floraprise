@@ -74,3 +74,8 @@ CREATE TABLE IF NOT EXISTS "StaffAttendanceRecords" (
 
 CREATE INDEX IF NOT EXISTS "IX_StaffAttendance_CompanyId_Date" ON "StaffAttendanceRecords" ("CompanyId", "CheckInUtc" DESC);
 CREATE INDEX IF NOT EXISTS "IX_StaffAttendance_StaffId" ON "StaffAttendanceRecords" ("StaffId");
+
+-- 5. Add LocationId to JournalEntries and Expenses (doc compliance)
+ALTER TABLE "JournalEntries" ADD COLUMN IF NOT EXISTS "LocationId" UUID NULL;
+ALTER TABLE "Expenses"       ADD COLUMN IF NOT EXISTS "LocationId" UUID NULL;
+ALTER TABLE "Expenses"       ADD COLUMN IF NOT EXISTS "AccountId"  UUID NULL;
