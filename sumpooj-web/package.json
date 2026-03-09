@@ -16,6 +16,7 @@
     "@mui/icons-material": "^7.3.9",
     "@mui/material": "^7.3.9",
     "@tailwindcss/vite": "^4.2.0",
+    "@types/react-window": "^1.8.8",
     "axios": "^1.13.2",
     "dayjs": "^1.11.19",
     "html-to-image": "^1.11.13",
