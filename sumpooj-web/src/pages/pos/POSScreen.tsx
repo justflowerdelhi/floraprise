@@ -108,7 +108,7 @@ const POSScreen: React.FC = () => {
       console.log("Finished batches API result:", batchResult);
 
       const rawProducts = productResult?.items ?? [];
-      const rawBatches = batchResult?.items ?? batchResult?.data ?? batchResult ?? [];
+      const rawBatches = (batchResult as any)?.items ?? (batchResult as any)?.data ?? batchResult ?? [];
       console.log("Finished batches:", rawBatches);
 
       const normalizedProducts = normalizeProducts(rawProducts);
@@ -184,10 +184,10 @@ const POSScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadCatalog();
+    loadData();
 
     const interval = setInterval(() => {
-      loadCatalog();
+      loadData();
     }, 600000);
 
     return () => clearInterval(interval);
@@ -243,7 +243,7 @@ const POSScreen: React.FC = () => {
   useEffect(() => {
     const checkShift = async () => {
       try {
-        const shift = await getActiveShift();
+        const shift = await getActiveShift(user?.primaryLocationId ?? '');
 
         if (shift) {
           setActiveShift(shift);

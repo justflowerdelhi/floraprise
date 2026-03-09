@@ -26,6 +26,7 @@ export async function addVendor(vendor: VendorFlorist) {
     email: vendor.email,
     phone: vendor.phone,
     address: vendor.address,
+    paymentTermsDays: 0,
   });
 }
 

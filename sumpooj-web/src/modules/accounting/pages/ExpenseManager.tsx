@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, IconButton } from '@mui/material';
 import { Edit, Block } from '@mui/icons-material';
 import ExpenseForm from './ExpenseForm';
@@ -6,10 +6,11 @@ import { categoryIcons } from '../accounting.constants.tsx';
 import { getExpenses, addExpense } from '../accounting.service';
 
 const ExpenseManager: React.FC = () => {
-  const initialExpenses = getExpenses();
-  const [expenses, setExpenses] = useState(
-    Array.isArray(initialExpenses) ? initialExpenses : []
-  );
+  const [expenses, setExpenses] = useState<any[]>([]);
+
+  useEffect(() => {
+    getExpenses().then(data => setExpenses(Array.isArray(data) ? data : []));
+  }, []);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
@@ -24,20 +25,20 @@ const ExpenseManager: React.FC = () => {
     setFormOpen(true);
   };
 
-  const handleFormSubmit = (data: any) => {
+  const handleFormSubmit = async (data: any) => {
     if (editData) {
       // updateExpense(editData.id, data); // Function not implemented
     } else {
-      addExpense(data);
+      await addExpense(data);
     }
-    const expensesData = getExpenses();
+    const expensesData = await getExpenses();
     setExpenses(Array.isArray(expensesData) ? expensesData : []);
     setFormOpen(false);
   };
 
-  const handleDisable = (expense: any) => {
+  const handleDisable = async (expense: any) => {
     // disableExpense(expense.id); // Function not implemented
-    const expensesData = getExpenses();
+    const expensesData = await getExpenses();
     setExpenses(Array.isArray(expensesData) ? expensesData : []);
   };
 

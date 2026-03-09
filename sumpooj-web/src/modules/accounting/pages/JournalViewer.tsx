@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, TextField, MenuItem, Grid } from '@mui/material';
 import JournalEntryModal from './JournalEntryModal';
 import { getJournalEntries } from '../accounting.service';
 
 const JournalViewer: React.FC = () => {
-  const [entries, setEntries] = useState(getJournalEntries());
+  const [entries, setEntries] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [refType, setRefType] = useState('');
+
+  useEffect(() => {
+    getJournalEntries().then(data => setEntries(Array.isArray(data) ? data : []));
+  }, []);
 
   const handleRowClick = (entry: any) => {
     setSelectedEntry(entry);
@@ -17,24 +21,26 @@ const JournalViewer: React.FC = () => {
   };
 
   const handleFilter = () => {
-    let filtered = getJournalEntries();
-    if (dateFrom) filtered = filtered.filter(e => e.date >= dateFrom);
-    if (dateTo) filtered = filtered.filter(e => e.date <= dateTo);
-    if (refType) filtered = filtered.filter(e => e.referenceType === refType);
-    setEntries(filtered);
+    getJournalEntries().then(data => {
+      let filtered = Array.isArray(data) ? data : [];
+      if (dateFrom) filtered = filtered.filter((e: any) => e.date >= dateFrom);
+      if (dateTo) filtered = filtered.filter((e: any) => e.date <= dateTo);
+      if (refType) filtered = filtered.filter((e: any) => e.referenceType === refType);
+      setEntries(filtered);
+    });
   };
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
       <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>Journal Viewer</Typography>
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <TextField label="From" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} />
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <TextField label="To" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} />
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <TextField label="Reference Type" select value={refType} onChange={e => setRefType(e.target.value)} fullWidth>
             <MenuItem value="">All</MenuItem>
             {['CASH', 'ACCOUNT', 'RECEIVABLE', 'PAYABLE', 'INCOME', 'EXPENSE'].map(rt => (
@@ -42,7 +48,7 @@ const JournalViewer: React.FC = () => {
             ))}
           </TextField>
         </Grid>
-        <Grid item xs={12}>
+        <Grid size={12}>
           <Button variant="contained" onClick={handleFilter}>Filter</Button>
         </Grid>
       </Grid>

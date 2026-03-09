@@ -359,6 +359,12 @@ export const getInitialFormData = (staff?: Staff): StaffFormData => ({
   loginRole: '',
   password: '',
   confirmPassword: '',
+  salaryType: '',
+  monthlySalary: '',
+  overtimeRate: '',
+  weeklyOff: [],
+  shiftStart: '',
+  shiftEnd: '',
 });
 
 /** Roles available for identity login assignment */

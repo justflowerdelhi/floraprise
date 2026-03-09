@@ -119,7 +119,7 @@ export const createWastageEntry = async (
 
 // ─── Inventory Products (for component selection) ───────────
 
-export const getInventoryProducts = async () => {
+export const getInventoryProducts = async (locationId?: string) => {
   try {
     const res = await fetch('/api/inventory/products');
     return await res.json();

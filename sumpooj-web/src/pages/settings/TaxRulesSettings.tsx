@@ -148,7 +148,7 @@ const TaxRuleFormDialog: React.FC<TaxRuleFormProps> = ({
 
       <DialogContent dividers>
         <Grid container spacing={3}>
-          <Grid xs={12}>
+          <Grid size={12}>
             <FormControl fullWidth>
               <InputLabel>Country</InputLabel>
               <Select
@@ -166,7 +166,7 @@ const TaxRuleFormDialog: React.FC<TaxRuleFormProps> = ({
             </FormControl>
           </Grid>
 
-          <Grid xs={12}>
+          <Grid size={12}>
             <TextField
               fullWidth
               label="Tax Name"
@@ -177,7 +177,7 @@ const TaxRuleFormDialog: React.FC<TaxRuleFormProps> = ({
             />
           </Grid>
 
-          <Grid xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
               label="Tax Rate (%)"
@@ -192,7 +192,7 @@ const TaxRuleFormDialog: React.FC<TaxRuleFormProps> = ({
             />
           </Grid>
 
-          <Grid xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <FormControlLabel
               control={
                 <Switch
@@ -205,7 +205,7 @@ const TaxRuleFormDialog: React.FC<TaxRuleFormProps> = ({
             />
           </Grid>
 
-          <Grid xs={12}>
+          <Grid size={12}>
             <Alert severity="info">
               <Typography variant="body2">
                 <strong>Inclusive:</strong> Price already includes tax (common in EU/UK).

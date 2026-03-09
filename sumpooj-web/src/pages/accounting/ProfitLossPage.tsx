@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Button, Card, Table, DatePicker, Select } from "antd";
-import axios from "axios";
+import {
+  Box, Button, Card, CardContent, Typography, TextField, MenuItem,
+  Table, TableHead, TableBody, TableRow, TableCell, CircularProgress,
+  FormControl, InputLabel, Select,
+} from "@mui/material";
+import api from "../../api/axios";
 
 interface RevenueBreakdown {
   Account: string;
@@ -35,21 +39,20 @@ const ProfitLossPage: React.FC = () => {
     try {
       const params: any = { startDate, endDate };
       if (locationId) params.locationId = locationId;
-      const res = await axios.get("/accounting/profit-loss", { params });
+      const res = await api.get("/accounting/profit-loss", { params });
       setData(res.data);
-    } catch (e) {
+    } catch {
       setData(null);
     }
     setLoading(false);
   };
 
   const exportCSV = () => {
-    // Simple CSV export
     if (!data) return;
     let csv = "Section,Account,Amount\n";
-    data.RevenueBreakdown.forEach(r => csv += `Revenue,${r.Account},${r.Amount}\n`);
+    data.RevenueBreakdown.forEach((r: RevenueBreakdown) => csv += `Revenue,${r.Account},${r.Amount}\n`);
     csv += `COGS,,${data.COGSTotal}\n`;
-    data.ExpenseBreakdown.forEach(e => csv += `Expense,${e.Account},${e.Amount}\n`);
+    data.ExpenseBreakdown.forEach((e: ExpenseBreakdown) => csv += `Expense,${e.Account},${e.Amount}\n`);
     csv += `Gross Profit,,${data.GrossProfit}\n`;
     csv += `Net Profit,,${data.NetProfit}\n`;
     const blob = new Blob([csv], { type: "text/csv" });
@@ -61,60 +64,80 @@ const ProfitLossPage: React.FC = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  // Placeholder for PDF export
   const exportPDF = () => {
     window.print();
   };
 
+  const rows = data ? [
+    ...data.RevenueBreakdown.map((r: RevenueBreakdown) => ({ section: "Revenue", account: r.Account, amount: r.Amount })),
+    { section: "COGS", account: "", amount: data.COGSTotal },
+    ...data.ExpenseBreakdown.map((e: ExpenseBreakdown) => ({ section: "Expense", account: e.Account, amount: e.Amount })),
+    { section: "Gross Profit", account: "", amount: data.GrossProfit },
+    { section: "Net Profit", account: "", amount: data.NetProfit },
+  ] : [];
+
   return (
-    <div>
-      <h2>Profit & Loss Report</h2>
-      <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
-        <DatePicker
-          placeholder="Start Date"
-          onChange={(_, dateStr) => setStartDate(dateStr)}
+    <Box p={3}>
+      <Typography variant="h5" mb={2}>Profit &amp; Loss Report</Typography>
+      <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
+        <TextField
+          label="Start Date"
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          size="small"
         />
-        <DatePicker
-          placeholder="End Date"
-          onChange={(_, dateStr) => setEndDate(dateStr)}
+        <TextField
+          label="End Date"
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          size="small"
         />
-        <Select
-          placeholder="Location"
-          style={{ width: 200 }}
-          allowClear
-          onChange={v => setLocationId(v || "")}
-          options={[]}
-        />
-        <Button onClick={exportCSV}>Export CSV</Button>
-        <Button onClick={exportPDF}>Export PDF</Button>
-      </div>
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel>Location</InputLabel>
+          <Select
+            value={locationId}
+            label="Location"
+            onChange={(e) => setLocationId(e.target.value)}
+          >
+            <MenuItem value="">All</MenuItem>
+          </Select>
+        </FormControl>
+        <Button variant="outlined" onClick={exportCSV}>Export CSV</Button>
+        <Button variant="outlined" onClick={exportPDF}>Export PDF</Button>
+      </Box>
       {data && (
-        <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
-          <Card title="Revenue" style={{ flex: 1 }}>{data.RevenueBreakdown.reduce((sum, r) => sum + r.Amount, 0)}</Card>
-          <Card title="COGS" style={{ flex: 1 }}>{data.COGSTotal}</Card>
-          <Card title="Gross Profit" style={{ flex: 1 }}>{data.GrossProfit}</Card>
-          <Card title="Expenses" style={{ flex: 1 }}>{data.ExpenseBreakdown.reduce((sum, e) => sum + e.Amount, 0)}</Card>
-          <Card title="Net Profit" style={{ flex: 1 }}>{data.NetProfit}</Card>
-        </div>
+        <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
+          <Card sx={{ flex: 1, minWidth: 140 }}><CardContent><Typography variant="caption">Revenue</Typography><Typography variant="h6">{data.RevenueBreakdown.reduce((sum: number, r: RevenueBreakdown) => sum + r.Amount, 0)}</Typography></CardContent></Card>
+          <Card sx={{ flex: 1, minWidth: 140 }}><CardContent><Typography variant="caption">COGS</Typography><Typography variant="h6">{data.COGSTotal}</Typography></CardContent></Card>
+          <Card sx={{ flex: 1, minWidth: 140 }}><CardContent><Typography variant="caption">Gross Profit</Typography><Typography variant="h6">{data.GrossProfit}</Typography></CardContent></Card>
+          <Card sx={{ flex: 1, minWidth: 140 }}><CardContent><Typography variant="caption">Expenses</Typography><Typography variant="h6">{data.ExpenseBreakdown.reduce((sum: number, e: ExpenseBreakdown) => sum + e.Amount, 0)}</Typography></CardContent></Card>
+          <Card sx={{ flex: 1, minWidth: 140 }}><CardContent><Typography variant="caption">Net Profit</Typography><Typography variant="h6">{data.NetProfit}</Typography></CardContent></Card>
+        </Box>
       )}
-      <Table
-        loading={loading}
-        dataSource={data ? [
-          ...data.RevenueBreakdown.map(r => ({ section: "Revenue", account: r.Account, amount: r.Amount })),
-          { section: "COGS", account: "", amount: data.COGSTotal },
-          ...data.ExpenseBreakdown.map(e => ({ section: "Expense", account: e.Account, amount: e.Amount })),
-          { section: "Gross Profit", account: "", amount: data.GrossProfit },
-          { section: "Net Profit", account: "", amount: data.NetProfit }
-        ] : []}
-        columns={[
-          { title: "Section", dataIndex: "section" },
-          { title: "Account", dataIndex: "account" },
-          { title: "Amount", dataIndex: "amount" }
-        ]}
-        pagination={false}
-        rowKey={(_, idx) => idx.toString()}
-      />
-    </div>
+      {loading && <CircularProgress sx={{ display: "block", mx: "auto", my: 4 }} />}
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Section</TableCell>
+            <TableCell>Account</TableCell>
+            <TableCell align="right">Amount</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.map((row, idx: number) => (
+            <TableRow key={idx}>
+              <TableCell>{row.section}</TableCell>
+              <TableCell>{row.account}</TableCell>
+              <TableCell align="right">{row.amount}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Box>
   );
 };
 

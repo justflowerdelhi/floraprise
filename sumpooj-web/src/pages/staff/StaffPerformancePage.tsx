@@ -510,10 +510,10 @@ const StaffPerformancePage: React.FC = () => {
         <Grid container spacing={3}>
           {/* Sales Metrics (if role tracks sales) */}
           {roleConfig?.tracksSales && (
-            <Grid item xs={12}>
+            <Grid size={12}>
               <SectionCard title="Sales Performance" icon={<OrderIcon />} color="#2196f3">
                 <Grid container spacing={2}>
-                  <Grid item xs={6} sm={4} md={2}>
+                  <Grid size={{ xs: 6, sm: 4, md: 2 }}>
                     <MetricCard
                       label="Total Orders"
                       value={performance.sales.totalOrders}
@@ -521,7 +521,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<ReceiptIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid item xs={6} sm={4} md={2}>
+                  <Grid size={{ xs: 6, sm: 4, md: 2 }}>
                     <MetricCard
                       label="Total Revenue"
                       value={fmtCurrency(performance.sales.totalRevenue)}
@@ -529,7 +529,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<TrendingUpIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid item xs={6} sm={4} md={2}>
+                  <Grid size={{ xs: 6, sm: 4, md: 2 }}>
                     <MetricCard
                       label="Gross Profit"
                       value={fmtCurrency(performance.sales.grossProfit)}
@@ -537,7 +537,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<MoneyIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid item xs={6} sm={4} md={2}>
+                  <Grid size={{ xs: 6, sm: 4, md: 2 }}>
                     <MetricCard
                       label="Avg Order Value"
                       value={fmtCurrency(performance.sales.averageOrderValue)}
@@ -545,7 +545,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<ShoppingCart fontSize="small" />}
                     />
                   </Grid>
-                  <Grid item xs={6} sm={4} md={2}>
+                  <Grid size={{ xs: 6, sm: 4, md: 2 }}>
                     <MetricCard
                       label="Margin %"
                       value={fmtPercent(performance.sales.marginPercent)}
@@ -553,7 +553,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<TrendingUpIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid item xs={6} sm={4} md={2}>
+                  <Grid size={{ xs: 6, sm: 4, md: 2 }}>
                     <MetricCard
                       label="Discounts Given"
                       value={fmtCurrency(performance.sales.totalDiscountsGiven)}
@@ -569,7 +569,7 @@ const StaffPerformancePage: React.FC = () => {
                   Sales by Channel
                 </Typography>
                 <Grid container spacing={2}>
-                  <Grid item xs={4}>
+                  <Grid size={4}>
                     <Box sx={{ textAlign: 'center' }}>
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#fdd835' }}>
                         {fmtCurrency(performance.sales.walkInSales || 0)}
@@ -577,7 +577,7 @@ const StaffPerformancePage: React.FC = () => {
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>Walk-in</Typography>
                     </Box>
                   </Grid>
-                  <Grid item xs={4}>
+                  <Grid size={4}>
                     <Box sx={{ textAlign: 'center' }}>
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#03a9f4' }}>
                         {fmtCurrency(performance.sales.phoneSales || 0)}
@@ -585,7 +585,7 @@ const StaffPerformancePage: React.FC = () => {
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>Phone</Typography>
                     </Box>
                   </Grid>
-                  <Grid item xs={4}>
+                  <Grid size={4}>
                     <Box sx={{ textAlign: 'center' }}>
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#e91e63' }}>
                         {fmtCurrency(performance.sales.onlineSales || 0)}
@@ -600,10 +600,10 @@ const StaffPerformancePage: React.FC = () => {
 
           {/* Event Metrics (if role tracks events) */}
           {roleConfig?.tracksEvents && (
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <SectionCard title="Events Performance" icon={<EventIcon />} color="#e91e63">
                 <Grid container spacing={2}>
-                  <Grid item xs={6}>
+                  <Grid size={6}>
                     <MetricCard
                       label="Events Assigned"
                       value={performance.events.eventsAssigned}
@@ -611,7 +611,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<AssignmentIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid size={6}>
                     <MetricCard
                       label="Events Completed"
                       value={performance.events.eventsCompleted}
@@ -619,14 +619,14 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<CheckIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid size={6}>
                     <MetricCard
                       label="Proposals Created"
                       value={performance.events.proposalsCreated}
                       color="#ff9800"
                     />
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid size={6}>
                     <MetricCard
                       label="Proposals Approved"
                       value={performance.events.proposalsApproved}
@@ -638,14 +638,14 @@ const StaffPerformancePage: React.FC = () => {
                 <Divider sx={{ my: 2 }} />
 
                 <Grid container spacing={2}>
-                  <Grid item xs={6}>
+                  <Grid size={6}>
                     <MetricCard
                       label="Event Revenue"
                       value={fmtCurrency(performance.events.eventRevenue)}
                       color="#9c27b0"
                     />
                   </Grid>
-                  <Grid xs={6}>
+                  <Grid size={6}>
                     <MetricCard
                       label="Event Profit"
                       value={fmtCurrency(performance.events.eventProfit)}
@@ -659,10 +659,10 @@ const StaffPerformancePage: React.FC = () => {
 
           {/* Production Metrics (if role tracks production) */}
           {roleConfig?.tracksProduction && (
-            <Grid xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <SectionCard title="Production Performance" icon={<ProductionIcon />} color="#9c27b0">
                 <Grid container spacing={2} sx={{ mb: 2 }}>
-                  <Grid xs={6}>
+                  <Grid size={6}>
                     <MetricCard
                       label="Items Assigned"
                       value={performance.production.itemsAssigned}
@@ -670,7 +670,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<AssignmentIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid xs={6}>
+                  <Grid size={6}>
                     <MetricCard
                       label="Items Completed"
                       value={performance.production.itemsCompleted}
@@ -688,14 +688,14 @@ const StaffPerformancePage: React.FC = () => {
                 />
 
                 <Grid container spacing={2}>
-                  <Grid xs={6}>
+                  <Grid size={6}>
                     <MetricCard
                       label="In Progress"
                       value={performance.production.itemsInProgress || 0}
                       color="#ff9800"
                     />
                   </Grid>
-                  <Grid xs={6}>
+                  <Grid size={6}>
                     <MetricCard
                       label="Avg Completion"
                       value={`${performance.production.averageCompletionTime?.toFixed(1) || '-'} hrs`}
@@ -713,7 +713,7 @@ const StaffPerformancePage: React.FC = () => {
             <Grid size={{ xs: 12, md: 6 }}>
               <SectionCard title="Delivery Performance" icon={<DeliveryIcon />} color="#ff9800">
                 <Grid container spacing={2} sx={{ mb: 2 }}>
-                  <Grid xs={6}>
+                  <Grid size={6}>
                     <MetricCard
                       label="Deliveries Assigned"
                       value={performance.deliveries.deliveriesAssigned}
@@ -721,7 +721,7 @@ const StaffPerformancePage: React.FC = () => {
                       icon={<AssignmentIcon fontSize="small" />}
                     />
                   </Grid>
-                  <Grid xs={6}>
+                  <Grid size={6}>
                     <MetricCard
                       label="Deliveries Completed"
                       value={performance.deliveries.deliveriesCompleted}
@@ -762,10 +762,10 @@ const StaffPerformancePage: React.FC = () => {
 
           {/* Commission Summary */}
           {staff.commissionType && (
-            <Grid xs={12}>
+            <Grid size={12}>
               <SectionCard title="Commission Summary" icon={<MoneyIcon />} color="#fdd835">
                 <Grid container spacing={3} alignItems="center">
-                  <Grid xs={12} sm={4}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Box sx={{ textAlign: 'center', py: 2 }}>
                       <Typography variant="caption" sx={{ color: dk ? 'rgba(255,255,255,0.5)' : 'text.secondary' }}>
                         Commission Base ({staff.commissionType.toLowerCase()})
@@ -775,7 +775,7 @@ const StaffPerformancePage: React.FC = () => {
                       </Typography>
                     </Box>
                   </Grid>
-                  <Grid xs={12} sm={4}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Box sx={{ textAlign: 'center', py: 2 }}>
                       <Typography variant="caption" sx={{ color: dk ? 'rgba(255,255,255,0.5)' : 'text.secondary' }}>
                         Commission Rate
@@ -785,7 +785,7 @@ const StaffPerformancePage: React.FC = () => {
                       </Typography>
                     </Box>
                   </Grid>
-                  <Grid xs={12} sm={4}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Box
                       sx={{
                         textAlign: 'center',

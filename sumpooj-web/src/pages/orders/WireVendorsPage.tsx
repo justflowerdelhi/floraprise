@@ -34,22 +34,28 @@ import {
 import { MOCK_VENDOR_FLORISTS } from './WireMockData';
 
 const WireVendorsPage: React.FC = () => {
-  const handleSaveVendor = (data: any) => {
+  const [vendors, setVendors] = React.useState<VendorFlorist[]>([]);
+
+  React.useEffect(() => {
+    getVendors().then(data => setVendors(Array.isArray(data) ? data : []));
+  }, []);
+
+  const handleSaveVendor = async (data: any) => {
     if (editingVendor) {
-      updateVendor({
+      await updateVendor({
         ...editingVendor,
         ...data
       });
     } else {
-      addVendor({
+      await addVendor({
         id: Date.now().toString(),
         status: "ACTIVE",
         ...data
-      });
+      } as VendorFlorist);
     }
-    setVendors(getVendors());
+    const updatedVendors = await getVendors();
+    setVendors(Array.isArray(updatedVendors) ? updatedVendors : []);
   };
-  const [vendors, setVendors] = React.useState(getVendors());
   const [openForm, setOpenForm] = React.useState(false);
   const [editingVendor, setEditingVendor] = React.useState<any>(null);
   const theme = useTheme();
@@ -141,7 +147,7 @@ const WireVendorsPage: React.FC = () => {
                                   {vendor.address ?? "—"}
                                 </TableCell>
                                 <TableCell>
-                                  {vendor.zipCode ?? "—"}
+                                  {vendor.zipPinCode ?? "—"}
                                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">{vendor.phone ?? '—'}</Typography>
@@ -171,9 +177,10 @@ const WireVendorsPage: React.FC = () => {
                   </IconButton>
                   {/* Deactivate Button */}
                   <IconButton
-                    onClick={() => {
-                      deactivateVendor(vendor.id);
-                      setVendors(getVendors());
+                    onClick={async () => {
+                      await deactivateVendor(vendor.id);
+                      const updated = await getVendors();
+                      setVendors(Array.isArray(updated) ? updated : []);
                     }}
                   >
                     <DeleteIcon />

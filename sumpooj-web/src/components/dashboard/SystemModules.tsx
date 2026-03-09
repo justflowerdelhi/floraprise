@@ -13,7 +13,7 @@ export default function SystemModules() {
       </Typography>
 
       <Grid container spacing={2}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p:3, textAlign:"center", borderRadius:2 }}>
             <Typography fontWeight={600}>POS</Typography>
             <Typography variant="body2" color="text.secondary">
@@ -21,7 +21,7 @@ export default function SystemModules() {
             </Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p:3, textAlign:"center", borderRadius:2 }}>
             <Typography fontWeight={600}>Orders</Typography>
             <Typography variant="body2" color="text.secondary">
@@ -29,7 +29,7 @@ export default function SystemModules() {
             </Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p:3, textAlign:"center", borderRadius:2 }}>
             <Typography fontWeight={600}>Inventory</Typography>
             <Typography variant="body2" color="text.secondary">
@@ -37,7 +37,7 @@ export default function SystemModules() {
             </Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p:3, textAlign:"center", borderRadius:2 }}>
             <Typography fontWeight={600}>CRM</Typography>
             <Typography variant="body2" color="text.secondary">
@@ -45,7 +45,7 @@ export default function SystemModules() {
             </Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p:3, textAlign:"center", borderRadius:2 }}>
             <Typography fontWeight={600}>Production</Typography>
             <Typography variant="body2" color="text.secondary">
@@ -53,7 +53,7 @@ export default function SystemModules() {
             </Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p:3, textAlign:"center", borderRadius:2 }}>
             <Typography fontWeight={600}>Events</Typography>
             <Typography variant="body2" color="text.secondary">
@@ -61,7 +61,7 @@ export default function SystemModules() {
             </Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p:3, textAlign:"center", borderRadius:2 }}>
             <Typography fontWeight={600}>Payments</Typography>
             <Typography variant="body2" color="text.secondary">
@@ -69,7 +69,7 @@ export default function SystemModules() {
             </Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p:3, textAlign:"center", borderRadius:2 }}>
             <Typography fontWeight={600}>Reports</Typography>
             <Typography variant="body2" color="text.secondary">
@@ -77,7 +77,7 @@ export default function SystemModules() {
             </Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p:3, textAlign:"center", borderRadius:2 }}>
             <Typography fontWeight={600}>Settings</Typography>
             <Typography variant="body2" color="text.secondary">

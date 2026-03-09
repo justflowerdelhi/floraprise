@@ -47,7 +47,7 @@ export default function PaymentPanel({ total, onCheckout }: Props) {
       </Box>
       <Box sx={{ mt: 2 }}>
         <Grid container spacing={1}>
-          <Grid item xs={4}>
+          <Grid size={4}>
             <Button
               fullWidth
               variant="outlined"
@@ -56,7 +56,7 @@ export default function PaymentPanel({ total, onCheckout }: Props) {
               Cash
             </Button>
           </Grid>
-          <Grid item xs={4}>
+          <Grid size={4}>
             <Button
               fullWidth
               variant="outlined"
@@ -68,7 +68,7 @@ export default function PaymentPanel({ total, onCheckout }: Props) {
               Card
             </Button>
           </Grid>
-          <Grid item xs={4}>
+          <Grid size={4}>
             <Button
               fullWidth
               variant="outlined"
@@ -83,7 +83,7 @@ export default function PaymentPanel({ total, onCheckout }: Props) {
         <Box sx={{ mt: 2 }}>
           {payments.map((p, i) => (
             <Grid container spacing={1} key={i} sx={{ mb: 1 }}>
-              <Grid item xs={6}>
+              <Grid size={6}>
                 <TextField
                   select
                   fullWidth
@@ -98,7 +98,7 @@ export default function PaymentPanel({ total, onCheckout }: Props) {
                   <MenuItem value="UPI">UPI</MenuItem>
                 </TextField>
               </Grid>
-              <Grid item xs={6}>
+              <Grid size={6}>
                 <TextField
                   fullWidth
                   size="small"

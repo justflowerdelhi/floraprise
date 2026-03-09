@@ -10,10 +10,12 @@ import { POSProvider } from "./pages/pos/POSContext";
 
 import { BrowserRouter } from "react-router-dom";
 
+const basename = import.meta.env.BASE_URL.replace(/\/+$/, '') || '/';
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <POSProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={basename}>
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <App />

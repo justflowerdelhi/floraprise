@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 
 import Box from "@mui/material/Box";
@@ -33,7 +33,11 @@ const HomeDashboard = () => {
     { title: "Upcoming Events", value: "0", subtitle: "Next 7 days" }
   ];
 
-  const financial = getDailyFinancialSummary();
+  const [financial, setFinancial] = useState({ salesToday: 0, expensesToday: 0, profitToday: 0, cashInDrawer: 0 });
+
+  useEffect(() => {
+    getDailyFinancialSummary().then(data => setFinancial(data));
+  }, []);
 
   const financeStats = [
     { title: "Revenue Today", value: `₹${financial.salesToday}` },
@@ -48,7 +52,7 @@ const HomeDashboard = () => {
       {/* TOP STATS */}
       <Grid container spacing={2} mb={2}>
         {topStats.map((stat, index) => (
-          <Grid item xs={12} md={2} key={index}>
+          <Grid size={{ xs: 12, md: 2 }} key={index}>
             <Paper sx={{ p:2, borderRadius:2 }}>
               <Typography fontSize={13} color="text.secondary">
                 {stat.title}
@@ -68,7 +72,7 @@ const HomeDashboard = () => {
       {/* FINANCE STATS */}
       <Grid container spacing={2} mb={3}>
         {financeStats.map((stat, index) => (
-          <Grid item xs={12} md={3} key={index}>
+          <Grid size={{ xs: 12, md: 3 }} key={index}>
             <Paper sx={{ p:2, borderRadius:2 }}>
               <Typography fontSize={13} color="text.secondary">
                 {stat.title}
@@ -119,7 +123,7 @@ const HomeDashboard = () => {
           { icon: <BarChartIcon sx={{ fontSize:32, color:'#5e35b1', mb:1 }} />, label: 'Reports', desc: 'Profit & analytics', to: '/reports' },
           { icon: <SettingsIcon sx={{ fontSize:32, color:'#6d4c41', mb:1 }} />, label: 'Settings', desc: 'Store configuration', to: '/settings' }
         ]).map((mod, idx) => (
-          <Grid item xs={12} sm={6} md={3} lg={2} key={mod.label} sx={{ display: 'flex' }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3, lg: 2 }} key={mod.label} sx={{ display: 'flex' }}>
             <Paper
               component={Link}
               to={mod.to}

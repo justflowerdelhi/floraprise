@@ -16,8 +16,7 @@ const TrialBalance = () => {
   const [rows, setRows] = useState<any[]>([]);
 
   useEffect(() => {
-    const data = getTrialBalance();
-    setRows(data);
+    getTrialBalance().then(data => setRows(Array.isArray(data) ? data : []));
   }, []);
 
   // Add total calculations

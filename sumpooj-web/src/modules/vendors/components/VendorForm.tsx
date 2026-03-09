@@ -23,7 +23,9 @@ const VendorForm: React.FC<Props> = ({ open, onClose, onSave, vendor }) => {
     state: vendor?.state || "",
     phone: vendor?.phone || "",
     email: vendor?.email || "",
-    commission: vendor?.commission || 0
+    commission: vendor?.commission || 0,
+    address: vendor?.address || "",
+    zipCode: vendor?.zipCode || ""
   })
 
   const handleChange = (field: string, value: any) => {

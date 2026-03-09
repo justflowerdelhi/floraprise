@@ -11,9 +11,8 @@ const CloseShiftModal = ({ shift }: any) => {
   const difference = cash - expectedCash;
 
   const handleCloseShift = async () => {
-    await closeShift({
-      shiftId: shift.id,
-      closingCash: cash
+    await closeShift(shift.id, {
+      closingCashCount: cash
     });
 
     window.location.reload();

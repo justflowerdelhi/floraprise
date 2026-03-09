@@ -13,17 +13,17 @@ export default function OutstationDeliverySection() {
     <Grid container spacing={2} sx={{ mt: 2 }}>
 
       {/* Recipient Name */}
-      <Grid xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <TextField label="Recipient Name" fullWidth size="small" />
       </Grid>
 
       {/* Recipient Phone */}
-      <Grid xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <TextField label="Recipient Phone" fullWidth size="small" />
       </Grid>
 
       {/* Address */}
-      <Grid item xs={12}>
+      <Grid size={12}>
         <TextField
           label="Delivery Address"
           fullWidth
@@ -34,22 +34,22 @@ export default function OutstationDeliverySection() {
       </Grid>
 
       {/* City */}
-      <Grid item xs={12} md={4}>
+      <Grid size={{ xs: 12, md: 4 }}>
         <TextField label="City" fullWidth size="small" />
       </Grid>
 
       {/* State */}
-      <Grid item xs={12} md={4}>
+      <Grid size={{ xs: 12, md: 4 }}>
         <TextField label="State" fullWidth size="small" />
       </Grid>
 
       {/* ZIP */}
-      <Grid item xs={12} md={4}>
+      <Grid size={{ xs: 12, md: 4 }}>
         <TextField label="ZIP Code" fullWidth size="small" />
       </Grid>
 
       {/* Delivery Date */}
-      <Grid xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <TextField
           label="Delivery Date"
           type="date"
@@ -60,7 +60,7 @@ export default function OutstationDeliverySection() {
       </Grid>
 
       {/* Time Slot */}
-      <Grid xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <TextField
           select
           label="Time Slot"
@@ -76,7 +76,7 @@ export default function OutstationDeliverySection() {
       </Grid>
 
       {/* Card Message */}
-      <Grid item xs={12}>
+      <Grid size={12}>
         <TextField
           label="Card Message"
           multiline
@@ -87,7 +87,7 @@ export default function OutstationDeliverySection() {
       </Grid>
 
       {/* Sender */}
-      <Grid xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <TextField label="Sender Name" fullWidth size="small" />
       </Grid>
       </Grid>

@@ -18,7 +18,7 @@ export default function ProductSection({
 }: Props) {
   return (
     <Grid container spacing={2}>
-      <Grid item xs={12} md={8}>
+      <Grid size={{ xs: 12, md: 8 }}>
         <TextField
           label="Product Description"
           value={productDescription}
@@ -31,7 +31,7 @@ export default function ProductSection({
         />
       </Grid>
 
-      <Grid item xs={12} md={4}>
+      <Grid size={{ xs: 12, md: 4 }}>
         <TextField
           label="Amount"
           type="number"

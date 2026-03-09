@@ -38,7 +38,7 @@ const MorningSetupPanel = () => {
 
       <Grid container spacing={2}>
 
-        <Grid item xs={6} md={3}>
+        <Grid size={{ xs: 6, md: 3 }}>
           <Box display="flex" alignItems="center" gap={1}>
             <PrecisionManufacturingIcon color="primary" />
             <Typography>
@@ -47,7 +47,7 @@ const MorningSetupPanel = () => {
           </Box>
         </Grid>
 
-        <Grid item xs={6} md={3}>
+        <Grid size={{ xs: 6, md: 3 }}>
           <Box display="flex" alignItems="center" gap={1}>
             <LocalShippingIcon color="success" />
             <Typography>
@@ -56,7 +56,7 @@ const MorningSetupPanel = () => {
           </Box>
         </Grid>
 
-        <Grid item xs={6} md={3}>
+        <Grid size={{ xs: 6, md: 3 }}>
           <Box display="flex" alignItems="center" gap={1}>
             <LocalFloristIcon color="error" />
             <Typography>
@@ -65,7 +65,7 @@ const MorningSetupPanel = () => {
           </Box>
         </Grid>
 
-        <Grid item xs={6} md={3}>
+        <Grid size={{ xs: 6, md: 3 }}>
           <Box display="flex" alignItems="center" gap={1}>
             <InventoryIcon color="warning" />
             <Typography>

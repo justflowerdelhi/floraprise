@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Button, Grid, Paper, Typography, TextField, MenuItem } from '@mui/material';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import ProfitSummaryCards from './ProfitSummaryCards';
@@ -10,7 +10,11 @@ const TaxSummary: React.FC = () => {
   const [dateTo, setDateTo] = useState('');
   const [location, setLocation] = useState('Main');
   const [taxType, setTaxType] = useState('');
-  const data = getTaxSummaryData();
+  const [data, setData] = useState<any>({ taxChartData: [], taxBreakdown: [] });
+
+  useEffect(() => {
+    getTaxSummaryData().then(result => setData(result && typeof result === 'object' ? result : { taxChartData: [], taxBreakdown: [] }));
+  }, []);
 
   const summaryCards = [
     { title: 'Tax Collected', value: 0, color: '#E3F2FD' },
@@ -22,24 +26,24 @@ const TaxSummary: React.FC = () => {
     <Box sx={{ p: { xs: 1, sm: 2, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
       <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>Tax Summary</Typography>
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={3}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <TextField label="From" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} />
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <TextField label="To" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} />
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <TextField label="Location" select value={location} onChange={e => setLocation(e.target.value)} fullWidth>
             {locations.map(l => (
               <MenuItem key={l} value={l}>{l}</MenuItem>
             ))}
           </TextField>
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <TextField label="Tax Type" select value={taxType} onChange={e => setTaxType(e.target.value)} fullWidth>
             <MenuItem value="">All</MenuItem>
             {taxTypes.map(tt => (
-              <MenuItem key={tt} value={tt}>{tt}</MenuItem>
+              <MenuItem key={tt.value} value={tt.value}>{tt.label}</MenuItem>
             ))}
           </TextField>
         </Grid>

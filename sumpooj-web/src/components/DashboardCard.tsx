@@ -38,7 +38,7 @@ const DashboardCard = ({ title, children, color = 'info', icon }: DashboardCardP
         }}
       />
       <Box display="flex" alignItems="center" gap={1} mb={1}>
-        {icon && React.cloneElement(icon as React.ReactElement, { sx: { fontSize: 18, color: barColor } })}
+        {icon && React.cloneElement(icon as React.ReactElement<any>, { sx: { fontSize: 18, color: barColor } })}
         <Typography variant="subtitle2" fontWeight={700} sx={{ color: barColor }}>
           {title}
         </Typography>

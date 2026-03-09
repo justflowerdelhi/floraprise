@@ -228,7 +228,7 @@ const CustomBouquetBuilder = () => {
                     size="small"
                     startIcon={<AddIcon />}
                     onClick={addComponent}
-                    disabled={error && inventoryProducts.length === 0}
+                    disabled={!!error && inventoryProducts.length === 0}
                     sx={{ textTransform: 'none' }}
                   >
                     Add Item

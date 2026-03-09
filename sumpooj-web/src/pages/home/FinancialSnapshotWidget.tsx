@@ -33,7 +33,7 @@ const snapshotData = [
 const FinancialSnapshotWidget: React.FC = () => (
   <Grid container spacing={2}>
     {snapshotData.map((card, idx) => (
-      <Grid item xs={12} sm={6} md={3} key={idx}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }} key={idx}>
         <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', borderRadius: 2, minHeight: 120, bgcolor: 'background.paper', boxShadow: 1 }}>
           <Box sx={{ mb: 1 }}>{card.icon}</Box>
           <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>{card.title}</Typography>

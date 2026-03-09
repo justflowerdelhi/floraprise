@@ -185,9 +185,9 @@ export const LocationSwitcher: React.FC = () => {
         anchorOrigin={{ horizontal: 'left', vertical: 'bottom' }}
       >
         {/* All Locations Option (Admin only) */}
-        {canViewAllLocations && (
-          <>
+        {canViewAllLocations && [
             <MenuItem
+              key="all-locations"
               onClick={() => handleSelectLocation(LOCATION_CONFIG.ALL_LOCATIONS_ID)}
               selected={isAllLocations}
               sx={{
@@ -212,10 +212,9 @@ export const LocationSwitcher: React.FC = () => {
                 </Typography>
               </ListItemText>
               {isAllLocations && <CheckIcon sx={{ color: '#fdd835', ml: 1 }} />}
-            </MenuItem>
-            <Divider sx={{ my: 0.5 }} />
-          </>
-        )}
+            </MenuItem>,
+            <Divider key="all-locations-divider" sx={{ my: 0.5 }} />,
+        ]}
 
         {/* Location List */}
         {accessibleLocations.map((location) => {

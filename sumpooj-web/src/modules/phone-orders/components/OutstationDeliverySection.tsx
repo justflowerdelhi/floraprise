@@ -10,15 +10,15 @@ const TIME_SLOTS = [
 function OutstationDeliverySection() {
   return (
     <Grid container spacing={2} sx={{ mt: 2 }}>
-      <Grid xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <TextField label="Recipient Name" fullWidth size="small" />
       </Grid>
 
-      <Grid xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <TextField label="Recipient Phone" fullWidth size="small" />
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={12}>
         <TextField
           label="Delivery Address"
           fullWidth
@@ -28,19 +28,19 @@ function OutstationDeliverySection() {
         />
       </Grid>
 
-      <Grid item xs={12} md={4}>
+      <Grid size={{ xs: 12, md: 4 }}>
         <TextField label="City" fullWidth size="small" />
       </Grid>
 
-      <Grid item xs={12} md={4}>
+      <Grid size={{ xs: 12, md: 4 }}>
         <TextField label="State" fullWidth size="small" />
       </Grid>
 
-      <Grid item xs={12} md={4}>
+      <Grid size={{ xs: 12, md: 4 }}>
         <TextField label="ZIP Code" fullWidth size="small" />
       </Grid>
 
-      <Grid xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <TextField
           label="Delivery Date"
           type="date"
@@ -50,7 +50,7 @@ function OutstationDeliverySection() {
         />
       </Grid>
 
-      <Grid xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <TextField select label="Time Slot" fullWidth size="small">
           {TIME_SLOTS.map((slot) => (
             <MenuItem key={slot} value={slot}>
@@ -60,7 +60,7 @@ function OutstationDeliverySection() {
         </TextField>
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={12}>
         <TextField
           label="Card Message"
           multiline
@@ -70,11 +70,11 @@ function OutstationDeliverySection() {
         />
       </Grid>
 
-      <Grid xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <TextField label="Sender Name" fullWidth size="small" />
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={12}>
         <TextField
           label="Special Instructions"
           multiline

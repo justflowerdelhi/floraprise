@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material';
 import { expenseCategories, paymentMethods } from '../accounting.constants.tsx';
-import { createExpense } from '../accounting.service';
-import { useToast } from '../../hooks/useToast';
+import { addExpense } from '../accounting.service';
+import { useToast } from '../../../hooks/useToast';
 
 const QuickExpenseWidget: React.FC<{ onExpenseSaved?: () => void }> = ({ onExpenseSaved }) => {
   const [open, setOpen] = useState(false);
@@ -10,12 +10,12 @@ const QuickExpenseWidget: React.FC<{ onExpenseSaved?: () => void }> = ({ onExpen
   const [category, setCategory] = useState(expenseCategories[0]);
   const [paymentMethod, setPaymentMethod] = useState(paymentMethods[0]);
   const [note, setNote] = useState('');
-  const showToast = useToast();
+  const toast = useToast();
 
   const handleSave = () => {
-    createExpense({ amount, category, paymentMethod, note });
+    addExpense({ amount, category, paymentMethod, note });
     setOpen(false);
-    showToast('Expense recorded successfully', { type: 'success' });
+    toast.success('Expense recorded successfully');
     if (onExpenseSaved) onExpenseSaved();
     setAmount('');
     setCategory(expenseCategories[0]);

@@ -49,7 +49,7 @@ const AccountingDashboard: React.FC = () => {
 
       <Grid container spacing={3} sx={{ mt: 2 }}>
 
-        <Grid item xs={12} md={7}>
+        <Grid size={{ xs: 12, md: 7 }}>
           <Paper sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
               Revenue vs Expense
@@ -69,7 +69,7 @@ const AccountingDashboard: React.FC = () => {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={5}>
+        <Grid size={{ xs: 12, md: 5 }}>
           <Paper sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
               Top Expense Categories

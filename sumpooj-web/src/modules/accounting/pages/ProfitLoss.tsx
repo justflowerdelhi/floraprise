@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Box, Typography, Card } from "@mui/material";
-import { getProfitLossData } from "../accounting.service";
+import { getProfitLossReportData } from "../accounting.service";
 
 export default function ProfitLoss() {
 
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    setData(getProfitLossData());
+    getProfitLossReportData().then(setData);
   }, []);
 
   if (!data) return null;

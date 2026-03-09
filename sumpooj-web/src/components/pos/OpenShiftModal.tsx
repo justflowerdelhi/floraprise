@@ -10,8 +10,7 @@ const OpenShiftModal = ({ onOpened }: any) => {
 
   const handleOpen = async () => {
     const shift = await openShift({
-      staffId: user?.id,
-      locationId: user?.primaryLocationId,
+      locationId: user?.primaryLocationId ?? '',
       openingCash: cash,
     });
 

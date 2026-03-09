@@ -27,7 +27,7 @@ export default function CustomerSection({
     <Grid container spacing={2} sx={{ mt: 2 }}>
 
       {/* Phone Number */}
-      <Grid xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <TextField
           label="Phone Number"
           value={phoneNumber}
@@ -38,7 +38,7 @@ export default function CustomerSection({
       </Grid>
 
       {/* Customer Name */}
-      <Grid xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <Autocomplete
           freeSolo
           options={options}

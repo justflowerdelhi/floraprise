@@ -19,9 +19,9 @@ const UnifiedPhoneOrderPage: React.FC = () => {
   const [paid, setPaid] = useState(0);
   const [orderType, setOrderType] = useState<string>("delivery");
   const [timeSlot, setTimeSlot] = useState<string>("");
-  const [paymentMode, setPaymentMode] = useState<string>("Cash");
-  const paymentModes = ["Cash", "Card", "UPI", "Cheque"];
-  const [splitPayments, setSplitPayments] = useState<{mode: string, amount: number}[]>([]);
+  const [paymentMode, setPaymentMode] = useState<'Cash' | 'UPI' | 'Card' | 'BankTransfer'>("Cash");
+  const paymentModes: Array<'Cash' | 'UPI' | 'Card' | 'BankTransfer'> = ["Cash", "Card", "UPI", "BankTransfer"];
+  const [splitPayments, setSplitPayments] = useState<{mode: 'Cash' | 'UPI' | 'Card' | 'BankTransfer', amount: number}[]>([]);
   const [showSplitPrompt, setShowSplitPrompt] = useState(false);
 
   const repeatOrder = (order: any) => {
@@ -296,7 +296,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
               <select
                 className="border rounded p-2 w-full"
                 value={paymentMode}
-                onChange={e => setPaymentMode(e.target.value)}
+                onChange={e => setPaymentMode(e.target.value as 'Cash' | 'UPI' | 'Card' | 'BankTransfer')}
               >
                 {paymentModes.map(mode => (
                   <option key={mode} value={mode}>{mode}</option>
@@ -340,7 +340,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
               <select
                 className="border rounded p-2 w-full"
                 value={paymentMode}
-                onChange={e => setPaymentMode(e.target.value)}
+                onChange={e => setPaymentMode(e.target.value as 'Cash' | 'UPI' | 'Card' | 'BankTransfer')}
               >
                 {paymentModes.map(mode => (
                   <option key={mode} value={mode}>{mode}</option>
@@ -388,7 +388,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
                   className="border rounded p-2 w-full"
                   value={splitPayments[0]?.mode || "Cash"}
                   onChange={e => {
-                    setSplitPayments(payments => [{...payments[0], mode: e.target.value, amount: payments[0]?.amount || 0}, payments[1] || {mode: "Card", amount: 0}]);
+                    setSplitPayments(payments => [{...payments[0], mode: e.target.value as 'Cash' | 'UPI' | 'Card' | 'BankTransfer', amount: payments[0]?.amount || 0}, payments[1] || {mode: "Card", amount: 0}]);
                   }}
                 >
                   {paymentModes.map(mode => (
@@ -410,7 +410,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
                   className="border rounded p-2 w-full"
                   value={splitPayments[1]?.mode || "Card"}
                   onChange={e => {
-                    setSplitPayments(payments => [payments[0] || {mode: "Cash", amount: 0}, {...payments[1], mode: e.target.value, amount: payments[1]?.amount || 0}]);
+                    setSplitPayments(payments => [payments[0] || {mode: "Cash", amount: 0}, {...payments[1], mode: e.target.value as 'Cash' | 'UPI' | 'Card' | 'BankTransfer', amount: payments[1]?.amount || 0}]);
                   }}
                 >
                   {paymentModes.map(mode => (
@@ -423,7 +423,6 @@ const UnifiedPhoneOrderPage: React.FC = () => {
                 onClick={async () => {
                   const totalPaid = (splitPayments[0]?.amount || 0) + (splitPayments[1]?.amount || 0);
                   setPaid(totalPaid);
-                  setPaymentMode("Split");
                   setShowSplitPrompt(false);
                   // Send both payments to backend
                   if (splitPayments[0]?.amount) {

@@ -116,7 +116,7 @@ const ProductionIntelligenceDashboard: React.FC = () => {
 
         <Grid container spacing={2}>
           {kanbanStages.map((stage) => (
-            <Grid item xs={12} sm={6} md key={stage}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} key={stage}>
               <Paper sx={{ p: 2, borderRadius: 2, minHeight: 180, bgcolor: "#f5f5f5" }}>
 
                 <Typography
@@ -174,7 +174,7 @@ const ProductionIntelligenceDashboard: React.FC = () => {
 
       <Grid container spacing={2} sx={{ mt: 4 }}>
         {summaryCards.map((card) => (
-          <Grid item xs={12} sm={6} md={3} key={card.title}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }} key={card.title}>
             <Paper sx={{ p: 2, borderRadius: 2, background: card.color }}>
               <Typography variant="subtitle2">
                 {card.title}
@@ -194,7 +194,7 @@ const ProductionIntelligenceDashboard: React.FC = () => {
 
       <Grid container spacing={3} sx={{ mt: 2 }}>
 
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Paper sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="subtitle1" fontWeight={600}>
               Production Trend
@@ -212,7 +212,7 @@ const ProductionIntelligenceDashboard: React.FC = () => {
         </Grid>
 
 
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Paper sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="subtitle1" fontWeight={600}>
               Florist Performance

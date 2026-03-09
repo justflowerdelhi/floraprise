@@ -17,7 +17,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ open, onClose, onSubmit, init
   const [paymentMethod, setPaymentMethod] = useState(initialData?.paymentMethod || 'Cash');
   const [location, setLocation] = useState(initialData?.location || 'Main');
   const [notes, setNotes] = useState(initialData?.notes || '');
-  const [receipt, setReceipt] = useState(null);
+  const [receipt, setReceipt] = useState<File | null>(null);
 
   const handleSubmit = () => {
     onSubmit({ date, category, vendor, amount, paymentMethod, location, notes, receipt });

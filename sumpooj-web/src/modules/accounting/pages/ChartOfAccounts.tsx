@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Chip, IconButton } from '@mui/material';
 import { Edit, Block } from '@mui/icons-material';
 import AccountForm from './AccountForm';
@@ -6,7 +6,11 @@ import { AccountTypeIcons } from '../accounting.constants.tsx';
 import { getAccounts } from '../accounting.service';
 
 const ChartOfAccounts: React.FC = () => {
-  const [accounts, setAccounts] = useState(getAccounts());
+  const [accounts, setAccounts] = useState<any[]>([]);
+
+  useEffect(() => {
+    getAccounts().then((data) => setAccounts(Array.isArray(data) ? data : []));
+  }, []);
   const [formOpen, setFormOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
 
@@ -26,13 +30,13 @@ const ChartOfAccounts: React.FC = () => {
     } else {
       // addAccount(data); // Function not implemented
     }
-    setAccounts(getAccounts());
+    getAccounts().then((data) => setAccounts(Array.isArray(data) ? data : []));
     setFormOpen(false);
   };
 
   const handleDisable = (account: any) => {
     // disableAccount(account.id); // Function not implemented
-    setAccounts(getAccounts());
+    getAccounts().then((data) => setAccounts(Array.isArray(data) ? data : []));
   };
 
   return (

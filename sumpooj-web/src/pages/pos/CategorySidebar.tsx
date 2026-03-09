@@ -51,7 +51,7 @@ const CategorySidebar: React.FC<CategorySidebarProps> = ({
       <nav className="flex-1 overflow-y-auto py-2">
         <ul className="flex flex-col gap-1">
           {categories.map((category) => {
-            const IconComponent = CATEGORY_ICONS[category.icon] || AllIcon;
+            const IconComponent = (category.icon && CATEGORY_ICONS[category.icon]) || AllIcon;
             const isSelected = selectedCategory === category.id;
             return (
               <li key={category.id}>

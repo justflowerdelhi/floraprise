@@ -20,6 +20,7 @@ export function postAccountingEvent(type: AccountingEventType, payload: any) {
       const { amount, location } = payload;
 
       createJournalEntry({
+        id: crypto.randomUUID(),
         date,
         reference: "SALE",
         description: "POS Sale",
@@ -47,6 +48,7 @@ export function postAccountingEvent(type: AccountingEventType, payload: any) {
       const { amount, location } = payload;
 
       createJournalEntry({
+        id: crypto.randomUUID(),
         date,
         reference: "EXPENSE",
         description: "Expense Payment",
@@ -72,6 +74,7 @@ export function postAccountingEvent(type: AccountingEventType, payload: any) {
     case "INVENTORY_SALE": {
       const { cost, location } = payload;
       createJournalEntry({
+        id: crypto.randomUUID(),
         date,
         reference: "SALE",
         description: "Cost of Goods Sold",

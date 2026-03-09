@@ -28,7 +28,7 @@ export default function PaymentSection({
   return (
     <Grid container spacing={2} sx={{ mt: 2 }}>
 
-      <Grid xs={12} md={3}>
+      <Grid size={{ xs: 12, md: 3 }}>
         <TextField
           label="Advance Paid"
           type="number"
@@ -41,7 +41,7 @@ export default function PaymentSection({
         />
       </Grid>
 
-      <Grid xs={12} md={3}>
+      <Grid size={{ xs: 12, md: 3 }}>
         <TextField
           select
           label="Payment Mode"
@@ -58,7 +58,7 @@ export default function PaymentSection({
         </TextField>
       </Grid>
 
-      <Grid xs={12} md={3}>
+      <Grid size={{ xs: 12, md: 3 }}>
         <TextField
           label="Order Total"
           value={total}
@@ -68,7 +68,7 @@ export default function PaymentSection({
         />
       </Grid>
 
-      <Grid xs={12} md={3}>
+      <Grid size={{ xs: 12, md: 3 }}>
         <TextField
           label="Balance"
           value={balance}

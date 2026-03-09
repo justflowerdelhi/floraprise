@@ -353,7 +353,7 @@ export default function TenantSettingsPage() {
 
           <Grid container spacing={3}>
             {/* Country */}
-            <Grid xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <FormControl fullWidth>
                 <InputLabel>Country</InputLabel>
                 <Select
@@ -374,7 +374,7 @@ export default function TenantSettingsPage() {
             </Grid>
 
             {/* Base Currency */}
-            <Grid xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <FormControl fullWidth>
                 <InputLabel>Base Currency</InputLabel>
                 <Select
@@ -397,7 +397,7 @@ export default function TenantSettingsPage() {
             </Grid>
 
             {/* Locale */}
-            <Grid xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <FormControl fullWidth>
                 <InputLabel>Locale</InputLabel>
                 <Select

@@ -18,33 +18,22 @@ export default function BalanceSheet() {
   const [equity, setEquity] = useState<any[]>([]);
 
   useEffect(() => {
+    getTrialBalance().then((rows: any[]) => {
+      const safeRows = Array.isArray(rows) ? rows : [];
+      const a: any[] = [];
+      const l: any[] = [];
+      const e: any[] = [];
 
-    const rows = getTrialBalance();
+      safeRows.forEach((row: any) => {
+        if (row.code.startsWith("1")) a.push(row);
+        if (row.code.startsWith("2")) l.push(row);
+        if (row.code.startsWith("3") || row.code.startsWith("4")) e.push(row);
+      });
 
-    const a: any[] = [];
-    const l: any[] = [];
-    const e: any[] = [];
-
-    rows.forEach((row: any) => {
-
-      if (row.code.startsWith("1")) {
-        a.push(row);
-      }
-
-      if (row.code.startsWith("2")) {
-        l.push(row);
-      }
-
-      if (row.code.startsWith("3") || row.code.startsWith("4")) {
-        e.push(row);
-      }
-
+      setAssets(a);
+      setLiabilities(l);
+      setEquity(e);
     });
-
-    setAssets(a);
-    setLiabilities(l);
-    setEquity(e);
-
   }, []);
 
   const renderRows = (rows: any[]) =>

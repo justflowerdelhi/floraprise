@@ -12,11 +12,11 @@ import type { Product, CartItem, CartSummary, OrderPaymentEntry } from '../order
 export interface POSCategory {
   id: string;
   name: string;
-  icon: string;
+  icon?: string;
   color?: string;
 }
 
-export const POS_CATEGORIES = [
+export const POS_CATEGORIES: POSCategory[] = [
   { id: "all", name: "All" },
   { id: "fresh-flowers", name: "Fresh Flowers" },
   { id: "bouquets", name: "Bouquets" },

@@ -38,7 +38,7 @@ import { getAllSuppliers } from '../../api/supplier.api';
 import { fetchSellableFinishedGoods } from '../../api/order.api';
 import { GiftCardBuilderModal } from '../gift-cards';
 import type { SavedGiftCard } from '../gift-cards';
-import { postAccountingEvent } from "../accounting/accountingEngine";
+import { postAccountingEvent } from "../../modules/accounting/accountingEngine";
 
 const WalkInPOS: React.FC = () => {
   const theme = useTheme();
@@ -241,7 +241,7 @@ const WalkInPOS: React.FC = () => {
         location: "Main"
       });
       postAccountingEvent("INVENTORY_SALE", {
-        cost: state.totals.recipeCost,
+        cost: state.totals.totalCost,
         location: "Main"
       });
       setPayModalOpen(false);
