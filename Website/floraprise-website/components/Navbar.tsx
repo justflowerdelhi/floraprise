@@ -18,6 +18,7 @@ export default function Header() {
             alt="Floraprise"
             width={40}
             height={40}
+            style={{ height: "auto" }}
           />
           <span className="text-xl font-semibold">
             Flora<span className="text-green-700">Prise</span>
@@ -27,11 +28,7 @@ export default function Header() {
         {/* Desktop Menu */}
         <nav className="hidden md:flex items-center gap-8 text-gray-700 font-medium">
 
-          <Link href="/product" className="hover:text-green-700">
-            Product
-          </Link>
-
-          <Link href="/features" className="hover:text-green-700">
+                    <Link href="/features" className="hover:text-green-700">
             Features
           </Link>
 

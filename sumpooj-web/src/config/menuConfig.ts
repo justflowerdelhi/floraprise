@@ -88,5 +88,19 @@ export const MENU_CONFIG: MenuSection[] = [
         { id: 'attendance', label: 'Attendance', icon: 'Schedule', path: '/staff/StaffAttendance' },
     ],
   },
+  {
+    id: 'ai',
+    label: 'Floraprise Smart AI',
+    items: [
+      {
+        id: 'bouquet-scanner',
+        label: 'Bouquet Scanner',
+        icon: 'Science',
+        path: '/ai/bouquet-scanner',
+        color: 'green', // Changed from yellow to green
+        permissions: [], // Visible to all users
+      },
+    ],
+  },
   // Add more sections/items as needed
 ];

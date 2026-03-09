@@ -71,7 +71,8 @@ export type Permission =
   | 'settings:view'
   | 'settings:edit'
   | 'settings:billing'
-  | 'users:manage';
+  | 'users:manage'
+  | 'ai:view';
 
 // ─── Role Permission Mapping ────────────────────────────────
 
@@ -93,6 +94,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'tasks:view', 'tasks:manage',
     'production:view', 'production:manage',
     'settings:view', 'settings:edit', 'settings:billing', 'users:manage',
+    'ai:view',
   ],
 
   ADMIN: [
@@ -111,6 +113,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'tasks:view', 'tasks:manage',
     'production:view', 'production:manage',
     'settings:view', 'settings:edit', 'settings:billing', 'users:manage',
+    'ai:view',
   ],
 
   MANAGER: [
@@ -128,6 +131,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'staff:view', 'staff:manage',
     'tasks:view', 'tasks:manage',
     'production:view', 'production:manage',
+    'settings:view', 'settings:edit', 'settings:billing', 'users:manage',
+    'ai:view',
   ],
 
   CASHIER: [
@@ -234,7 +239,7 @@ export const MENU_SECTIONS: MenuSection[] = [
         label: 'Walk-In Sales',
         icon: 'PointOfSale',
         path: '/pos',
-        permissions: ['pos:access'],
+        permissions: [],
       },
       {
         id: 'phone-order',
@@ -619,6 +624,19 @@ export const MENU_SECTIONS: MenuSection[] = [
       { id: 'journal', label: 'Journal', icon: 'ReceiptLong', path: '/accounting/journal', permissions: ['reports:view'] },
       { id: 'profit-loss', label: 'Profit & Loss', icon: 'TrendingUp', path: '/accounting/profit-loss', permissions: ['reports:view'] },
       { id: 'tax-summary', label: 'Tax Summary', icon: 'Percent', path: '/accounting/tax-summary', permissions: ['reports:view'] },
+    ],
+  },
+  {
+    id: 'ai',
+    title: 'Floraprise AI',
+    items: [
+      {
+        id: 'bouquet-scanner',
+        label: 'Bouquet Scanner',
+        icon: '🌸',
+        path: '/ai/bouquet-scanner',
+        permissions: ['ai:view'],
+      },
     ],
   },
 ];

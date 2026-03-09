@@ -16,6 +16,7 @@ import ImpactStats from "@/components/ImpactStats";
 import Capabilities from "@/components/Capabilities";
 import FinalPremiumCTA from "@/components/FinalPremiumCTA";
 import ProductGallery from "@/components/ProductGallery";
+import SmartAISection from "@/components/SmartAISection";
 
 export default function Home() {
   return (
@@ -151,6 +152,7 @@ export default function Home() {
       <DashboardShowcase />
       <ProductGallery />
       <PlatformSection />
+      <SmartAISection />
       <ComparisonSection />
       <FloristTypes />
       <AccountingModule />

@@ -50,13 +50,13 @@ return ( <section className="py-24 bg-white"> <div className="max-w-6xl mx-auto 
 
       <div className="bg-gray-50 p-6 rounded-xl shadow-sm">
         <Image
-          src="/screens/delivery.png"
-          alt="Floraprise delivery routing"
+          src="/screens/command.png"
+          alt="Florist Command Center"
           width={800}
           height={500}
           className="rounded-lg"
         />
-        <div className="mt-4 font-medium">Delivery Routing</div>
+        <div className="mt-4 font-medium">Florist Command Center </div>
       </div>
 
     </div>

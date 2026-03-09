@@ -2,6 +2,7 @@ import { POSProvider } from '../pages/pos/POSContext';
 /**
  * AppRoutes.tsx — Production-Ready Route Configuration
  */
+import BouquetScanner from "../pages/ai/BouquetScanner";
 import { Navigate, Routes, Route } from 'react-router-dom';
 import Login from '../pages/auth/Login';
 import RequireAuth from '../auth/RequireAuth';
@@ -95,6 +96,7 @@ import { CustomerListPage, Customer360View, SmartReminderDashboard, LoyaltyProgr
 
 // Gift Cards
 import { GiftCardPage } from '../pages/gift-cards';
+// Removed duplicate import of BouquetScanner
 
 // Floral Production Engine
 import {
@@ -302,6 +304,9 @@ export default function AppRoutes() {
           <Route path="/crm/customers/:customerId" element={<Customer360View />} />
           <Route path="/crm/reminders" element={<SmartReminderDashboard />} />
           <Route path="/crm/loyalty" element={<LoyaltyProgramPage />} />
+
+          {/* ─── Floraprise AI ───────────────────────────── */}
+          <Route path="/ai/bouquet-scanner" element={<BouquetScanner />} />
 
           {/* ─── Gift Cards ────────────────────────────── */}
           <Route path="/gift-cards/designer" element={<GiftCardPage />} />

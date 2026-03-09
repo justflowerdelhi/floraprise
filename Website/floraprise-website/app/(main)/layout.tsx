@@ -1,7 +1,6 @@
 import { Inter } from "next/font/google";
 import type { Metadata } from "next";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+
 import "../globals.css";
 
 const inter = Inter({
@@ -37,7 +36,7 @@ export default function MainSiteLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} bg-white text-gray-900`}>
-        <Navbar />
+        
         {children}
         {/* Sticky Book Demo CTA for mobile */}
         <div className="fixed bottom-4 left-0 right-0 flex justify-center gap-4 md:hidden z-50">
@@ -56,7 +55,7 @@ export default function MainSiteLayout({
             WhatsApp Us
           </a>
         </div>
-        <Footer />
+        
       </body>
     </html>
   );

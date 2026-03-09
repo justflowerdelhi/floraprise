@@ -345,6 +345,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     'inventory',
     'catalog',
     'production',
+    'ai', // Floraprise AI above Gift Cards
     'gift-cards',
     'accounting',
     'events',
