@@ -140,3 +140,10 @@ export const cancelOrder = async (id: string, data?: CancelOrderRequest) => {
   const res = await api.post(`/Orders/${id}/cancel`, data);
   return res.data;
 };
+
+// ─── Finished Goods (Production items for Walk-In POS) ──────
+
+export const fetchSellableFinishedGoods = async () => {
+  const res = await api.get('/production/finished-goods/sellable');
+  return res.data;
+};
