@@ -55,9 +55,16 @@ export default function HeroPremium() {
   आपके फूलों के व्यवसाय का स्मार्ट साथी।
 </p>
 
-          <p className="mt-6 text-lg text-gray-600 leading-relaxed text-justify">
-  Floraprise is an advanced florist POS and ERP software designed for modern flower shops and multi-location floral businesses. From real-time inventory management and perishable batch tracking to bouquet production workflows, delivery routing, staff scheduling, and profit analytics, Floraprise centralizes every operational process into one intelligent, cloud-based platform built specifically for professional florists.
-</p>
+
+          <p className="mt-6 text-lg text-gray-600 leading-relaxed text-center">
+            Floraprise is the operating system for modern flower shops.
+            <br />
+            Manage POS, inventory, bouquet production, delivery,
+            <br />
+            and accounting from one unified platform built specifically
+            <br />
+            for professional florists.
+          </p>
 
           {/* Conversion credibility line */}
           <div className="mt-8 text-base text-center text-gray-700 font-semibold">

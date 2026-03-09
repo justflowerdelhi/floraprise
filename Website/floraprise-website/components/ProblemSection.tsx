@@ -37,6 +37,16 @@ export default function ProblemSection() {
             </p>
           </div>
 
+          <div>
+            <h3 className="font-semibold mb-3">
+              No Financial Visibility
+            </h3>
+            <p className="text-gray-600">
+              Florists often rely on external accounting tools,
+              making it difficult to track real profitability.
+            </p>
+          </div>
+
         </div>
 
       </div>
