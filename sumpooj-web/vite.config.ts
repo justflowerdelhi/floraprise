@@ -9,9 +9,8 @@ export default defineConfig(({ mode }) => ({
   server: {
     proxy: {
       '/api': {
-        target: 'https://floritribe.com/florapriseapi',
+        target: 'http://localhost:3000',
         changeOrigin: true,
-        secure: true,
       },
     },
   },

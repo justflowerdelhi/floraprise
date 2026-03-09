@@ -294,6 +294,7 @@ const POSLayout: React.FC = () => {
           selectedCategory={selectedCategory}
           onAddProduct={handleAddProduct}
           isLoading={isLoading}
+          locationId={currentLocationId}
         />
 
         {/* Cart Panel */}

@@ -17,7 +17,7 @@ export default function Integrations() {
           operations stay synchronized across every channel.
         </p>
 
-        <div className="flex flex-row flex-wrap gap-10 items-center justify-center grayscale op">
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-10 items-center justify-center grayscale op">
            <img src="/images/integrations/quickbooks.png" alt="QuickBooks Integration" width="60" height="60" />
            <img src="/images/integrations/stripe.png" alt="Stripe Integration" width="60" height="60" />
            <img src="/images/integrations/doordash.png" alt="DoorDash Integration" width="60" height="60" />

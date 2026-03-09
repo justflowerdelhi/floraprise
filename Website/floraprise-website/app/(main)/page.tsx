@@ -8,9 +8,14 @@ import Testimonials from "@/components/Testimonials";
 import LifestyleSection from "@/components/LifestyleSection";
 import DashboardShowcase from "@/components/DashboardShowcase";
 import Integrations from "@/components/Integrations";
+import AccountingModule from "@/components/AccountingModule";
+import PlatformSection from "@/components/PlatformSection";
+import ComparisonSection from "@/components/ComparisonSection";
+import FloristTypes from "@/components/FloristTypes";
 import ImpactStats from "@/components/ImpactStats";
 import Capabilities from "@/components/Capabilities";
 import FinalPremiumCTA from "@/components/FinalPremiumCTA";
+import ProductGallery from "@/components/ProductGallery";
 
 export default function Home() {
   return (
@@ -144,6 +149,11 @@ export default function Home() {
         </div>
       </section>
       <DashboardShowcase />
+      <ProductGallery />
+      <PlatformSection />
+      <ComparisonSection />
+      <FloristTypes />
+      <AccountingModule />
       <Integrations />
       <ImpactStats />
       <FeatureComparison />

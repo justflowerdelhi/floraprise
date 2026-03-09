@@ -3,6 +3,7 @@
  * 3-4 column responsive grid for the POS center area
  */
 import React, { useMemo, useRef, useCallback } from 'react';
+import { useFinishedGoodsPOS } from '../production/hooks/useProductionPOS';
 import ProductCard from './ProductCard';
 import { Grid } from "react-window";
 import { AutoSizer } from "react-virtualized-auto-sizer";
@@ -15,6 +16,7 @@ interface ProductGridProps {
   selectedCategory: string;
   onAddProduct: (product: Product) => void;
   isLoading?: boolean;
+  locationId?: string;
 }
 
 // Map category IDs to product category names
@@ -37,16 +39,28 @@ const ProductGrid: React.FC<ProductGridProps> = ({
   selectedCategory,
   onAddProduct,
   isLoading = false,
+  locationId,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // Filter products based on search and category
+  // Combine finished goods with products
+  const { items: finishedGoods } = useFinishedGoodsPOS(locationId);
+  const finishedGoodsAsProducts = finishedGoods.map(fg => ({
+    id: fg.productId,
+    name: fg.name,
+    sku: fg.batchCode || '',
+    barcode: fg.barcode || '',
+    category: 'Bouquets & Arrangements', // Match POS filter
+    availableStock: fg.quantityAvailable,
+    sellingPrice: fg.sellingPrice,
+    ...fg,
+  }));
+  const combinedProducts = [
+    ...products.filter(p => p.availableStock && p.availableStock > 0),
+    ...finishedGoodsAsProducts.filter(fg => fg.quantityAvailable > 0)
+  ];
+  // Filter combined products
   const filteredProducts = useMemo(() => {
-    let result = products;
-
-    // Hide out of stock
-    result = result.filter((p) => p.availableStock > 0);
-
+    let result = combinedProducts;
     // Category filter
     if (selectedCategory !== "all") {
       result = result.filter(
@@ -54,19 +68,20 @@ const ProductGrid: React.FC<ProductGridProps> = ({
           p.category?.toLowerCase().replace(/\s/g, "-") === selectedCategory
       );
     }
-
     // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (p) =>
           p.name.toLowerCase().includes(q) ||
-          p.sku.toLowerCase().includes(q)
+          p.sku?.toLowerCase().includes(q) ||
+          (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+          (p.internalBarcode && p.internalBarcode.toLowerCase().includes(q)) ||
+          (p.recipeName && p.recipeName.toLowerCase().includes(q))
       );
     }
-
     return result;
-  }, [products, searchQuery, selectedCategory]);
+  }, [combinedProducts, searchQuery, selectedCategory]);
 
   // Handle product add with optimistic feedback
   const handleAdd = useCallback((product: Product) => {
@@ -99,36 +114,16 @@ const ProductGrid: React.FC<ProductGridProps> = ({
       </div>
     );
   }
-
+  // ...existing code...
   return (
-    <div
-      ref={containerRef}
-      className="flex-1 overflow-y-auto p-4"
-    >
-      {/* Product count */}
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs text-gray-500">
-          {filteredProducts.length} {filteredProducts.length === 1 ? "product" : "products"}
-        </span>
-      </div>
-
-      {/* Grid */}
-      <div className="grid 
-        grid-cols-2
-        sm:grid-cols-2
-        md:grid-cols-3
-        lg:grid-cols-4
-        xl:grid-cols-5
-        gap-3 sm:gap-4
-      ">
-        {filteredProducts.map((product) => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            onAdd={handleAdd}
-          />
-        ))}
-      </div>
+    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+      {filteredProducts.map((product) => (
+        <ProductCard
+          key={product.id}
+          product={product}
+          onAdd={handleAdd}
+        />
+      ))}
     </div>
   );
 };
