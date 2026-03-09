@@ -135,18 +135,23 @@ const CustomBouquetBuilder = () => {
     if (!isValid) return;
 
     try {
-      const qty = components.reduce((sum, c) => sum + c.quantity, 0);
+      const bouquetName = generateBouquetName(
+        components.map(c => ({ productName: c.productName, quantity: c.quantity })),
+      );
       const product = {
         id: `custom-bouquet-${Date.now()}`,
-        name: `${qty} Red Rose Bouquet`,
-        price: Number(sellingPrice),
-        cost: Number(totalCost),
+        name: bouquetName,
         sku: `CUSTOM-${Date.now()}`,
-        category: "Custom",
-        taxRuleId: null,
-        barcode: null,
-        imageUrl: imageUrls?.[0] ?? null,
-        trackInventory: false
+        barcode: undefined,
+        category: 'Bouquets' as const,
+        sellingPrice: Number(sellingPrice),
+        costPrice: Number(totalCost),
+        taxRate: 0,
+        availableStock: 999,
+        isPerishable: false,
+        trackBatch: false,
+        imageUrl: imageUrls?.[0] ?? undefined,
+        batches: [],
       };
       addProduct(product as any, 1);
       navigate("/pos");

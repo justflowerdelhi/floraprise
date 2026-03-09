@@ -64,6 +64,10 @@ public class ProductionController : ControllerBase
     public async Task<ActionResult<List<FinishedGoodsBatchDto>>> GetFinishedBatches()
         => Ok(await _service.GetFinishedBatchesAsync(CompanyId));
 
+    [HttpGet("finished-goods/sellable")]
+    public async Task<ActionResult<List<SellableFinishedGoodDto>>> GetSellableFinishedGoods()
+        => Ok(await _service.GetSellableFinishedGoodsAsync(CompanyId));
+
     [HttpGet("finished-goods/{id:guid}")]
     public async Task<ActionResult<FinishedGoodsBatchDto>> GetFinishedBatch(Guid id)
     {

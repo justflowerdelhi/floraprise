@@ -14,6 +14,7 @@ public class OrderService
     private readonly ILocationRepository _locationRepository;
     private readonly IShiftRepository _shiftRepository;
     private readonly IPaymentRepository _paymentRepository;
+    private readonly IFinishedGoodsBatchRepository _finishedGoodsBatchRepository;
 
     public OrderService(
         IOrderRepository orderRepository,
@@ -21,7 +22,8 @@ public class OrderService
         IProductRepository productRepository,
         ILocationRepository locationRepository,
         IShiftRepository shiftRepository,
-        IPaymentRepository paymentRepository)
+        IPaymentRepository paymentRepository,
+        IFinishedGoodsBatchRepository finishedGoodsBatchRepository)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
@@ -29,6 +31,7 @@ public class OrderService
         _locationRepository = locationRepository;
         _shiftRepository = shiftRepository;
         _paymentRepository = paymentRepository;
+        _finishedGoodsBatchRepository = finishedGoodsBatchRepository;
     }
 
     public async Task<OrderDto?> GetByIdAsync(Guid companyId, Guid id)
@@ -195,6 +198,9 @@ public class OrderService
             {
                 order.SetFulfillmentStatus(FulfillmentStatus.Completed);
                 order.MarkDeliveredDirect();
+
+                // Deduct inventory for each sold item
+                await DeductInventoryForOrderAsync(companyId, order);
             }
 
             await _orderRepository.UpdateAsync(order);
@@ -350,7 +356,41 @@ public class OrderService
         order.MarkDeliveredDirect();
         await _orderRepository.UpdateAsync(order);
 
+        // Deduct inventory for each sold item
+        await DeductInventoryForOrderAsync(companyId, order);
+
         return order.Id;
+    }
+
+    /// <summary>
+    /// Deducts inventory for each item in a completed order.
+    /// Handles both regular products (from Products table) and
+    /// finished goods batches (from production).
+    /// </summary>
+    private async Task DeductInventoryForOrderAsync(Guid companyId, Order order)
+    {
+        foreach (var item in order.Items)
+        {
+            // First, try to find as a regular product
+            var product = await _productRepository.GetByIdAsync(item.ProductId);
+            if (product != null)
+            {
+                if (product.TrackInventory)
+                {
+                    product.AdjustStock(-item.Quantity);
+                    await _productRepository.UpdateAsync(product);
+                }
+                continue;
+            }
+
+            // If not a product, try finished goods batch (production items)
+            var batch = await _finishedGoodsBatchRepository.GetByIdAsync(companyId, item.ProductId);
+            if (batch != null)
+            {
+                batch.Deduct(item.Quantity);
+                await _finishedGoodsBatchRepository.UpdateAsync(batch);
+            }
+        }
     }
 
     private static OrderDto MapToDto(Order order) => new()

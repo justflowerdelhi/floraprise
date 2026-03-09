@@ -231,3 +231,27 @@ public class DeductBatchRequest
 {
     public int Quantity { get; set; }
 }
+
+/// <summary>
+/// Finished goods batch projected as a sellable POS product.
+/// Used by Walk-In Sales to display production items alongside regular products.
+/// </summary>
+public class SellableFinishedGoodDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = default!;
+    public string Sku { get; set; } = default!;
+    public string? Barcode { get; set; }
+    public string Category { get; set; } = "Bouquets";
+    public string ProductType { get; set; } = "FinishedGood";
+    public decimal RetailPrice { get; set; }
+    public decimal CostPrice { get; set; }
+    public int StockQuantity { get; set; }
+    public bool IsActive { get; set; } = true;
+    public bool IsPerishable { get; set; } = true;
+    public Guid RecipeId { get; set; }
+    public string RecipeName { get; set; } = default!;
+    public string BatchCode { get; set; } = default!;
+    public Guid LocationId { get; set; }
+    public string LocationName { get; set; } = default!;
+}

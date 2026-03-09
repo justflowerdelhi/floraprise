@@ -398,6 +398,54 @@ public class ProductionService
         }).ToList();
     }
 
+    // ─── Sellable Finished Goods (for Walk-In POS) ────────────
+
+    /// <summary>
+    /// Returns active finished goods batches with available quantity as sellable product items.
+    /// Used by the Walk-In Sales POS to include production items in the product list.
+    /// </summary>
+    public async Task<List<SellableFinishedGoodDto>> GetSellableFinishedGoodsAsync(Guid companyId)
+    {
+        var batches = await _batchRepo.GetAllAsync(companyId);
+        var activeBatches = batches
+            .Where(b => b.Status == FinishedBatchStatus.Active && b.QuantityAvailable > 0)
+            .ToList();
+
+        if (activeBatches.Count == 0)
+            return [];
+
+        // Look up recipes to get selling prices
+        var recipeIds = activeBatches.Select(b => b.RecipeId).Distinct().ToList();
+        var recipes = await _recipeRepo.GetAllAsync(companyId);
+        var recipePriceMap = recipes.ToDictionary(r => r.Id, r => r.SellingPrice);
+
+        return activeBatches.Select(b =>
+        {
+            var sellingPrice = recipePriceMap.GetValueOrDefault(b.RecipeId, 0);
+            var costPerUnit = b.QuantityProduced > 0 ? b.TotalCost / b.QuantityProduced : 0;
+
+            return new SellableFinishedGoodDto
+            {
+                Id = b.Id,
+                Name = b.RecipeName,
+                Sku = b.BatchCode,
+                Barcode = b.Barcode,
+                Category = "Bouquets",
+                ProductType = "FinishedGood",
+                RetailPrice = sellingPrice,
+                CostPrice = costPerUnit,
+                StockQuantity = b.QuantityAvailable,
+                IsActive = true,
+                IsPerishable = true,
+                RecipeId = b.RecipeId,
+                RecipeName = b.RecipeName,
+                BatchCode = b.BatchCode,
+                LocationId = b.LocationId,
+                LocationName = b.LocationName,
+            };
+        }).ToList();
+    }
+
     // ─── Helpers ────────────────────────────────────────────
 
     private static FloralRecipeDto MapRecipe(FloralRecipe r) => new()

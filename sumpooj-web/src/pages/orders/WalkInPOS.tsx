@@ -35,6 +35,7 @@ import { type Customer } from '../crm/CRMTypes';
 import { searchProducts, normalizeProducts } from '../../api/product.api';
 import { searchCustomers } from '../../api/customer.api';
 import { getAllSuppliers } from '../../api/supplier.api';
+import { fetchSellableFinishedGoods } from '../../api/order.api';
 import { GiftCardBuilderModal } from '../gift-cards';
 import type { SavedGiftCard } from '../gift-cards';
 import { postAccountingEvent } from "../accounting/accountingEngine";
@@ -61,13 +62,33 @@ const WalkInPOS: React.FC = () => {
       setDataLoading(true);
       setDataError('');
       try {
-        const [prodRes, custRes, supplierRes] = await Promise.all([
+        const [prodRes, custRes, supplierRes, finishedGoodsRes] = await Promise.all([
           searchProducts({ IsActive: true, PageSize: 500 }),
           searchCustomers({ PageSize: 500 }),
           getAllSuppliers(),
+          fetchSellableFinishedGoods().catch(() => []),
         ]);
         const prodItems = Array.isArray(prodRes) ? prodRes : prodRes.items ?? [];
-        setProducts(normalizeProducts(prodItems));
+        const normalizedProducts = normalizeProducts(prodItems);
+
+        // Merge finished goods as products
+        const finishedGoods: Product[] = (Array.isArray(finishedGoodsRes) ? finishedGoodsRes : []).map((fg: any) => ({
+          id: fg.id,
+          name: fg.name,
+          sku: fg.sku || fg.batchCode || '',
+          barcode: fg.barcode,
+          finishedBarcode: fg.barcode,
+          category: 'Bouquets' as ProductCategory,
+          sellingPrice: Number(fg.retailPrice) || 0,
+          costPrice: Number(fg.costPrice) || 0,
+          taxRate: 0,
+          availableStock: Number(fg.stockQuantity) || 0,
+          isPerishable: true,
+          trackBatch: false,
+          batches: [],
+        }));
+
+        setProducts([...normalizedProducts, ...finishedGoods]);
         const custItems = Array.isArray(custRes) ? custRes : custRes.items ?? [];
         setCustomers(custItems);
         const suppliers = Array.isArray(supplierRes) ? supplierRes : supplierRes.items ?? [];
