@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -294,6 +295,12 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 
 #region Middleware
+
+// Forward headers from IIS/reverse proxy (X-Forwarded-For, X-Forwarded-Proto)
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 //if (app.Environment.IsDevelopment())
 //{
