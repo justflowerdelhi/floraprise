@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-//using Sumpooj.API.Models;
+using Microsoft.EntityFrameworkCore;
 using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Customers;
+using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.UseCases;
+using Sumpooj.Infrastructure.Persistence;
 
 
 namespace Sumpooj.API.Controllers;
@@ -14,11 +16,18 @@ namespace Sumpooj.API.Controllers;
 public class CustomersController : ControllerBase
 {
     private readonly CustomerService _service;
+    private readonly SumpoojDbContext _db;
+    private readonly ITenantContext _tenantContext;
 
-    public CustomersController(CustomerService service)
+    public CustomersController(CustomerService service, SumpoojDbContext db, ITenantContext tenantContext)
     {
         _service = service;
+        _db = db;
+        _tenantContext = tenantContext;
     }
+
+    private Guid CompanyId => _tenantContext.CompanyId
+        ?? throw new UnauthorizedAccessException("Company context required");
 
     [HttpGet("search")]
     public async Task<IActionResult> Search([FromQuery] CustomerSearchRequest request)
@@ -80,5 +89,56 @@ public class CustomersController : ControllerBase
     {
         await _service.ReactivateAsync(id);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Lookup a customer by phone number.
+    /// Used by phone-order screen for quick customer identification.
+    /// </summary>
+    [HttpGet("by-phone")]
+    public async Task<IActionResult> GetByPhone([FromQuery] string phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone))
+            return BadRequest(new { message = "Phone number is required" });
+
+        var cid = CompanyId;
+        var customer = await _db.Customers
+            .Where(c => c.CompanyId == cid && c.IsActive && c.Phone != null && c.Phone.Contains(phone))
+            .Select(c => new
+            {
+                c.Id,
+                c.Name,
+                c.Email,
+                c.Phone,
+                c.Notes,
+            })
+            .FirstOrDefaultAsync();
+
+        if (customer == null)
+            return Ok((object?)null);
+
+        // Also fetch recent orders for this customer
+        var recentOrders = await _db.Orders
+            .Where(o => o.CompanyId == cid && o.CustomerId == customer.Id)
+            .OrderByDescending(o => o.OrderDate)
+            .Take(5)
+            .Select(o => new
+            {
+                o.Id,
+                o.OrderNumber,
+                description = o.InternalNotes ?? "",
+                amount = o.TotalAmount,
+                o.OrderDate,
+            })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            customer.Id,
+            customer.Name,
+            customer.Email,
+            customer.Phone,
+            orders = recentOrders,
+        });
     }
 }

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Sumpooj.Application.Deliveries;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.UseCases;
+using Sumpooj.Domain.Entities;
 using Sumpooj.Infrastructure.Persistence;
 
 namespace Sumpooj.API.Controllers;
@@ -28,35 +29,59 @@ public class DeliveriesController : ControllerBase
     }
 
     /// <summary>
-    /// Get deliveries for a specific date (defaults to today)
+    /// Get deliveries for a specific date (defaults to today).
+    /// Supports optional status and routeId filters for the delivery-routes page.
+    /// Pass routeId=null to get unassigned deliveries.
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> GetDeliveries([FromQuery] DateTime? date)
+    public async Task<IActionResult> GetDeliveries(
+        [FromQuery] DateTime? date,
+        [FromQuery] string? status,
+        [FromQuery] string? routeId)
     {
         var targetDate = (date?.Date ?? DateTime.UtcNow.Date);
         targetDate = DateTime.SpecifyKind(targetDate, DateTimeKind.Utc);
 
-        var deliveries = await (
-            from d in _db.Deliveries
-            join o in _db.Orders on d.SalesOrderId equals o.Id
-            join c in _db.Customers on o.CustomerId equals c.Id
-            join s in _db.Staff on d.DeliveryPersonId equals s.Id into staffJoin
-            from s in staffJoin.DefaultIfEmpty()
-            where d.DeliveryDate.Date == targetDate
-            orderby d.DeliveryDate, d.TimeSlot
-            select new DeliveryListDto
+        var query = from d in _db.Deliveries
+                    join o in _db.Orders on d.SalesOrderId equals o.Id
+                    join c in _db.Customers on o.CustomerId equals c.Id
+                    join s in _db.Staff on d.DeliveryPersonId equals s.Id into staffJoin
+                    from s in staffJoin.DefaultIfEmpty()
+                    where d.DeliveryDate.Date == targetDate
+                    select new { d, o, c, DriverName = s != null ? s.Name : null };
+
+        // Filter by status (e.g. "Scheduled")
+        if (!string.IsNullOrEmpty(status)
+            && Enum.TryParse<DeliveryStatus>(status, true, out var deliveryStatus))
+        {
+            query = query.Where(x => x.d.Status == deliveryStatus);
+        }
+
+        // Filter by routeId — "null" string means unassigned deliveries
+        if (routeId != null)
+        {
+            if (routeId == "null" || routeId == "")
+                query = query.Where(x => x.d.DeliveryRouteId == null);
+            else if (Guid.TryParse(routeId, out var rid))
+                query = query.Where(x => x.d.DeliveryRouteId == rid);
+        }
+
+        var deliveries = await query
+            .OrderBy(x => x.d.DeliveryDate).ThenBy(x => x.d.TimeSlot)
+            .Select(x => new DeliveryListDto
             {
-                DeliveryId = d.Id,
-                OrderNumber = o.OrderNumber,
-                CustomerName = c.Name,
-                Phone = c.Phone,
-                DeliveryDate = d.DeliveryDate,
-                TimeSlot = d.TimeSlot,
-                Address = d.DeliveryAddress,
-                Status = d.Status.ToString(),
-                DeliveryPersonName = s != null ? s.Name : null
-            }
-        ).AsNoTracking().ToListAsync();
+                DeliveryId = x.d.Id,
+                OrderNumber = x.o.OrderNumber,
+                CustomerName = x.c.Name,
+                Phone = x.c.Phone,
+                DeliveryDate = x.d.DeliveryDate,
+                TimeSlot = x.d.TimeSlot,
+                Address = x.d.DeliveryAddress,
+                PostalCode = x.d.PostalCode,
+                Status = x.d.Status.ToString(),
+                DeliveryPersonName = x.DriverName
+            })
+            .AsNoTracking().ToListAsync();
 
         return Ok(deliveries);
     }
@@ -120,6 +145,7 @@ public class DeliveryListDto
     public DateTime DeliveryDate { get; set; }
     public string TimeSlot { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
+    public string? PostalCode { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? DeliveryPersonName { get; set; }
 }

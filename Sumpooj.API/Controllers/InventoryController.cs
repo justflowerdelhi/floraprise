@@ -127,6 +127,33 @@ public class InventoryController : ControllerBase
         return Ok(available);
     }
 
+    /// <summary>
+    /// Returns all active products as inventory items for production/custom bouquet builder.
+    /// Frontend calls GET /api/inventory/products.
+    /// </summary>
+    [HttpGet("products")]
+    public async Task<IActionResult> GetProducts()
+    {
+        var tenantContext = HttpContext.RequestServices.GetRequiredService<ITenantContext>();
+        var companyId = tenantContext.CompanyId
+            ?? throw new UnauthorizedAccessException("Company context required");
+
+        var products = await _productRepository.GetAllAsync(companyId);
+        var result = products
+            .Where(p => p.IsActive)
+            .Select(p => new
+            {
+                id = p.Id,
+                name = p.Name,
+                productType = p.ProductType.ToString(),
+                quantityAvailable = p.StockQuantity,
+                unitCost = p.CostPrice,
+            })
+            .ToList();
+
+        return Ok(result);
+    }
+
     private Guid GetCurrentUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

@@ -86,6 +86,8 @@ public class CreateOrderRequest
     public string? TimeSlot { get; set; }
     public string OrderSource { get; set; } = "WalkIn";
     public string? OrderIntent { get; set; }
+    public DateTime? PickupDate { get; set; }
+    public string? PickupTimeSlot { get; set; }
     public decimal DeliveryFee { get; set; }
     public decimal DiscountAmount { get; set; }
     public string? InternalNotes { get; set; }
