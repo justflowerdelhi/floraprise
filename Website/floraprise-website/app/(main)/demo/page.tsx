@@ -17,16 +17,19 @@ export default function DemoPage() {
           e.preventDefault();
           const formData = new FormData(e.currentTarget);
 
-          const res = await fetch("/api/contact", {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_ERP_API_URL}/api/marketing/demo-request`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "X-Website-Key": process.env.NEXT_PUBLIC_WEBSITE_API_KEY || "",
+            },
             body: JSON.stringify({
-              name: formData.get("name"),
-              email: formData.get("email"),
+              fullName: formData.get("name"),
+              businessEmail: formData.get("email"),
               businessType: formData.get("businessType"),
               currentSoftware: formData.get("currentSoftware"),
               notes: formData.get("notes"),
-              message: "Demo Request",
+              submittedAt: new Date().toISOString(),
             }),
           });
 

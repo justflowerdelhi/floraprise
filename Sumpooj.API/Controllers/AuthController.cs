@@ -130,7 +130,7 @@ public class AuthController : ControllerBase
                 access_token = accessToken,
                 refresh_token = refreshToken.Token,
                 user = BuildUserResponse(user, primaryRole),
-                tenant = BuildTenantResponse(user)
+                tenant = await BuildTenantResponseAsync(user)
             });
         }
         catch (Exception ex)
@@ -187,7 +187,7 @@ public class AuthController : ControllerBase
             access_token = accessToken,
             refresh_token = newRefreshToken.Token,
             user = BuildUserResponse(user, primaryRole),
-            tenant = BuildTenantResponse(user)
+            tenant = await BuildTenantResponseAsync(user)
         });
     }
 
@@ -237,7 +237,7 @@ public class AuthController : ControllerBase
         return Ok(new
         {
             user = BuildUserResponse(user, primaryRole),
-            tenant = BuildTenantResponse(user)
+            tenant = await BuildTenantResponseAsync(user)
         });
     }
 
@@ -281,23 +281,38 @@ public class AuthController : ControllerBase
         assignedLocationIds = Array.Empty<string>()
     };
 
-    private static object? BuildTenantResponse(ApplicationUser user) =>
-        user.CompanyId.HasValue ? new
+    private async Task<object?> BuildTenantResponseAsync(ApplicationUser user)
+    {
+        if (!user.CompanyId.HasValue) return null;
+
+        var company = await _db.Companies.FindAsync(user.CompanyId.Value);
+
+        return new
         {
             id = user.CompanyId.Value.ToString(),
-            name = "Company",
-            slug = "company",
+            name = company?.Name ?? "Company",
+            slug = (company?.Name ?? "company").ToLower().Replace(" ", "-"),
             plan = "PRO",
             subscriptionStatus = "ACTIVE",
-            country = "IN",
-            currency = "INR",
-            taxSystem = "GST",
+            country = company?.Region ?? "IN",
+            currency = company?.CurrencyCode ?? "USD",
+            taxSystem = !string.IsNullOrEmpty(company?.TaxIdentifier) ? "GST" : "NONE",
             dateFormat = "DD/MM/YYYY",
             timeFormat = "12H",
-            locale = "en-IN",
-            isActive = true,
-            createdAt = DateTime.UtcNow.ToString("o")
-        } : null;
+            locale = (company?.CurrencyCode) switch
+            {
+                "INR" => "en-IN",
+                "AED" => "en-AE",
+                "GBP" => "en-GB",
+                "EUR" => "en-DE",
+                "CAD" => "en-CA",
+                "AUD" => "en-AU",
+                _ => "en-US"
+            },
+            isActive = company?.IsActive ?? true,
+            createdAt = company?.CreatedAtUtc.ToString("o") ?? DateTime.UtcNow.ToString("o")
+        };
+    }
 
     /// <summary>
     /// Revoke all active refresh tokens for a user (token reuse detection).

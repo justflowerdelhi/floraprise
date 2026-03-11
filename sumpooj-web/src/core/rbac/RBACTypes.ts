@@ -609,6 +609,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         path: '/admin/audit-logs',
         permissions: ['settings:edit'],
       },
+      {
+        id: 'demo-requests',
+        label: 'Demo Requests',
+        icon: 'RequestQuote',
+        path: '/admin/demo-requests',
+        permissions: ['settings:edit'],
+      },
     ],
   },
   {
@@ -738,6 +745,7 @@ export const DEFAULT_LANDING: Record<UserRole, string> = {
 // ─── Utility Type Guards ────────────────────────────────────
 
 export const hasPermission = (userPermissions: Permission[], required: Permission[]): boolean => {
+  if (required.length === 0) return true; // No permissions required — accessible to all
   return required.some((p) => userPermissions.includes(p));
 };
 

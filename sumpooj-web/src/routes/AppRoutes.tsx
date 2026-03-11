@@ -81,6 +81,7 @@ import PlatformAdminDashboard from '../pages/admin/PlatformAdminDashboard';
 import CompanyManagementPage from '../pages/admin/CompanyManagementPage';
 import PlatformAnalyticsPage from '../pages/admin/PlatformAnalyticsPage';
 import PlatformSettingsPage from '../pages/admin/PlatformSettingsPage';
+import AdminDemoRequestsPage from '../pages/admin/AdminDemoRequestsPage';
 
 // Categories
 import { CategoryManagementPage } from '../pages/categories';
@@ -298,6 +299,7 @@ export default function AppRoutes() {
           <Route path="/admin/companies" element={<CompanyManagementPage />} />
           <Route path="/admin/analytics" element={<PlatformAnalyticsPage />} />
           <Route path="/admin/settings" element={<PlatformSettingsPage />} />
+          <Route path="/admin/demo-requests" element={<AdminDemoRequestsPage />} />
 
           {/* ─── CRM & Customer Intelligence ────────────── */}
           <Route path="/crm/customers" element={<CustomerListPage />} />

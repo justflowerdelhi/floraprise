@@ -15,9 +15,13 @@ using Sumpooj.Application.Payments;
 using Sumpooj.Application.UseCases;
 using Sumpooj.Infrastructure;
 using Sumpooj.Infrastructure.Companies;
+using Sumpooj.Infrastructure.ExternalServices;
 using Sumpooj.Infrastructure.Identity;
 using Sumpooj.Infrastructure.Persistence;
 using Sumpooj.Infrastructure.Repositories;
+using Sumpooj.Application.Marketing;
+using Sumpooj.Application.Email;
+using Sumpooj.Infrastructure.Email;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -273,6 +277,15 @@ builder.Services.AddScoped<ProductionService>();
 
 // Barcodes
 builder.Services.AddScoped<BarcodeService>();
+
+// Email
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Email"));
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+
+// Marketing — Demo Requests
+builder.Services.AddScoped<IDemoRequestRepository, DemoRequestRepository>();
+builder.Services.AddScoped<ILeadNotificationService, LeadNotificationService>();
+builder.Services.AddScoped<DemoRequestService>();
 
 // Audit Action Filter (auto-logs all mutating API actions)
 builder.Services.AddScoped<AuditActionFilter>();

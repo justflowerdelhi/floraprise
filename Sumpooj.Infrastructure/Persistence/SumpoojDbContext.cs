@@ -93,6 +93,9 @@ public class SumpoojDbContext
     // Staff Attendance
     public DbSet<StaffAttendanceRecord> StaffAttendanceRecords => Set<StaffAttendanceRecord>();
 
+    // Marketing
+    public DbSet<DemoRequest> DemoRequests => Set<DemoRequest>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
