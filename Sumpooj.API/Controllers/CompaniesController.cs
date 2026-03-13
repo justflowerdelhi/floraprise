@@ -60,4 +60,17 @@ public class CompaniesController : ControllerBase
         var result = await CompanyDemoDataSeeder.SeedAsync(_db, companyId);
         return Ok(result);
     }
+
+    /// <summary>
+    /// Remove ALL company data from every major table (for going live).
+    /// The Company record itself is preserved — only its data is wiped.
+    /// Platform Super Admin only.
+    /// </summary>
+    [HttpPost("{companyId:guid}/purge-demo-data")]
+    [Authorize(Policy = PolicyNames.PlatformOnly)]
+    public async Task<IActionResult> PurgeDemoData(Guid companyId)
+    {
+        var result = await CompanyDemoDataSeeder.PurgeAsync(_db, companyId);
+        return Ok(result);
+    }
 }

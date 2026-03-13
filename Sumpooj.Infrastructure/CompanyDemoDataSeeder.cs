@@ -35,6 +35,81 @@ public static class CompanyDemoDataSeeder
         return result;
     }
 
+    /// <summary>
+    /// Removes ALL company data from every major table (child rows first, then parents).
+    /// Used when a demo company goes live and needs a clean slate.
+    /// The Company row itself is NOT deleted — only its data.
+    /// </summary>
+    public static async Task<DemoPurgeResult> PurgeAsync(SumpoojDbContext db, Guid companyId)
+    {
+        _ = await db.Companies.FindAsync(companyId)
+            ?? throw new InvalidOperationException("Company not found");
+
+        var result = new DemoPurgeResult();
+
+        // ── Child / junction tables first (FK dependencies) ─────
+
+        // Order children
+        var orderIds = await db.Orders.Where(o => o.CompanyId == companyId).Select(o => o.Id).ToListAsync();
+        if (orderIds.Count > 0)
+        {
+            result.OrderItems = await RemoveAsync(db, db.OrderItems.Where(i => orderIds.Contains(EF.Property<Guid>(i, "OrderId"))));
+            result.Payments = await RemoveAsync(db, db.Payments.Where(p => orderIds.Contains(p.OrderId)));
+        }
+
+        // Production children
+        var recipeIds = await db.FloralRecipes.Where(r => r.CompanyId == companyId).Select(r => r.Id).ToListAsync();
+        if (recipeIds.Count > 0)
+            result.RecipeComponents = await RemoveAsync(db, db.RecipeComponents.Where(c => recipeIds.Contains(c.RecipeId)));
+
+        // Proposal children
+        var proposalIds = await db.Proposals.Where(p => p.CompanyId == companyId).Select(p => p.Id).ToListAsync();
+        if (proposalIds.Count > 0)
+            result.ProposalItems = await RemoveAsync(db, db.ProposalItems.Where(i => proposalIds.Contains(i.ProposalId)));
+
+        // PurchaseOrder children
+        var poIds = await db.PurchaseOrders.Where(p => p.CompanyId == companyId).Select(p => p.Id).ToListAsync();
+        if (poIds.Count > 0)
+            result.PurchaseOrderItems = await RemoveAsync(db, db.PurchaseOrderItems.Where(i => poIds.Contains(EF.Property<Guid>(i, "PurchaseOrderId"))));
+
+        // ── Parent tables ───────────────────────────────────────
+
+        result.Orders = await RemoveAsync(db, db.Orders.Where(o => o.CompanyId == companyId));
+        result.Events = await RemoveAsync(db, db.Events.Where(e => e.CompanyId == companyId));
+        result.Proposals = await RemoveAsync(db, db.Proposals.Where(p => p.CompanyId == companyId));
+        result.WireOrders = await RemoveAsync(db, db.WireOrders.Where(w => w.CompanyId == companyId));
+        result.Recipes = await RemoveAsync(db, db.FloralRecipes.Where(r => r.CompanyId == companyId));
+        result.FinishedGoods = await RemoveAsync(db, db.FinishedGoodsBatches.Where(f => f.CompanyId == companyId));
+        result.ProductionJobs = await RemoveAsync(db, db.ProductionJobs.Where(j => j.CompanyId == companyId));
+        result.Expenses = await RemoveAsync(db, db.Expenses.Where(e => e.CompanyId == companyId));
+        result.JournalEntries = await RemoveAsync(db, db.JournalEntries.Where(j => j.CompanyId == companyId));
+        result.Accounts = await RemoveAsync(db, db.Accounts.Where(a => a.CompanyId == companyId));
+        result.PurchaseOrders = await RemoveAsync(db, db.PurchaseOrders.Where(p => p.CompanyId == companyId));
+        result.StockMovements = await RemoveAsync(db, db.StockMovements.Where(s => s.CompanyId == companyId));
+        result.ProductBatches = await RemoveAsync(db, db.ProductBatches.Where(b => b.CompanyId == companyId));
+        result.Products = await RemoveAsync(db, db.Products.Where(p => p.CompanyId == companyId));
+        result.Customers = await RemoveAsync(db, db.Customers.Where(c => c.CompanyId == companyId));
+        result.Suppliers = await RemoveAsync(db, db.Suppliers.Where(s => s.CompanyId == companyId));
+        result.Staff = await RemoveAsync(db, db.Staff.Where(s => s.CompanyId == companyId));
+        result.Shifts = await RemoveAsync(db, db.Shifts.Where(s => s.CompanyId == companyId));
+        result.DeliveryZones = await RemoveAsync(db, db.DeliveryZones.Where(z => z.CompanyId == companyId));
+        result.Categories = await RemoveAsync(db, db.ProductCategories.Where(c => c.CompanyId == companyId));
+        result.TaxRules = await RemoveAsync(db, db.TaxRules.Where(t => t.CompanyId == companyId));
+        result.Locations = await RemoveAsync(db, db.Locations.Where(l => l.CompanyId == companyId));
+
+        return result;
+    }
+
+    /// <summary>Batch-remove all matching rows and return the count deleted.</summary>
+    private static async Task<int> RemoveAsync<T>(SumpoojDbContext db, IQueryable<T> query) where T : class
+    {
+        var items = await query.ToListAsync();
+        if (items.Count == 0) return 0;
+        db.RemoveRange(items);
+        await db.SaveChangesAsync();
+        return items.Count;
+    }
+
     // ─── Locations ──────────────────────────────────────────
 
     private static async Task<int> SeedLocationsAsync(SumpoojDbContext db, Guid cid)
@@ -345,4 +420,45 @@ public class DemoSeedResult
 
     public int TotalSeeded => Locations + TaxRules + Categories + Suppliers + Products
         + Customers + Staff + Accounts + Expenses + Orders + Events + Recipes + DeliveryZones;
+}
+
+/// <summary>Summary of how many records were purged per table.</summary>
+public class DemoPurgeResult
+{
+    // Child / junction
+    public int OrderItems { get; set; }
+    public int Payments { get; set; }
+    public int RecipeComponents { get; set; }
+    public int ProposalItems { get; set; }
+    public int PurchaseOrderItems { get; set; }
+
+    // Parent tables
+    public int Locations { get; set; }
+    public int TaxRules { get; set; }
+    public int Categories { get; set; }
+    public int Suppliers { get; set; }
+    public int Products { get; set; }
+    public int ProductBatches { get; set; }
+    public int StockMovements { get; set; }
+    public int Customers { get; set; }
+    public int Staff { get; set; }
+    public int Shifts { get; set; }
+    public int Accounts { get; set; }
+    public int Expenses { get; set; }
+    public int JournalEntries { get; set; }
+    public int Orders { get; set; }
+    public int Events { get; set; }
+    public int Proposals { get; set; }
+    public int WireOrders { get; set; }
+    public int PurchaseOrders { get; set; }
+    public int Recipes { get; set; }
+    public int FinishedGoods { get; set; }
+    public int ProductionJobs { get; set; }
+    public int DeliveryZones { get; set; }
+
+    public int TotalPurged => OrderItems + Payments + RecipeComponents + ProposalItems + PurchaseOrderItems
+        + Locations + TaxRules + Categories + Suppliers + Products + ProductBatches + StockMovements
+        + Customers + Staff + Shifts + Accounts + Expenses + JournalEntries
+        + Orders + Events + Proposals + WireOrders + PurchaseOrders
+        + Recipes + FinishedGoods + ProductionJobs + DeliveryZones;
 }

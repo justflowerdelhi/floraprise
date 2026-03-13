@@ -41,6 +41,8 @@ const CompanyManagementPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState<string | null>(null);
   const [seedResult, setSeedResult] = useState<SeedResult | null>(null);
+  const [purging, setPurging] = useState<string | null>(null);
+  const [purgeResult, setPurgeResult] = useState<Record<string, number> | null>(null);
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false, message: '', severity: 'success',
   });
@@ -88,6 +90,26 @@ const CompanyManagementPage: React.FC = () => {
       setSnack({ open: true, message: err?.response?.data?.message || 'Failed to seed demo data', severity: 'error' });
     } finally {
       setSeeding(null);
+    }
+  };
+
+  const handlePurgeDemoData = async (company: CompanyRow) => {
+    if (!confirm(`⚠️ REMOVE ALL DATA for "${company.name}"?\n\nThis will permanently delete ALL records (orders, customers, products, staff, etc.) for this company.\n\nThe company itself will NOT be deleted — only its data.\n\nThis action CANNOT be undone.`)) return;
+
+    setPurging(company.id);
+    try {
+      const res = await api.post(`/platform/companies/${company.id}/purge-demo-data`);
+      const result = res.data;
+      if (result.totalPurged === 0) {
+        setSnack({ open: true, message: `"${company.name}" has no data to remove.`, severity: 'success' });
+      } else {
+        setPurgeResult(result);
+      }
+    } catch (err: any) {
+      console.error('Failed to purge demo data:', err);
+      setSnack({ open: true, message: err?.response?.data?.message || 'Failed to purge demo data', severity: 'error' });
+    } finally {
+      setPurging(null);
     }
   };
 
@@ -141,6 +163,15 @@ const CompanyManagementPage: React.FC = () => {
                   >
                     {seeding === c.id ? 'Seeding…' : '🌱 Populate Demo Data'}
                   </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    disabled={purging === c.id}
+                    onClick={() => handlePurgeDemoData(c)}
+                  >
+                    {purging === c.id ? 'Removing…' : '🗑️ Remove Data'}
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -183,6 +214,35 @@ const CompanyManagementPage: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setSeedResult(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Purge Result Dialog */}
+      <Dialog open={!!purgeResult} onClose={() => setPurgeResult(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>🗑️ Demo Data Removed</DialogTitle>
+        <DialogContent>
+          {purgeResult && (
+            <List dense>
+              {Object.entries(purgeResult)
+                .filter(([key]) => key !== 'totalPurged')
+                .filter(([, count]) => (count as number) > 0)
+                .map(([key, count]) => (
+                  <ListItem key={key}>
+                    <ListItemText
+                      primary={key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
+                    />
+                    <Chip label={`−${count}`} color="error" size="small" variant="outlined" />
+                  </ListItem>
+                ))}
+              <ListItem>
+                <ListItemText primary="Total Removed" primaryTypographyProps={{ fontWeight: 700 }} />
+                <Chip label={`${purgeResult.totalPurged} records`} color="error" size="small" />
+              </ListItem>
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPurgeResult(null)}>Close</Button>
         </DialogActions>
       </Dialog>
 
