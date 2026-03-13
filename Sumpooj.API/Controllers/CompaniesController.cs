@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Companies;
+using Sumpooj.Infrastructure;
+using Sumpooj.Infrastructure.Persistence;
 
 namespace Sumpooj.API.Controllers;
 
@@ -11,10 +13,12 @@ namespace Sumpooj.API.Controllers;
 public class CompaniesController : ControllerBase
 {
     private readonly ICompanyService _service;
+    private readonly SumpoojDbContext _db;
 
-    public CompaniesController(ICompanyService service)
+    public CompaniesController(ICompanyService service, SumpoojDbContext db)
     {
         _service = service;
+        _db = db;
     }
 
     [HttpGet]
@@ -43,5 +47,17 @@ public class CompaniesController : ControllerBase
     {
         await _service.SetActiveAsync(companyId, false);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Populate ~5 demo records per major table for a company.
+    /// Platform Super Admin only. Skips tables that already have data.
+    /// </summary>
+    [HttpPost("{companyId:guid}/seed-demo-data")]
+    [Authorize(Policy = PolicyNames.PlatformOnly)]
+    public async Task<IActionResult> SeedDemoData(Guid companyId)
+    {
+        var result = await CompanyDemoDataSeeder.SeedAsync(_db, companyId);
+        return Ok(result);
     }
 }

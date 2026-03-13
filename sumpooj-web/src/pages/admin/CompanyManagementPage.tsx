@@ -5,6 +5,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, Chip, CircularProgress, Button,
+  Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions,
+  List, ListItem, ListItemText,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
@@ -16,10 +18,32 @@ interface CompanyRow {
   isActive: boolean;
 }
 
+interface SeedResult {
+  locations: number;
+  taxRules: number;
+  categories: number;
+  suppliers: number;
+  products: number;
+  customers: number;
+  staff: number;
+  accounts: number;
+  expenses: number;
+  orders: number;
+  events: number;
+  recipes: number;
+  deliveryZones: number;
+  totalSeeded: number;
+}
+
 const CompanyManagementPage: React.FC = () => {
   const navigate = useNavigate();
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState<string | null>(null);
+  const [seedResult, setSeedResult] = useState<SeedResult | null>(null);
+  const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false, message: '', severity: 'success',
+  });
 
   useEffect(() => {
     const load = async () => {
@@ -44,6 +68,26 @@ const CompanyManagementPage: React.FC = () => {
       );
     } catch (err) {
       console.error('Failed to toggle company status:', err);
+    }
+  };
+
+  const handleSeedDemoData = async (company: CompanyRow) => {
+    if (!confirm(`Populate demo data for "${company.name}"?\n\nThis will add ~5 sample records to each major table (customers, products, orders, etc.). Tables that already have data will be skipped.`)) return;
+
+    setSeeding(company.id);
+    try {
+      const res = await api.post(`/platform/companies/${company.id}/seed-demo-data`);
+      const result: SeedResult = res.data;
+      if (result.totalSeeded === 0) {
+        setSnack({ open: true, message: `"${company.name}" already has data in all tables. Nothing seeded.`, severity: 'success' });
+      } else {
+        setSeedResult(result);
+      }
+    } catch (err: any) {
+      console.error('Failed to seed demo data:', err);
+      setSnack({ open: true, message: err?.response?.data?.message || 'Failed to seed demo data', severity: 'error' });
+    } finally {
+      setSeeding(null);
     }
   };
 
@@ -84,9 +128,18 @@ const CompanyManagementPage: React.FC = () => {
                     size="small"
                   />
                 </TableCell>
-                <TableCell>
+                <TableCell sx={{ display: 'flex', gap: 1 }}>
                   <Button size="small" onClick={() => handleToggleActive(c)}>
                     {c.isActive ? 'Deactivate' : 'Activate'}
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="secondary"
+                    disabled={seeding === c.id}
+                    onClick={() => handleSeedDemoData(c)}
+                  >
+                    {seeding === c.id ? 'Seeding…' : '🌱 Populate Demo Data'}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -99,6 +152,51 @@ const CompanyManagementPage: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Seed Result Dialog */}
+      <Dialog open={!!seedResult} onClose={() => setSeedResult(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>✅ Demo Data Populated</DialogTitle>
+        <DialogContent>
+          {seedResult && (
+            <List dense>
+              {Object.entries(seedResult)
+                .filter(([key]) => key !== 'totalSeeded')
+                .map(([key, count]) => (
+                  <ListItem key={key}>
+                    <ListItemText
+                      primary={key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
+                      secondary={count > 0 ? `${count} records added` : 'Already had data — skipped'}
+                    />
+                    <Chip
+                      label={count > 0 ? `+${count}` : 'Skipped'}
+                      color={count > 0 ? 'success' : 'default'}
+                      size="small"
+                    />
+                  </ListItem>
+                ))}
+              <ListItem>
+                <ListItemText primary="Total" primaryTypographyProps={{ fontWeight: 700 }} />
+                <Chip label={`${seedResult.totalSeeded} records`} color="primary" size="small" />
+              </ListItem>
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSeedResult(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={4000}
+        onClose={() => setSnack(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={snack.severity} onClose={() => setSnack(s => ({ ...s, open: false }))}>
+          {snack.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
