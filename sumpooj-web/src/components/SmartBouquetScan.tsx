@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import api from "../api/axios";
 
 export default function SmartBouquetScan() {
 
@@ -20,14 +21,11 @@ export default function SmartBouquetScan() {
 
     try {
 
-      const response = await fetch("http://127.0.0.1:8001/analyze-bouquet", {
-        method: "POST",
-        body: formData
+      const response = await api.post("/ai/analyze-bouquet", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const data = await response.json();
-
-      setFlowers(data.flowers || []);
+      setFlowers(response.data.flowers || []);
 
     } catch (err) {
 

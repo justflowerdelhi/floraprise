@@ -1,4 +1,5 @@
 import { useState } from "react";
+import api from "../../api/axios";
 
 export default function BouquetScanner() {
 
@@ -79,18 +80,22 @@ export default function BouquetScanner() {
     const formData = new FormData();
     formData.append("file", image);
 
-    const res = await fetch("http://localhost:8001/analyze-bouquet", {
-      method: "POST",
-      body: formData
-    });
+    try {
+      const res = await api.post("/ai/analyze-bouquet", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const data = res.data;
 
-    const data = await res.json().catch(() => ({ flowers: [] }));
-
-    setFlowers(data.flowers || []);
-    setStyle(data.style || "");
-    setShape(data.shape || "");
-    setHeight(data.height || "");
-    setLoading(false);
+      setFlowers(data.flowers || []);
+      setStyle(data.style || "");
+      setShape(data.shape || "");
+      setHeight(data.height || "");
+    } catch (err) {
+      console.error("Bouquet analysis failed:", err);
+      setFlowers([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const generateRecipe = () => {
@@ -113,16 +118,12 @@ export default function BouquetScanner() {
 
     if (!recipe) return;
 
-    const res = await fetch("http://localhost:8001/api/bouquet-recipes", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(recipe)
-    });
-
-    await res.json();
-    setSaved(true);
+    try {
+      await api.post("/ai/bouquet-recipes", recipe);
+      setSaved(true);
+    } catch (err) {
+      console.error("Failed to save recipe:", err);
+    }
   };
 
   const createCatalogProduct = async () => {
@@ -137,18 +138,15 @@ export default function BouquetScanner() {
       image: preview
     };
 
-    const res = await fetch("http://localhost:8001/api/ai-create-product", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(product)
-    });
-
-    const data = await res.json();
-
-    alert("Product created in catalog!");
-    console.log(data);
+    try {
+      await api.post("/ai/bouquet-recipes", {
+        ...product,
+        name: product.name,
+      });
+      alert("Product created in catalog!");
+    } catch (err) {
+      console.error("Failed to create product:", err);
+    }
   };
 
   return (

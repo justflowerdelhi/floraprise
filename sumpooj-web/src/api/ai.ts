@@ -1,16 +1,12 @@
-export async function analyzeBouquet(image: File) {
+import api from './axios';
 
+export async function analyzeBouquet(image: File) {
   const formData = new FormData();
   formData.append("file", image);
 
-  const response = await fetch("http://127.0.0.1:8001/analyze-bouquet", {
-    method: "POST",
-    body: formData
+  const response = await api.post("/ai/analyze-bouquet", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
   });
 
-  if (!response.ok) {
-    throw new Error("AI analysis failed");
-  }
-
-  return await response.json();
+  return response.data;
 }

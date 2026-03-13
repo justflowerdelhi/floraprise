@@ -170,6 +170,7 @@ var openAISettings = builder.Configuration.GetSection("OpenAI").Get<OpenAISettin
 builder.Services.AddSingleton(openAISettings);
 builder.Services.AddScoped<IAIUsageRepository, AIUsageRepository>();
 builder.Services.AddScoped<GiftCardAIService>();
+builder.Services.AddScoped<BouquetAIService>();
 
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ProductService>();
