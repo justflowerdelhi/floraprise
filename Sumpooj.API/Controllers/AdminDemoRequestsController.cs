@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Sumpooj.Application.Companies;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Domain.Entities;
+using Sumpooj.Infrastructure.Identity;
 
 namespace Sumpooj.API.Controllers;
 
@@ -16,11 +18,16 @@ public class AdminDemoRequestsController : ControllerBase
 {
     private readonly IDemoRequestRepository _repo;
     private readonly ICompanyService _companyService;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public AdminDemoRequestsController(IDemoRequestRepository repo, ICompanyService companyService)
+    public AdminDemoRequestsController(
+        IDemoRequestRepository repo,
+        ICompanyService companyService,
+        UserManager<ApplicationUser> userManager)
     {
         _repo = repo;
         _companyService = companyService;
+        _userManager = userManager;
     }
 
     /// <summary>
@@ -91,7 +98,8 @@ public class AdminDemoRequestsController : ControllerBase
 
     /// <summary>
     /// Onboard a demo request as a new company.
-    /// Creates the company and marks the demo request as Converted.
+    /// Creates the company, a CompanyAdmin user, and marks the demo request as Converted.
+    /// Returns the login credentials for sharing with the client.
     /// </summary>
     [HttpPost("{id:guid}/onboard")]
     public async Task<IActionResult> Onboard(Guid id)
@@ -113,11 +121,66 @@ public class AdminDemoRequestsController : ControllerBase
             CurrencyCode = "INR",
         });
 
+        // Create CompanyAdmin user
+        var adminEmail = demo.BusinessEmail;
+        var tempPassword = GenerateTempPassword();
+
+        // Check if user already exists
+        var existingUser = await _userManager.FindByEmailAsync(adminEmail);
+        if (existingUser != null)
+        {
+            // If user exists but has no company, assign them
+            if (existingUser.CompanyId == null)
+            {
+                existingUser.CompanyId = companyId;
+                await _userManager.UpdateAsync(existingUser);
+            }
+        }
+        else
+        {
+            var adminUser = new ApplicationUser
+            {
+                UserName = adminEmail,
+                Email = adminEmail,
+                CompanyId = companyId,
+                EmailConfirmed = true,
+                IsActive = true,
+            };
+
+            var createResult = await _userManager.CreateAsync(adminUser, tempPassword);
+            if (!createResult.Succeeded)
+            {
+                var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
+                return BadRequest(new { message = $"Company created but failed to create admin user: {errors}" });
+            }
+
+            await _userManager.AddToRoleAsync(adminUser, "CompanyAdmin");
+        }
+
         // Mark as Converted
         demo.UpdateStatus(LeadStatus.Converted, $"Onboarded as company {companyId}");
         await _repo.UpdateAsync(demo);
 
-        return Ok(new { companyId, message = $"Company created and demo request marked as Converted." });
+        return Ok(new
+        {
+            companyId,
+            companyName = demo.FullName,
+            adminEmail,
+            tempPassword,
+            message = "Company and admin user created successfully.",
+        });
+    }
+
+    /// <summary>Generates a readable temporary password like "Flora@7x3K".</summary>
+    private static string GenerateTempPassword()
+    {
+        const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const string lower = "abcdefghjkmnpqrstuvwxyz";
+        const string digits = "23456789";
+        var rng = Random.Shared;
+
+        // Format: Flora@{digit}{lower}{digit}{upper} — always meets complexity rules
+        return $"Flora@{upper[rng.Next(upper.Length)]}{lower[rng.Next(lower.Length)]}{digits[rng.Next(digits.Length)]}{lower[rng.Next(lower.Length)]}{digits[rng.Next(digits.Length)]}{upper[rng.Next(upper.Length)]}";
     }
 }
 
