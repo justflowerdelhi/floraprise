@@ -3,16 +3,18 @@ import type { UserRole } from '../core/rbac/RBACTypes';
 
 /**
  * Normalize backend role strings to frontend UserRole type.
- * Backend roles: ADMIN, COMPANYADMIN, MANAGER, CASHIER, DESIGNER, DRIVER, etc.
- * Frontend roles: ADMIN, MANAGER, CASHIER, DESIGNER, DRIVER
+ * Backend roles: PlatformSuperAdmin, CompanyAdmin, Manager, Cashier, Designer, Driver, etc.
+ * Frontend roles: PLATFORMSUPERADMIN, ADMIN, MANAGER, CASHIER, DESIGNER, DRIVER, STAFF
  */
 export function normalizeRole(backendRole: string): UserRole {
   const normalized = backendRole.toUpperCase();
-  
+
   // Map common backend roles to frontend roles
   const roleMap: Record<string, UserRole> = {
+    'PLATFORMSUPERADMIN': 'PLATFORMSUPERADMIN',
+    'PLATFORMSUPPORT': 'PLATFORMSUPERADMIN',
     'ADMIN': 'ADMIN',
-    'COMPANYADMIN': 'ADMIN',  // Backend's company admin → frontend admin
+    'COMPANYADMIN': 'ADMIN',
     'MANAGER': 'MANAGER',
     'STOREMANAGER': 'MANAGER',
     'CASHIER': 'CASHIER',
@@ -20,6 +22,7 @@ export function normalizeRole(backendRole: string): UserRole {
     'FLORALDESIGNER': 'DESIGNER',
     'DRIVER': 'DRIVER',
     'DELIVERYDRIVER': 'DRIVER',
+    'STAFF': 'STAFF',
   };
 
   return roleMap[normalized] || 'CASHIER';  // Default to CASHIER for unknown roles

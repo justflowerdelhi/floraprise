@@ -108,6 +108,7 @@ const SECTION_COLORS: Record<string, string> = {
   crm: '#5B2E91',        // FloraPrice Purple
   reports: '#5B2E91',    // FloraPrice Purple
   settings: '#F4C430',   // Accent Yellow
+  platform: '#1B5E20',   // Dark Green for Platform Admin
 };
 
 // ─── Sidebar Props ──────────────────────────────────────────
@@ -353,6 +354,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     'crm',
     'reports',
     'settings',
+    'platform', // Platform Admin at the bottom
   ];
   menuSections = menuSections.sort((a, b) => {
     const ai = desiredOrder.indexOf(a.id);

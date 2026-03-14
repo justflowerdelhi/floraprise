@@ -10,6 +10,7 @@ import type { User, UserRole } from '../core/rbac/RBACTypes';
 import type { Tenant } from '../core/tenant/TenantTypes';
 import { fetchMe, revokeToken } from '../api/auth.api';
 import { setAuthToken, setRefreshToken, clearAuthToken, getRefreshToken } from '../api/axios';
+import { normalizeRole } from '../api/auth.api';
 
 // ─── Dev Bypass ─────────────────────────────────────────────
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true';
@@ -111,7 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     try {
       const data: AuthMeResponse = await fetchMe();
-      const resolvedUser = data.user;
+      const resolvedUser = { ...data.user, role: normalizeRole(data.user.role) };
       const resolvedTenant = data.tenant ?? PLATFORM_ADMIN_TENANT;
       setUser(resolvedUser);
       setTenant(resolvedTenant);

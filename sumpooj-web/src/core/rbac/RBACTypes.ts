@@ -72,13 +72,15 @@ export type Permission =
   | 'settings:edit'
   | 'settings:billing'
   | 'users:manage'
-  | 'ai:view';
+  | 'ai:view'
+  | 'platform:admin';
 
 // ─── Role Permission Mapping ────────────────────────────────
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   PLATFORMSUPERADMIN: [
     // Platform admins have all permissions
+    'platform:admin',
     'pos:access', 'pos:refund', 'pos:day_close',
     'orders:view', 'orders:create', 'orders:edit', 'orders:delete', 'orders:external', 'orders:status_update',
     'customers:view', 'customers:create', 'customers:edit',
@@ -643,6 +645,54 @@ export const MENU_SECTIONS: MenuSection[] = [
         icon: '🌸',
         path: '/ai/bouquet-scanner',
         permissions: ['ai:view'],
+      },
+    ],
+  },
+  {
+    id: 'platform',
+    title: 'Platform Admin',
+    items: [
+      {
+        id: 'admin-dashboard',
+        label: 'Admin Dashboard',
+        icon: 'Dashboard',
+        path: '/admin/dashboard',
+        permissions: ['platform:admin'],
+      },
+      {
+        id: 'admin-companies',
+        label: 'Companies',
+        icon: 'Store',
+        path: '/admin/companies',
+        permissions: ['platform:admin'],
+      },
+      {
+        id: 'admin-analytics',
+        label: 'Platform Analytics',
+        icon: 'Assessment',
+        path: '/admin/analytics',
+        permissions: ['platform:admin'],
+      },
+      {
+        id: 'admin-settings',
+        label: 'Platform Settings',
+        icon: 'Settings',
+        path: '/admin/settings',
+        permissions: ['platform:admin'],
+      },
+      {
+        id: 'admin-demo-requests',
+        label: 'Demo Requests',
+        icon: 'RequestQuote',
+        path: '/admin/demo-requests',
+        permissions: ['platform:admin'],
+      },
+      {
+        id: 'admin-audit-logs',
+        label: 'Audit Logs',
+        icon: 'History',
+        path: '/admin/audit-logs',
+        permissions: ['platform:admin'],
       },
     ],
   },
