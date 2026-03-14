@@ -28,11 +28,34 @@ public class CompaniesController : ControllerBase
         return Ok(companies);
     }
 
+    [HttpGet("{companyId:guid}")]
+    public async Task<IActionResult> GetById(Guid companyId)
+    {
+        var company = await _service.GetByIdAsync(companyId);
+        return company == null ? NotFound() : Ok(company);
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create(CreateCompanyRequest request)
     {
         var companyId = await _service.CreateAsync(request);
-        return CreatedAtAction(nameof(GetAll), new { id = companyId }, companyId);
+        return CreatedAtAction(nameof(GetById), new { companyId }, companyId);
+    }
+
+    [HttpPut("{companyId:guid}")]
+    public async Task<IActionResult> Update(Guid companyId, CreateCompanyRequest request)
+    {
+        // Reuse CreateCompanyRequest for update (same fields)
+        var existing = await _service.GetByIdAsync(companyId);
+        if (existing == null) return NotFound();
+
+        await _service.UpdateSettingsAsync(companyId, new UpdateCompanySettingsRequest
+        {
+            TimeZone = request.TimeZone,
+            CurrencyCode = request.CurrencyCode,
+            TaxIdentifier = request.TaxIdentifier,
+        });
+        return NoContent();
     }
 
     [HttpPatch("{companyId:guid}/activate")]

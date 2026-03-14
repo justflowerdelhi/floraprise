@@ -1,13 +1,14 @@
 /**
  * CompanyManagementPage.tsx — Platform Admin Company Management
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, Chip, CircularProgress, Button,
   Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions,
-  List, ListItem, ListItemText,
+  List, ListItem, ListItemText, TextField, Grid, IconButton,
 } from '@mui/material';
+import { Edit as EditIcon, Add as AddIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 
@@ -16,6 +17,13 @@ interface CompanyRow {
   name: string;
   region: string;
   isActive: boolean;
+  email?: string;
+  phone?: string;
+  address?: string;
+  shortDescription?: string;
+  timeZone?: string;
+  currencyCode?: string;
+  taxIdentifier?: string;
 }
 
 interface SeedResult {
@@ -35,6 +43,23 @@ interface SeedResult {
   totalSeeded: number;
 }
 
+interface CompanyForm {
+  name: string;
+  region: string;
+  email: string;
+  phone: string;
+  address: string;
+  shortDescription: string;
+  timeZone: string;
+  currencyCode: string;
+  taxIdentifier: string;
+}
+
+const EMPTY_FORM: CompanyForm = {
+  name: '', region: 'IN', email: '', phone: '', address: '',
+  shortDescription: '', timeZone: 'Asia/Kolkata', currencyCode: 'INR', taxIdentifier: '',
+};
+
 const CompanyManagementPage: React.FC = () => {
   const navigate = useNavigate();
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
@@ -47,19 +72,25 @@ const CompanyManagementPage: React.FC = () => {
     open: false, message: '', severity: 'success',
   });
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await api.get('/platform/companies');
-        setCompanies(res.data ?? []);
-      } catch (err) {
-        console.error('Failed to load companies:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+  // Create / Edit dialog
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<CompanyForm>(EMPTY_FORM);
+  const [formSaving, setFormSaving] = useState(false);
+
+  const loadCompanies = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/platform/companies');
+      setCompanies(res.data ?? []);
+    } catch (err) {
+      console.error('Failed to load companies:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { loadCompanies(); }, [loadCompanies]);
 
   const handleToggleActive = async (company: CompanyRow) => {
     try {
@@ -73,29 +104,71 @@ const CompanyManagementPage: React.FC = () => {
     }
   };
 
-  const handleSeedDemoData = async (company: CompanyRow) => {
-    if (!confirm(`Populate demo data for "${company.name}"?\n\nThis will add ~5 sample records to each major table (customers, products, orders, etc.). Tables that already have data will be skipped.`)) return;
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setFormOpen(true);
+  };
 
+  const openEdit = (c: CompanyRow) => {
+    setEditingId(c.id);
+    setForm({
+      name: c.name || '',
+      region: c.region || 'IN',
+      email: c.email || '',
+      phone: c.phone || '',
+      address: c.address || '',
+      shortDescription: c.shortDescription || '',
+      timeZone: c.timeZone || 'Asia/Kolkata',
+      currencyCode: c.currencyCode || 'INR',
+      taxIdentifier: c.taxIdentifier || '',
+    });
+    setFormOpen(true);
+  };
+
+  const handleFormSave = async () => {
+    if (!form.name.trim()) {
+      setSnack({ open: true, message: 'Company name is required', severity: 'error' });
+      return;
+    }
+    setFormSaving(true);
+    try {
+      if (editingId) {
+        await api.put(`/platform/companies/${editingId}`, form);
+        setSnack({ open: true, message: 'Company updated', severity: 'success' });
+      } else {
+        await api.post('/platform/companies', form);
+        setSnack({ open: true, message: 'Company created', severity: 'success' });
+      }
+      setFormOpen(false);
+      loadCompanies();
+    } catch (err: any) {
+      setSnack({ open: true, message: err?.response?.data?.message || 'Failed to save', severity: 'error' });
+    } finally {
+      setFormSaving(false);
+    }
+  };
+
+  const handleSeedDemoData = async (company: CompanyRow) => {
+    if (!confirm(`Populate demo data for "${company.name}"?\n\nTables that already have data will be skipped.`)) return;
     setSeeding(company.id);
     try {
       const res = await api.post(`/platform/companies/${company.id}/seed-demo-data`);
       const result: SeedResult = res.data;
       if (result.totalSeeded === 0) {
-        setSnack({ open: true, message: `"${company.name}" already has data in all tables. Nothing seeded.`, severity: 'success' });
+        setSnack({ open: true, message: `"${company.name}" already has data in all tables.`, severity: 'success' });
       } else {
         setSeedResult(result);
       }
     } catch (err: any) {
-      console.error('Failed to seed demo data:', err);
-      setSnack({ open: true, message: err?.response?.data?.message || 'Failed to seed demo data', severity: 'error' });
+      setSnack({ open: true, message: err?.response?.data?.message || 'Failed to seed', severity: 'error' });
     } finally {
       setSeeding(null);
     }
   };
 
   const handlePurgeDemoData = async (company: CompanyRow) => {
-    if (!confirm(`⚠️ REMOVE ALL DATA for "${company.name}"?\n\nThis will permanently delete ALL records (orders, customers, products, staff, etc.) for this company.\n\nThe company itself will NOT be deleted — only its data.\n\nThis action CANNOT be undone.`)) return;
-
+    if (!confirm(`⚠️ REMOVE ALL DATA for "${company.name}"?\n\nThis action CANNOT be undone.`)) return;
     setPurging(company.id);
     try {
       const res = await api.post(`/platform/companies/${company.id}/purge-demo-data`);
@@ -106,12 +179,14 @@ const CompanyManagementPage: React.FC = () => {
         setPurgeResult(result);
       }
     } catch (err: any) {
-      console.error('Failed to purge demo data:', err);
-      setSnack({ open: true, message: err?.response?.data?.message || 'Failed to purge demo data', severity: 'error' });
+      setSnack({ open: true, message: err?.response?.data?.message || 'Failed to purge', severity: 'error' });
     } finally {
       setPurging(null);
     }
   };
+
+  const updateField = (field: keyof CompanyForm, value: string) =>
+    setForm(prev => ({ ...prev, [field]: value }));
 
   if (loading) {
     return (
@@ -125,7 +200,12 @@ const CompanyManagementPage: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
         <Typography variant="h5" fontWeight={700}>Company Management</Typography>
-        <Button variant="outlined" onClick={() => navigate('/admin/dashboard')}>Back</Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+            Add Company
+          </Button>
+          <Button variant="outlined" onClick={() => navigate('/admin/dashboard')}>Back</Button>
+        </Box>
       </Box>
 
       <TableContainer component={Paper}>
@@ -133,7 +213,9 @@ const CompanyManagementPage: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell><strong>Name</strong></TableCell>
+              <TableCell><strong>Email</strong></TableCell>
               <TableCell><strong>Region</strong></TableCell>
+              <TableCell><strong>Currency</strong></TableCell>
               <TableCell><strong>Status</strong></TableCell>
               <TableCell><strong>Actions</strong></TableCell>
             </TableRow>
@@ -141,8 +223,15 @@ const CompanyManagementPage: React.FC = () => {
           <TableBody>
             {companies.map(c => (
               <TableRow key={c.id}>
-                <TableCell>{c.name}</TableCell>
+                <TableCell>
+                  <Typography fontWeight={600}>{c.name}</Typography>
+                  {c.shortDescription && (
+                    <Typography variant="caption" color="text.secondary">{c.shortDescription}</Typography>
+                  )}
+                </TableCell>
+                <TableCell>{c.email || '—'}</TableCell>
                 <TableCell>{c.region}</TableCell>
+                <TableCell>{c.currencyCode || '—'}</TableCell>
                 <TableCell>
                   <Chip
                     label={c.isActive ? 'Active' : 'Inactive'}
@@ -150,39 +239,76 @@ const CompanyManagementPage: React.FC = () => {
                     size="small"
                   />
                 </TableCell>
-                <TableCell sx={{ display: 'flex', gap: 1 }}>
-                  <Button size="small" onClick={() => handleToggleActive(c)}>
-                    {c.isActive ? 'Deactivate' : 'Activate'}
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="secondary"
-                    disabled={seeding === c.id}
-                    onClick={() => handleSeedDemoData(c)}
-                  >
-                    {seeding === c.id ? 'Seeding…' : '🌱 Populate Demo Data'}
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="error"
-                    disabled={purging === c.id}
-                    onClick={() => handlePurgeDemoData(c)}
-                  >
-                    {purging === c.id ? 'Removing…' : '🗑️ Remove Data'}
-                  </Button>
+                <TableCell>
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    <IconButton size="small" title="Edit" onClick={() => openEdit(c)}>
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <Button size="small" onClick={() => handleToggleActive(c)}>
+                      {c.isActive ? 'Deactivate' : 'Activate'}
+                    </Button>
+                    <Button size="small" variant="outlined" color="secondary"
+                      disabled={seeding === c.id} onClick={() => handleSeedDemoData(c)}>
+                      {seeding === c.id ? 'Seeding…' : '🌱 Demo Data'}
+                    </Button>
+                    <Button size="small" variant="outlined" color="error"
+                      disabled={purging === c.id} onClick={() => handlePurgeDemoData(c)}>
+                      {purging === c.id ? 'Removing…' : '🗑️ Purge'}
+                    </Button>
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}
             {companies.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} align="center">No companies found</TableCell>
+                <TableCell colSpan={6} align="center">No companies found</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* ─── Create / Edit Company Dialog ─── */}
+      <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{editingId ? 'Edit Company' : 'Add New Company'}</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            <Grid size={{ xs: 12 }}>
+              <TextField label="Company Name" value={form.name} onChange={e => updateField('name', e.target.value)} fullWidth required />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField label="Email" value={form.email} onChange={e => updateField('email', e.target.value)} fullWidth />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField label="Phone" value={form.phone} onChange={e => updateField('phone', e.target.value)} fullWidth />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField label="Address" value={form.address} onChange={e => updateField('address', e.target.value)} fullWidth />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField label="Short Description" value={form.shortDescription} onChange={e => updateField('shortDescription', e.target.value)} fullWidth />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <TextField label="Region" value={form.region} onChange={e => updateField('region', e.target.value)} fullWidth />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <TextField label="Time Zone" value={form.timeZone} onChange={e => updateField('timeZone', e.target.value)} fullWidth />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <TextField label="Currency" value={form.currencyCode} onChange={e => updateField('currencyCode', e.target.value)} fullWidth />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField label="Tax Identifier (GST/VAT)" value={form.taxIdentifier} onChange={e => updateField('taxIdentifier', e.target.value)} fullWidth />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFormOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleFormSave} disabled={formSaving}>
+            {formSaving ? 'Saving…' : editingId ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Seed Result Dialog */}
       <Dialog open={!!seedResult} onClose={() => setSeedResult(null)} maxWidth="xs" fullWidth>
@@ -196,13 +322,9 @@ const CompanyManagementPage: React.FC = () => {
                   <ListItem key={key}>
                     <ListItemText
                       primary={key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
-                      secondary={count > 0 ? `${count} records added` : 'Already had data — skipped'}
+                      secondary={count > 0 ? `${count} records added` : 'Skipped'}
                     />
-                    <Chip
-                      label={count > 0 ? `+${count}` : 'Skipped'}
-                      color={count > 0 ? 'success' : 'default'}
-                      size="small"
-                    />
+                    <Chip label={count > 0 ? `+${count}` : 'Skipped'} color={count > 0 ? 'success' : 'default'} size="small" />
                   </ListItem>
                 ))}
               <ListItem>
@@ -228,9 +350,7 @@ const CompanyManagementPage: React.FC = () => {
                 .filter(([, count]) => (count as number) > 0)
                 .map(([key, count]) => (
                   <ListItem key={key}>
-                    <ListItemText
-                      primary={key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
-                    />
+                    <ListItemText primary={key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())} />
                     <Chip label={`−${count}`} color="error" size="small" variant="outlined" />
                   </ListItem>
                 ))}

@@ -39,13 +39,7 @@ public class CompanyService : ICompanyService
     {
         return await _db.Companies
             .OrderBy(c => c.Name)
-            .Select(c => new CompanyDto
-            {
-                Id = c.Id,
-                Name = c.Name,
-                Region = c.Region,
-                IsActive = c.IsActive
-            })
+            .Select(c => MapToDto(c))
             .ToListAsync();
     }
 
@@ -66,13 +60,7 @@ public class CompanyService : ICompanyService
     {
         return await _db.Companies
             .Where(c => c.Id == companyId)
-            .Select(c => new CompanyDto
-            {
-                Id = c.Id,
-                Name = c.Name,
-                Region = c.Region,
-                IsActive = c.IsActive
-            })
+            .Select(c => MapToDto(c))
             .FirstOrDefaultAsync();
     }
 
@@ -95,4 +83,20 @@ public class CompanyService : ICompanyService
 
         await _db.SaveChangesAsync();
     }
+
+    private static CompanyDto MapToDto(Company c) => new()
+    {
+        Id = c.Id,
+        Name = c.Name,
+        Region = c.Region,
+        IsActive = c.IsActive,
+        Email = c.Email,
+        Phone = c.Phone,
+        Address = c.Address,
+        ShortDescription = c.ShortDescription,
+        TimeZone = c.TimeZone,
+        CurrencyCode = c.CurrencyCode,
+        TaxIdentifier = c.TaxIdentifier,
+        CreatedAt = c.CreatedAtUtc,
+    };
 }

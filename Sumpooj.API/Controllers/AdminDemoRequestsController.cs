@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Sumpooj.Application.Companies;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Domain.Entities;
 
@@ -14,10 +15,12 @@ namespace Sumpooj.API.Controllers;
 public class AdminDemoRequestsController : ControllerBase
 {
     private readonly IDemoRequestRepository _repo;
+    private readonly ICompanyService _companyService;
 
-    public AdminDemoRequestsController(IDemoRequestRepository repo)
+    public AdminDemoRequestsController(IDemoRequestRepository repo, ICompanyService companyService)
     {
         _repo = repo;
+        _companyService = companyService;
     }
 
     /// <summary>
@@ -84,6 +87,37 @@ public class AdminDemoRequestsController : ControllerBase
         await _repo.UpdateAsync(demo);
 
         return Ok(new { id = demo.Id, status = demo.Status.ToString(), comments = demo.Comments });
+    }
+
+    /// <summary>
+    /// Onboard a demo request as a new company.
+    /// Creates the company and marks the demo request as Converted.
+    /// </summary>
+    [HttpPost("{id:guid}/onboard")]
+    public async Task<IActionResult> Onboard(Guid id)
+    {
+        var demo = await _repo.GetByIdAsync(id);
+        if (demo == null) return NotFound();
+
+        if (demo.Status == LeadStatus.Converted)
+            return BadRequest(new { message = "This demo request has already been converted." });
+
+        // Create company from demo request info
+        var companyId = await _companyService.CreateAsync(new CreateCompanyRequest
+        {
+            Name = demo.FullName,
+            Region = "IN",
+            Email = demo.BusinessEmail,
+            ShortDescription = demo.BusinessType,
+            TimeZone = "Asia/Kolkata",
+            CurrencyCode = "INR",
+        });
+
+        // Mark as Converted
+        demo.UpdateStatus(LeadStatus.Converted, $"Onboarded as company {companyId}");
+        await _repo.UpdateAsync(demo);
+
+        return Ok(new { companyId, message = $"Company created and demo request marked as Converted." });
     }
 }
 

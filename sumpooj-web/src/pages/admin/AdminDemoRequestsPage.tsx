@@ -47,6 +47,7 @@ export default function AdminDemoRequestsPage() {
   const [editStatus, setEditStatus] = useState('');
   const [editComments, setEditComments] = useState('');
   const [saving, setSaving] = useState(false);
+  const [onboarding, setOnboarding] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -92,6 +93,21 @@ export default function AdminDemoRequestsPage() {
       day: '2-digit', month: 'short', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     });
+
+  const handleOnboard = async (r: DemoRequest) => {
+    if (!confirm(`Onboard "${r.fullName}" as a new company?\n\nThis will:\n• Create a new company with their info\n• Mark this demo request as "Converted"`)) return;
+
+    setOnboarding(r.id);
+    try {
+      await api.post(`/admin/demo-requests/${r.id}/onboard`);
+      loadData();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Failed to onboard';
+      alert(msg);
+    } finally {
+      setOnboarding(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -154,9 +170,25 @@ export default function AdminDemoRequestsPage() {
                 </TableCell>
                 <TableCell>{fmtDate(r.createdAt)}</TableCell>
                 <TableCell>
-                  <IconButton size="small" onClick={() => openEdit(r)}>
-                    <EditIcon fontSize="small" />
-                  </IconButton>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <IconButton size="small" onClick={() => openEdit(r)} title="Edit Status">
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    {r.status !== 'Converted' && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        color="success"
+                        disabled={onboarding === r.id}
+                        onClick={() => handleOnboard(r)}
+                      >
+                        {onboarding === r.id ? 'Creating…' : '🚀 Onboard'}
+                      </Button>
+                    )}
+                    {r.status === 'Converted' && (
+                      <Chip label="Onboarded" color="success" size="small" variant="outlined" />
+                    )}
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}
