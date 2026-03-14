@@ -213,7 +213,7 @@ export default function DayCloseScreen() {
       try {
         const data = await execute(
           () => closeDay({
-            locationId: currentLocationId !== 'ALL' ? currentLocationId : '',
+            locationId: currentLocationId !== 'ALL' ? currentLocationId : undefined,
             businessDate: summary.date,
             actualCash: parseFloat(countedCash),
             notes: notes || null,
@@ -270,11 +270,11 @@ export default function DayCloseScreen() {
   
   const isDayClosed = summary?.status === 'CLOSED';
   
-  if (!summary) {
+  if (apiLoading || !summary) {
     return (
       <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
         <Typography variant="h4" fontWeight={700} mb={2}>Day Close</Typography>
-        {apiLoading ? <LinearProgress /> : <Alert severity="info">No day close summary available.</Alert>}
+        <LinearProgress />
       </Box>
     );
   }
@@ -395,7 +395,7 @@ export default function DayCloseScreen() {
                       </TableCell>
                       <TableCell align="right">{formatCurrency(summary.cashSales)}</TableCell>
                       <TableCell align="right">
-                        {Math.round((summary.cashSales / summary.totalSales) * 100)}%
+                        {safePercent(summary.cashSales, summary.totalSales)}%
                       </TableCell>
                     </TableRow>
                     <TableRow>
@@ -407,7 +407,7 @@ export default function DayCloseScreen() {
                       </TableCell>
                       <TableCell align="right">{formatCurrency(summary.cardSales)}</TableCell>
                       <TableCell align="right">
-                        {Math.round((summary.cardSales / summary.totalSales) * 100)}%
+                        {safePercent(summary.cardSales, summary.totalSales)}%
                       </TableCell>
                     </TableRow>
                     <TableRow>
@@ -419,7 +419,7 @@ export default function DayCloseScreen() {
                       </TableCell>
                       <TableCell align="right">{formatCurrency(summary.upiSales)}</TableCell>
                       <TableCell align="right">
-                        {Math.round((summary.upiSales / summary.totalSales) * 100)}%
+                        {safePercent(summary.upiSales, summary.totalSales)}%
                       </TableCell>
                     </TableRow>
                     {summary.otherPayments > 0 && (
@@ -427,7 +427,7 @@ export default function DayCloseScreen() {
                         <TableCell>Other</TableCell>
                         <TableCell align="right">{formatCurrency(summary.otherPayments)}</TableCell>
                         <TableCell align="right">
-                          {Math.round((summary.otherPayments / summary.totalSales) * 100)}%
+                          {safePercent(summary.otherPayments, summary.totalSales)}%
                         </TableCell>
                       </TableRow>
                     )}
@@ -653,13 +653,13 @@ export default function DayCloseScreen() {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2">Average Order Value</Typography>
                   <Typography variant="body2" fontWeight={600}>
-                    {formatCurrency(Math.round(summary.totalSales / summary.totalOrders))}
+                    {formatCurrency(safeAverage(summary.totalSales, summary.totalOrders))}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography variant="body2">Refund Rate</Typography>
                   <Typography variant="body2" fontWeight={600}>
-                    {Math.round((summary.refundCount / summary.totalOrders) * 100)}%
+                    {safePercent(summary.refundCount, summary.totalOrders)}%
                   </Typography>
                 </Box>
               </Box>
@@ -679,19 +679,19 @@ export default function DayCloseScreen() {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2">Walk-In</Typography>
                   <Typography variant="body2" fontWeight={600}>
-                    {Math.round((summary.walkInSales / summary.totalSales) * 100)}%
+                    {safePercent(summary.walkInSales, summary.totalSales)}%
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2">Phone</Typography>
                   <Typography variant="body2" fontWeight={600}>
-                    {Math.round((summary.phoneOrdersAmount / summary.totalSales) * 100)}%
+                    {safePercent(summary.phoneOrdersAmount, summary.totalSales)}%
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography variant="body2">Online</Typography>
                   <Typography variant="body2" fontWeight={600}>
-                    {Math.round((summary.onlineOrdersAmount / summary.totalSales) * 100)}%
+                    {safePercent(summary.onlineOrdersAmount, summary.totalSales)}%
                   </Typography>
                 </Box>
               </Box>
@@ -701,4 +701,14 @@ export default function DayCloseScreen() {
       </Card>
     </Box>
   );
+}
+
+function safePercent(part: number, total: number): number {
+  if (!total || total === 0) return 0;
+  return Math.round((part / total) * 100);
+}
+
+function safeAverage(total: number, count: number): number {
+  if (!count || count === 0) return 0;
+  return Math.round(total / count);
 }

@@ -23,121 +23,71 @@ public class DayCloseService
         _locationRepository = locationRepository;
     }
 
-    public async Task<DayCloseDto?> GetByIdAsync(Guid companyId, Guid id)
+    public async Task<object> GetSummaryAsync(Guid companyId, Guid locationId, DateTime date)
     {
-        var dayClose = await _dayCloseRepository.GetByIdAsync(companyId, id);
-        return dayClose == null ? null : MapToDto(dayClose);
-    }
-
-    public async Task<bool> IsDayClosedAsync(Guid companyId, Guid locationId, DateTime date)
-    {
-        return await _dayCloseRepository.IsDayClosedAsync(companyId, locationId, date);
-    }
-
-    public async Task<DayCloseSummaryDto> GetSummaryAsync(Guid companyId, Guid locationId, DateTime date)
-    {
-        var location = await _locationRepository.GetByIdAsync(locationId);
         var orders = await _orderRepository.GetByDateAsync(companyId, date);
 
-        // Calculate totals (simplified - would need actual payment data per location)
+        orders = orders
+            .Where(o => o.LocationId == locationId)
+            .ToList();
+
         var totalOrders = orders.Count;
-        var totalSales = orders.Sum(o => o.TotalAmount);
-        var completedOrders = orders.Count(o => o.Status == "Delivered");
-        var cancelledOrders = orders.Count(o => o.Status == "Cancelled");
-        var pendingOrders = totalOrders - completedOrders - cancelledOrders;
+        var totalSales = orders.Sum(o => o.TotalAmount ?? 0);
 
-        // Check if can close
-        var isClosed = await _dayCloseRepository.IsDayClosedAsync(companyId, locationId, date);
-        var canClose = !isClosed && date.Date <= DateTime.UtcNow.Date;
+        var walkInOrders = orders.Count(o => o.Source == "WALK_IN");
+        var phoneOrders = orders.Count(o => o.Source == "PHONE");
+        var onlineOrders = orders.Count(o => o.Source == "WEBSITE");
 
-        return new DayCloseSummaryDto
+        var walkInSales = orders
+            .Where(o => o.Source == "WALK_IN")
+            .Sum(o => o.TotalAmount ?? 0);
+
+        var phoneOrdersAmount = orders
+            .Where(o => o.Source == "PHONE")
+            .Sum(o => o.TotalAmount ?? 0);
+
+        var onlineOrdersAmount = orders
+            .Where(o => o.Source == "WEBSITE")
+            .Sum(o => o.TotalAmount ?? 0);
+
+        var payments = await _paymentRepository.GetByDateAsync(companyId, locationId, date);
+
+        var cashSales = payments.Where(p => p.Method == "CASH").Sum(p => p.Amount);
+        var cardSales = payments.Where(p => p.Method == "CARD").Sum(p => p.Amount);
+        var upiSales = payments.Where(p => p.Method == "UPI").Sum(p => p.Amount);
+        var otherPayments = payments
+            .Where(p => p.Method != "CASH" && p.Method != "CARD" && p.Method != "UPI")
+            .Sum(p => p.Amount);
+
+        var totalRefunds = orders.Sum(o => o.TotalRefunded ?? 0);
+        var refundCount = orders.Count(o => (o.TotalRefunded ?? 0) > 0);
+
+        return new
         {
-            BusinessDate = date,
-            LocationId = locationId,
-            LocationName = location?.Name ?? "Unknown",
-            TotalOrders = totalOrders,
-            TotalSales = totalSales,
-            TotalRefunds = 0, // Would need refund calculation
-            NetSales = totalSales,
-            CompletedOrders = completedOrders,
-            CancelledOrders = cancelledOrders,
-            PendingOrders = pendingOrders,
-            Payments = new PaymentBreakdownDto
-            {
-                Cash = 0, // Would need actual payment breakdown
-                Card = 0,
-                Upi = 0,
-                GiftCard = 0,
-                Other = 0
-            },
-            CanClose = canClose
+            date = date.ToString("yyyy-MM-dd"),
+
+            totalOrders = totalOrders,
+            totalSales = totalSales,
+
+            walkInOrders = walkInOrders,
+            phoneOrders = phoneOrders,
+            onlineOrders = onlineOrders,
+
+            walkInSales = walkInSales,
+            phoneOrdersAmount = phoneOrdersAmount,
+            onlineOrdersAmount = onlineOrdersAmount,
+
+            cashSales = payments.Cash,
+            cardSales = payments.Card,
+            upiSales = payments.Upi,
+            otherPayments = payments.Other,
+
+            expectedCash = payments.Cash,
+
+            refundCount = refundCount,
+            totalRefunds = totalRefunds,
+
+            status = "OPEN"
         };
     }
-
-    public async Task<List<DayCloseDto>> GetHistoryAsync(Guid companyId, Guid locationId, int days = 30)
-    {
-        return await _dayCloseRepository.GetHistoryAsync(companyId, locationId, days);
-    }
-
-    public async Task<Guid> CloseAsync(Guid companyId, CloseDayRequest request, Guid userId)
-    {
-        // Check if already closed
-        var isClosed = await _dayCloseRepository.IsDayClosedAsync(companyId, request.LocationId, request.BusinessDate);
-        if (isClosed)
-            throw new InvalidOperationException("Day is already closed for this location");
-
-        // Get summary data
-        var summary = await GetSummaryAsync(companyId, request.LocationId, request.BusinessDate);
-
-        var dayClose = new Domain.Entities.DayClose(
-            companyId,
-            request.LocationId,
-            request.BusinessDate,
-            userId);
-
-        dayClose.SetSalesSummary(
-            summary.TotalOrders,
-            summary.TotalSales,
-            summary.TotalRefunds);
-
-        dayClose.SetPaymentBreakdown(
-            summary.Payments.Cash,
-            summary.Payments.Card,
-            summary.Payments.Upi,
-            summary.Payments.GiftCard,
-            summary.Payments.Other);
-
-        dayClose.SetCashCount(request.ActualCash);
-
-        if (!string.IsNullOrEmpty(request.Notes))
-        {
-            dayClose.AddNotes(request.Notes);
-        }
-
-        await _dayCloseRepository.AddAsync(dayClose);
-        return dayClose.Id;
-    }
-
-    private static DayCloseDto MapToDto(Domain.Entities.DayClose dc) => new()
-    {
-        Id = dc.Id,
-        LocationId = dc.LocationId,
-        BusinessDate = dc.BusinessDate,
-        Status = dc.Status.ToString(),
-        ClosedAt = dc.ClosedAt,
-        ClosedByUserId = dc.ClosedByUserId,
-        TotalOrders = dc.TotalOrders,
-        TotalSales = dc.TotalSales,
-        TotalRefunds = dc.TotalRefunds,
-        NetSales = dc.NetSales,
-        CashTotal = dc.CashTotal,
-        CardTotal = dc.CardTotal,
-        UpiTotal = dc.UpiTotal,
-        GiftCardTotal = dc.GiftCardTotal,
-        OtherPaymentsTotal = dc.OtherPaymentsTotal,
-        ExpectedCash = dc.ExpectedCash,
-        ActualCash = dc.ActualCash,
-        CashVariance = dc.CashVariance,
-        Notes = dc.Notes
-    };
 }
