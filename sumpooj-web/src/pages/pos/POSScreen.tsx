@@ -3,7 +3,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Alert, Box } from "@mui/material";
+import { Alert, Box, Typography, Button } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
 import { usePOS } from "./POSContext";
 import { useAuth } from "../../auth/AuthContext";
@@ -55,6 +56,26 @@ const MOCK_CUSTOMERS: POSCustomer[] = [
 const POSScreen: React.FC = () => {
   const { state, setOrderIntent, cancelPayment, intentErrors } = usePOS();
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Platform admins have no company — POS requires company context
+  const isPlatformAdmin = (user as any)?.role === 'PLATFORMSUPERADMIN';
+  if (isPlatformAdmin) {
+    return (
+      <Box sx={{ p: 6, textAlign: 'center' }}>
+        <Typography variant="h5" fontWeight={700} gutterBottom>
+          POS Not Available
+        </Typography>
+        <Typography color="text.secondary" sx={{ mb: 3 }}>
+          The Point of Sale requires a company context. Platform administrators
+          do not have a company assigned.
+        </Typography>
+        <Button variant="contained" onClick={() => navigate('/admin/dashboard')}>
+          Go to Admin Dashboard
+        </Button>
+      </Box>
+    );
+  }
 
   const [activeTab, setActiveTab] = useState<POSTab>(0);
 
