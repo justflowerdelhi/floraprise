@@ -611,13 +611,6 @@ export const MENU_SECTIONS: MenuSection[] = [
         path: '/admin/audit-logs',
         permissions: ['settings:edit'],
       },
-      {
-        id: 'demo-requests',
-        label: 'Demo Requests',
-        icon: 'RequestQuote',
-        path: '/admin/demo-requests',
-        permissions: ['settings:edit'],
-      },
     ],
   },
   {
