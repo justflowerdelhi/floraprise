@@ -60,9 +60,11 @@ public class PaymentRepository : IPaymentRepository
 
     public async Task<List<Payment>> GetByDateAsync(Guid companyId, Guid locationId, DateTime date)
     {
+        var dayStart = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+        var dayEnd = dayStart.AddDays(1);
         var query = _db.Payments
             .Where(p => p.CompanyId == companyId
-                && p.CreatedAtUtc.Date == date.Date
+                && p.CreatedAtUtc >= dayStart && p.CreatedAtUtc < dayEnd
                 && p.Status == PaymentTransactionStatus.Approved);
 
         // Filter by location only if a specific location is provided

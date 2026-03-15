@@ -110,8 +110,9 @@ public class OrderRepository : IOrderRepository
 
     public async Task<List<OrderListDto>> GetTodaysOrdersAsync(Guid companyId, Guid? locationId = null)
     {
-        var today = DateTime.UtcNow.Date;
-        var query = _db.Orders.Where(o => o.CompanyId == companyId && o.IsActive && o.OrderDate.Date == today);
+        var dayStart = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+        var dayEnd = dayStart.AddDays(1);
+        var query = _db.Orders.Where(o => o.CompanyId == companyId && o.IsActive && o.OrderDate >= dayStart && o.OrderDate < dayEnd);
 
         return await query
             .OrderByDescending(o => o.OrderDate)
@@ -137,8 +138,10 @@ public class OrderRepository : IOrderRepository
 
     public async Task<List<OrderListDto>> GetByDateAsync(Guid companyId, DateTime date)
     {
+        var dayStart = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+        var dayEnd = dayStart.AddDays(1);
         return await _db.Orders
-            .Where(o => o.CompanyId == companyId && o.IsActive && o.OrderDate.Date == date.Date)
+            .Where(o => o.CompanyId == companyId && o.IsActive && o.OrderDate >= dayStart && o.OrderDate < dayEnd)
             .OrderBy(o => o.OrderDate)
             .Select(o => new OrderListDto
             {

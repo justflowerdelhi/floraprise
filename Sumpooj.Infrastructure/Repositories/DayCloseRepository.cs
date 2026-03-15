@@ -22,23 +22,27 @@ public class DayCloseRepository : IDayCloseRepository
 
     public async Task<Domain.Entities.DayClose?> GetByDateAsync(Guid companyId, Guid locationId, DateTime date)
     {
+        var dayStart = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+        var dayEnd = dayStart.AddDays(1);
         return await _db.DayCloses
             .FirstOrDefaultAsync(d => d.CompanyId == companyId && 
                                       d.LocationId == locationId && 
-                                      d.BusinessDate.Date == date.Date);
+                                      d.BusinessDate >= dayStart && d.BusinessDate < dayEnd);
     }
 
     public async Task<bool> IsDayClosedAsync(Guid companyId, Guid locationId, DateTime date)
     {
+        var dayStart = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+        var dayEnd = dayStart.AddDays(1);
         return await _db.DayCloses
             .AnyAsync(d => d.CompanyId == companyId && 
                           d.LocationId == locationId && 
-                          d.BusinessDate.Date == date.Date);
+                          d.BusinessDate >= dayStart && d.BusinessDate < dayEnd);
     }
 
     public async Task<List<DayCloseDto>> GetHistoryAsync(Guid companyId, Guid locationId, int days = 30)
     {
-        var startDate = DateTime.UtcNow.AddDays(-days).Date;
+        var startDate = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-days).Date, DateTimeKind.Utc);
 
         return await _db.DayCloses
             .Where(d => d.CompanyId == companyId && 
