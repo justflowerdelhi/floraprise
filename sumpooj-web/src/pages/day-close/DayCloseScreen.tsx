@@ -177,6 +177,7 @@ export default function DayCloseScreen() {
     const data = await execute(
       () => getDayCloseSummary({
         locationId: currentLocationId !== 'ALL' ? currentLocationId : undefined,
+        date: new Date().toISOString().split('T')[0],
       }),
       { errorMessage: 'Failed to load day close summary' }
     );

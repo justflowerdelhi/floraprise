@@ -36,10 +36,13 @@ public class DayCloseService
 
     public async Task<object> GetSummaryAsync(Guid companyId, Guid locationId, DateTime date)
     {
-        var orders = await _orderRepository.GetByDateAsync(companyId, date);
+        var allOrders = await _orderRepository.GetByDateAsync(companyId, date);
 
-        // Filter by location — OrderListDto uses LocationId if available, otherwise skip
-        // OrderListDto doesn't have LocationId, so we use all orders for the date
+        // Filter by location if provided (Guid.Empty = all locations)
+        var orders = locationId != Guid.Empty
+            ? allOrders.Where(o => o.LocationId == locationId).ToList()
+            : allOrders;
+
         var totalOrders = orders.Count;
         var totalSales = orders.Sum(o => o.TotalAmount);
 

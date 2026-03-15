@@ -170,9 +170,9 @@ public class OrderService
                 var payment = new Payment(companyId, order.Id, method, p.Amount);
                 payment.SetLocation(request.LocationId);
 
-                // Auto-approve cash; card payments are approved on terminal response
-                if (method == PaymentMethod.Cash)
-                    payment.Approve(null, null);
+                // POS payments are immediate — approve all methods
+                // (card/UPI terminal has already confirmed at the POS)
+                payment.Approve(null, null);
 
                 await _paymentRepository.AddAsync(payment);
                 totalPaid += p.Amount;

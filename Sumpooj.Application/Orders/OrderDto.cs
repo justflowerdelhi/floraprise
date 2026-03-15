@@ -71,6 +71,7 @@ public class OrderListDto
     public int ItemCount { get; set; }
     public string? RecipientName { get; set; }
     public string DeliveryPriority { get; set; } = default!;
+    public Guid LocationId { get; set; }
 }
 
 public class CreateOrderRequest

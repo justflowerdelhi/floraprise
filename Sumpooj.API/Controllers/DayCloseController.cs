@@ -35,16 +35,18 @@ public class DayCloseController : ControllerBase
     }
 
     [HttpGet("summary")]
-    public async Task<IActionResult> GetSummary([FromQuery] Guid locationId, [FromQuery] DateTime date)
+    public async Task<IActionResult> GetSummary([FromQuery] Guid locationId, [FromQuery] DateTime? date = null)
     {
-        var summary = await _dayCloseService.GetSummaryAsync(CompanyId, locationId, date);
+        var businessDate = date ?? DateTime.UtcNow.Date;
+        var summary = await _dayCloseService.GetSummaryAsync(CompanyId, locationId, businessDate);
         return Ok(summary);
     }
 
     [HttpGet("is-closed")]
-    public async Task<IActionResult> IsClosed([FromQuery] Guid locationId, [FromQuery] DateTime date)
+    public async Task<IActionResult> IsClosed([FromQuery] Guid locationId, [FromQuery] DateTime? date = null)
     {
-        var isClosed = await _dayCloseService.IsDayClosedAsync(CompanyId, locationId, date);
+        var businessDate = date ?? DateTime.UtcNow.Date;
+        var isClosed = await _dayCloseService.IsDayClosedAsync(CompanyId, locationId, businessDate);
         return Ok(new { isClosed });
     }
 
