@@ -83,6 +83,7 @@ import {
   DarkMode,
   LightMode,
   LocalFlorist,
+  Lock as LockIcon,
 } from '@mui/icons-material';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
@@ -94,6 +95,7 @@ import { ConfirmationProvider } from '../ux/ConfirmationModal';
 import { ROLE_CONFIG } from '../rbac/RBACTypes';
 import { LocationProvider } from '../location/LocationContext';
 import { LocationSwitcher } from '../location/LocationSwitcher';
+import ChangePasswordDialog from '../../components/ChangePasswordDialog';
 import {
   TenantProvider,
   TrialBanner,
@@ -116,6 +118,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
   const auth = useAuth();
   const navigate = useNavigate();
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
 
   // Fallback for when user is null
   if (!user) return null;
@@ -248,6 +251,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
             <ListItemText>Settings</ListItemText>
           </MenuItem>
 
+          <MenuItem onClick={() => { setUserMenuAnchor(null); setPasswordDialogOpen(true); }}>
+            <ListItemIcon><LockIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Change Password</ListItemText>
+          </MenuItem>
+
           <MenuItem onClick={() => setUserMenuAnchor(null)}>
             <ListItemIcon>{dk ? <LightMode fontSize="small" /> : <DarkMode fontSize="small" />}</ListItemIcon>
             <ListItemText>{dk ? 'Light Mode' : 'Dark Mode'}</ListItemText>
@@ -267,6 +275,13 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
             <ListItemText>Sign Out</ListItemText>
           </MenuItem>
         </Menu>
+
+        {/* Change Password Dialog */}
+        <ChangePasswordDialog
+          open={passwordDialogOpen}
+          onClose={() => setPasswordDialogOpen(false)}
+          userRole={user.role}
+        />
       </Toolbar>
     </AppBar>
   );
