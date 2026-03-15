@@ -58,6 +58,16 @@ public class PaymentRepository : IPaymentRepository
             .SumAsync(p => p.Amount);
     }
 
+    public async Task<List<Payment>> GetByDateAsync(Guid companyId, Guid locationId, DateTime date)
+    {
+        return await _db.Payments
+            .Where(p => p.CompanyId == companyId
+                && p.LocationId == locationId
+                && p.CreatedAtUtc.Date == date.Date
+                && p.Status == PaymentTransactionStatus.Approved)
+            .ToListAsync();
+    }
+
     public async Task AddAsync(Payment payment)
     {
         await _db.Payments.AddAsync(payment);
