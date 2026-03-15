@@ -1,8 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Companies;
 using Sumpooj.Infrastructure;
+using Sumpooj.Infrastructure.Identity;
 using Sumpooj.Infrastructure.Persistence;
 
 namespace Sumpooj.API.Controllers;
@@ -14,11 +17,16 @@ public class CompaniesController : ControllerBase
 {
     private readonly ICompanyService _service;
     private readonly SumpoojDbContext _db;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public CompaniesController(ICompanyService service, SumpoojDbContext db)
+    public CompaniesController(
+        ICompanyService service,
+        SumpoojDbContext db,
+        UserManager<ApplicationUser> userManager)
     {
         _service = service;
         _db = db;
+        _userManager = userManager;
     }
 
     [HttpGet]
@@ -95,5 +103,63 @@ public class CompaniesController : ControllerBase
     {
         var result = await CompanyDemoDataSeeder.PurgeAsync(_db, companyId);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Get login credentials for a company's admin user.
+    /// Resets the password to a new temporary value each time.
+    /// Platform Super Admin only.
+    /// </summary>
+    [HttpPost("{companyId:guid}/admin-credentials")]
+    [Authorize(Policy = PolicyNames.PlatformOnly)]
+    public async Task<IActionResult> GetAdminCredentials(Guid companyId)
+    {
+        var company = await _service.GetByIdAsync(companyId);
+        if (company == null) return NotFound(new { message = "Company not found." });
+
+        // Find the CompanyAdmin user for this company
+        var adminUsers = await _userManager.Users
+            .Where(u => u.CompanyId == companyId)
+            .ToListAsync();
+
+        ApplicationUser? adminUser = null;
+        foreach (var user in adminUsers)
+        {
+            if (await _userManager.IsInRoleAsync(user, "CompanyAdmin"))
+            {
+                adminUser = user;
+                break;
+            }
+        }
+
+        if (adminUser == null)
+            return NotFound(new { message = "No CompanyAdmin user found for this company." });
+
+        // Generate a new temp password and reset
+        var tempPassword = GenerateTempPassword();
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(adminUser);
+        var resetResult = await _userManager.ResetPasswordAsync(adminUser, resetToken, tempPassword);
+
+        if (!resetResult.Succeeded)
+        {
+            var errors = string.Join(", ", resetResult.Errors.Select(e => e.Description));
+            return BadRequest(new { message = $"Failed to reset password: {errors}" });
+        }
+
+        return Ok(new
+        {
+            companyName = company.Name,
+            adminEmail = adminUser.Email,
+            tempPassword,
+        });
+    }
+
+    private static string GenerateTempPassword()
+    {
+        const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const string lower = "abcdefghjkmnpqrstuvwxyz";
+        const string digits = "23456789";
+        var rng = Random.Shared;
+        return $"Flora@{upper[rng.Next(upper.Length)]}{lower[rng.Next(lower.Length)]}{digits[rng.Next(digits.Length)]}{lower[rng.Next(lower.Length)]}{digits[rng.Next(digits.Length)]}{upper[rng.Next(upper.Length)]}";
     }
 }
