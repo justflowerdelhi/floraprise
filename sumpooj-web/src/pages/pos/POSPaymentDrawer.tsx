@@ -14,7 +14,7 @@ import {
   CheckCircle as CheckIcon,
 } from '@mui/icons-material';
 import { Drawer } from '@mui/material';
-import type { POSPaymentMethod, POSPaymentEntry, POSBillingInfo } from './POSTypes';
+import type { POSPaymentMethod, POSPaymentEntry, POSBillingInfo, OrderIntent } from './POSTypes';
 import type { POSCustomer } from './POSCustomerTypes';
 import { formatCurrency } from '../../core/i18n';
 
@@ -26,6 +26,7 @@ interface POSPaymentDrawerProps {
   onComplete: (payments: POSPaymentEntry[], billingInfo: POSBillingInfo) => void;
   onPartialSave?: (payments: POSPaymentEntry[], billingInfo: POSBillingInfo, paidAmount: number, remainingAmount: number) => void;
   initialMethod?: 'cash' | 'card' | 'split' | 'more';
+  orderIntent?: OrderIntent;
 }
 
 const PAYMENT_METHODS: { method: POSPaymentMethod; label: string; icon: React.ReactElement }[] = [
@@ -44,6 +45,7 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
   onComplete,
   onPartialSave,
   initialMethod = 'split',
+  orderIntent = 'TAKE_NOW',
 }) => {
   const [payments, setPayments] = useState<POSPaymentEntry[]>([]);
   const [selectedMethod, setSelectedMethod] = useState<POSPaymentMethod>('CASH');
@@ -97,9 +99,11 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
   const isFullyPaid = remaining === 0 && payments.length > 0;
   const hasPartialPayment = payments.length > 0 && remaining > 0;
 
-  // Check if billing is required (for card/split or email receipt)
-  const requiresBilling = payments.some(p => p.method === 'CARD') || hasPartialPayment;
-  const isBillingValid = !requiresBilling || (billingInfo.name.trim() && billingInfo.email.trim());
+  // Billing name & phone are always required
+  const isDelivery = orderIntent === 'DELIVERY';
+  const isPickup = orderIntent === 'PICKUP_LATER';
+  const isBillingValid = billingInfo.name.trim() !== '' && (billingInfo.phone ?? '').trim() !== ''
+    && (!isDelivery || ((billingInfo.deliveryAddress ?? '').trim() !== '' && (billingInfo.recipientName ?? '').trim() !== '' && (billingInfo.recipientPhone ?? '').trim() !== ''));
 
   const handleAddPayment = useCallback(() => {
     const amount = parseFloat(inputAmount);
@@ -300,38 +304,134 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
             </div>
           )}
 
-          {/* Billing Info */}
-          {(requiresBilling || isFullyPaid) && (
+          {/* Billing Info — always shown */}
+          <div className="px-6 py-4 bg-white border-b border-gray-200">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">
+              Billing Info <span className="text-red-500 ml-1">*</span>
+            </h3>
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={billingInfo.name}
+                onChange={(e) => setBillingInfo(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Customer Name *"
+                className={`w-full h-10 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  !billingInfo.name.trim() ? 'border-red-300' : 'border-gray-200'
+                }`}
+              />
+              <input
+                type="tel"
+                value={billingInfo.phone || ''}
+                onChange={(e) => setBillingInfo(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="Mobile Number *"
+                className={`w-full h-10 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  !(billingInfo.phone ?? '').trim() ? 'border-red-300' : 'border-gray-200'
+                }`}
+              />
+              <input
+                type="email"
+                value={billingInfo.email}
+                onChange={(e) => setBillingInfo(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="Email (optional)"
+                className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
+                           focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Delivery Details — shown when intent is DELIVERY */}
+          {isDelivery && (
             <div className="px-6 py-4 bg-white border-b border-gray-200">
               <h3 className="text-sm font-medium text-gray-700 mb-3">
-                Billing Info
-                {requiresBilling && <span className="text-red-500 ml-1">*</span>}
+                Delivery Details <span className="text-red-500 ml-1">*</span>
               </h3>
               <div className="space-y-3">
                 <input
                   type="text"
-                  value={billingInfo.name}
-                  onChange={(e) => setBillingInfo(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Name"
-                  className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
-                             focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                <input
-                  type="email"
-                  value={billingInfo.email}
-                  onChange={(e) => setBillingInfo(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="Email"
-                  className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
-                             focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  value={billingInfo.recipientName || ''}
+                  onChange={(e) => setBillingInfo(prev => ({ ...prev, recipientName: e.target.value }))}
+                  placeholder="Recipient Name *"
+                  className={`w-full h-10 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    !(billingInfo.recipientName ?? '').trim() ? 'border-red-300' : 'border-gray-200'
+                  }`}
                 />
                 <input
                   type="tel"
-                  value={billingInfo.phone || ''}
-                  onChange={(e) => setBillingInfo(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="Phone (optional)"
+                  value={billingInfo.recipientPhone || ''}
+                  onChange={(e) => setBillingInfo(prev => ({ ...prev, recipientPhone: e.target.value }))}
+                  placeholder="Recipient Phone *"
+                  className={`w-full h-10 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    !(billingInfo.recipientPhone ?? '').trim() ? 'border-red-300' : 'border-gray-200'
+                  }`}
+                />
+                <textarea
+                  value={billingInfo.deliveryAddress || ''}
+                  onChange={(e) => setBillingInfo(prev => ({ ...prev, deliveryAddress: e.target.value }))}
+                  placeholder="Delivery Address *"
+                  rows={2}
+                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    !(billingInfo.deliveryAddress ?? '').trim() ? 'border-red-300' : 'border-gray-200'
+                  }`}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="date"
+                    value={billingInfo.deliveryDate || ''}
+                    onChange={(e) => setBillingInfo(prev => ({ ...prev, deliveryDate: e.target.value }))}
+                    className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
+                               focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <select
+                    value={billingInfo.timeSlot || ''}
+                    onChange={(e) => setBillingInfo(prev => ({ ...prev, timeSlot: e.target.value }))}
+                    className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
+                               focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="">Time Slot</option>
+                    <option value="9AM-12PM">9 AM – 12 PM</option>
+                    <option value="12PM-3PM">12 PM – 3 PM</option>
+                    <option value="3PM-6PM">3 PM – 6 PM</option>
+                    <option value="6PM-9PM">6 PM – 9 PM</option>
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  value={billingInfo.cardMessage || ''}
+                  onChange={(e) => setBillingInfo(prev => ({ ...prev, cardMessage: e.target.value }))}
+                  placeholder="Card Message (optional)"
                   className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
                              focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Pickup Details — shown when intent is PICKUP_LATER */}
+          {isPickup && (
+            <div className="px-6 py-4 bg-white border-b border-gray-200">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">
+                Pickup Details
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="date"
+                  value={billingInfo.pickupDate || ''}
+                  onChange={(e) => setBillingInfo(prev => ({ ...prev, pickupDate: e.target.value }))}
+                  className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
+                             focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+                <select
+                  value={billingInfo.pickupTimeSlot || ''}
+                  onChange={(e) => setBillingInfo(prev => ({ ...prev, pickupTimeSlot: e.target.value }))}
+                  className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
+                             focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="">Time Slot</option>
+                  <option value="9AM-12PM">9 AM – 12 PM</option>
+                  <option value="12PM-3PM">12 PM – 3 PM</option>
+                  <option value="3PM-6PM">3 PM – 6 PM</option>
+                  <option value="6PM-9PM">6 PM – 9 PM</option>
+                </select>
               </div>
             </div>
           )}

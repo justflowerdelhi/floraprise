@@ -317,6 +317,7 @@ const POSLayout: React.FC = () => {
         onComplete={handlePaymentComplete}
         onPartialSave={handlePartialSave}
         initialMethod={paymentMethod}
+        orderIntent={orderType}
       />
 
       {/* Customer Drawer */}
