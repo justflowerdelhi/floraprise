@@ -5,6 +5,7 @@
  */
 
 import { apiClient } from "../../../core/api/apiClient";
+import { safeArray } from "../../../utils/safeArray";
 import type {
   FloralRecipe,
   FinishedGoodsBatch,
@@ -21,7 +22,8 @@ import type {
 // ─── Recipes ────────────────────────────────────────────────
 
 export const getRecipes = async (): Promise<FloralRecipe[]> => {
-  return (await apiClient.get("/production/recipes")).data;
+  const res = await apiClient.get("/production/recipes");
+  return safeArray(res.data);
 };
 
 export const getRecipeById = async (
@@ -50,7 +52,8 @@ export const deleteRecipe = async (id: string): Promise<void> => {
 // ─── Finished Goods ─────────────────────────────────────────
 
 export const getFinishedBatches = async (): Promise<FinishedGoodsBatch[]> => {
-  return (await apiClient.get("/production/finished-batches")).data;
+  const res = await apiClient.get("/production/finished-batches");
+  return safeArray(res.data);
 };
 
 export const getFinishedBatchById = async (
@@ -102,13 +105,15 @@ export const performMaintenance = async (
 
 export const getMaintenanceLogs =
   async (): Promise<ProductionMaintenanceLog[]> => {
-    return (await apiClient.get("/production/maintenance")).data;
+    const res = await apiClient.get("/production/maintenance");
+    return safeArray(res.data);
   };
 
 // ─── Wastage ────────────────────────────────────────────────
 
 export const getWastageLogs = async (): Promise<WastageLog[]> => {
-  return (await apiClient.get("/production/wastage")).data;
+  const res = await apiClient.get("/production/wastage");
+  return safeArray(res.data);
 };
 
 export const createWastageEntry = async (

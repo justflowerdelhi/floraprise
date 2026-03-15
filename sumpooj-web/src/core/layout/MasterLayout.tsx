@@ -33,14 +33,40 @@ class RouteErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <Box sx={{ p: 4, color: '#ff5252' }}>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Something went wrong</Typography>
-          <Typography variant="body1" sx={{ mt: 1, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-            {this.state.error?.message}
+        <Box sx={{ p: 6, textAlign: 'center', maxWidth: 500, mx: 'auto', mt: 8 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+            Something went wrong
           </Typography>
-          <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
-            Check the browser console (F12) for details.
+          <Typography variant="body1" sx={{ color: 'text.secondary', mb: 3 }}>
+            This page encountered an unexpected error. Please try again.
           </Typography>
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              style={{
+                padding: '10px 24px', borderRadius: 8, border: 'none',
+                background: '#5B2E91', color: '#fff', fontWeight: 600,
+                cursor: 'pointer', fontSize: 14,
+              }}
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => window.location.href = '/dashboard'}
+              style={{
+                padding: '10px 24px', borderRadius: 8,
+                border: '1px solid #ddd', background: '#fff', color: '#333',
+                fontWeight: 600, cursor: 'pointer', fontSize: 14,
+              }}
+            >
+              Go to Dashboard
+            </button>
+          </Box>
+          {process.env.NODE_ENV === 'development' && this.state.error && (
+            <Typography variant="caption" sx={{ mt: 3, display: 'block', fontFamily: 'monospace', color: 'error.main' }}>
+              {this.state.error.message}
+            </Typography>
+          )}
         </Box>
       );
     }

@@ -145,5 +145,5 @@ export const cancelOrder = async (id: string, data?: CancelOrderRequest) => {
 
 export const fetchSellableFinishedGoods = async () => {
   const res = await api.get('/production/finished-goods/sellable');
-  return res.data;
+  return Array.isArray(res.data) ? res.data : [];
 };

@@ -50,7 +50,7 @@ export const searchSuppliers = async (params: SupplierSearchParams = {}) => {
 
 export const getAllSuppliers = async () => {
   const res = await api.get('/suppliers');
-  return res.data;
+  return Array.isArray(res.data) ? res.data : [];
 };
 
 export const createSupplier = async (data: CreateSupplierRequest) => {

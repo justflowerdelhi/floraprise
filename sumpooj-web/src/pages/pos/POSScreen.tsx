@@ -97,13 +97,13 @@ const POSScreen: React.FC = () => {
 
     try {
       const [productResult, batchResult] = await Promise.all([
-        searchProducts({ PageSize: 200, IsActive: true }),
-        getFinishedBatches(),
+        searchProducts({ PageSize: 200, IsActive: true }).catch(() => []),
+        getFinishedBatches().catch(() => []),
       ]);
 
-      const rawProducts = productResult?.items ?? [];
-      const rawBatches =
-        batchResult?.items ?? batchResult?.data ?? batchResult ?? [];
+      const rawProducts = Array.isArray(productResult) ? productResult : productResult?.items ?? [];
+      const rawBatches = Array.isArray(batchResult) ? batchResult
+        : batchResult?.items ?? batchResult?.data ?? [];
 
       const normalizedProducts = normalizeProducts(rawProducts);
 

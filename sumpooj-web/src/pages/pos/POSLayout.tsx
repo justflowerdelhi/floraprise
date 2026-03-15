@@ -66,14 +66,14 @@ const POSLayout: React.FC = () => {
       setError('');
       try {
         const [prodRes, custRes] = await Promise.all([
-          searchProducts({ IsActive: true, PageSize: 500 }),
-          searchCustomers({ PageSize: 500 }),
+          searchProducts({ IsActive: true, PageSize: 500 }).catch(() => []),
+          searchCustomers({ PageSize: 500 }).catch(() => []),
         ]);
-        const prodItems = Array.isArray(prodRes) ? prodRes : prodRes.items ?? [];
+        const prodItems = Array.isArray(prodRes) ? prodRes : prodRes?.items ?? [];
         const normalized = normalizeProducts(prodItems);
 
         setProducts(normalized);
-        const custItems = Array.isArray(custRes) ? custRes : custRes.items ?? [];
+        const custItems = Array.isArray(custRes) ? custRes : custRes?.items ?? [];
         setCustomers(custItems);
       } catch (err) {
         console.error('POS data load failed:', err);
