@@ -15,6 +15,7 @@ public class OrderService
     private readonly IShiftRepository _shiftRepository;
     private readonly IPaymentRepository _paymentRepository;
     private readonly IFinishedGoodsBatchRepository _finishedGoodsBatchRepository;
+    private readonly IJournalEntryRepository _journalEntryRepository;
 
     public OrderService(
         IOrderRepository orderRepository,
@@ -23,7 +24,8 @@ public class OrderService
         ILocationRepository locationRepository,
         IShiftRepository shiftRepository,
         IPaymentRepository paymentRepository,
-        IFinishedGoodsBatchRepository finishedGoodsBatchRepository)
+        IFinishedGoodsBatchRepository finishedGoodsBatchRepository,
+        IJournalEntryRepository journalEntryRepository)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
@@ -32,6 +34,7 @@ public class OrderService
         _shiftRepository = shiftRepository;
         _paymentRepository = paymentRepository;
         _finishedGoodsBatchRepository = finishedGoodsBatchRepository;
+        _journalEntryRepository = journalEntryRepository;
     }
 
     public async Task<OrderDto?> GetByIdAsync(Guid companyId, Guid id)
@@ -206,6 +209,15 @@ public class OrderService
             await _orderRepository.UpdateAsync(order);
         }
 
+        // ── Create accounting journal entries for payments ──
+        if (request.Payments.Count > 0)
+        {
+            await CreateSaleJournalEntriesAsync(companyId, order, request);
+        }
+
+        // ── Update customer purchase stats ──
+        await UpdateCustomerStatsAsync(customerId);
+
         return order.Id;
     }
 
@@ -359,6 +371,21 @@ public class OrderService
         // Deduct inventory for each sold item
         await DeductInventoryForOrderAsync(companyId, order);
 
+        // Create accounting journal entries
+        var manualEntries = new List<JournalEntry>
+        {
+            new JournalEntry(companyId, saleDate, order.OrderNumber, "SALE",
+                $"Manual Sale {order.OrderNumber} — {method} payment",
+                order.TotalAmount, 0, null),
+            new JournalEntry(companyId, saleDate, order.OrderNumber, "SALE",
+                $"Manual Sale {order.OrderNumber} — Revenue",
+                0, order.TotalAmount, null),
+        };
+        await _journalEntryRepository.AddRangeAsync(manualEntries);
+
+        // Update customer stats
+        await UpdateCustomerStatsAsync(walkIn.Id);
+
         return order.Id;
     }
 
@@ -390,6 +417,66 @@ public class OrderService
                 batch.Deduct(item.Quantity);
                 await _finishedGoodsBatchRepository.UpdateAsync(batch);
             }
+        }
+    }
+
+    /// <summary>
+    /// Creates double-entry journal entries for a POS sale.
+    /// Dr Cash/Card/UPI → Cr Sales Revenue
+    /// </summary>
+    private async Task CreateSaleJournalEntriesAsync(Guid companyId, Order order, CreateOrderRequest request)
+    {
+        var entries = new List<JournalEntry>();
+        var now = DateTime.UtcNow;
+        var orderRef = order.OrderNumber;
+
+        foreach (var p in request.Payments)
+        {
+            var methodStr = NormalizeEnumString(p.Method);
+            if (!Enum.TryParse<PaymentMethod>(methodStr, true, out var method))
+                method = PaymentMethod.Cash;
+
+            var methodLabel = method switch
+            {
+                PaymentMethod.Cash => "Cash",
+                PaymentMethod.Card => "Card",
+                PaymentMethod.Upi => "UPI",
+                PaymentMethod.GiftCard => "Gift Card",
+                PaymentMethod.BankTransfer => "Bank Transfer",
+                _ => method.ToString()
+            };
+
+            // Debit: Payment method account
+            var debitEntry = new JournalEntry(
+                companyId, now, orderRef, "SALE",
+                $"POS Sale {orderRef} — {methodLabel} payment",
+                p.Amount, 0, null);
+            debitEntry.SetLocation(order.LocationId);
+            entries.Add(debitEntry);
+
+            // Credit: Sales Revenue
+            var creditEntry = new JournalEntry(
+                companyId, now, orderRef, "SALE",
+                $"POS Sale {orderRef} — Revenue",
+                0, p.Amount, null);
+            creditEntry.SetLocation(order.LocationId);
+            entries.Add(creditEntry);
+        }
+
+        if (entries.Count > 0)
+            await _journalEntryRepository.AddRangeAsync(entries);
+    }
+
+    /// <summary>
+    /// Increments the customer's order count after a sale.
+    /// </summary>
+    private async Task UpdateCustomerStatsAsync(Guid customerId)
+    {
+        var customer = await _customerRepository.GetByIdAsync(customerId);
+        if (customer != null)
+        {
+            customer.IncrementOrderCount();
+            await _customerRepository.UpdateAsync(customer);
         }
     }
 

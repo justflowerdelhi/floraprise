@@ -217,6 +217,8 @@ builder.Services.AddScoped<RefundService>();
 builder.Services.AddScoped<IDayCloseRepository, DayCloseRepository>();
 builder.Services.AddScoped<DayCloseService>();
 
+builder.Services.AddScoped<IJournalEntryRepository, JournalEntryRepository>();
+
 builder.Services.AddScoped<IShiftRepository, ShiftRepository>();
 builder.Services.AddScoped<ShiftService>();
 
