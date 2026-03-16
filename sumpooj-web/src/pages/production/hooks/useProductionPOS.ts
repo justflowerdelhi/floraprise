@@ -52,13 +52,14 @@ export function useFinishedGoodsPOS(locationId?: string): UseFinishedGoodsPOSRes
     setLoading(true);
     try {
       const [batchData, recipeData] = await Promise.all([
-        getFinishedBatches(),
-        getRecipes(),
+        getFinishedBatches().catch(() => []),
+        getRecipes().catch(() => []),
       ]);
-      setBatches(batchData);
-      setRecipes(recipeData);
+      setBatches(Array.isArray(batchData) ? batchData : []);
+      setRecipes(Array.isArray(recipeData) ? recipeData : []);
     } catch {
-      // handle error silently in POS
+      setBatches([]);
+      setRecipes([]);
     } finally {
       setLoading(false);
     }

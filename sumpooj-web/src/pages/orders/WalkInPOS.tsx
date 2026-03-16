@@ -63,12 +63,12 @@ const WalkInPOS: React.FC = () => {
       setDataError('');
       try {
         const [prodRes, custRes, supplierRes, finishedGoodsRes] = await Promise.all([
-          searchProducts({ IsActive: true, PageSize: 500 }),
-          searchCustomers({ PageSize: 500 }),
-          getAllSuppliers(),
+          searchProducts({ IsActive: true, PageSize: 500 }).catch(() => []),
+          searchCustomers({ PageSize: 500 }).catch(() => []),
+          getAllSuppliers().catch(() => []),
           fetchSellableFinishedGoods().catch(() => []),
         ]);
-        const prodItems = Array.isArray(prodRes) ? prodRes : prodRes.items ?? [];
+        const prodItems = Array.isArray(prodRes) ? prodRes : prodRes?.items ?? [];
         const normalizedProducts = normalizeProducts(prodItems);
 
         // Merge finished goods as products
@@ -89,9 +89,9 @@ const WalkInPOS: React.FC = () => {
         }));
 
         setProducts([...normalizedProducts, ...finishedGoods]);
-        const custItems = Array.isArray(custRes) ? custRes : custRes.items ?? [];
+        const custItems = Array.isArray(custRes) ? custRes : custRes?.items ?? [];
         setCustomers(custItems);
-        const suppliers = Array.isArray(supplierRes) ? supplierRes : supplierRes.items ?? [];
+        const suppliers = Array.isArray(supplierRes) ? supplierRes : supplierRes?.items ?? [];
         setVendorFlorists(suppliers);
       } catch (err: any) {
         console.error('❌ POS data load failed:', err);

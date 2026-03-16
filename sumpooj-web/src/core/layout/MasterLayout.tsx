@@ -33,14 +33,40 @@ class RouteErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <Box sx={{ p: 4, color: '#ff5252' }}>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Something went wrong</Typography>
-          <Typography variant="body1" sx={{ mt: 1, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-            {this.state.error?.message}
+        <Box sx={{ p: 6, textAlign: 'center', maxWidth: 500, mx: 'auto', mt: 8 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+            Something went wrong
           </Typography>
-          <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
-            Check the browser console (F12) for details.
+          <Typography variant="body1" sx={{ color: 'text.secondary', mb: 3 }}>
+            This page encountered an unexpected error. Please try again.
           </Typography>
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              style={{
+                padding: '10px 24px', borderRadius: 8, border: 'none',
+                background: '#5B2E91', color: '#fff', fontWeight: 600,
+                cursor: 'pointer', fontSize: 14,
+              }}
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => window.location.href = '/dashboard'}
+              style={{
+                padding: '10px 24px', borderRadius: 8,
+                border: '1px solid #ddd', background: '#fff', color: '#333',
+                fontWeight: 600, cursor: 'pointer', fontSize: 14,
+              }}
+            >
+              Go to Dashboard
+            </button>
+          </Box>
+          {process.env.NODE_ENV === 'development' && this.state.error && (
+            <Typography variant="caption" sx={{ mt: 3, display: 'block', fontFamily: 'monospace', color: 'error.main' }}>
+              {this.state.error.message}
+            </Typography>
+          )}
         </Box>
       );
     }
@@ -57,6 +83,7 @@ import {
   DarkMode,
   LightMode,
   LocalFlorist,
+  Lock as LockIcon,
 } from '@mui/icons-material';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
@@ -68,6 +95,7 @@ import { ConfirmationProvider } from '../ux/ConfirmationModal';
 import { ROLE_CONFIG } from '../rbac/RBACTypes';
 import { LocationProvider } from '../location/LocationContext';
 import { LocationSwitcher } from '../location/LocationSwitcher';
+import ChangePasswordDialog from '../../components/ChangePasswordDialog';
 import {
   TenantProvider,
   TrialBanner,
@@ -90,6 +118,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
   const auth = useAuth();
   const navigate = useNavigate();
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
 
   // Fallback for when user is null
   if (!user) return null;
@@ -222,6 +251,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
             <ListItemText>Settings</ListItemText>
           </MenuItem>
 
+          <MenuItem onClick={() => { setUserMenuAnchor(null); setPasswordDialogOpen(true); }}>
+            <ListItemIcon><LockIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Change Password</ListItemText>
+          </MenuItem>
+
           <MenuItem onClick={() => setUserMenuAnchor(null)}>
             <ListItemIcon>{dk ? <LightMode fontSize="small" /> : <DarkMode fontSize="small" />}</ListItemIcon>
             <ListItemText>{dk ? 'Light Mode' : 'Dark Mode'}</ListItemText>
@@ -241,6 +275,13 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
             <ListItemText>Sign Out</ListItemText>
           </MenuItem>
         </Menu>
+
+        {/* Change Password Dialog */}
+        <ChangePasswordDialog
+          open={passwordDialogOpen}
+          onClose={() => setPasswordDialogOpen(false)}
+          userRole={user.role}
+        />
       </Toolbar>
     </AppBar>
   );

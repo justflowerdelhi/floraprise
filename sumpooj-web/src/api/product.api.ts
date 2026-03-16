@@ -214,6 +214,7 @@ export const normalizeProduct = (apiData: any): Product => {
   };
 };
 
-export const normalizeProducts = (apiData: any[]): Product[] => {
-  return apiData.map(normalizeProduct);
+export const normalizeProducts = (apiData: any): Product[] => {
+  const arr = Array.isArray(apiData) ? apiData : [];
+  return arr.map(normalizeProduct);
 };

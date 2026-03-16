@@ -83,3 +83,21 @@ export const refreshTokens = async (refreshToken: string): Promise<LoginResponse
 export const revokeToken = async (refreshToken: string): Promise<void> => {
   await api.post('/auth/revoke', { refreshToken });
 };
+
+/** POST /auth/change-password — change own password */
+export const changePassword = async (currentPassword: string, newPassword: string) => {
+  const res = await api.post('/auth/change-password', { currentPassword, newPassword });
+  return res.data;
+};
+
+/** POST /auth/admin-reset-password — admin resets another user's password */
+export const adminResetPassword = async (userId: string, newPassword: string) => {
+  const res = await api.post('/auth/admin-reset-password', { userId, newPassword });
+  return res.data;
+};
+
+/** GET /auth/manageable-users — list users current admin can manage */
+export const getManageableUsers = async (): Promise<{ id: string; email: string; companyId: string | null }[]> => {
+  const res = await api.get('/auth/manageable-users');
+  return Array.isArray(res.data) ? res.data : [];
+};

@@ -34,16 +34,24 @@ class POSErrorBoundary extends Component<EBProps, EBState> {
   render() {
     if (this.state.error) {
       return (
-        <div className="h-screen w-screen flex items-center justify-center bg-red-50 p-8">
-          <div className="max-w-lg text-center">
-            <h1 className="text-2xl font-bold text-red-700 mb-4">POS Error</h1>
-            <p className="text-red-600 mb-2 font-mono text-sm">{this.state.error.message}</p>
-            <pre className="text-xs text-left bg-red-100 p-4 rounded overflow-auto max-h-60 mb-4">
-              {this.state.error.stack}
-            </pre>
-            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-red-600 text-white rounded">
-              Reload
-            </button>
+        <div className="h-screen w-screen flex items-center justify-center bg-gray-50 p-8">
+          <div className="max-w-md text-center">
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">Something went wrong</h1>
+            <p className="text-gray-500 mb-6">The POS encountered an unexpected error. Please try again.</p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => this.setState({ error: null })}
+                className="px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => window.location.href = '/dashboard'}
+                className="px-5 py-2.5 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Go to Dashboard
+              </button>
+            </div>
           </div>
         </div>
       );

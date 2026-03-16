@@ -345,6 +345,113 @@ public class AuthController : ControllerBase
         var valid = await _userManager.CheckPasswordAsync(user, request.Password);
         return Ok(new { verified = valid });
     }
+
+    /// <summary>
+    /// Change the current user's own password. Requires current password.
+    /// Available to any authenticated user.
+    /// </summary>
+    [HttpPost("change-password")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId == null) return Unauthorized();
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null) return Unauthorized();
+
+        var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+            return BadRequest(new { message = errors });
+        }
+
+        return Ok(new { message = "Password changed successfully." });
+    }
+
+    /// <summary>
+    /// Reset another user's password (admin action).
+    /// - PlatformSuperAdmin / PlatformSupport: can reset any user
+    /// - CompanyAdmin: can only reset users within their company
+    /// </summary>
+    [HttpPost("admin-reset-password")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public async Task<IActionResult> AdminResetPassword([FromBody] AdminResetPasswordRequest request)
+    {
+        var callerUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (callerUserId == null) return Unauthorized();
+
+        var caller = await _userManager.FindByIdAsync(callerUserId);
+        if (caller == null) return Unauthorized();
+
+        var callerRoles = await _userManager.GetRolesAsync(caller);
+        var isPlatformAdmin = callerRoles.Any(r =>
+            r == "PlatformSuperAdmin" || r == "PlatformSupport");
+        var isCompanyAdmin = callerRoles.Any(r => r == "CompanyAdmin");
+
+        if (!isPlatformAdmin && !isCompanyAdmin)
+            return Forbid();
+
+        var targetUser = await _userManager.FindByIdAsync(request.UserId);
+        if (targetUser == null)
+            return NotFound(new { message = "User not found." });
+
+        // CompanyAdmin can only reset passwords for users in the same company
+        if (isCompanyAdmin && !isPlatformAdmin)
+        {
+            if (caller.CompanyId == null || targetUser.CompanyId != caller.CompanyId)
+                return Forbid();
+        }
+
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(targetUser);
+        var result = await _userManager.ResetPasswordAsync(targetUser, resetToken, request.NewPassword);
+
+        if (!result.Succeeded)
+        {
+            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+            return BadRequest(new { message = errors });
+        }
+
+        return Ok(new { message = "Password reset successfully." });
+    }
+
+    /// <summary>
+    /// List users that the current admin can manage passwords for.
+    /// - PlatformSuperAdmin / PlatformSupport: all users
+    /// - CompanyAdmin: users in their company only
+    /// </summary>
+    [HttpGet("manageable-users")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public async Task<IActionResult> GetManageableUsers()
+    {
+        var callerUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (callerUserId == null) return Unauthorized();
+
+        var caller = await _userManager.FindByIdAsync(callerUserId);
+        if (caller == null) return Unauthorized();
+
+        var callerRoles = await _userManager.GetRolesAsync(caller);
+        var isPlatformAdmin = callerRoles.Any(r =>
+            r == "PlatformSuperAdmin" || r == "PlatformSupport");
+        var isCompanyAdmin = callerRoles.Any(r => r == "CompanyAdmin");
+
+        if (!isPlatformAdmin && !isCompanyAdmin)
+            return Ok(Array.Empty<object>());
+
+        IQueryable<ApplicationUser> query = _userManager.Users;
+
+        if (isCompanyAdmin && !isPlatformAdmin && caller.CompanyId.HasValue)
+            query = query.Where(u => u.CompanyId == caller.CompanyId);
+
+        var users = await query
+            .Where(u => u.Id != Guid.Parse(callerUserId)) // exclude self
+            .OrderBy(u => u.Email)
+            .Select(u => new { id = u.Id.ToString(), email = u.Email, companyId = u.CompanyId })
+            .ToListAsync();
+
+        return Ok(users);
+    }
 }
 
 public record LoginRequest(string Email, string Password);
@@ -352,4 +459,16 @@ public record RefreshRequest(string RefreshToken);
 public class VerifyPasswordRequest
 {
     public string Password { get; set; } = default!;
+}
+
+public class ChangePasswordRequest
+{
+    public string CurrentPassword { get; set; } = default!;
+    public string NewPassword { get; set; } = default!;
+}
+
+public class AdminResetPasswordRequest
+{
+    public string UserId { get; set; } = default!;
+    public string NewPassword { get; set; } = default!;
 }

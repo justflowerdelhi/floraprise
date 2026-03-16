@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   plugins: [tailwindcss(), react()],
-  base: mode === 'production' ? '/floraprise/' : '/',
+  base: '/',
   server: {
     proxy: {
       '/api': {

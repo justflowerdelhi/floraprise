@@ -8,7 +8,7 @@ import {
   Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions,
   List, ListItem, ListItemText, TextField, Grid, IconButton,
 } from '@mui/material';
-import { Edit as EditIcon, Add as AddIcon } from '@mui/icons-material';
+import { Edit as EditIcon, Add as AddIcon, ContentCopy as CopyIcon, Key as KeyIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 
@@ -68,6 +68,9 @@ const CompanyManagementPage: React.FC = () => {
   const [seedResult, setSeedResult] = useState<SeedResult | null>(null);
   const [purging, setPurging] = useState<string | null>(null);
   const [purgeResult, setPurgeResult] = useState<Record<string, number> | null>(null);
+  const [credentials, setCredentials] = useState<{ companyName: string; adminEmail: string; tempPassword: string } | null>(null);
+  const [credLoading, setCredLoading] = useState<string | null>(null);
+  const [copied, setCopied] = useState('');
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false, message: '', severity: 'success',
   });
@@ -185,6 +188,33 @@ const CompanyManagementPage: React.FC = () => {
     }
   };
 
+  const handleGetCredentials = async (company: CompanyRow) => {
+    setCredLoading(company.id);
+    try {
+      const res = await api.post(`/platform/companies/${company.id}/admin-credentials`);
+      setCredentials(res.data);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Failed to get credentials';
+      setSnack({ open: true, message: msg, severity: 'error' });
+    } finally {
+      setCredLoading(null);
+    }
+  };
+
+  const copyToClipboard = async (text: string, label: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(label);
+    setTimeout(() => setCopied(''), 2000);
+  };
+
+  const copyAllCredentials = async () => {
+    if (!credentials) return;
+    const text = `Login Credentials for ${credentials.companyName}\n\nURL: ${window.location.origin}\nEmail: ${credentials.adminEmail}\nPassword: ${credentials.tempPassword}\n\nPlease change your password after first login.`;
+    await navigator.clipboard.writeText(text);
+    setCopied('all');
+    setTimeout(() => setCopied(''), 2000);
+  };
+
   const updateField = (field: keyof CompanyForm, value: string) =>
     setForm(prev => ({ ...prev, [field]: value }));
 
@@ -254,6 +284,11 @@ const CompanyManagementPage: React.FC = () => {
                     <Button size="small" variant="outlined" color="error"
                       disabled={purging === c.id} onClick={() => handlePurgeDemoData(c)}>
                       {purging === c.id ? 'Removing…' : '🗑️ Purge'}
+                    </Button>
+                    <Button size="small" variant="outlined" color="info"
+                      disabled={credLoading === c.id} onClick={() => handleGetCredentials(c)}
+                      startIcon={<KeyIcon fontSize="small" />}>
+                      {credLoading === c.id ? 'Loading…' : 'Login Info'}
                     </Button>
                   </Box>
                 </TableCell>
@@ -363,6 +398,58 @@ const CompanyManagementPage: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPurgeResult(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Login Credentials Dialog */}
+      <Dialog open={!!credentials} onClose={() => setCredentials(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>🔑 Company Login Credentials</DialogTitle>
+        <DialogContent>
+          {credentials && (
+            <Box>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Share these login credentials with the company admin. They should change their password after first login.
+              </Alert>
+
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Company</Typography>
+              <Typography variant="body1" fontWeight={600} sx={{ mb: 2 }}>{credentials.companyName}</Typography>
+
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Login URL</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, p: 1.5, bgcolor: 'grey.100', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', flexGrow: 1 }}>{window.location.origin}</Typography>
+                <IconButton size="small" onClick={() => copyToClipboard(window.location.origin, 'url')} color={copied === 'url' ? 'success' : 'default'}>
+                  <CopyIcon fontSize="small" />
+                </IconButton>
+              </Box>
+
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Email</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, p: 1.5, bgcolor: 'grey.100', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', flexGrow: 1 }}>{credentials.adminEmail}</Typography>
+                <IconButton size="small" onClick={() => copyToClipboard(credentials.adminEmail, 'email')} color={copied === 'email' ? 'success' : 'default'}>
+                  <CopyIcon fontSize="small" />
+                </IconButton>
+              </Box>
+
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Temporary Password</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, p: 1.5, bgcolor: 'grey.100', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', flexGrow: 1, fontWeight: 700 }}>{credentials.tempPassword}</Typography>
+                <IconButton size="small" onClick={() => copyToClipboard(credentials.tempPassword, 'password')} color={copied === 'password' ? 'success' : 'default'}>
+                  <CopyIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            variant="outlined"
+            startIcon={<CopyIcon />}
+            onClick={copyAllCredentials}
+            color={copied === 'all' ? 'success' : 'primary'}
+          >
+            {copied === 'all' ? 'Copied!' : 'Copy All'}
+          </Button>
+          <Button variant="contained" onClick={() => setCredentials(null)}>Done</Button>
         </DialogActions>
       </Dialog>
 
