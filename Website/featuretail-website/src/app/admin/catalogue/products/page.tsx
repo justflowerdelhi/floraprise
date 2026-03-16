@@ -14,7 +14,9 @@ export default function ProductsPage() {
   const fetchProducts = async () => {
     const res = await fetch("/api/admin/products");
     const data = await res.json();
+
     console.log("PRODUCT DATA:", data);
+
     setProducts(data);
   };
 
@@ -55,6 +57,7 @@ export default function ProductsPage() {
           <thead className="bg-gray-100">
             <tr>
               <th className="p-3 text-left">Product</th>
+              <th className="p-3 text-left">Variant</th>
               <th className="p-3 text-left">Category</th>
               <th className="p-3 text-left">Price</th>
               <th className="p-3 text-left">Stock</th>
@@ -66,18 +69,16 @@ export default function ProductsPage() {
           <tbody>
 
             {products.map((p) => (
-
               <React.Fragment key={p.id}>
-
                 {/* PRODUCT ROW */}
-
-                <tr className="font-semibold bg-gray-50 border-t">
-                  <td className="p-3">{p.name}</td>
-                  <td className="p-3">{p.category?.name}</td>
-                  <td className="p-3">₹{p.price}</td>
-                  <td className="p-3">{p.stock}</td>
-                  <td className="p-3">{p.status}</td>
-                  <td className="p-3">
+                <tr className="font-semibold bg-gray-50">
+                  <td>{p.name}</td>
+                  <td className="text-gray-400 italic">—</td>
+                  <td>{p.category?.name}</td>
+                  <td>₹{p.price}</td>
+                  <td>{p.stock}</td>
+                  <td>{p.status}</td>
+                  <td>
                     <button
                       onClick={() => deleteProduct(p.id)}
                       className="text-red-600 text-sm"
@@ -87,48 +88,27 @@ export default function ProductsPage() {
                   </td>
                 </tr>
 
-                {/* VARIANTS */}
-
-                {p.variants?.map((v:any) => {
-
-                  const optionValues =
-                    v.options?.map((o:any)=>o.value).join(" / ") || "-";
-
+                {/* VARIANT ROWS */}
+                {p.variants && p.variants.length > 0 && p.variants.map((v:any) => {
                   const price =
                     v.options?.find((o:any)=>o.price !== null)?.price ?? "-";
-
                   const stock =
                     v.options?.find((o:any)=>o.stock !== null)?.stock ?? "-";
-
+                  const optionValues =
+                    v.options?.map((o:any)=>o.value).join(" / ") ?? "Variant";
                   return (
-                    <tr key={v.id} className="bg-gray-50 text-sm">
-
-                      {/* Product column (empty to indent) */}
-                      <td className="pl-8 text-gray-600">
-                        ↳ {optionValues}
-                      </td>
-
-                      {/* Category */}
+                    <tr key={v.id} className="text-sm text-gray-600 bg-gray-50">
                       <td></td>
-
-                      {/* Price */}
-                      <td>₹{price}</td>
-
-                      {/* Stock */}
-                      <td>{stock}</td>
-
-                      {/* Status */}
+                      <td className="pl-4">{optionValues}</td>
                       <td>-</td>
-
-                      {/* Actions */}
+                      <td>₹{price}</td>
+                      <td>{stock}</td>
+                      <td>-</td>
                       <td></td>
-
                     </tr>
                   );
                 })}
-
               </React.Fragment>
-
             ))}
 
           </tbody>

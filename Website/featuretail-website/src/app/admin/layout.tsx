@@ -30,14 +30,19 @@ export default function AdminLayout({
             Dashboard
           </Link>
 
-          <Link href="/admin/catalogue" className="block hover:text-pink-600">
-            Catalogue
-          </Link>
+          <span className="block text-gray-700">Catalogue</span>
+
 
             <div className="ml-4">
               <Link href="/admin/catalogue/categories" className="block hover:text-pink-600">
                 Categories
               </Link>
+              <a
+                href="/admin/catalogue/products"
+                className="block hover:text-pink-600"
+              >
+                Products
+              </a>
             </div>
 
           <Link href="/admin/inventory" className="block hover:text-pink-600">

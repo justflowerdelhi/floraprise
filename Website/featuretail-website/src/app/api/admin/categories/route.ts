@@ -1,15 +1,25 @@
-import { prisma } from "@/lib/prisma";
+
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
-
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const includeSub = searchParams.get("includeSub") === "true";
-  const categories = await prisma.category.findMany({
-    include: includeSub ? { subCategories: true } : {},
-    orderBy: { name: "asc" },
-  });
-  return NextResponse.json(categories);
+export async function GET() {
+  try {
+    const categories = await prisma.category.findMany({
+      include: {
+        subCategories: true
+      },
+      orderBy: {
+        name: "asc"
+      }
+    });
+    return NextResponse.json(categories);
+  } catch (error) {
+    console.error("CATEGORY FETCH ERROR:", error);
+    return NextResponse.json(
+      { error: "Server error" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(req: Request) {

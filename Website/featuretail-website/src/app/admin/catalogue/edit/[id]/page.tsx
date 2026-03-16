@@ -1,14 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 
 export default function EditProduct() {
+
   const router = useRouter();
   const params = useParams();
-  const { id } = params;
+  const id = params?.id as string;
 
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("basic");
+
+  const [categories, setCategories] = useState<any[]>([]);
+  const [subCategories, setSubCategories] = useState<any[]>([]);
+  const [images, setImages] = useState<any[]>([]);
+  const [variants, setVariants] = useState<any[]>([]);
 
   const [product, setProduct] = useState({
     name: "",
@@ -16,138 +23,389 @@ export default function EditProduct() {
     description: "",
     price: "",
     stock: "",
-    category: "",
-    tags: "",
-    status: "draft",
+    categoryId: "",
+    subCategoryId: "",
+    status: "draft"
   });
 
-  useEffect(() => {
-    fetchProduct();
-  }, []);
+  /* ---------------- FETCH PRODUCT ---------------- */
 
   const fetchProduct = async () => {
-    const res = await fetch(`/api/admin/products/${id}`);
-    const data = await res.json();
 
-    setProduct({
-      ...data,
-      price: data.price.toString(),
-      stock: data.stock.toString(),
-      tags: data.tags.join(", "),
-    });
+    try {
 
-    setLoading(false);
+      const res = await fetch(`/api/admin/products/${id}`);
+
+      if (!res.ok) {
+        console.error("Product fetch failed");
+        return;
+      }
+
+      const data = await res.json();
+
+      const categoryId = data.category?.id || "";
+      const subCategoryId = data.subCategory?.id || "";
+
+      setProduct({
+        name: data.name || "",
+        slug: data.slug || "",
+        description: data.description || "",
+        price: data.price?.toString() || "",
+        stock: data.stock?.toString() || "",
+        categoryId,
+        subCategoryId,
+        status: data.status || "draft"
+      });
+
+      setImages(data.images || []);
+      setVariants(data.variants || []);
+
+    } catch (error) {
+
+      console.error("Fetch product error:", error);
+
+    }
+
   };
+
+  /* ---------------- FETCH CATEGORIES ---------------- */
+
+  const fetchCategories = async () => {
+
+    try {
+
+      const res = await fetch("/api/admin/categories");
+
+      if (!res.ok) {
+        console.error("Categories fetch failed");
+        return;
+      }
+
+      const data = await res.json();
+
+      setCategories(data || []);
+
+    } catch (error) {
+
+      console.error("Category fetch error:", error);
+
+    }
+
+  };
+
+  /* ---------------- CATEGORY CHANGE ---------------- */
+
+  const handleCategoryChange = (categoryId: string) => {
+
+    const category = categories.find(
+      (c: any) => String(c.id) === String(categoryId)
+    );
+
+    setSubCategories(category?.subCategories || []);
+
+    setProduct((prev) => ({
+      ...prev,
+      categoryId,
+      subCategoryId: ""
+    }));
+
+  };
+
+  /* ---------------- UPDATE PRODUCT ---------------- */
 
   const handleUpdate = async () => {
-    await fetch(`/api/admin/products/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...product,
-        price: parseFloat(product.price),
-        stock: parseInt(product.stock),
-        tags: product.tags.split(",").map((t) => t.trim()),
-      }),
-    });
 
-    router.push("/admin/catalogue");
+    try {
+
+      const res = await fetch(`/api/admin/products/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          ...product,
+          price: Number(product.price),
+          stock: Number(product.stock)
+        })
+      });
+
+      if (!res.ok) {
+
+        const err = await res.json();
+        console.log("UPDATE ERROR:", err);
+
+        alert("Update failed");
+        return;
+
+      }
+
+      router.push("/admin/catalogue");
+
+    } catch (error) {
+
+      console.error("Update error:", error);
+      alert("Update failed");
+
+    }
+
   };
 
-  if (loading) return <p>Loading...</p>;
+  /* ---------------- LOAD DATA ---------------- */
+
+  useEffect(() => {
+
+    const load = async () => {
+
+      if (!id) return;
+
+      await fetchCategories();
+      await fetchProduct();
+
+      setLoading(false);
+
+    };
+
+    load();
+
+  }, [id]);
+
+  /* ---------------- POPULATE SUBCATEGORIES ---------------- */
+
+  useEffect(() => {
+
+    if (!product.categoryId) return;
+
+    const category = categories.find(
+      (c: any) => String(c.id) === String(product.categoryId)
+    );
+
+    if (category) {
+      setSubCategories(category.subCategories || []);
+    }
+
+  }, [categories, product.categoryId]);
+
+  if (loading) {
+    return (
+      <div className="p-10 text-center text-gray-500">
+        Loading product...
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
 
       <h1 className="text-2xl font-bold">Edit Product</h1>
 
-      <input
-        type="text"
-        className="w-full border p-3 rounded"
-        value={product.name}
-        onChange={(e) =>
-          setProduct({ ...product, name: e.target.value })
-        }
-      />
+      {/* TABS */}
 
-      <input
-        type="text"
-        className="w-full border p-3 rounded"
-        value={product.slug}
-        onChange={(e) =>
-          setProduct({ ...product, slug: e.target.value })
-        }
-      />
+      <div className="flex gap-6 border-b">
 
-      <textarea
-        className="w-full border p-3 rounded h-32"
-        value={product.description}
-        onChange={(e) =>
-          setProduct({ ...product, description: e.target.value })
-        }
-      />
+        {[
+          "basic",
+          "pricing",
+          "inventory",
+          "category",
+          "images",
+          "variants",
+          "status"
+        ].map((tab) => (
 
-      <div className="grid md:grid-cols-2 gap-6">
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`pb-2 ${
+              activeTab === tab
+                ? "border-b-2 border-pink-600 text-pink-600"
+                : "text-gray-500"
+            }`}
+          >
+            {tab.toUpperCase()}
+          </button>
 
-        <div className="bg-white p-6 rounded-xl shadow border space-y-4">
-          <h2 className="font-semibold">General</h2>
+        ))}
+
+      </div>
+
+      <div className="bg-white p-6 rounded-xl shadow border">
+
+        {/* BASIC */}
+
+        {activeTab === "basic" && (
+
+          <div className="space-y-4">
+
+            <input
+              className="w-full border p-3 rounded"
+              placeholder="Product Name"
+              value={product.name}
+              onChange={(e) =>
+                setProduct({ ...product, name: e.target.value })
+              }
+            />
+
+            <input
+              className="w-full border p-3 rounded"
+              placeholder="Slug"
+              value={product.slug}
+              onChange={(e) =>
+                setProduct({ ...product, slug: e.target.value })
+              }
+            />
+
+            <textarea
+              className="w-full border p-3 rounded h-32"
+              placeholder="Description"
+              value={product.description}
+              onChange={(e) =>
+                setProduct({ ...product, description: e.target.value })
+              }
+            />
+
+          </div>
+
+        )}
+
+        {/* PRICING */}
+
+        {activeTab === "pricing" && (
 
           <input
             type="number"
-            className="w-full border p-2 rounded"
+            className="w-full border p-3 rounded"
+            placeholder="Price"
             value={product.price}
             onChange={(e) =>
               setProduct({ ...product, price: e.target.value })
             }
           />
-        </div>
 
-        <div className="bg-white p-6 rounded-xl shadow border space-y-4">
-          <h2 className="font-semibold">Inventory</h2>
+        )}
+
+        {/* INVENTORY */}
+
+        {activeTab === "inventory" && (
 
           <input
             type="number"
-            className="w-full border p-2 rounded"
+            className="w-full border p-3 rounded"
+            placeholder="Stock"
             value={product.stock}
             onChange={(e) =>
               setProduct({ ...product, stock: e.target.value })
             }
           />
-        </div>
 
-      </div>
+        )}
 
-      <div className="bg-white p-6 rounded-xl shadow border space-y-4">
-        <h2 className="font-semibold">Organization</h2>
+        {/* CATEGORY */}
 
-        <input
-          type="text"
-          className="w-full border p-2 rounded"
-          value={product.category}
-          onChange={(e) =>
-            setProduct({ ...product, category: e.target.value })
-          }
-        />
+        {activeTab === "category" && (
 
-        <input
-          type="text"
-          className="w-full border p-2 rounded"
-          value={product.tags}
-          onChange={(e) =>
-            setProduct({ ...product, tags: e.target.value })
-          }
-        />
+          <div className="space-y-4">
 
-        <select
-          className="w-full border p-2 rounded"
-          value={product.status}
-          onChange={(e) =>
-            setProduct({ ...product, status: e.target.value })
-          }
-        >
-          <option value="draft">Draft</option>
-          <option value="published">Published</option>
-        </select>
+            <select
+              className="w-full border p-2 rounded"
+              value={product.categoryId}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+            >
+
+              <option value="">Select Category</option>
+
+              {categories.map((cat: any) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+
+            </select>
+
+            <select
+              className="w-full border p-2 rounded"
+              value={product.subCategoryId}
+              onChange={(e) =>
+                setProduct({ ...product, subCategoryId: e.target.value })
+              }
+            >
+
+              <option value="">Select Subcategory</option>
+
+              {subCategories.map((sub: any) => (
+                <option key={sub.id} value={sub.id}>
+                  {sub.name}
+                </option>
+              ))}
+
+            </select>
+
+          </div>
+
+        )}
+
+        {/* IMAGES */}
+
+        {activeTab === "images" && (
+
+          <div className="grid grid-cols-5 gap-4">
+
+            {images.length === 0 && <p>No images</p>}
+
+            {images.map((img: any) => (
+
+              <img
+                key={img.id}
+                src={img.url}
+                className="h-24 object-cover border rounded"
+              />
+
+            ))}
+
+          </div>
+
+        )}
+
+        {/* VARIANTS */}
+
+        {activeTab === "variants" && (
+
+          <div className="space-y-3">
+
+            {variants.length === 0 && <p>No variants</p>}
+
+            {variants.map((variant: any) => (
+
+              <div key={variant.id} className="border p-3 rounded">
+
+                <strong>{variant.name}</strong>
+
+              </div>
+
+            ))}
+
+          </div>
+
+        )}
+
+        {/* STATUS */}
+
+        {activeTab === "status" && (
+
+          <select
+            className="w-full border p-3 rounded"
+            value={product.status}
+            onChange={(e) =>
+              setProduct({ ...product, status: e.target.value })
+            }
+          >
+
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+
+          </select>
+
+        )}
+
       </div>
 
       <button

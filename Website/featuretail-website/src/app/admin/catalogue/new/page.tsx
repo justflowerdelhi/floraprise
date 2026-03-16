@@ -1,12 +1,10 @@
 "use client";
 
-import type React from "react";
-import { useEffect, useState } from "react";
+import VariantMatrixGenerator from "../components/VariantMatrixGenerator";
+
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  DndContext,
-  closestCenter
-} from "@dnd-kit/core";
+import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
   SortableContext,
   horizontalListSortingStrategy,
@@ -15,14 +13,19 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-function SortableImage({id, img, removeImage}: {id: string, img: string, removeImage: (id: string) => void}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition
-  } = useSortable({id});
+/* ---------------- IMAGE COMPONENT ---------------- */
+
+function SortableImage({
+  id,
+  img,
+  removeImage
+}: {
+  id: string;
+  img: string;
+  removeImage: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -35,13 +38,12 @@ function SortableImage({id, img, removeImage}: {id: string, img: string, removeI
       style={style}
       {...attributes}
       {...listeners}
-      className="relative cursor-move"
+      className="relative"
     >
-      <img
-        src={img}
-        className="w-full h-24 object-cover rounded border"
-      />
+      <img src={img} className="w-full h-24 object-cover border rounded" />
+
       <button
+        type="button"
         onClick={() => removeImage(id)}
         className="absolute top-1 right-1 bg-red-500 text-white px-2 text-xs rounded"
       >
@@ -50,121 +52,79 @@ function SortableImage({id, img, removeImage}: {id: string, img: string, removeI
     </div>
   );
 }
-// ...existing code...
 
-// ...existing code...
+/* ---------------- PAGE ---------------- */
 
-export default function AdvancedProductPage() {
-      // ...existing code...
-    const selectTag = (tag: any) => {
-      if (!selectedTags.find(t => t.id === tag.id)) {
-        setSelectedTags([...selectedTags, tag]);
-      }
-    };
-
-    const removeTag = (id: string) => {
-      setSelectedTags(selectedTags.filter(t => t.id !== id));
-    };
+export default function CreateProductPage() {
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState("basic");
+
   const [categories, setCategories] = useState<any[]>([]);
   const [subCategories, setSubCategories] = useState<any[]>([]);
-  const [tags, setTags] = useState<any[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
-  const [selectedTags, setSelectedTags] = useState<any[]>([]);
-  const [tagInput, setTagInput] = useState("");
-  const addTag = async () => {
-    if (!tagInput) return;
-
-    const res = await fetch("/api/admin/tags", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ name: tagInput }),
-    });
-
-    const newTag = await res.json();
-
-    setSelectedTags([...selectedTags, newTag]);
-    setTagInput("");
-    fetchTags();
-  };
 
   const [product, setProduct] = useState({
     name: "",
     slug: "",
     description: "",
+    bulletPoints: "",
     price: "",
     stock: "",
+    weight: "",
+    length: "",
+    width: "",
+    height: "",
+    metaTitle: "",
+    metaDescription: "",
+    seoKeywords: "",
+    tags: "",
     categoryId: "",
     subCategoryId: "",
-    status: "draft",
+    status: "draft"
   });
 
-
-  const [variantTypes, setVariantTypes] = useState([
-    { name: "", values: [""] }
-  ]);
-
-  type VariantRow = { name: string; price: string; stock: string };
-  const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
-
-  const generateVariants = () => {
-    const combinations = variantTypes.reduce<string[][]>((acc, type) => {
-      const values = type.values.filter(v => v);
-      if (!values.length) return acc;
-      if (acc.length === 0) {
-        return values.map(v => [v]);
-      }
-      const result: string[][] = [];
-      acc.forEach(a => {
-        values.forEach(v => {
-          result.push([...a, v]);
-        });
-      });
-      return result;
-    }, []);
-
-    setVariantRows(
-      combinations.map(c => ({
-        name: c.join(" / "),
-        price: "",
-        stock: ""
-      }))
-    );
-  };
-  const [variants, setVariants] = useState([
-    {
-      name: "",
-      options: [
-        { value: "", price: "", stock: "" }
-      ]
-    }
-  ]);
+  /* ---------------- LOAD CATEGORIES ---------------- */
 
   useEffect(() => {
     fetchCategories();
-    fetchTags();
   }, []);
-  const fetchTags = async () => {
-    const res = await fetch("/api/admin/tags");
-    const data = await res.json();
-    setTags(data);
-  };
 
   const fetchCategories = async () => {
-    const res = await fetch("/api/admin/categories");
+    const res = await fetch("/api/admin/categories?includeSub=true");
     const data = await res.json();
-    setCategories(data);
+    setCategories(data || []);
   };
+
+  /* ---------------- SLUG ---------------- */
+
+  const generateSlug = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-");
+
+  /* ---------------- CATEGORY ---------------- */
 
   const handleCategoryChange = (categoryId: string) => {
-    setProduct({ ...product, categoryId, subCategoryId: "" });
+    setSelectedCategoryId(categoryId);
 
-    const selected = categories.find((c) => c.id === categoryId);
-    setSubCategories(selected ? selected.subCategories : []);
+    const category = categories.find((c) => c.id === categoryId);
+
+    setSubCategories(category?.subCategories || []);
+
+    setProduct((prev) => ({
+      ...prev,
+      categoryId,
+      subCategoryId: ""
+    }));
   };
+
+  /* ---------------- IMAGE UPLOAD ---------------- */
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -172,56 +132,119 @@ export default function AdvancedProductPage() {
     setImages((prev) => [...prev, ...files]);
 
     const newPreviews = files.map((file) => URL.createObjectURL(file));
+
     setPreviews((prev) => [...prev, ...newPreviews]);
   };
 
-  const removeImage = (index: number) => {
+  const removeImage = (id: string) => {
+    const index = previews.indexOf(id);
+
     setImages(images.filter((_, i) => i !== index));
     setPreviews(previews.filter((_, i) => i !== index));
   };
 
+  /* ---------------- SAVE PRODUCT ---------------- */
+
   const handleSubmit = async () => {
     const formData = new FormData();
 
-    formData.append("name", product.name);
-    formData.append("slug", product.slug);
-    formData.append("description", product.description);
-    formData.append("price", product.price);
-    formData.append("stock", product.stock);
-    formData.append("categoryId", product.categoryId);
-    formData.append("subCategoryId", product.subCategoryId);
-    formData.append("status", product.status);
-
-    images.forEach((img) => {
-      formData.append("images", img);
+    Object.entries(product).forEach(([key, value]) => {
+      formData.append(key, String(value));
     });
 
-    formData.append("tagIds", JSON.stringify(selectedTags.map(tag => tag.id)));
+    // Add variants from VariantMatrixGenerator
+    formData.append("variants", JSON.stringify(window.generatedVariants || []));
 
-    await fetch("/api/admin/products/create", {
+    images.forEach((img) => formData.append("images", img));
+
+
+    const res = await fetch("/api/admin/products", {
       method: "POST",
-      body: formData,
+      body: formData
     });
+
+    let data: any = {};
+    try {
+      data = await res.json();
+    } catch {
+      data = {};
+    }
+
+    if (!res.ok) {
+      alert(data.error || "Product creation failed");
+      return;
+    }
 
     router.push("/admin/catalogue");
   };
 
-  const generateSlug = (text: string) => {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .trim()
-      .replace(/\s+/g, "-");
+  /* ---------------- AI GENERATOR ---------------- */
+
+  const handleAIGenerate = async () => {
+    if (!product.name) {
+      alert("Enter product name first");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/ai/product-generator", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ productName: product.name })
+      });
+
+      const data = await res.json();
+      const ai = JSON.parse(data.result);
+
+      setProduct((prev) => ({
+        ...prev,
+        description: ai.description ?? prev.description,
+        bulletPoints: ai.bulletPoints?.join("\n") ?? prev.bulletPoints,
+        metaTitle: ai.seoTitle ?? prev.metaTitle,
+        metaDescription: ai.seoDescription ?? prev.metaDescription,
+        seoKeywords: ai.seoKeywords?.join(", ") ?? prev.seoKeywords,
+        tags: ai.tags?.join(", ") ?? prev.tags
+      }));
+    } catch (err) {
+      console.error(err);
+      alert("AI generation failed");
+    }
   };
+
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
 
-      <h1 className="text-2xl font-bold">Create Product</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Create Product</h1>
 
-      {/* Tabs */}
+        <button
+          onClick={handleAIGenerate}
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          Generate with AI
+        </button>
+      </div>
+
+      {/* TABS */}
+
+
       <div className="flex gap-6 border-b">
-        {["basic","pricing","inventory","category","images","variants","status","tags"].map(tab => (
+        {[
+          "basic",
+          "pricing",
+          "inventory",
+          "variants",
+          "dimensions",
+          "category",
+          "images",
+          "seo",
+          "tags",
+          "status"
+        ].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -238,8 +261,11 @@ export default function AdvancedProductPage() {
 
       <div className="bg-white p-6 rounded-xl shadow border">
 
+        {/* BASIC */}
+
         {activeTab === "basic" && (
           <div className="space-y-4">
+
             <input
               className="w-full border p-3 rounded"
               placeholder="Product Name"
@@ -249,282 +275,7 @@ export default function AdvancedProductPage() {
                 setProduct({
                   ...product,
                   name,
-                  slug: generateSlug(name),
-                });
-              }}
-            />
-            {/* ...other basic tab content... */}
-          </div>
-        )}
-
-        {activeTab === "pricing" && (
-          <div className="space-y-4">{/* Pricing tab content */}</div>
-        )}
-
-        {activeTab === "inventory" && (
-          <div className="space-y-4">{/* Inventory tab content */}</div>
-        )}
-
-        {activeTab === "category" && (
-          <div className="space-y-4">
-            <select
-              className="w-full border p-3 rounded"
-              value={product.categoryId}
-              onChange={(e) => handleCategoryChange(e.target.value)}
-            >
-              <option value="">Select Category</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="w-full border p-3 rounded mt-4"
-              value={product.subCategoryId}
-              onChange={(e) =>
-                setProduct({
-                  ...product,
-                  subCategoryId: e.target.value
-                })
-              }
-              disabled={!subCategories.length}
-            >
-              <option value="">Select Subcategory</option>
-              {subCategories.map(sub => (
-                <option key={sub.id} value={sub.id}>
-                  {sub.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {activeTab === "images" && (
-          <div className="space-y-4">
-            <input
-              type="file"
-              multiple
-              onChange={handleImageUpload}
-            />
-
-            {/* Drag-and-drop Preview Grid */}
-            <DndContext
-              collisionDetection={closestCenter}
-              onDragEnd={(event) => {
-                const {active, over} = event;
-                if (over && String(active.id) !== String(over.id)) {
-                  const oldIndex = previews.indexOf(String(active.id));
-                  const newIndex = previews.indexOf(String(over.id));
-                  setPreviews(arrayMove(previews, oldIndex, newIndex));
-                  setImages(arrayMove(images, oldIndex, newIndex));
-                }
-              }}
-            >
-              <SortableContext
-                items={previews}
-                strategy={horizontalListSortingStrategy}
-              >
-                <div className="grid grid-cols-4 gap-4">
-                  {previews.map((img) => (
-                    <SortableImage
-                      key={img}
-                      id={img}
-                      img={img}
-                      removeImage={(id)=>removeImage(previews.indexOf(id))}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          </div>
-        )}
-
-        {activeTab === "variants" && (
-          <div className="space-y-6">
-            {variantTypes.map((type, index) => (
-              <div key={index} className="border p-4 rounded">
-                <input
-                  className="border p-2 w-full mb-3"
-                  placeholder="Variant Name (Color / Size / Pack)"
-                  value={type.name}
-                  onChange={(e) => {
-                    const updated = [...variantTypes];
-                    updated[index].name = e.target.value;
-                    setVariantTypes(updated);
-                  }}
-                />
-
-                <div className="space-y-2">
-                  {type.values.map((val, vIndex) => (
-                    <input
-                      key={vIndex}
-                      className="border p-2 w-full"
-                      placeholder="Value (Red / Blue / 100 pcs)"
-                      value={val}
-                      onChange={(e) => {
-                        const updated = [...variantTypes];
-                        updated[index].values[vIndex] = e.target.value;
-                        setVariantTypes(updated);
-                      }}
-                    />
-                  ))}
-                </div>
-
-                <button
-                  className="text-blue-600 mt-2"
-                  type="button"
-                  onClick={() => {
-                    const updated = [...variantTypes];
-                    updated[index].values.push("");
-                    setVariantTypes(updated);
-                  }}
-                >
-                  + Add Value
-                </button>
-              </div>
-            ))}
-
-            <button
-              className="bg-gray-800 text-white px-4 py-2 rounded"
-              type="button"
-              onClick={() => {
-                setVariantTypes([...variantTypes, { name: "", values: [""] }]);
-              }}
-            >
-              Add Variant Type
-            </button>
-
-            <button
-              className="bg-green-600 text-white px-4 py-2 rounded"
-              type="button"
-              onClick={generateVariants}
-            >
-              Generate Variants
-            </button>
-
-            {variantRows.length > 0 && (
-              <table className="w-full border mt-4">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="p-2 border">Variant</th>
-                    <th className="p-2 border">Price</th>
-                    <th className="p-2 border">Stock</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {variantRows.map((row, index) => (
-                    <tr key={index}>
-                      <td className="border p-2">{row.name}</td>
-                      <td className="border p-2">
-                        <input
-                          className="border p-1 w-full"
-                          value={row.price}
-                          onChange={e => {
-                            const updated = [...variantRows];
-                            updated[index].price = e.target.value;
-                            setVariantRows(updated);
-                          }}
-                        />
-                      </td>
-                      <td className="border p-2">
-                        <input
-                          className="border p-1 w-full"
-                          value={row.stock}
-                          onChange={e => {
-                            const updated = [...variantRows];
-                            updated[index].stock = e.target.value;
-                            setVariantRows(updated);
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-
-        {activeTab === "status" && (
-          <select
-            className="w-full border p-3 rounded"
-            value={product.status}
-            onChange={(e) =>
-              setProduct({ ...product, status: e.target.value })
-            }
-          >
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-          </select>
-        )}
-
-        {activeTab === "tags" && (
-          <div className="space-y-4">
-            <input
-              className="border p-2 rounded w-full"
-              placeholder="Search or create tag"
-              value={tagInput}
-              onChange={(e)=>setTagInput(e.target.value)}
-            />
-
-            <button
-              onClick={addTag}
-              className="bg-blue-600 text-white px-4 py-2 rounded"
-            >
-              Add Tag
-            </button>
-
-            {/* Existing Tags */}
-            <div className="flex flex-wrap gap-2">
-              {tags.map(tag => (
-                <button
-                  key={tag.id}
-                  onClick={()=>selectTag(tag)}
-                  className="bg-gray-200 px-2 py-1 rounded text-sm"
-                >
-                  {tag.name}
-                </button>
-              ))}
-            </div>
-
-            {/* Selected Tags */}
-            <div className="flex flex-wrap gap-2 mt-3">
-              {selectedTags.map(tag => (
-                <div
-                  key={tag.id}
-                  className="bg-pink-100 px-3 py-1 rounded flex items-center gap-2"
-                >
-                  {tag.name}
-
-                  <button
-                    onClick={()=>removeTag(tag.id)}
-                    className="text-red-600"
-                  >
-                    x
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-      </div>
-      <div className="bg-white p-6 rounded-xl shadow border">
-
-        {activeTab === "basic" && (
-          <div className="space-y-4">
-            <input
-              className="w-full border p-3 rounded"
-              placeholder="Product Name"
-              value={product.name}
-              onChange={(e) => {
-                const name = e.target.value;
-                setProduct({
-                  ...product,
-                  name,
-                  slug: generateSlug(name),
+                  slug: generateSlug(name)
                 });
               }}
             />
@@ -534,15 +285,9 @@ export default function AdvancedProductPage() {
               placeholder="Slug"
               value={product.slug}
               onChange={(e) =>
-                setProduct({
-                  ...product,
-                  slug: e.target.value,
-                })
+                setProduct({ ...product, slug: e.target.value })
               }
             />
-            <p className="text-sm text-gray-500">
-              URL: /product/{product.slug}
-            </p>
 
             <textarea
               className="w-full border p-3 rounded h-32"
@@ -552,14 +297,26 @@ export default function AdvancedProductPage() {
                 setProduct({ ...product, description: e.target.value })
               }
             />
+
+            <textarea
+              className="w-full border p-3 rounded h-24"
+              placeholder="Bullet Points"
+              value={product.bulletPoints}
+              onChange={(e) =>
+                setProduct({ ...product, bulletPoints: e.target.value })
+              }
+            />
+
           </div>
         )}
+
+        {/* PRICING */}
 
         {activeTab === "pricing" && (
           <input
             type="number"
             className="w-full border p-3 rounded"
-            placeholder="Price (GST Inclusive)"
+            placeholder="Price"
             value={product.price}
             onChange={(e) =>
               setProduct({ ...product, price: e.target.value })
@@ -567,11 +324,13 @@ export default function AdvancedProductPage() {
           />
         )}
 
+        {/* INVENTORY */}
+
         {activeTab === "inventory" && (
           <input
             type="number"
             className="w-full border p-3 rounded"
-            placeholder="Stock Quantity"
+            placeholder="Stock"
             value={product.stock}
             onChange={(e) =>
               setProduct({ ...product, stock: e.target.value })
@@ -579,80 +338,199 @@ export default function AdvancedProductPage() {
           />
         )}
 
+        {/* VARIANTS */}
+        {activeTab === "variants" && (
+          <VariantMatrixGenerator />
+        )}
+
+        {/* DIMENSIONS */}
+
+        {activeTab === "dimensions" && (
+          <div className="grid grid-cols-2 gap-4">
+
+            <input
+              placeholder="Weight"
+              className="border p-3 rounded"
+              value={product.weight}
+              onChange={(e) =>
+                setProduct({ ...product, weight: e.target.value })
+              }
+            />
+
+            <input
+              placeholder="Length"
+              className="border p-3 rounded"
+              value={product.length}
+              onChange={(e) =>
+                setProduct({ ...product, length: e.target.value })
+              }
+            />
+
+            <input
+              placeholder="Width"
+              className="border p-3 rounded"
+              value={product.width}
+              onChange={(e) =>
+                setProduct({ ...product, width: e.target.value })
+              }
+            />
+
+            <input
+              placeholder="Height"
+              className="border p-3 rounded"
+              value={product.height}
+              onChange={(e) =>
+                setProduct({ ...product, height: e.target.value })
+              }
+            />
+
+          </div>
+        )}
+
+        {/* CATEGORY */}
+
         {activeTab === "category" && (
           <div className="space-y-4">
 
-            {/* Category Dropdown */}
             <select
               className="w-full border p-3 rounded"
-              value={product.categoryId}
-              onChange={(e) =>
-                handleCategoryChange(e.target.value)
-              }
+              value={selectedCategoryId}
+              onChange={(e) => handleCategoryChange(e.target.value)}
             >
               <option value="">Select Category</option>
+
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
                 </option>
               ))}
+
             </select>
 
-            {/* Subcategory Dropdown */}
             <select
               className="w-full border p-3 rounded"
               value={product.subCategoryId}
               onChange={(e) =>
                 setProduct({
                   ...product,
-                  subCategoryId: e.target.value,
+                  subCategoryId: e.target.value
                 })
               }
-              disabled={!subCategories.length}
             >
               <option value="">Select Subcategory</option>
+
               {subCategories.map((sub) => (
                 <option key={sub.id} value={sub.id}>
                   {sub.name}
                 </option>
               ))}
+
             </select>
 
           </div>
         )}
 
+        {/* IMAGES */}
+
         {activeTab === "images" && (
           <div className="space-y-4">
 
-            <input
-              type="file"
-              multiple
-              onChange={handleImageUpload}
-            />
+            <input type="file" multiple onChange={handleImageUpload} />
 
-            {/* Preview Grid */}
-            <div className="grid grid-cols-4 gap-4">
-              {previews.map((img, index) => (
-                <div key={index} className="relative">
+            <DndContext
+              collisionDetection={closestCenter}
+              onDragEnd={(event) => {
 
-                  <img
-                    src={img}
-                    className="w-full h-24 object-cover rounded"
-                  />
+                const { active, over } = event;
 
-                  <button
-                    onClick={() => removeImage(index)}
-                    className="absolute top-1 right-1 bg-red-500 text-white px-2 text-xs rounded"
-                  >
-                    X
-                  </button>
+                if (over && active.id !== over.id) {
+
+                  const oldIndex = previews.indexOf(String(active.id));
+                  const newIndex = previews.indexOf(String(over.id));
+
+                  setPreviews(arrayMove(previews, oldIndex, newIndex));
+                  setImages(arrayMove(images, oldIndex, newIndex));
+                }
+
+              }}
+            >
+
+              <SortableContext
+                items={previews}
+                strategy={horizontalListSortingStrategy}
+              >
+
+                <div className="grid grid-cols-4 gap-4">
+
+                  {previews.map((img) => (
+
+                    <SortableImage
+                      key={img}
+                      id={img}
+                      img={img}
+                      removeImage={removeImage}
+                    />
+
+                  ))}
 
                 </div>
-              ))}
-            </div>
+
+              </SortableContext>
+
+            </DndContext>
 
           </div>
         )}
+
+        {/* SEO */}
+
+        {activeTab === "seo" && (
+          <div className="space-y-4">
+
+            <input
+              className="w-full border p-3 rounded"
+              placeholder="Meta Title"
+              value={product.metaTitle}
+              onChange={(e) =>
+                setProduct({ ...product, metaTitle: e.target.value })
+              }
+            />
+
+            <textarea
+              className="w-full border p-3 rounded h-24"
+              placeholder="Meta Description"
+              value={product.metaDescription}
+              onChange={(e) =>
+                setProduct({ ...product, metaDescription: e.target.value })
+              }
+            />
+
+            <input
+              className="w-full border p-3 rounded"
+              placeholder="SEO Keywords"
+              value={product.seoKeywords}
+              onChange={(e) =>
+                setProduct({ ...product, seoKeywords: e.target.value })
+              }
+            />
+
+          </div>
+        )}
+
+        {/* TAGS */}
+
+        {activeTab === "tags" && (
+          <input
+            className="w-full border p-3 rounded"
+            placeholder="Product Tags"
+            value={product.tags}
+            onChange={(e) =>
+              setProduct({ ...product, tags: e.target.value })
+            }
+          />
+        )}
+
+        {/* STATUS */}
 
         {activeTab === "status" && (
           <select

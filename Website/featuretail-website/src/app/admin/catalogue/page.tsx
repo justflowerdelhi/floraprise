@@ -71,9 +71,15 @@ export default function CataloguePage() {
             {filteredProducts.map((product) => (
               <tr key={product.id} className="border-b hover:bg-gray-50">
                 <td className="p-3">{product.name}</td>
-                <td className="p-3">{product.category}</td>
+
+                <td className="p-3">
+                  {product.category?.name || "-"}
+                </td>
+
                 <td className="p-3">₹{product.price}</td>
+
                 <td className="p-3">{product.stock}</td>
+
                 <td className="p-3">
                   {product.status === "published" ? (
                     <span className="text-green-600">Published</span>
@@ -81,6 +87,7 @@ export default function CataloguePage() {
                     <span className="text-gray-500">Draft</span>
                   )}
                 </td>
+
                 <td className="p-3 text-right space-x-4">
                   <Link
                     href={`/admin/catalogue/edit/${product.id}`}

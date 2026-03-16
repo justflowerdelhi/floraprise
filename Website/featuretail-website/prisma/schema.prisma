@@ -76,7 +76,7 @@ model Category {
   name          String
   slug          String        @unique
   products      Product[]
-  subCategories SubCategory[]
+  subCategories SubCategory[] @relation("CategorySubCategories")
 }
 
 model SubCategory {
@@ -84,8 +84,8 @@ model SubCategory {
   name       String
   slug       String    @unique
   categoryId String
+  category   Category  @relation("CategorySubCategories", fields: [categoryId], references: [id])
   products   Product[]
-  category   Category  @relation(fields: [categoryId], references: [id])
 }
 
 model Tag {
@@ -111,23 +111,53 @@ model ProductImage {
 }
 
 model Product {
-  id            String         @id @default(cuid())
+  id            String   @id @default(cuid())
   name          String
-  slug          String         @unique
-  description   String
+  slug          String   @unique
+  description   String?
+
+  // Bullet points (Amazon style)
+  bulletPoints  String?
+
+  // Pricing
   price         Float
-  stock         Int
-  status        String         @default("draft")
-  featured      Boolean        @default(false)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  comparePrice  Float?
+
+  // Inventory
+  stock         Int      @default(0)
+  sku           String?
+
+  // Dimensions
+  weight        Float?
+  length        Float?
+  width         Float?
+  height        Float?
+
+  // Package dimensions
+  packageWeight Float?
+  packageLength Float?
+  packageWidth  Float?
+  packageHeight Float?
+
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+  seoKeywords     String?
+
+  status        String   @default("draft")
+
   categoryId    String
   subCategoryId String?
-  category      Category       @relation(fields: [categoryId], references: [id])
-  subCategory   SubCategory?   @relation(fields: [subCategoryId], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category      Category @relation(fields: [categoryId], references: [id])
+  subCategory   SubCategory? @relation(fields: [subCategoryId], references: [id])
+
   images        ProductImage[]
-  tags          ProductTag[]
   variants      Variant[]
+  tags          ProductTag[]
 }
 
 model Variant {
