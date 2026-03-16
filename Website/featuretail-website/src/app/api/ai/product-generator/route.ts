@@ -75,6 +75,7 @@ Suggested Category
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
+      temperature: 0.7,
       messages: [
         {
           role: "user",
@@ -83,11 +84,24 @@ Suggested Category
       ]
     });
 
-    const result = completion.choices[0].message.content;
+    let result = completion.choices[0].message.content || "";
 
-    return NextResponse.json({
-      result
-    });
+    // Remove markdown code blocks if AI adds them
+    result = result.replace(/```json/g, "").replace(/```/g, "").trim();
+
+    let parsed;
+
+    try {
+      parsed = JSON.parse(result);
+    } catch (err) {
+      console.error("JSON PARSE ERROR:", result);
+      return NextResponse.json(
+        { error: "AI returned invalid JSON", raw: result },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(parsed);
 
   } catch (error) {
 

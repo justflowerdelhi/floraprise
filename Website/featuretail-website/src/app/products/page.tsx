@@ -54,6 +54,7 @@ export default function ProductsPage() {
 
           <thead className="bg-gray-100">
             <tr>
+              <th className="p-3 text-left">Image</th>
               <th className="p-3 text-left">Product</th>
               <th className="p-3 text-left">Category</th>
               <th className="p-3 text-left">Price</th>
@@ -72,6 +73,12 @@ export default function ProductsPage() {
                 {/* PRODUCT ROW */}
 
                 <tr className="font-semibold bg-gray-50 border-t">
+                  <td className="p-2">
+                    <img
+                      src={p.images?.[0]?.url || "/no-image.png"}
+                      className="w-12 h-12 object-cover rounded"
+                    />
+                  </td>
                   <td className="p-3">{p.name}</td>
                   <td className="p-3">{p.category?.name}</td>
                   <td className="p-3">₹{p.price}</td>
@@ -90,39 +97,30 @@ export default function ProductsPage() {
                 {/* VARIANTS */}
 
                 {p.variants?.map((v:any) => {
-
                   const optionValues =
                     v.options?.map((o:any)=>o.value).join(" / ") || "-";
-
                   const price =
                     v.options?.find((o:any)=>o.price !== null)?.price ?? "-";
-
                   const stock =
                     v.options?.find((o:any)=>o.stock !== null)?.stock ?? "-";
-
+                  const image =
+                    v.image || p.images?.[0]?.url || "/no-image.png";
                   return (
                     <tr key={v.id} className="bg-gray-50 text-sm">
-
-                      {/* Product column (empty to indent) */}
-                      <td className="pl-8 text-gray-600">
-                        ↳ {optionValues}
+                      <td className="p-2">
+                        <img
+                          src={image}
+                          className="w-10 h-10 object-cover rounded"
+                        />
                       </td>
-
-                      {/* Category */}
+                      <td className="pl-6 text-gray-700">
+                        {p.name} ({optionValues})
+                      </td>
                       <td></td>
-
-                      {/* Price */}
                       <td>₹{price}</td>
-
-                      {/* Stock */}
                       <td>{stock}</td>
-
-                      {/* Status */}
                       <td>-</td>
-
-                      {/* Actions */}
                       <td></td>
-
                     </tr>
                   );
                 })}

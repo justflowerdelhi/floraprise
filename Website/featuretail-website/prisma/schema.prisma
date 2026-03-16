@@ -164,6 +164,7 @@ model Variant {
   id        String          @id @default(cuid())
   name      String
   productId String
+  image     String?         // NEW
   product   Product         @relation(fields: [productId], references: [id])
   options   VariantOption[]
 }

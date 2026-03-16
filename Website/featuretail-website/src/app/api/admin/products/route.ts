@@ -7,25 +7,21 @@ export async function GET() {
 
   try {
 
-    const products = await prisma.product.findMany({
 
+    const products = await prisma.product.findMany({
       include: {
         category: true,
         subCategory: true,
         images: true,
-
         variants: {
           include: {
             options: true
           }
         }
-
       },
-
       orderBy: {
         createdAt: "desc"
       }
-
     })
 
     return NextResponse.json(products)
@@ -127,7 +123,7 @@ export async function POST(req: Request) {
           ? {
               create: variants.map((v: any) => ({
                 name: v.sku || "Variant",
-
+                image: v.image || null,
                 options: {
                   create: (v.options || []).map((o: any) => ({
                     value: o.value,
@@ -135,7 +131,6 @@ export async function POST(req: Request) {
                     stock: Number(v.stock || 0)
                   }))
                 }
-
               }))
             }
           : undefined
