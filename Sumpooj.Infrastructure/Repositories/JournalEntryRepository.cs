@@ -25,4 +25,18 @@ public class JournalEntryRepository : IJournalEntryRepository
         _db.JournalEntries.AddRange(entries);
         await _db.SaveChangesAsync();
     }
+
+    public async Task<Guid> GetOrCreateAccountIdAsync(Guid companyId, string code, string name, string type)
+    {
+        var account = await _db.Accounts
+            .FirstOrDefaultAsync(a => a.CompanyId == companyId && a.Code == code);
+
+        if (account != null)
+            return account.Id;
+
+        account = new Account(companyId, code, name, type);
+        _db.Accounts.Add(account);
+        await _db.SaveChangesAsync();
+        return account.Id;
+    }
 }

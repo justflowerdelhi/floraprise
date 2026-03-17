@@ -426,45 +426,72 @@ public class OrderService
     /// </summary>
     private async Task CreateSaleJournalEntriesAsync(Guid companyId, Order order, CreateOrderRequest request)
     {
-        var entries = new List<JournalEntry>();
-        var now = DateTime.UtcNow;
-        var orderRef = order.OrderNumber;
-
-        foreach (var p in request.Payments)
+        try
         {
-            var methodStr = NormalizeEnumString(p.Method);
-            if (!Enum.TryParse<PaymentMethod>(methodStr, true, out var method))
-                method = PaymentMethod.Cash;
+            // Look up (or auto-create) the Sales Revenue account
+            var revenueAccountId = await _journalEntryRepository
+                .GetOrCreateAccountIdAsync(companyId, "4000", "Sales Revenue", "Income");
 
-            var methodLabel = method switch
+            var entries = new List<JournalEntry>();
+            var now = DateTime.UtcNow;
+            var orderRef = order.OrderNumber;
+
+            foreach (var p in request.Payments)
             {
-                PaymentMethod.Cash => "Cash",
-                PaymentMethod.Card => "Card",
-                PaymentMethod.Upi => "UPI",
-                PaymentMethod.GiftCard => "Gift Card",
-                PaymentMethod.BankTransfer => "Bank Transfer",
-                _ => method.ToString()
-            };
+                var methodStr = NormalizeEnumString(p.Method);
+                if (!Enum.TryParse<PaymentMethod>(methodStr, true, out var method))
+                    method = PaymentMethod.Cash;
 
-            // Debit: Payment method account
-            var debitEntry = new JournalEntry(
-                companyId, now, orderRef, "SALE",
-                $"POS Sale {orderRef} — {methodLabel} payment",
-                p.Amount, 0, null);
-            debitEntry.SetLocation(order.LocationId);
-            entries.Add(debitEntry);
+                // Determine the payment method account
+                var (acctCode, acctName) = method switch
+                {
+                    PaymentMethod.Cash => ("1000", "Cash"),
+                    PaymentMethod.Card => ("1010", "Card Receivables"),
+                    PaymentMethod.Upi => ("1020", "UPI Receivables"),
+                    PaymentMethod.GiftCard => ("1030", "Gift Card Receivables"),
+                    PaymentMethod.BankTransfer => ("1100", "Bank Account"),
+                    _ => ("1000", "Cash")
+                };
 
-            // Credit: Sales Revenue
-            var creditEntry = new JournalEntry(
-                companyId, now, orderRef, "SALE",
-                $"POS Sale {orderRef} — Revenue",
-                0, p.Amount, null);
-            creditEntry.SetLocation(order.LocationId);
-            entries.Add(creditEntry);
+                var paymentAccountId = await _journalEntryRepository
+                    .GetOrCreateAccountIdAsync(companyId, acctCode, acctName, "Asset");
+
+                var methodLabel = method switch
+                {
+                    PaymentMethod.Cash => "Cash",
+                    PaymentMethod.Card => "Card",
+                    PaymentMethod.Upi => "UPI",
+                    PaymentMethod.GiftCard => "Gift Card",
+                    PaymentMethod.BankTransfer => "Bank Transfer",
+                    _ => method.ToString()
+                };
+
+                // Debit: Payment method account
+                var debitEntry = new JournalEntry(
+                    companyId, now, orderRef, "SALE",
+                    $"POS Sale {orderRef} — {methodLabel} payment",
+                    p.Amount, 0, paymentAccountId);
+                debitEntry.SetLocation(order.LocationId);
+                entries.Add(debitEntry);
+
+                // Credit: Sales Revenue
+                var creditEntry = new JournalEntry(
+                    companyId, now, orderRef, "SALE",
+                    $"POS Sale {orderRef} — Revenue",
+                    0, p.Amount, revenueAccountId);
+                creditEntry.SetLocation(order.LocationId);
+                entries.Add(creditEntry);
+            }
+
+            if (entries.Count > 0)
+                await _journalEntryRepository.AddRangeAsync(entries);
         }
-
-        if (entries.Count > 0)
-            await _journalEntryRepository.AddRangeAsync(entries);
+        catch (Exception ex)
+        {
+            // Journal entry creation should not block order creation
+            // Log and continue — the order itself is already saved
+            System.Diagnostics.Debug.WriteLine($"[OrderService] Journal entry creation failed: {ex.Message}");
+        }
     }
 
     /// <summary>
