@@ -12,6 +12,7 @@ import {
   LocalShipping as DeliveryIcon,
   ShoppingBag as PickupIcon,
   WarningAmber as WarningIcon,
+  KeyboardArrowDown as ArrowDownIcon,
 } from '@mui/icons-material';
 import type { OrderIntent } from './POSTypes';
 import { ORDER_INTENT_OPTIONS } from './POSTypes';
@@ -99,6 +100,7 @@ const OrderIntentSwitcher: React.FC<OrderIntentSwitcherProps> = ({
   hasItems,
 }) => {
   const [pendingIntent, setPendingIntent] = useState<OrderIntent | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const handleClick = useCallback(
     (intent: OrderIntent) => {
@@ -123,9 +125,50 @@ const OrderIntentSwitcher: React.FC<OrderIntentSwitcherProps> = ({
     setPendingIntent(null);
   }, []);
 
+  const activeOption = ORDER_INTENT_OPTIONS.find((o) => o.value === value);
+
   return (
     <>
-      <div className="inline-flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5">
+      {/* Mobile: Dropdown */}
+      <div className="relative sm:hidden shrink-0">
+        <button
+          onClick={() => setDropdownOpen((v) => !v)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg
+                     bg-white text-purple-700 shadow-sm ring-1 ring-gray-200"
+        >
+          {activeOption && INTENT_ICON[activeOption.icon]}
+          {activeOption?.label}
+          <ArrowDownIcon className={`w-4 h-4 text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {dropdownOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
+            <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[160px] py-1">
+              {ORDER_INTENT_OPTIONS.map((opt) => {
+                const isActive = value === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      handleClick(opt.value);
+                      setDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                      isActive ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {INTENT_ICON[opt.icon]}
+                    <span>{opt.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Desktop: Segmented control */}
+      <div className="hidden sm:inline-flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5">
         {ORDER_INTENT_OPTIONS.map((opt) => {
           const isActive = value === opt.value;
           return (

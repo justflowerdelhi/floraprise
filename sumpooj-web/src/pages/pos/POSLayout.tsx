@@ -283,8 +283,8 @@ const POSLayout: React.FC = () => {
         onCloseShift={() => setCloseDrawerOpen(true)}
       />
 
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main Content — stack on mobile, side-by-side on desktop */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         
 
         {/* Product Grid */}

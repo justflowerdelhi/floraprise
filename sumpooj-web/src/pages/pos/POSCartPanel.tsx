@@ -58,7 +58,7 @@ const POSCartPanel: React.FC<POSCartPanelProps> = ({
   const isEmpty = items.length === 0;
 
   return (
-    <aside className="w-80 xl:w-96 bg-white border-l border-gray-200 flex flex-col h-full shrink-0">
+    <aside className="w-full md:w-80 xl:w-96 bg-white border-t md:border-t-0 md:border-l border-gray-200 flex flex-col h-64 md:h-full shrink-0">
       {/* Cart Header */}
       <header className="px-4 py-3 border-b border-gray-200">
         <div className="flex items-center gap-2">

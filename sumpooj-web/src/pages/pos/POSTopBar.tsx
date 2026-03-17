@@ -113,105 +113,108 @@ const POSTopBar: React.FC<POSTopBarProps> = ({
   }, [onSearchSubmit]);
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center px-2 gap-2 shrink-0">
-      {/* Search / Barcode Input */}
-      <div className="flex-1 max-w-md">
-        <div className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            ref={searchRef}
-            type="text"
-            placeholder={searchProps?.placeholder || "Search products or scan barcode... (F2)"}
-            value={searchValue}
-            onChange={(e) => onSearchChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className={searchProps?.className || "w-full h-10 pl-10 pr-4 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-400"}
-            style={searchProps?.sx}
-          />
+    <header className="bg-white border-b border-gray-200 shrink-0">
+      {/* Row 1: Search + Customer + Total (always visible) */}
+      <div className="h-14 sm:h-16 flex items-center px-2 gap-2">
+        {/* Search / Barcode Input */}
+        <div className="flex-1 min-w-0">
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              ref={searchRef}
+              type="text"
+              placeholder={searchProps?.placeholder || "Search / scan barcode (F2)"}
+              value={searchValue}
+              onChange={(e) => onSearchChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className={searchProps?.className || "w-full h-10 pl-10 pr-4 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-400"}
+              style={searchProps?.sx}
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Customer Selector */}
-      <button
-        onClick={onCustomerClick}
-        className="flex items-center gap-1.5 h-9 px-2 border border-gray-200 rounded-md
-                   hover:bg-gray-50 transition-colors min-w-[110px] text-xs"
-      >
-        <PersonIcon className="w-5 h-5 text-gray-500" />
-        <span className="text-sm text-gray-700 truncate max-w-[100px]">
-          {selectedCustomer ? selectedCustomer.name : 'Walk-in'}
-        </span>
-        <ArrowDownIcon className="w-4 h-4 text-gray-400 ml-auto" />
-      </button>
-
-      {/* Order Intent Segmented Control */}
-      <OrderIntentSwitcher
-        value={orderType}
-        onChange={onOrderTypeChange}
-        hasItems={hasItems}
-        {...(orderTypeProps || {})}
-      />
-
-      {/* Location Dropdown */}
-      <div className="relative">
+        {/* Customer Selector — hidden on xs, shown on sm+ */}
         <button
-          ref={locationBtnRef}
-          onClick={() => setLocationMenuOpen((v) => !v)}
-          className={locationProps?.className || "flex items-center gap-1 h-8 px-2 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors text-xs"}
-          style={locationProps?.sx}
+          onClick={onCustomerClick}
+          className="hidden sm:flex items-center gap-1.5 h-9 px-2 border border-gray-200 rounded-md
+                     hover:bg-gray-50 transition-colors min-w-[110px] text-xs"
         >
-          <LocationIcon className="w-4 h-4 text-green-600" />
-          <span className="max-w-[80px] truncate">{locationName}</span>
-          <ArrowDownIcon className={`w-3 h-3 text-gray-400 transition-transform ${locationMenuOpen ? 'rotate-180' : ''}`} />
+          <PersonIcon className="w-5 h-5 text-gray-500" />
+          <span className="text-sm text-gray-700 truncate max-w-[100px]">
+            {selectedCustomer ? selectedCustomer.name : 'Walk-in'}
+          </span>
+          <ArrowDownIcon className="w-4 h-4 text-gray-400 ml-auto" />
         </button>
 
-        {locationMenuOpen && (
-          <>
-            {/* Backdrop */}
-            <div className="fixed inset-0 z-40" onClick={() => setLocationMenuOpen(false)} />
-
-            {/* Menu */}
-            <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[220px] py-1">
-              {accessibleLocations.map((loc) => {
-                const isSelected = loc.id === currentLocationId;
-                return (
-                  <button
-                    key={loc.id}
-                    onClick={() => {
-                      onLocationChange(loc.id);
-                      setLocationMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors ${
-                      isSelected ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-gray-700'
-                    }`}
-                  >
-                    <LocationIcon className={`w-4 h-4 ${isSelected ? 'text-purple-600' : 'text-gray-400'}`} />
-                    <span className="flex-1 truncate">{loc.name}</span>
-                    {isSelected && <CheckIcon className="w-4 h-4 text-purple-600" />}
-                  </button>
-                );
-              })}
-              {accessibleLocations.length === 0 && (
-                <div className="px-3 py-2 text-sm text-gray-400">No locations available</div>
-              )}
-            </div>
-          </>
-        )}
+        {/* Grand Total */}
+        <div className="pl-2 sm:pl-4 border-l border-gray-200">
+          <div className="text-right">
+            <span className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide">Total</span>
+            <p className="text-lg sm:text-xl font-bold text-purple-700">
+              {formatCurrency(grandTotal)}
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Shift Status & Close Button */}
-      {activeShift && (
-        <ShiftChip shift={activeShift} onClose={onCloseShift} closeShiftProps={closeShiftProps} />
-      )}
+      {/* Row 2: Order Intent + Location + Shift (wraps on mobile) */}
+      <div className="flex items-center gap-2 px-2 pb-2 overflow-x-auto scrollbar-hide">
+        {/* Order Intent Segmented Control */}
+        <OrderIntentSwitcher
+          value={orderType}
+          onChange={onOrderTypeChange}
+          hasItems={hasItems}
+          {...(orderTypeProps || {})}
+        />
 
-      {/* Grand Total */}
-      <div className="ml-auto pl-4 border-l border-gray-200">
-        <div className="text-right">
-          <span className="text-xs text-gray-500 uppercase tracking-wide">Total</span>
-          <p className="text-xl font-bold text-purple-700">
-            {formatCurrency(grandTotal)}
-          </p>
+        {/* Location Dropdown */}
+        <div className="relative shrink-0">
+          <button
+            ref={locationBtnRef}
+            onClick={() => setLocationMenuOpen((v) => !v)}
+            className={locationProps?.className || "flex items-center gap-1 h-8 px-2 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors text-xs"}
+            style={locationProps?.sx}
+          >
+            <LocationIcon className="w-4 h-4 text-green-600" />
+            <span className="max-w-[80px] truncate">{locationName}</span>
+            <ArrowDownIcon className={`w-3 h-3 text-gray-400 transition-transform ${locationMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {locationMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setLocationMenuOpen(false)} />
+              <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[220px] py-1">
+                {accessibleLocations.map((loc) => {
+                  const isSelected = loc.id === currentLocationId;
+                  return (
+                    <button
+                      key={loc.id}
+                      onClick={() => {
+                        onLocationChange(loc.id);
+                        setLocationMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors ${
+                        isSelected ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-gray-700'
+                      }`}
+                    >
+                      <LocationIcon className={`w-4 h-4 ${isSelected ? 'text-purple-600' : 'text-gray-400'}`} />
+                      <span className="flex-1 truncate">{loc.name}</span>
+                      {isSelected && <CheckIcon className="w-4 h-4 text-purple-600" />}
+                    </button>
+                  );
+                })}
+                {accessibleLocations.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-gray-400">No locations available</div>
+                )}
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Shift Status & Close Button */}
+        {activeShift && (
+          <ShiftChip shift={activeShift} onClose={onCloseShift} closeShiftProps={closeShiftProps} />
+        )}
       </div>
     </header>
   );
