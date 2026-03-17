@@ -70,6 +70,8 @@ export async function createPhoneOrder(payload: {
   occasion?: string;
   budget?: number;
   specialInstructions?: string;
+  deliveryCharge?: number;
+  items?: { description: string; quantity: number; unitPrice: number }[];
 }): Promise<PhoneOrderResponse> {
   const res = await api.post('/phone-orders', payload);
   return res.data;

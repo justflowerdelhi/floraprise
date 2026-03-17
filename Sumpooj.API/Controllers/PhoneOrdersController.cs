@@ -88,6 +88,28 @@ public class PhoneOrdersController : ControllerBase
         if (!string.IsNullOrEmpty(request.SpecialInstructions))
             order.AddInternalNote(request.SpecialInstructions);
 
+        // Add line items
+        if (request.Items.Count > 0)
+        {
+            foreach (var item in request.Items)
+            {
+                order.AddItem(
+                    item.ProductId ?? Guid.Empty,
+                    item.Description,
+                    item.Quantity > 0 ? item.Quantity : 1,
+                    item.UnitPrice);
+            }
+        }
+        else if (request.Budget.HasValue && request.Budget.Value > 0)
+        {
+            // Fallback: use budget as a single line item
+            order.AddItem(Guid.Empty, request.SpecialInstructions ?? "Phone Order", 1, request.Budget.Value);
+        }
+
+        // Set delivery charge
+        if (request.DeliveryCharge > 0)
+            order.SetDeliveryFee(request.DeliveryCharge);
+
         await _orderRepository.AddAsync(order);
 
         return CreatedAtAction(nameof(GetPhoneOrder), new { id = order.Id }, BuildPhoneOrderResponse(order, customerName, request.DeliveryCity, request.TimeSlot, request.Occasion, request.Budget));
@@ -393,6 +415,16 @@ public class CreatePhoneOrderRequest
     public string? Occasion { get; set; }
     public decimal? Budget { get; set; }
     public string? SpecialInstructions { get; set; }
+    public decimal DeliveryCharge { get; set; }
+    public List<PhoneOrderItemRequest> Items { get; set; } = new();
+}
+
+public class PhoneOrderItemRequest
+{
+    public Guid? ProductId { get; set; }
+    public string Description { get; set; } = "Phone Order";
+    public int Quantity { get; set; } = 1;
+    public decimal UnitPrice { get; set; }
 }
 
 public class AddItemRequest

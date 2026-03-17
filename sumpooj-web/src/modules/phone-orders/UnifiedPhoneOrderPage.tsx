@@ -10,6 +10,16 @@ const UnifiedPhoneOrderPage: React.FC = () => {
   const ensureOrderCreated = async (): Promise<string> => {
     if (savedOrderId) return savedOrderId;
 
+    // Build items from the order amount
+    const items: { description: string; quantity: number; unitPrice: number }[] = [];
+    if (typeof amount === 'number' && amount > 0) {
+      items.push({
+        description: orderDescription || 'Phone Order',
+        quantity: 1,
+        unitPrice: amount,
+      });
+    }
+
     const created = await createPhoneOrder({
       customerName: customerName || undefined,
       phoneNumber: phone || undefined,
@@ -19,6 +29,8 @@ const UnifiedPhoneOrderPage: React.FC = () => {
       timeSlot: timeSlot || undefined,
       budget: typeof amount === 'number' ? amount : undefined,
       specialInstructions: orderDescription || undefined,
+      deliveryCharge: typeof deliveryCharge === 'number' ? deliveryCharge : 0,
+      items,
     });
 
     setSavedOrderId(created.id);
