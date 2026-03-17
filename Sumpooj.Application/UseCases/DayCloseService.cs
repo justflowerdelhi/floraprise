@@ -37,10 +37,11 @@ public class DayCloseService
     public async Task<object> GetSummaryAsync(Guid companyId, Guid locationId, DateTime date)
     {
         var allOrders = await _orderRepository.GetByDateAsync(companyId, date);
-        
+
         // Filter by location if provided (Guid.Empty = all locations)
+        // Include orders with no location (phone orders) in all-location view
         var orders = locationId != Guid.Empty
-            ? allOrders.Where(o => o.LocationId == locationId).ToList()
+            ? allOrders.Where(o => o.LocationId == locationId || o.LocationId == null).ToList()
             : allOrders;
 
         var totalOrders = orders.Count;

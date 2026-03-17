@@ -68,8 +68,9 @@ public class PaymentRepository : IPaymentRepository
                 && p.Status == PaymentTransactionStatus.Approved);
 
         // Filter by location only if a specific location is provided
+        // Include payments without a location (phone orders) in location-specific views too
         if (locationId != Guid.Empty)
-            query = query.Where(p => p.LocationId == locationId);
+            query = query.Where(p => p.LocationId == locationId || p.LocationId == null);
 
         return await query.ToListAsync();
     }

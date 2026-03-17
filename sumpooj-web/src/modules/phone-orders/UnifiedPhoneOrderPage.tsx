@@ -86,16 +86,16 @@ const UnifiedPhoneOrderPage: React.FC = () => {
   const balance = total - paid;
 
   return (
-    <div className="p-6 grid grid-cols-12 gap-6">
-      {/* LEFT SIDE */}
-      <div className="col-span-8 bg-white rounded-xl shadow p-6 space-y-6">
+    <div className="p-3 sm:p-6 flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-6">
+      {/* LEFT SIDE — Order Form */}
+      <div className="lg:col-span-8 bg-white rounded-xl shadow p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* ORDER TYPE */}
         <div>
           <h2 className="font-semibold mb-3">Order Type</h2>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             <button
               onClick={() => setOrderType("pickup")}
-              className={`px-5 py-2 rounded-lg border ${
+              className={`px-4 py-2 rounded-lg border text-sm sm:text-base ${
                 orderType === "pickup"
                   ? "bg-gray-700 text-white"
                   : "bg-gray-100"
@@ -105,7 +105,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
             </button>
             <button
               onClick={() => setOrderType("delivery")}
-              className={`px-5 py-2 rounded-lg border ${
+              className={`px-4 py-2 rounded-lg border text-sm sm:text-base ${
                 orderType === "delivery"
                   ? "bg-purple-600 text-white"
                   : "bg-gray-100"
@@ -115,7 +115,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
             </button>
             <button
               onClick={() => setOrderType("outstation")}
-              className={`px-5 py-2 rounded-lg border ${
+              className={`px-4 py-2 rounded-lg border text-sm sm:text-base ${
                 orderType === "outstation"
                   ? "bg-orange-500 text-white"
                   : "bg-gray-100"
@@ -126,7 +126,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
           </div>
         </div>
         {/* CUSTOMER */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <input
             placeholder="Customer Phone"
             value={phone}
@@ -171,8 +171,8 @@ const UnifiedPhoneOrderPage: React.FC = () => {
         )}
         {/* DELIVERY DETAILS */}
         {orderType !== "pickup" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <input
                 placeholder="Recipient Name"
                 className="border rounded-lg p-3"
@@ -186,35 +186,20 @@ const UnifiedPhoneOrderPage: React.FC = () => {
               placeholder="Delivery Address"
               className="border rounded-lg p-3 w-full"
             />
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <input placeholder="City" className="border rounded-lg p-3" value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} />
               <input placeholder="State" className="border rounded-lg p-3" />
               <input placeholder="ZIP Code" className="border rounded-lg p-3" />
             </div>
-            <div className="flex gap-2 mt-2">
-              <button
-                onClick={() => setDeliveryCharge(50)}
-                className="px-3 py-1 bg-gray-200 rounded"
-              >
-                ₹50
-              </button>
-              <button
-                onClick={() => setDeliveryCharge(100)}
-                className="px-3 py-1 bg-gray-200 rounded"
-              >
-                ₹100
-              </button>
-              <button
-                onClick={() => setDeliveryCharge(150)}
-                className="px-3 py-1 bg-gray-200 rounded"
-              >
-                ₹150
-              </button>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <button onClick={() => setDeliveryCharge(50)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹50</button>
+              <button onClick={() => setDeliveryCharge(100)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹100</button>
+              <button onClick={() => setDeliveryCharge(150)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹150</button>
             </div>
           </div>
         )}
         {/* DELIVERY DATE */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <input type="date" className="border rounded-lg p-3" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
           <select
             value={timeSlot}
@@ -256,7 +241,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
           onChange={(e) => setOrderDescription(e.target.value)}
           className="border rounded-lg p-3 w-full"
         />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div>
             <label className="text-sm text-gray-600">Order Amount</label>
             <input
@@ -278,14 +263,14 @@ const UnifiedPhoneOrderPage: React.FC = () => {
             />
           </div>
         </div>
-        <div className="flex gap-2 mt-2">
-          <button onClick={() => setDeliveryCharge(50)} className="px-3 py-1 bg-gray-200 rounded">₹50</button>
-          <button onClick={() => setDeliveryCharge(100)} className="px-3 py-1 bg-gray-200 rounded">₹100</button>
-          <button onClick={() => setDeliveryCharge(150)} className="px-3 py-1 bg-gray-200 rounded">₹150</button>
+        <div className="flex flex-wrap gap-2 mt-2">
+          <button onClick={() => setDeliveryCharge(50)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹50</button>
+          <button onClick={() => setDeliveryCharge(100)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹100</button>
+          <button onClick={() => setDeliveryCharge(150)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹150</button>
         </div>
       </div>
-      {/* RIGHT SIDE */}
-      <div className="col-span-4 bg-white rounded-xl shadow p-6">
+      {/* RIGHT SIDE — Summary & Payment */}
+      <div className="lg:col-span-4 bg-white rounded-xl shadow p-4 sm:p-6">
         <h2 className="font-semibold mb-4">Order Summary</h2>
         <div className="space-y-4">
           <div className="flex justify-between text-gray-600">
@@ -413,7 +398,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
           <div className="mt-4 p-4 bg-white border rounded-lg">
             <div className="mb-2 font-semibold">Split Payment</div>
             <div className="space-y-2">
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="number"
                   placeholder="Amount 1"
@@ -424,7 +409,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
                   }}
                 />
                 <select
-                  className="border rounded p-2 w-full"
+                  className="border rounded p-2 w-full sm:w-auto"
                   value={splitPayments[0]?.mode || "Cash"}
                   onChange={e => {
                     setSplitPayments(payments => [{...payments[0], mode: e.target.value as 'Cash' | 'UPI' | 'Card' | 'BankTransfer', amount: payments[0]?.amount || 0}, payments[1] || {mode: "Card", amount: 0}]);
@@ -435,7 +420,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="number"
                   placeholder="Amount 2"
@@ -446,7 +431,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
                   }}
                 />
                 <select
-                  className="border rounded p-2 w-full"
+                  className="border rounded p-2 w-full sm:w-auto"
                   value={splitPayments[1]?.mode || "Card"}
                   onChange={e => {
                     setSplitPayments(payments => [payments[0] || {mode: "Cash", amount: 0}, {...payments[1], mode: e.target.value as 'Cash' | 'UPI' | 'Card' | 'BankTransfer', amount: payments[1]?.amount || 0}]);
