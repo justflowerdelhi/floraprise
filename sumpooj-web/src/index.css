@@ -18,6 +18,19 @@ body {
   color: #1F2937;
 }
 
+/* Mobile cart slide-up animation */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slideUp 0.25s ease-out;
+}
+
+/* Hide scrollbar for POS top bar overflow */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
 a {
   font-weight: 500;
   text-decoration: inherit;

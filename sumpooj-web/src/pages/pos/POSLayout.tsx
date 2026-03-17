@@ -6,6 +6,7 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { Alert, Snackbar } from '@mui/material';
+import { ShoppingCart as CartIcon } from '@mui/icons-material';
 import POSTopBar from './POSTopBar';
 
 import ProductGrid from './ProductGrid';
@@ -106,6 +107,9 @@ const POSLayout: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [state.items.length, clearCart]);
+
+  // Mobile cart drawer
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
   // Handlers
   const showSnackbar = useCallback((message: string, severity: 'success' | 'error' | 'info' = 'success') => {
@@ -283,11 +287,9 @@ const POSLayout: React.FC = () => {
         onCloseShift={() => setCloseDrawerOpen(true)}
       />
 
-      {/* Main Content — stack on mobile, side-by-side on desktop */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        
-
-        {/* Product Grid */}
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Product Grid — full width on mobile */}
         <ProductGrid
           products={products}
           searchQuery={searchQuery}
@@ -297,16 +299,74 @@ const POSLayout: React.FC = () => {
           locationId={currentLocationId}
         />
 
-        {/* Cart Panel */}
-        <POSCartPanel
-          items={state.items}
-          totals={state.totals}
-          products={products}
-          onUpdateQty={handleUpdateQty}
-          onRemoveItem={handleRemoveItem}
-          onPayment={handlePayment}
-        />
+        {/* Cart Panel — hidden on mobile, shown on md+ */}
+        <div className="hidden md:flex">
+          <POSCartPanel
+            items={state.items}
+            totals={state.totals}
+            products={products}
+            onUpdateQty={handleUpdateQty}
+            onRemoveItem={handleRemoveItem}
+            onPayment={handlePayment}
+          />
+        </div>
       </div>
+
+      {/* Mobile Cart Floating Button — visible only on mobile when cart has items */}
+      {state.items.length > 0 && !mobileCartOpen && (
+        <button
+          onClick={() => setMobileCartOpen(true)}
+          className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40
+                     flex items-center gap-2 px-6 py-3 bg-purple-600 text-white
+                     rounded-full shadow-lg shadow-purple-200 active:scale-95 transition-transform"
+        >
+          <CartIcon className="w-5 h-5" />
+          <span className="font-semibold">{state.items.length} items</span>
+          <span className="text-purple-200">•</span>
+          <span className="font-bold">{formatCurrency(state.totals.grandTotal)}</span>
+        </button>
+      )}
+
+      {/* Mobile Cart Drawer — slides up from bottom */}
+      {mobileCartOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex flex-col">
+          {/* Backdrop */}
+          <div
+            className="flex-shrink-0 bg-black/40"
+            style={{ height: '60px' }}
+            onClick={() => setMobileCartOpen(false)}
+          />
+          {/* Cart panel fills remaining space */}
+          <div className="flex-1 bg-white rounded-t-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+            {/* Drag handle + close */}
+            <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-1 bg-gray-300 rounded-full" />
+              </div>
+              <button
+                onClick={() => setMobileCartOpen(false)}
+                className="text-sm text-purple-600 font-medium px-3 py-1"
+              >
+                Done
+              </button>
+            </div>
+            {/* Reuse cart panel */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <POSCartPanel
+                items={state.items}
+                totals={state.totals}
+                products={products}
+                onUpdateQty={handleUpdateQty}
+                onRemoveItem={handleRemoveItem}
+                onPayment={(method) => {
+                  setMobileCartOpen(false);
+                  handlePayment(method);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Payment Drawer */}
       <POSPaymentDrawer
