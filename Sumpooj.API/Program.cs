@@ -317,10 +317,11 @@ var app = builder.Build();
     app.MapScalarApiReference(); // optional API explorer
 //}
 
-app.UseHttpsRedirection();
-
-// CORS must run before auth so preflight OPTIONS requests get proper headers
+// CORS must run FIRST — before HTTPS redirect, auth, etc.
+// Otherwise preflight OPTIONS requests get redirected/blocked.
 app.UseCors("DefaultCorsPolicy");
+
+app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
