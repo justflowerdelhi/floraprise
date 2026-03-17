@@ -1,10 +1,39 @@
 import React, { useState } from "react";
-import { confirmPhoneLocalOrder } from "./phoneOrders.api";
+import { confirmPhoneLocalOrder, createPhoneOrder } from "./phoneOrders.api";
 import { createPayment } from "./phoneOrders.api";
 
 const UnifiedPhoneOrderPage: React.FC = () => {
-      // Dummy orderId for demonstration; replace with actual orderId logic
-      const orderId = "phone_order_" + Date.now();
+  const [savedOrderId, setSavedOrderId] = useState<string | null>(null);
+  const [deliveryDate, setDeliveryDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [deliveryCity, setDeliveryCity] = useState<string>("");
+
+  const ensureOrderCreated = async (): Promise<string> => {
+    if (savedOrderId) return savedOrderId;
+
+    const created = await createPhoneOrder({
+      customerName: customerName || undefined,
+      phoneNumber: phone || undefined,
+      orderType: orderType === 'outstation' ? 'PhoneOutstation' : 'PhoneLocal',
+      deliveryDate: deliveryDate || new Date().toISOString(),
+      deliveryCity: deliveryCity || 'Unknown',
+      timeSlot: timeSlot || undefined,
+      budget: typeof amount === 'number' ? amount : undefined,
+      specialInstructions: orderDescription || undefined,
+    });
+
+    setSavedOrderId(created.id);
+    return created.id;
+  };
+
+  const safeCreatePayment = async (payload: { amount: number; paymentMode: 'Cash' | 'UPI' | 'Card' | 'BankTransfer' }) => {
+    try {
+      const orderId = await ensureOrderCreated();
+      await createPayment({ ...payload, orderId });
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Unable to create payment.';
+      alert(msg);
+    }
+  };
     // Advance payment modal state
     const [showAdvancePrompt, setShowAdvancePrompt] = useState(false);
     const [advanceAmount, setAdvanceAmount] = useState(0);
@@ -146,7 +175,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
               className="border rounded-lg p-3 w-full"
             />
             <div className="grid grid-cols-3 gap-4">
-              <input placeholder="City" className="border rounded-lg p-3" />
+              <input placeholder="City" className="border rounded-lg p-3" value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} />
               <input placeholder="State" className="border rounded-lg p-3" />
               <input placeholder="ZIP Code" className="border rounded-lg p-3" />
             </div>
@@ -174,7 +203,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
         )}
         {/* DELIVERY DATE */}
         <div className="grid grid-cols-2 gap-4">
-          <input type="date" className="border rounded-lg p-3" />
+          <input type="date" className="border rounded-lg p-3" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
           <select
             value={timeSlot}
             onChange={(e) => setTimeSlot(e.target.value)}
@@ -307,8 +336,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
                 onClick={async () => {
                   setPaid(advanceAmount);
                   setShowAdvancePrompt(false);
-                  await createPayment({
-                    orderId,
+                  await safeCreatePayment({
                     amount: advanceAmount,
                     paymentMode
                   });
@@ -351,8 +379,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
                 onClick={async () => {
                   setPaid(total);
                   setShowFullPrompt(false);
-                  await createPayment({
-                    orderId,
+                  await safeCreatePayment({
                     amount: total,
                     paymentMode
                   });
@@ -426,15 +453,13 @@ const UnifiedPhoneOrderPage: React.FC = () => {
                   setShowSplitPrompt(false);
                   // Send both payments to backend
                   if (splitPayments[0]?.amount) {
-                    await createPayment({
-                      orderId,
+                    await safeCreatePayment({
                       amount: splitPayments[0].amount,
                       paymentMode: splitPayments[0].mode
                     });
                   }
                   if (splitPayments[1]?.amount) {
-                    await createPayment({
-                      orderId,
+                    await safeCreatePayment({
                       amount: splitPayments[1].amount,
                       paymentMode: splitPayments[1].mode
                     });
@@ -473,11 +498,13 @@ const UnifiedPhoneOrderPage: React.FC = () => {
               return;
             }
             try {
-              const res = await confirmPhoneLocalOrder(orderId);
+              const orderId = await ensureOrderCreated();
+              await confirmPhoneLocalOrder(orderId);
               alert("Order completed successfully!");
               // Optionally reset form or redirect
-            } catch (err) {
-              alert("Order completion failed. Please try again.");
+            } catch (err: any) {
+              const msg = err?.response?.data?.message || "Order completion failed. Please try again.";
+              alert(msg);
             }
           }}
         >

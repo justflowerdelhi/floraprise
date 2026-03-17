@@ -125,8 +125,25 @@ export async function createPayment(payload: {
   orderId: string;
   amount: number;
   paymentMode: 'Cash' | 'UPI' | 'Card' | 'BankTransfer';
+  locationId?: string;
 }): Promise<PaymentResponse> {
-  const res = await api.post('/payments', payload);
+  const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!guidRegex.test(payload.orderId)) {
+    throw new Error('Payment requires a valid saved order. Please create/confirm the order first.');
+  }
+
+  // Backend expects CreatePaymentRequest: { orderId: Guid, method: string, amount: decimal, locationId?: Guid }
+  const requestBody: any = {
+    orderId: payload.orderId,
+    method: payload.paymentMode,
+    amount: payload.amount,
+  };
+
+  if (payload.locationId && guidRegex.test(payload.locationId)) {
+    requestBody.locationId = payload.locationId;
+  }
+
+  const res = await api.post('/payments', requestBody);
   return res.data;
 }
 
