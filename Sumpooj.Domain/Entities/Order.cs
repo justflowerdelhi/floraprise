@@ -31,8 +31,8 @@ public class Order : BaseEntity
     public Guid CompanyId { get; private set; }
     public Guid CustomerId { get; private set; }
     public Customer? Customer { get; private set; }
-    public Guid LocationId { get; set; }
-    public Location Location { get; set; } = null!;
+    public Guid? LocationId { get; set; }
+    public Location? Location { get; set; }
     public string OrderNumber { get; private set; }
     public DateTime OrderDate { get; private set; }
     public DateTime DeliveryDate { get; private set; }
@@ -40,6 +40,7 @@ public class Order : BaseEntity
     public PaymentStatus PaymentStatus { get; private set; }
     public FulfillmentStatus FulfillmentStatus { get; private set; }
     public OrderSource OrderSource { get; private set; }
+    public OrderType OrderType { get; private set; }
     public bool IsActive { get; private set; }
     public string? TimeSlot { get; private set; }
 
@@ -63,6 +64,9 @@ public class Order : BaseEntity
 
     // Notes
     public string? InternalNotes { get; private set; }
+
+    // Invoice
+    public string? InvoiceNumber { get; private set; }
 
     public IReadOnlyCollection<OrderItem> Items => _items.AsReadOnly();
 
@@ -125,6 +129,25 @@ public class Order : BaseEntity
         MarkUpdated();
     }
 
+    public void SetOrderType(OrderType type)
+    {
+        OrderType = type;
+        MarkUpdated();
+    }
+
+    public void SetInvoiceNumber(string invoiceNumber)
+    {
+        InvoiceNumber = invoiceNumber;
+        MarkUpdated();
+    }
+
+    public static string GenerateInvoiceNumber()
+    {
+        var random = new Random();
+        var digits = random.Next(100000, 999999);
+        return $"INV-{DateTime.UtcNow:yyyyMMdd}-{digits}";
+    }
+
     public void SetFulfillmentStatus(FulfillmentStatus status)
     {
         FulfillmentStatus = status;
@@ -181,6 +204,19 @@ public class Order : BaseEntity
 
         Status = OrderStatus.Processing;
         AssignedToUserId = userId;
+        MarkUpdated();
+    }
+
+    /// <summary>
+    /// Start processing without assigning a specific user (e.g., phone orders going to production).
+    /// </summary>
+    public void StartProcessing()
+    {
+        if (Status != OrderStatus.Confirmed)
+            throw new InvalidOperationException("Only confirmed orders can be processed");
+
+        Status = OrderStatus.Processing;
+        FulfillmentStatus = FulfillmentStatus.InDesign;
         MarkUpdated();
     }
 

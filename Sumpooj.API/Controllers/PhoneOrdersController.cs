@@ -12,20 +12,20 @@ namespace Sumpooj.API.Controllers;
 [Authorize(Policy = "CompanyOnly")]
 public class PhoneOrdersController : ControllerBase
 {
-    private readonly ISalesOrderRepository _salesOrderRepository;
+    private readonly IOrderRepository _orderRepository;
     private readonly ICustomerRepository _customerRepository;
     private readonly IPaymentRepository _paymentRepository;
     private readonly ScheduleDeliveryHandler _scheduleDeliveryHandler;
     private readonly ITenantContext _tenantContext;
 
     public PhoneOrdersController(
-        ISalesOrderRepository salesOrderRepository,
+        IOrderRepository orderRepository,
         ICustomerRepository customerRepository,
         IPaymentRepository paymentRepository,
         ScheduleDeliveryHandler scheduleDeliveryHandler,
         ITenantContext tenantContext)
     {
-        _salesOrderRepository = salesOrderRepository;
+        _orderRepository = orderRepository;
         _customerRepository = customerRepository;
         _paymentRepository = paymentRepository;
         _scheduleDeliveryHandler = scheduleDeliveryHandler;
@@ -59,72 +59,49 @@ public class PhoneOrdersController : ControllerBase
             customerName = name;
         }
 
+        // Parse delivery date
+        DateTime deliveryDate;
+        if (!string.IsNullOrEmpty(request.DeliveryDate) && DateTime.TryParse(request.DeliveryDate, out var parsed))
+            deliveryDate = DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+        else
+            deliveryDate = DateTime.UtcNow;
+
+        // Create Order with Phone source
+        var order = new Order(
+            companyId,
+            customerId,
+            deliveryDate,
+            request.DeliveryCity,
+            null,
+            null);
+
         // Map order type
         if (!Enum.TryParse<OrderType>(request.OrderType, true, out var orderType))
             orderType = OrderType.PhoneLocal;
 
-        var order = new SalesOrder(
-            companyId,
-            customerId,
-            orderType,
-            request.DeliveryCity ?? "",
-            null,
-            request.DeliveryCity ?? "",
-            "",
-            null);
+        order.SetOrderSource(OrderSource.Phone);
+        order.SetOrderType(orderType);
 
-        await _salesOrderRepository.AddAsync(order);
+        if (!string.IsNullOrEmpty(request.TimeSlot))
+            order.SetTimeSlot(request.TimeSlot);
 
-        return CreatedAtAction(nameof(GetPhoneOrder), new { id = order.Id }, new PhoneOrderResponse
-        {
-            Id = order.Id.ToString(),
-            CompanyId = companyId.ToString(),
-            CustomerId = customerId.ToString(),
-            CustomerName = customerName,
-            OrderNumber = order.OrderNumber,
-            OrderType = order.OrderType.ToString(),
-            Status = order.Status.ToString(),
-            DeliveryDate = request.DeliveryDate ?? "",
-            DeliveryCity = request.DeliveryCity ?? "",
-            TimeSlot = request.TimeSlot,
-            Occasion = request.Occasion,
-            Budget = request.Budget,
-            Items = new List<PhoneOrderItemResponse>(),
-            CreatedAtUtc = order.CreatedAtUtc.ToString("O"),
-        });
+        if (!string.IsNullOrEmpty(request.SpecialInstructions))
+            order.AddInternalNote(request.SpecialInstructions);
+
+        await _orderRepository.AddAsync(order);
+
+        return CreatedAtAction(nameof(GetPhoneOrder), new { id = order.Id }, BuildPhoneOrderResponse(order, customerName, request.DeliveryCity, request.TimeSlot, request.Occasion, request.Budget));
     }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetPhoneOrder(Guid id)
     {
-        var order = await _salesOrderRepository.GetByIdAsync(id);
+        var order = await _orderRepository.GetByIdAsync(CompanyId, id);
         if (order == null) return NotFound(new { message = "Order not found" });
 
         var customer = await _customerRepository.GetByIdAsync(order.CustomerId);
 
-        return Ok(new PhoneOrderResponse
-        {
-            Id = order.Id.ToString(),
-            CompanyId = order.CompanyId.ToString(),
-            CustomerId = order.CustomerId.ToString(),
-            CustomerName = customer?.Name,
-            OrderNumber = order.OrderNumber,
-            OrderType = order.OrderType.ToString(),
-            Status = order.Status.ToString(),
-            DeliveryDate = "",
-            DeliveryCity = order.City,
-            Items = order.Items.Select(i => new PhoneOrderItemResponse
-            {
-                Id = i.Id.ToString(),
-                ProductId = i.ProductId.ToString(),
-                ProductName = i.ProductName,
-                Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice,
-                TotalPrice = i.TotalPrice,
-            }).ToList(),
-            CreatedAtUtc = order.CreatedAtUtc.ToString("O"),
-            UpdatedAtUtc = order.UpdatedAtUtc?.ToString("O"),
-        });
+        return Ok(BuildPhoneOrderResponse(order, customer?.Name, order.DeliveryAddress, order.TimeSlot, null, null));
     }
 
     [HttpGet]
@@ -132,18 +109,26 @@ public class PhoneOrdersController : ControllerBase
         [FromQuery] string? status,
         [FromQuery] string? type)
     {
-        var orders = await _salesOrderRepository.GetAllAsync();
+        // Get today's phone orders
+        var allOrders = await _orderRepository.GetTodaysOrdersAsync(CompanyId);
+
+        // Filter to phone orders only
+        var dayStart = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+        var dayEnd = dayStart.AddDays(1);
+        var orders = await _orderRepository.GetByIdsAsync(CompanyId, allOrders
+            .Where(o => o.OrderSource == "Phone")
+            .Select(o => o.Id).ToList());
 
         var query = orders.AsQueryable();
 
-        if (!string.IsNullOrEmpty(type))
+        if (!string.IsNullOrEmpty(type) && Enum.TryParse<OrderType>(type, true, out var orderType))
         {
-            query = query.Where(o => o.OrderType.ToString() == type);
+            query = query.Where(o => o.OrderType == orderType);
         }
 
-        if (!string.IsNullOrEmpty(status))
+        if (!string.IsNullOrEmpty(status) && Enum.TryParse<OrderStatus>(status, true, out var orderStatus))
         {
-            query = query.Where(o => o.Status.ToString() == status);
+            query = query.Where(o => o.Status == orderStatus);
         }
 
         var result = query.Select(o => new
@@ -151,13 +136,13 @@ public class PhoneOrdersController : ControllerBase
             o.Id,
             o.CompanyId,
             o.CustomerId,
-            CustomerName = o.CustomerId.ToString(), // replace later with real join
+            CustomerName = o.Customer != null ? o.Customer.Name : "",
             o.OrderNumber,
             OrderType = o.OrderType.ToString(),
             Status = o.Status.ToString(),
-            DeliveryDate = (DateTime?)null, // TODO: add to domain
-            DeliveryCity = (string?)null,   // TODO: add to domain
-            TimeSlot = (string?)null,       // TODO: add to domain
+            o.DeliveryDate,
+            DeliveryCity = o.DeliveryAddress,
+            o.TimeSlot,
             Occasion = (string?)null,
             Budget = (decimal?)null,
             Items = o.Items.Select(i => new
@@ -179,24 +164,20 @@ public class PhoneOrdersController : ControllerBase
     [HttpGet("{id:guid}/invoice")]
     public async Task<IActionResult> GetInvoice(Guid id)
     {
-        var order = await _salesOrderRepository.GetByIdAsync(id);
+        var order = await _orderRepository.GetByIdAsync(CompanyId, id);
         if (order == null)
             return NotFound(new { message = "Order not found" });
 
         // Generate invoice number if not set
         if (string.IsNullOrEmpty(order.InvoiceNumber))
         {
-            order.SetInvoiceNumber(SalesOrder.GenerateInvoiceNumber());
-            await _salesOrderRepository.UpdateAsync(order);
+            order.SetInvoiceNumber(Order.GenerateInvoiceNumber());
+            await _orderRepository.UpdateAsync(order);
         }
 
-        // Load customer
         var customer = await _customerRepository.GetByIdAsync(order.CustomerId);
-
-        // Load payments
         var paidAmount = await _paymentRepository.GetTotalPaidForOrderAsync(order.Id);
 
-        // Calculate totals from items
         var items = order.Items.Select(i => new InvoiceItemDto
         {
             Description = i.ProductName,
@@ -205,27 +186,21 @@ public class PhoneOrdersController : ControllerBase
             Total = i.TotalPrice
         }).ToList();
 
-        var subtotal = items.Sum(i => i.Total);
-        decimal deliveryCharge = 0; // TODO: Add delivery charge to domain
-        decimal discount = 0;       // TODO: Add discount to domain
-        var total = subtotal + deliveryCharge - discount;
-        var balance = total - paidAmount;
-
         var invoice = new InvoiceDto
         {
             InvoiceNumber = order.InvoiceNumber!,
             OrderNumber = order.OrderNumber,
             CustomerName = customer?.Name ?? "Unknown",
             Phone = customer?.Phone,
-            DeliveryDate = null, // TODO: Add delivery date to domain
+            DeliveryDate = order.DeliveryDate,
             OrderType = order.OrderType.ToString(),
             Items = items,
-            Subtotal = subtotal,
-            DeliveryCharge = deliveryCharge,
-            Discount = discount,
-            Total = total,
+            Subtotal = order.SubTotal,
+            DeliveryCharge = order.DeliveryFee,
+            Discount = order.DiscountAmount,
+            Total = order.TotalAmount,
             PaidAmount = paidAmount,
-            Balance = balance
+            Balance = order.TotalAmount - paidAmount
         };
 
         return Ok(invoice);
@@ -234,23 +209,19 @@ public class PhoneOrdersController : ControllerBase
     [HttpGet("dashboard-summary")]
     public async Task<IActionResult> GetDashboardSummary()
     {
-        var orders = await _salesOrderRepository.GetAllAsync();
-
-        var today = DateTime.UtcNow.Date;
-
-        // Today's orders: Count SalesOrders where CreatedDate = Today
-        var todayOrders = orders.Count(o => o.CreatedAtUtc.Date == today);
-
-        // Pending production: Count SalesOrders where Status = Confirmed AND OrderType = PhoneLocal
-        var pendingProduction = orders.Count(o =>
-            o.OrderType == OrderType.PhoneLocal &&
-            o.Status == SalesOrderStatus.Confirmed);
-
-        // Pending delivery: Count SalesOrders where Status = InProduction
-        var pendingDelivery = orders.Count(o => o.Status == SalesOrderStatus.InProduction);
-
-        // Today's revenue: Sum Payments where PaymentDate = Today
+        var todayOrders = await _orderRepository.GetTodaysOrderCountAsync(CompanyId);
         var todayRevenue = await _paymentRepository.GetTodayTotalAsync();
+
+        // Get phone orders for production/delivery stats
+        var allToday = await _orderRepository.GetTodaysOrdersAsync(CompanyId);
+        var phoneOrders = await _orderRepository.GetByIdsAsync(CompanyId,
+            allToday.Where(o => o.OrderSource == "Phone").Select(o => o.Id).ToList());
+
+        var pendingProduction = phoneOrders.Count(o =>
+            o.OrderType == OrderType.PhoneLocal &&
+            o.Status == OrderStatus.Confirmed);
+
+        var pendingDelivery = phoneOrders.Count(o => o.Status == OrderStatus.Processing);
 
         return Ok(new DashboardSummaryDto
         {
@@ -278,38 +249,37 @@ public class PhoneOrdersController : ControllerBase
     [HttpPost("{id:guid}/items")]
     public async Task<IActionResult> AddItem(Guid id, [FromBody] AddItemRequest request)
     {
-        var order = await _salesOrderRepository.GetByIdAsync(id);
+        var order = await _orderRepository.GetByIdAsync(CompanyId, id);
         if (order == null) return NotFound(new { message = "Order not found" });
 
         order.AddItem(request.ProductId, request.ProductName ?? "Product", request.Quantity, request.UnitPrice);
-        await _salesOrderRepository.UpdateAsync(order);
+        await _orderRepository.UpdateAsync(order);
 
         var customer = await _customerRepository.GetByIdAsync(order.CustomerId);
-        return Ok(BuildPhoneOrderResponse(order, customer?.Name));
+        return Ok(BuildPhoneOrderResponse(order, customer?.Name, order.DeliveryAddress, order.TimeSlot, null, null));
     }
 
     [HttpPost("{id:guid}/confirm-local")]
     public async Task<IActionResult> ConfirmLocal(Guid id)
     {
-        var order = await _salesOrderRepository.GetByIdAsync(id);
+        var order = await _orderRepository.GetByIdAsync(CompanyId, id);
         if (order == null) return NotFound(new { message = "Order not found" });
 
         order.Confirm();
-        await _salesOrderRepository.UpdateAsync(order);
+        await _orderRepository.UpdateAsync(order);
 
         var customer = await _customerRepository.GetByIdAsync(order.CustomerId);
-        return Ok(BuildPhoneOrderResponse(order, customer?.Name));
+        return Ok(BuildPhoneOrderResponse(order, customer?.Name, order.DeliveryAddress, order.TimeSlot, null, null));
     }
 
     [HttpPost("{id:guid}/confirm-outstation")]
     public async Task<IActionResult> ConfirmOutstation(Guid id)
     {
-        var order = await _salesOrderRepository.GetByIdAsync(id);
+        var order = await _orderRepository.GetByIdAsync(CompanyId, id);
         if (order == null) return NotFound(new { message = "Order not found" });
 
         order.Confirm();
-        order.MarkSentToVendor();
-        await _salesOrderRepository.UpdateAsync(order);
+        await _orderRepository.UpdateAsync(order);
 
         return Ok(new { orderId = order.Id.ToString(), vendorExecutionId = Guid.NewGuid().ToString() });
     }
@@ -317,30 +287,30 @@ public class PhoneOrdersController : ControllerBase
     [HttpPost("{id:guid}/start-production")]
     public async Task<IActionResult> StartProduction(Guid id)
     {
-        var order = await _salesOrderRepository.GetByIdAsync(id);
+        var order = await _orderRepository.GetByIdAsync(CompanyId, id);
         if (order == null) return NotFound(new { message = "Order not found" });
 
-        order.MarkInProduction();
-        await _salesOrderRepository.UpdateAsync(order);
+        order.StartProcessing();
+        await _orderRepository.UpdateAsync(order);
 
         var customer = await _customerRepository.GetByIdAsync(order.CustomerId);
-        return Ok(BuildPhoneOrderResponse(order, customer?.Name));
+        return Ok(BuildPhoneOrderResponse(order, customer?.Name, order.DeliveryAddress, order.TimeSlot, null, null));
     }
 
     [HttpPost("{id:guid}/cancel")]
     public async Task<IActionResult> CancelOrder(Guid id)
     {
-        var order = await _salesOrderRepository.GetByIdAsync(id);
+        var order = await _orderRepository.GetByIdAsync(CompanyId, id);
         if (order == null) return NotFound(new { message = "Order not found" });
 
-        order.Cancel();
-        await _salesOrderRepository.UpdateAsync(order);
+        order.Cancel(null);
+        await _orderRepository.UpdateAsync(order);
 
         var customer = await _customerRepository.GetByIdAsync(order.CustomerId);
-        return Ok(BuildPhoneOrderResponse(order, customer?.Name));
+        return Ok(BuildPhoneOrderResponse(order, customer?.Name, order.DeliveryAddress, order.TimeSlot, null, null));
     }
 
-    private static PhoneOrderResponse BuildPhoneOrderResponse(SalesOrder order, string? customerName)
+    private static PhoneOrderResponse BuildPhoneOrderResponse(Order order, string? customerName, string? deliveryCity, string? timeSlot, string? occasion, decimal? budget)
     {
         return new PhoneOrderResponse
         {
@@ -351,8 +321,11 @@ public class PhoneOrdersController : ControllerBase
             OrderNumber = order.OrderNumber,
             OrderType = order.OrderType.ToString(),
             Status = order.Status.ToString(),
-            DeliveryDate = "",
-            DeliveryCity = order.City,
+            DeliveryDate = order.DeliveryDate.ToString("O"),
+            DeliveryCity = deliveryCity ?? "",
+            TimeSlot = timeSlot,
+            Occasion = occasion,
+            Budget = budget,
             Items = order.Items.Select(i => new PhoneOrderItemResponse
             {
                 Id = i.Id.ToString(),

@@ -317,6 +317,7 @@ public enum ReservationStatus
 // Sales Order
 public enum OrderType
 {
+    Standard,
     PhoneLocal,
     PhoneOutstation
 }

@@ -8,16 +8,13 @@ public class PaymentService
 {
     private readonly IPaymentRepository _paymentRepository;
     private readonly IOrderRepository _orderRepository;
-    private readonly ISalesOrderRepository _salesOrderRepository;
 
     public PaymentService(
         IPaymentRepository paymentRepository,
-        IOrderRepository orderRepository,
-        ISalesOrderRepository salesOrderRepository)
+        IOrderRepository orderRepository)
     {
         _paymentRepository = paymentRepository;
         _orderRepository = orderRepository;
-        _salesOrderRepository = salesOrderRepository;
     }
 
     public async Task<PaymentDto?> GetByIdAsync(Guid id)
@@ -33,18 +30,9 @@ public class PaymentService
 
     public async Task<PaymentDto> CreateAsync(Guid companyId, CreatePaymentRequest request, Guid userId)
     {
-        // Validate order exists in Orders or SalesOrders
-        var order = await _orderRepository.GetByIdAsync(companyId, request.OrderId);
-        var salesOrder = order == null
-            ? await _salesOrderRepository.GetByIdAsync(request.OrderId)
-            : null;
-
-        if (order == null && salesOrder == null)
-            throw new KeyNotFoundException("Order not found");
-
-        // For SalesOrders, verify company ownership
-        if (salesOrder != null && salesOrder.CompanyId != companyId)
-            throw new KeyNotFoundException("Order not found");
+        // Validate order exists
+        var order = await _orderRepository.GetByIdAsync(companyId, request.OrderId)
+            ?? throw new KeyNotFoundException("Order not found");
 
         if (!Enum.TryParse<PaymentMethod>(request.Method, true, out var method))
             throw new ArgumentException($"Invalid payment method: {request.Method}");
@@ -56,14 +44,13 @@ public class PaymentService
 
         payment.SetProcessedBy(userId);
 
-        // Auto-approve all POS/phone payments (terminal already confirmed)
+        // Auto-approve payments
         payment.Approve(null, null);
 
         await _paymentRepository.AddAsync(payment);
 
-        // Update order payment status (only for Orders table, SalesOrders don't track payment status)
-        if (order != null)
-            await UpdateOrderPaymentStatusAsync(companyId, request.OrderId);
+        // Update order payment status
+        await UpdateOrderPaymentStatusAsync(companyId, request.OrderId);
 
         return MapToDto(payment);
     }

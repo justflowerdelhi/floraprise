@@ -72,7 +72,7 @@ public class OrderService
     public async Task<Guid> CreateAsync(Guid companyId, CreateOrderRequest request)
     {
         // Validate LocationId is provided
-        if (request.LocationId == Guid.Empty)
+        if (!request.LocationId.HasValue || request.LocationId == Guid.Empty)
         {
             // Auto-assign default location if not provided
             var defaultLocation = await _locationRepository.GetDefaultAsync(companyId);
@@ -83,7 +83,7 @@ public class OrderService
         }
 
         // Validate Location exists and belongs to the same company
-        var location = await _locationRepository.GetByIdAsync(request.LocationId)
+        var location = await _locationRepository.GetByIdAsync(request.LocationId.Value)
             ?? throw new InvalidOperationException($"Location '{request.LocationId}' not found.");
 
         if (location.CompanyId != companyId)
@@ -93,7 +93,7 @@ public class OrderService
             throw new InvalidOperationException("Cannot create an order for an inactive location.");
 
         // Validate an active shift exists for this location
-        var activeShift = await _shiftRepository.GetActiveShiftAsync(companyId, request.LocationId);
+        var activeShift = await _shiftRepository.GetActiveShiftAsync(companyId, request.LocationId!.Value);
         if (activeShift == null)
             throw new InvalidOperationException("No active shift for this location. Please open a shift before creating orders.");
 
@@ -168,7 +168,8 @@ public class OrderService
                     method = PaymentMethod.Cash;
 
                 var payment = new Payment(companyId, order.Id, method, p.Amount);
-                payment.SetLocation(request.LocationId);
+                if (request.LocationId.HasValue)
+                    payment.SetLocation(request.LocationId.Value);
 
                 // POS payments are immediate — approve all methods
                 // (card/UPI terminal has already confirmed at the POS)
@@ -471,7 +472,8 @@ public class OrderService
                     companyId, now, orderRef, "SALE",
                     $"POS Sale {orderRef} — {methodLabel} payment",
                     p.Amount, 0, paymentAccountId);
-                debitEntry.SetLocation(order.LocationId);
+                if (order.LocationId.HasValue)
+                    debitEntry.SetLocation(order.LocationId.Value);
                 entries.Add(debitEntry);
 
                 // Credit: Sales Revenue
@@ -479,7 +481,8 @@ public class OrderService
                     companyId, now, orderRef, "SALE",
                     $"POS Sale {orderRef} — Revenue",
                     0, p.Amount, revenueAccountId);
-                creditEntry.SetLocation(order.LocationId);
+                if (order.LocationId.HasValue)
+                    creditEntry.SetLocation(order.LocationId.Value);
                 entries.Add(creditEntry);
             }
 

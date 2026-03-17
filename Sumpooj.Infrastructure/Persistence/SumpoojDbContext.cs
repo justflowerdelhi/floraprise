@@ -306,7 +306,15 @@ public class SumpoojDbContext
 
         modelBuilder.Entity<Order>()
             .Property(o => o.LocationId)
-            .IsRequired();
+            .IsRequired(false);
+
+        modelBuilder.Entity<Order>()
+            .Property(o => o.OrderType)
+            .HasDefaultValue(OrderType.Standard);
+
+        modelBuilder.Entity<Order>()
+            .Property(o => o.InvoiceNumber)
+            .IsRequired(false);
 
         // ProductCategoryEntity: unique name per company
         modelBuilder.Entity<ProductCategoryEntity>()

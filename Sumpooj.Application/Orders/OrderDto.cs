@@ -37,7 +37,7 @@ public class OrderDto
     public Guid? DeliveryPersonId { get; set; }
     public string? DeliveryPersonName { get; set; }
 
-    public Guid LocationId { get; set; }
+    public Guid? LocationId { get; set; }
     public string? LocationName { get; set; }
     public string? InternalNotes { get; set; }
     public List<OrderItemDto> Items { get; set; } = new();
@@ -71,13 +71,13 @@ public class OrderListDto
     public int ItemCount { get; set; }
     public string? RecipientName { get; set; }
     public string DeliveryPriority { get; set; } = default!;
-    public Guid LocationId { get; set; }
+    public Guid? LocationId { get; set; }
 }
 
 public class CreateOrderRequest
 {
     public Guid? CustomerId { get; set; }
-    public Guid LocationId { get; set; }
+    public Guid? LocationId { get; set; }
     public DateTime? DeliveryDate { get; set; }
     public string? DeliveryAddress { get; set; }
     public string? RecipientName { get; set; }
