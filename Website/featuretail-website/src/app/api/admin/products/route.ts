@@ -1,165 +1,137 @@
-import { prisma } from "@/lib/prisma"
-import { NextResponse } from "next/server"
+import { PrismaClient } from "@prisma/client";
+import { NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
 
-/* ================= GET PRODUCTS ================= */
-
-export async function GET() {
-
-  try {
-
-
-    const products = await prisma.product.findMany({
-      include: {
-        category: true,
-        subCategory: true,
-        images: true,
-        variants: {
-          include: {
-            options: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: "desc"
-      }
-    })
-
-    return NextResponse.json(products)
-
-  } catch (error) {
-
-    console.error("PRODUCT FETCH ERROR:", error)
-
-    return NextResponse.json(
-      { error: "Failed to fetch products" },
-      { status: 500 }
-    )
-  }
-
-}
-
-/* ---------------- CREATE PRODUCT ---------------- */
+const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
   try {
+    const formData = await req.formData();
 
-    let data: any = {}
+    // 🟢 BASIC
+    const name = formData.get("name") as string;
+    const slugRaw = formData.get("slug") as string;
+    const description = formData.get("description") as string;
 
-    const contentType = req.headers.get("content-type") || ""
+    const price = Number(formData.get("price") || 0);
+    const stock = Number(formData.get("stock") || 0);
 
-    /* ---------- PARSE REQUEST ---------- */
+    const categoryId = formData.get("categoryId") as string;
+    const subCategoryId = formData.get("subCategoryId") as string;
+    const status = formData.get("status") as string;
 
-    if (contentType.includes("multipart/form-data")) {
+    // 🟢 SLUG
+    const slug =
+      slugRaw && slugRaw.trim() !== ""
+        ? slugRaw
+        : name
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, "")
+            .trim()
+            .replace(/\s+/g, "-");
 
-      const formData = await req.formData()
+    // 🟢 FILES
+    const productFiles = formData.getAll("images") as File[];
+    const variantFiles = formData.getAll("variantImages") as File[];
 
-      formData.forEach((value, key) => {
-        if (typeof value === "string") {
-          data[key] = value
+    // 🟢 VARIANTS
+    let variants: any[] = [];
+    try {
+      variants = JSON.parse(formData.get("variants") as string);
+    } catch {}
+
+    // =========================
+    // 🖼️ PRODUCT IMAGES
+    // =========================
+    const productImages = [];
+
+    for (let i = 0; i < productFiles.length; i++) {
+      const file = productFiles[i];
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const fileName = Date.now() + "-" + file.name;
+
+      const filePath = path.join(process.cwd(), "public/uploads", fileName);
+      fs.writeFileSync(filePath, buffer);
+
+      productImages.push({
+        url: "/uploads/" + fileName,
+        order: i,
+      });
+    }
+
+    // =========================
+    // 🎨 VARIANT IMAGES
+    // =========================
+    let variantIndex = 0;
+
+    const variantData = await Promise.all(
+      variants.map(async (variant) => {
+        const images = [];
+
+        if (!variant.imageNames || variant.imageNames.length === 0) return; // Skip processing if imageNames is missing or empty
+        
+        for (let i = 0; i < variant.imageNames.length; i++) {
+          const file = variantFiles[variantIndex++];
+          const buffer = Buffer.from(await file.arrayBuffer());
+          const fileName = Date.now() + "-" + file.name;
+          const filePath = path.join(process.cwd(), "public/uploads", fileName);
+          fs.writeFileSync(filePath, buffer);
+          images.push({
+            url: "/uploads/" + fileName,
+            order: i,
+          });
         }
+
+        return {
+          name: variant.name,
+          price: variant.price ? Number(variant.price) : null,
+          stock: variant.stock ? Number(variant.stock) : null,
+          images: {
+            create: images,
+          },
+        };
       })
+    );
 
-    } else {
-
-      data = await req.json()
-
-    }
-
-    console.log("DATA RECEIVED:", data)
-
-    /* ---------- VALIDATION ---------- */
-
-    if (!data.name || data.name.trim() === "") {
-
-      return NextResponse.json(
-        { error: "Product name is required" },
-        { status: 400 }
-      )
-
-    }
-
-    /* ---------- SLUG ---------- */
-
-    if (!data.slug || data.slug.trim() === "") {
-
-      data.slug = data.name
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .trim()
-        .replace(/\s+/g, "-")
-
-    }
-
-    /* ---------- VARIANTS ---------- */
-
-    let variants: any[] = []
-
-    if (data.variants) {
-
-      try {
-        const raw = data.variants;
-        if (raw && typeof raw === "string") {
-          variants = JSON.parse(raw);
-        } else if (raw) {
-          variants = raw;
-        }
-      } catch (err) {
-        console.error("VARIANT PARSE ERROR:", err);
-        variants = [];
-      }
-
-    }
-
-    /* ---------- CREATE PRODUCT ---------- */
-
+    // =========================
+    // 🧠 CREATE PRODUCT
+    // =========================
     const product = await prisma.product.create({
-
       data: {
+        name,
+        slug,
+        description,
+        price,
+        stock,
+        status,
+        categoryId,
+        subCategoryId,
 
-        name: data.name,
-        slug: data.slug,
-        description: data.description || "",
+        images: {
+          create: productImages,
+        },
 
-        price: Number(data.price || 0),
-        stock: Number(data.stock || 0),
-
-        categoryId: data.categoryId,
-        subCategoryId: data.subCategoryId || null,
-
-        variants: variants.length
-          ? {
-              create: variants.map((v: any) => ({
-                name: v.sku || "Variant",
-                image: v.image || null,
-                options: {
-                  create: (v.options || []).map((o: any) => ({
-                    value: o.value,
-                    price: Number(v.price || 0),
-                    stock: Number(v.stock || 0)
-                  }))
-                }
-              }))
-            }
-          : undefined
-
+        variants: {
+          create: variantData,
+        },
       },
-
       include: {
-        variants: true
-      }
+        images: true,
+        variants: {
+          include: { images: true },
+        },
+      },
+    });
 
-    })
-
-    return NextResponse.json(product)
-
-  } catch (error) {
-
-    console.error("PRODUCT CREATE ERROR:", error)
+    return NextResponse.json(product);
+  } catch (error: any) {
+    console.error("PRODUCT CREATE ERROR:", error);
 
     return NextResponse.json(
-      { error: "Product creation failed" },
+      { error: error.message || "Failed" },
       { status: 500 }
-    )
-
+    );
   }
 }

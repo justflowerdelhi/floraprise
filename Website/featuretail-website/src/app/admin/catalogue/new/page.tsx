@@ -13,7 +13,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-/* ---------------- IMAGE COMPONENT ---------------- */
+/* ---------------- IMAGE ITEM ---------------- */
 
 function SortableImage({ id, img, removeImage }: any) {
   const { attributes, listeners, setNodeRef, transform, transition } =
@@ -25,7 +25,7 @@ function SortableImage({ id, img, removeImage }: any) {
       style={{ transform: CSS.Transform.toString(transform), transition }}
       {...attributes}
       {...listeners}
-      className="relative"
+      className="relative cursor-move"
     >
       <img src={img} className="w-full h-24 object-cover border rounded" />
 
@@ -36,6 +36,12 @@ function SortableImage({ id, img, removeImage }: any) {
       >
         X
       </button>
+
+      {id === img && (
+        <div className="absolute top-1 left-1 bg-green-600 text-white text-xs px-1 rounded">
+          COVER
+        </div>
+      )}
     </div>
   );
 }
@@ -43,8 +49,8 @@ function SortableImage({ id, img, removeImage }: any) {
 /* ---------------- PAGE ---------------- */
 
 export default function CreateProductPage() {
-
   const router = useRouter();
+
   const [activeTab, setActiveTab] = useState("basic");
 
   const [categories, setCategories] = useState<any[]>([]);
@@ -53,6 +59,11 @@ export default function CreateProductPage() {
 
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+
+  const [variantOptions, setVariantOptions] = useState([{ name: "", values: "" }]);
+  const [variantMatrix, setVariantMatrix] = useState<any[]>([]);
+  const [baseSku, setBaseSku] = useState("");
+  const [variants, setVariants] = useState<any[]>([]);
 
   const [product, setProduct] = useState({
     name: "",
@@ -111,10 +122,7 @@ export default function CreateProductPage() {
   /* ---------------- SAVE ---------------- */
 
   const handleSubmit = async () => {
-
     const formData = new FormData();
-
-    /* ---------------- FORCE CORRECT FIELD NAMES ---------------- */
 
     formData.append("name", product.name || "");
     formData.append("slug", product.slug || "");
@@ -124,55 +132,45 @@ export default function CreateProductPage() {
     formData.append("price", product.price || "0");
     formData.append("stock", product.stock || "0");
 
-    formData.append("weight", product.weight || "");
-    formData.append("length", product.length || "");
-    formData.append("width", product.width || "");
-    formData.append("height", product.height || "");
-
-    formData.append("metaTitle", product.metaTitle || "");
-    formData.append("metaDescription", product.metaDescription || "");
-    formData.append("seoKeywords", product.seoKeywords || "");
-    formData.append("tags", product.tags || "");
-
     formData.append("categoryId", product.categoryId || "");
     formData.append("subCategoryId", product.subCategoryId || "");
-
     formData.append("status", product.status || "draft");
 
-    /* ---------------- SAFE VARIANTS ---------------- */
-
-    const safeVariants =
+    // VARIANTS SAFE
+    const rawVariants =
       typeof window !== "undefined" &&
-      (window as any).generatedVariants &&
-      Array.isArray((window as any).generatedVariants)
+      (window as any).generatedVariants
         ? (window as any).generatedVariants
         : [];
 
-    formData.append("variants", JSON.stringify(safeVariants));
+    const formattedVariants = rawVariants.map((v: any) => ({
+      name: v.sku || "Variant",
+      price: v.price || 0,
+      stock: v.stock || 0,
+      imageNames: []
+    }));
 
-    /* ---------------- IMAGES ---------------- */
+    formData.append("variants", JSON.stringify(formattedVariants));
 
-    images.forEach((img) => formData.append("images", img));
-
-    /* ---------------- API ---------------- */
+    // IMAGES (CORRECT)
+    images.forEach((img) => {
+      formData.append("images", img);
+    });
 
     const res = await fetch("/api/admin/products", {
       method: "POST",
       body: formData
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json();
 
     if (!res.ok) {
-      console.error("SAVE ERROR:", data);
       alert(data.error || "Save failed");
       return;
     }
 
     router.push("/admin/catalogue/products");
   };
-
-  /* ---------------- AI ---------------- */
 
   const handleAIGenerate = async () => {
     const res = await fetch("/api/ai/generate", {
@@ -186,11 +184,8 @@ export default function CreateProductPage() {
     });
 
     const ai = await res.json();
-    console.log("AI DATA:", ai);
 
     if (!ai) return;
-
-    /* ---------------- SAFE FIELD MAPPING ---------------- */
 
     const newName =
       ai.product_name ||
@@ -207,7 +202,6 @@ export default function CreateProductPage() {
     const bulletsArray =
       ai.key_features ||
       ai.features ||
-      ai.bulletPoints ||
       [];
 
     const newBullets = Array.isArray(bulletsArray)
@@ -220,14 +214,11 @@ export default function CreateProductPage() {
 
     const keywordsArray =
       ai.seo_keywords ||
-      ai.searchKeywords ||
       [];
 
     const keywords = Array.isArray(keywordsArray)
       ? keywordsArray.join(", ")
       : "";
-
-    /* ---------------- UPDATE STATE ---------------- */
 
     setProduct((prev) => ({
       ...prev,
@@ -235,17 +226,8 @@ export default function CreateProductPage() {
       slug: newSlug,
       description: newDescription,
       bulletPoints: newBullets,
-
-      metaTitle:
-        ai.meta_title ||
-        ai.seoTitle ||
-        newName,
-
-      metaDescription:
-        ai.meta_description ||
-        ai.seoDescription ||
-        newDescription.slice(0, 150),
-
+      metaTitle: ai.meta_title || newName,
+      metaDescription: ai.meta_description || newDescription.slice(0, 150),
       seoKeywords: keywords,
       tags: keywords
     }));
@@ -258,7 +240,11 @@ export default function CreateProductPage() {
 
       <div className="flex justify-between">
         <h1 className="text-2xl font-bold">Create Product</h1>
-        <button onClick={handleAIGenerate} className="bg-blue-600 text-white px-4 py-2 rounded">
+
+        <button
+          onClick={handleAIGenerate}
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
           Generate with AI
         </button>
       </div>
@@ -267,8 +253,11 @@ export default function CreateProductPage() {
       <div className="flex gap-6 border-b">
         {["basic","pricing","inventory","variants","dimensions","category","images","seo","tags","status"]
           .map(tab => (
-            <button key={tab} onClick={()=>setActiveTab(tab)}
-              className={activeTab===tab ? "border-b-2 border-pink-600 text-pink-600":"text-gray-500"}>
+            <button
+              key={tab}
+              onClick={()=>setActiveTab(tab)}
+              className={activeTab===tab ? "border-b-2 border-pink-600 text-pink-600":"text-gray-500"}
+            >
               {tab.toUpperCase()}
             </button>
         ))}
@@ -297,9 +286,67 @@ export default function CreateProductPage() {
           </>
         )}
 
+        {/* SEO */}
+        {activeTab === "seo" && (
+          <>
+            <input
+              value={product.metaTitle}
+              placeholder="Meta Title"
+              onChange={(e) =>
+                setProduct({ ...product, metaTitle: e.target.value })
+              }
+              className="w-full border p-2 mb-2"
+            />
+
+            <textarea
+              value={product.metaDescription}
+              placeholder="Meta Description"
+              onChange={(e) =>
+                setProduct({ ...product, metaDescription: e.target.value })
+              }
+              className="w-full border p-2 mb-2"
+            />
+
+            <input
+              value={product.seoKeywords}
+              placeholder="SEO Keywords (comma separated)"
+              onChange={(e) =>
+                setProduct({ ...product, seoKeywords: e.target.value })
+              }
+              className="w-full border p-2"
+            />
+          </>
+        )}
+
+        {/* TAGS */}
+        {activeTab === "tags" && (
+          <input
+            value={product.tags}
+            placeholder="Tags (comma separated)"
+            onChange={(e) =>
+              setProduct({ ...product, tags: e.target.value })
+            }
+            className="w-full border p-2"
+          />
+        )}
+
+        {/* STATUS */}
+        {activeTab === "status" && (
+          <select
+            value={product.status}
+            onChange={(e) =>
+              setProduct({ ...product, status: e.target.value })
+            }
+            className="w-full border p-2"
+          >
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+          </select>
+        )}
+
         {/* PRICING */}
         {activeTab==="pricing" && (
-          <input type="number" placeholder="Price"
+          <input type="number"
             value={product.price}
             onChange={e=>setProduct({...product,price:e.target.value})}
             className="w-full border p-2"/>
@@ -307,111 +354,86 @@ export default function CreateProductPage() {
 
         {/* INVENTORY */}
         {activeTab==="inventory" && (
-          <input type="number" placeholder="Stock"
+          <input type="number"
             value={product.stock}
             onChange={e=>setProduct({...product,stock:e.target.value})}
             className="w-full border p-2"/>
         )}
 
         {/* VARIANTS */}
-        {activeTab==="variants" && <VariantMatrixGenerator />}
-
-        {/* DIMENSIONS */}
-        {activeTab==="dimensions" && (
-          <div className="grid grid-cols-2 gap-2">
-            {["weight","length","width","height"].map(f=>(
-              <input key={f} placeholder={f}
-                value={(product as any)[f]}
-                onChange={e=>setProduct({...product,[f]:e.target.value})}
-                className="border p-2"/>
-            ))}
-          </div>
+        {activeTab==="variants" && (
+          <VariantMatrixGenerator
+            options={variantOptions}
+            setOptions={setVariantOptions}
+            matrix={variantMatrix}
+            setMatrix={setVariantMatrix}
+            baseSku={baseSku}
+            setBaseSku={setBaseSku}
+            variants={variants}
+            setVariants={setVariants}
+          />
         )}
 
         {/* CATEGORY */}
-        {activeTab === "category" && (
-          <div className="space-y-4">
-
+        {activeTab==="category" && (
+          <div className="space-y-3">
             <select
-              className="w-full border p-2"
               value={product.categoryId}
-              onChange={(e) => handleCategoryChange(e.target.value)}
+              onChange={(e)=>handleCategoryChange(e.target.value)}
+              className="w-full border p-2"
             >
               <option value="">Select Category</option>
-
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
+              {categories.map((c)=>(
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
 
             <select
-              className="w-full border p-2"
               value={product.subCategoryId}
-              onChange={(e) =>
-                setProduct({
-                  ...product,
-                  subCategoryId: e.target.value
-                })
-              }
+              onChange={(e)=>setProduct({...product,subCategoryId:e.target.value})}
+              className="w-full border p-2"
             >
               <option value="">Select Subcategory</option>
-
-              {subCategories.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
+              {subCategories.map((s)=>(
+                <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-
           </div>
         )}
 
         {/* IMAGES */}
         {activeTab==="images" && (
           <>
-            <input type="file" multiple onChange={handleImageUpload}/>
-            <div className="grid grid-cols-4 gap-2 mt-2">
-              {previews.map(img=>(
-                <SortableImage key={img} id={img} img={img} removeImage={removeImage}/>
-              ))}
-            </div>
+            <input type="file" multiple onChange={handleImageUpload} />
+
+            {previews.length === 0 && (
+              <div className="border p-4 mt-2">No images selected</div>
+            )}
+
+            {previews.length > 0 && (
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragEnd={(event) => {
+                  const { active, over } = event;
+                  if (!over || active.id === over.id) return;
+
+                  const oldIndex = previews.indexOf(active.id);
+                  const newIndex = previews.indexOf(over.id);
+
+                  setPreviews(arrayMove(previews, oldIndex, newIndex));
+                  setImages(arrayMove(images, oldIndex, newIndex));
+                }}
+              >
+                <SortableContext items={previews} strategy={horizontalListSortingStrategy}>
+                  <div className="grid grid-cols-4 gap-2 mt-2">
+                    {previews.map((img) => (
+                      <SortableImage key={img} id={img} img={img} removeImage={removeImage}/>
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
           </>
-        )}
-
-        {/* SEO */}
-        {activeTab==="seo" && (
-          <>
-            <input value={product.metaTitle} placeholder="Meta Title"
-              onChange={e=>setProduct({...product,metaTitle:e.target.value})}
-              className="w-full border p-2 mb-2"/>
-
-            <textarea value={product.metaDescription}
-              onChange={e=>setProduct({...product,metaDescription:e.target.value})}
-              className="w-full border p-2 mb-2"/>
-
-            <input value={product.seoKeywords}
-              onChange={e=>setProduct({...product,seoKeywords:e.target.value})}
-              className="w-full border p-2"/>
-          </>
-        )}
-
-        {/* TAGS */}
-        {activeTab==="tags" && (
-          <input value={product.tags}
-            onChange={e=>setProduct({...product,tags:e.target.value})}
-            className="w-full border p-2"/>
-        )}
-
-        {/* STATUS */}
-        {activeTab==="status" && (
-          <select value={product.status}
-            onChange={e=>setProduct({...product,status:e.target.value})}
-            className="w-full border p-2">
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-          </select>
         )}
 
       </div>

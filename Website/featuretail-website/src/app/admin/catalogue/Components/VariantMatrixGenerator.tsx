@@ -9,58 +9,66 @@ type Option = {
   values: string
 }
 
-export default function VariantMatrixGenerator() {
+interface VariantMatrixGeneratorProps {
+  options: Option[];
+  setOptions: (opts: Option[]) => void;
+  matrix: any[];
+  setMatrix: (matrix: any[]) => void;
+  baseSku: string;
+  setBaseSku: (sku: string) => void;
+  variants: any[];
+  setVariants: (variants: any[]) => void;
+}
 
-  const [options, setOptions] = useState<Option[]>([
-    { name: "", values: "" }
-  ])
-
-  const [matrix, setMatrix] = useState<any[]>([])
-  const [baseSku, setBaseSku] = useState("")
-  const [variants, setVariants] = useState<any[]>([])
+export default function VariantMatrixGenerator({
+  options,
+  setOptions,
+  matrix,
+  setMatrix,
+  baseSku,
+  setBaseSku,
+  variants,
+  setVariants,
+}: VariantMatrixGeneratorProps) {
 
   // expose variants to product form
   useEffect(() => {
-    ;(window as any).generatedVariants = variants
-  }, [variants])
+    ;(window as any).generatedVariants = variants;
+  }, [variants]);
 
   const updateOption = (index: number, field: string, value: string) => {
-    const newOptions = [...options]
-    ;(newOptions as any)[index][field] = value
-    setOptions(newOptions)
-  }
+    const newOptions = [...options];
+    (newOptions as any)[index][field] = value;
+    setOptions(newOptions);
+  };
 
   const addOption = () => {
-    setOptions([...options, { name: "", values: "" }])
-  }
+    setOptions([...options, { name: "", values: "" }]);
+  };
 
   const generateMatrix = () => {
-
     const formatted = options
-      .filter(o => o.name && o.values)
-      .map(o => ({
+      .filter((o) => o.name && o.values)
+      .map((o) => ({
         name: o.name,
-        values: o.values.split(",").map(v => v.trim())
-      }))
+        values: o.values.split(",").map((v) => v.trim()),
+      }));
 
-    const result = generateVariantMatrix(formatted)
-    setMatrix(result)
+    const result = generateVariantMatrix(formatted);
+    setMatrix(result);
 
     // create variant objects
     const variantObjects = result.map((row: any) => {
-
-      const values = row.options.map((o: any) => o.value)
-
+      const values = row.options.map((o: any) => o.value);
       return {
         options: row.options,
         sku: baseSku ? generateSKU(baseSku, values) : "",
         price: "",
-        stock: ""
-      }
-    })
-
-    setVariants(variantObjects)
-  }
+        stock: "",
+      };
+    });
+    setVariants(variantObjects);
+  };
 
   return (
     <div className="border p-4 rounded-xl space-y-4">

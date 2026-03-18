@@ -106,6 +106,7 @@ model ProductTag {
 model ProductImage {
   id        String  @id @default(cuid())
   url       String
+  order     Int // Made required for image ordering
   productId String
   product   Product @relation(fields: [productId], references: [id])
 }
@@ -156,24 +157,25 @@ model Product {
   subCategory   SubCategory? @relation(fields: [subCategoryId], references: [id])
 
   images        ProductImage[]
-  variants      Variant[]
+  variants      ProductVariant[] // Added ProductVariant relation
   tags          ProductTag[]
 }
 
-model Variant {
-  id        String          @id @default(cuid())
+model ProductVariant {
+  id        String   @id @default(cuid())
   name      String
-  productId String
-  image     String?         // NEW
-  product   Product         @relation(fields: [productId], references: [id])
-  options   VariantOption[]
-}
-
-model VariantOption {
-  id        String  @id @default(cuid())
-  value     String
   price     Float?
   stock     Int?
-  variantId String
-  variant   Variant @relation(fields: [variantId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  images    VariantImage[]
 }
+
+model VariantImage {
+  id         String   @id @default(cuid())
+  url        String
+  order      Int
+  variantId  String
+  variant    ProductVariant @relation(fields: [variantId], references: [id])
+}
+
