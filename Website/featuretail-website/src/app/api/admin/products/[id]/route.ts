@@ -3,10 +3,9 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-
     const { id } = await context.params;
     if (!id) {
       return NextResponse.json(
@@ -36,23 +35,20 @@ export async function GET(
     return NextResponse.json(product);
 
   } catch (error) {
-
     console.error("GET PRODUCT ERROR:", error);
-
     return NextResponse.json(
       { error: "Server error" },
       { status: 500 }
     );
-
   }
 }
 
 export async function PUT(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = context.params;
+    const { id } = await context.params;
     const body = await request.json();
     const updated = await prisma.product.update({
       where: { id },

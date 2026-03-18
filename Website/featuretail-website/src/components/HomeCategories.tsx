@@ -14,29 +14,25 @@ const categories = [
 return(
 
 <section className="max-w-7xl mx-auto py-12">
-
-<h2 className="text-2xl font-bold mb-8 text-center">
-🛍 Shop by Category
-</h2>
-
-
-<div className="grid grid-cols-3 gap-6">
-	{categories.map(cat => (
-		<Link href={`/category/${cat.slug}`} key={cat.slug}>
-			<div className="border rounded-lg overflow-hidden hover:shadow-lg hover:scale-105 transition cursor-pointer">
-				<img
-					src={cat.image}
-					className="w-full h-44 object-cover"
-				<div className="p-4 text-center font-medium">
-
-					{cat.name}
+	<h2 className="text-2xl font-bold mb-8 text-center">
+		🛍 Shop by Category
+	</h2>
+	<div className="grid grid-cols-3 gap-6">
+		{categories.map(cat => (
+			<Link href={`/category/${cat.slug}`} key={cat.slug}>
+				<div className="border rounded-lg overflow-hidden hover:shadow-lg hover:scale-105 transition cursor-pointer">
+					<img
+						src={cat.image}
+						className="w-full h-44 object-cover"
+						alt={cat.name}
+					/>
+					<div className="p-4 text-center font-medium">
+						{cat.name}
+					</div>
 				</div>
-				<h2 className="text-2xl font-bold mb-4 text-center">
-		</Link>
-	))}
-</div>
-
-
+			</Link>
+		))}
+	</div>
 </section>
 
 )

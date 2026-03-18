@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react"
 
 export default function InventoryPage() {
-  const [products, setProducts] = useState([]);
-  const [qty, setQty] = useState({});
+  const [products, setProducts] = useState<any[]>([]);
+  const [qty, setQty] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState("");
 
   useEffect(() => {
@@ -14,15 +14,15 @@ export default function InventoryPage() {
   }, []);
 
   const handleQtyChange = (id: string, value: string) => {
-    setQty(q => ({ ...q, [id]: value }));
+    setQty(q => ({ ...q, [id]: Number(value) }));
   };
 
-  const updateStock = async (variantId: string, value: string) => {
+  const updateStock = async (variantId: string, value: number) => {
     setLoading(variantId);
     await fetch(`/api/admin/variants/${variantId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stock: Number(value) })
+      body: JSON.stringify({ stock: value })
     });
     setLoading("");
     // Refresh products
@@ -31,12 +31,12 @@ export default function InventoryPage() {
       .then(data => setProducts(data));
   };
 
-  const updateProductStock = async (productId: string, value: string) => {
+  const updateProductStock = async (productId: string, value: number) => {
     setLoading(productId);
     await fetch(`/api/admin/products?id=${productId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stock: Number(value) })
+      body: JSON.stringify({ stock: value })
     });
     setLoading("");
     fetch("/api/admin/products")

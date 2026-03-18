@@ -5,6 +5,31 @@ import React from "react";
 import Link from "next/link";
 
 export default function CataloguePage() {
+    // 🔥 ADD THIS FUNCTION
+    const [saving, setSaving] = useState<string | null>(null);
+
+    // 🔥 UPDATE FUNCTION
+    const updateField = async (
+      id: string,
+      field: "stock" | "price",
+      value: number,
+      isVariant = false
+    ) => {
+      setSaving(id);
+      await fetch("/api/admin/products/update-stock", {
+        method: "POST",
+        body: JSON.stringify({
+          id,
+          [field]: value,
+          isVariant,
+        }),
+      });
+      setSaving(null);
+    };
+
+    // Fix: Provide updateStock for inline stock editing
+    const updateStock = (id: string, value: number, isVariant = false) =>
+      updateField(id, "stock", value, isVariant);
   const [products, setProducts] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -101,8 +126,39 @@ export default function CataloguePage() {
                   <td className="p-3">
                     {product.category?.name || "-"}
                   </td>
-                  <td className="p-3">₹{product.price}</td>
-                  <td className="p-3">{product.stock}</td>
+                  {/* 🔥 REPLACE PRODUCT PRICE CELL */}
+                  <td className="p-3">
+                    ₹
+                    <input
+                      type="number"
+                      defaultValue={product.price}
+                      className="w-20 border px-1 rounded ml-1"
+                      onBlur={(e) =>
+                        updateField(product.id, "price", Number(e.target.value))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          (e.target as HTMLInputElement).blur();
+                        }
+                      }}
+                    />
+                  </td>
+                  {/* 🔥 REPLACE PRODUCT STOCK CELL */}
+                  <td className="p-3">
+                    <input
+                      type="number"
+                      defaultValue={product.stock}
+                      className="w-16 border px-1 rounded"
+                      onBlur={(e) =>
+                        updateStock(product.id, Number(e.target.value))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          (e.target as HTMLInputElement).blur();
+                        }
+                      }}
+                    />
+                  </td>
                   <td className="p-3">
                     {product.status === "published" ? (
                       <span className="text-green-600">Published</span>
@@ -144,8 +200,39 @@ export default function CataloguePage() {
                       </td>
                       <td></td>
                       <td></td>
-                      <td className="p-3">₹{v.price ?? product.price}</td>
-                      <td className="p-3">{v.stock ?? "-"}</td>
+                      {/* 🔥 REPLACE VARIANT PRICE CELL */}
+                      <td className="p-3">
+                        ₹
+                        <input
+                          type="number"
+                          defaultValue={v.price ?? product.price}
+                          className="w-20 border px-1 rounded ml-1"
+                          onBlur={(e) =>
+                            updateField(v.id, "price", Number(e.target.value), true)
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                        />
+                      </td>
+                      <td className="p-3">
+                        <input
+                          type="number"
+                          defaultValue={v.stock}
+                          className="w-16 border px-1 rounded"
+                          onBlur={(e) =>
+                            updateStock(v.id, Number(e.target.value), true)
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                        />
+                        {saving === v.id && <span className="text-xs text-gray-400 ml-2">Saving...</span>}
+                      </td>
                       <td></td>
                       <td className="p-3 text-right space-x-2">
                         <span className="text-blue-600 text-xs">Edit</span>

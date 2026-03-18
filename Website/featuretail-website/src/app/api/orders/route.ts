@@ -1,3 +1,59 @@
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const shipping = body.shipping;
+    const billing = body.billing;
+
+    // Generate a unique order number
+    const orderNumber = "ORD-" + Date.now();
+
+    const order = await prisma.order.create({
+      data: {
+        orderNumber,
+        paymentMethod: body.paymentMethod,
+        subtotal: body.subtotal,
+        shipping: body.shippingAmount,
+        discount: body.discount,
+        total: body.total,
+        gstAmount: body.gstAmount ?? 0,
+        // Shipping fields
+        shippingName: shipping.name,
+        shippingPhone: shipping.phone,
+        shippingEmail: shipping.email,
+        shippingAddress: shipping.address,
+        shippingCity: shipping.city,
+        shippingState: shipping.state,
+        shippingPincode: shipping.pincode,
+        // Billing fields
+        billingName: billing.name,
+        billingPhone: billing.phone,
+        billingEmail: billing.email,
+        billingAddress: billing.address,
+        billingCity: billing.city,
+        billingState: billing.state,
+        billingPincode: billing.pincode,
+        companyName: billing.companyName,
+        gstNumber: billing.gstNumber,
+        // Items
+        items: {
+          create: body.items?.map((item: any) => ({
+            productId: item.productId,
+            variantId: item.variantId,
+            name: item.name, // snapshot
+            variantName: item.variantName, // snapshot
+            price: item.price,
+            quantity: item.qty,
+          })) || [],
+        },
+      },
+      include: { items: true },
+    });
+    return NextResponse.json({ success: true, orderNumber, order });
+  } catch (error: any) {
+    console.error(error);
+    return NextResponse.json({ error: error.message || "Order creation failed" }, { status: 500 });
+  }
+}
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
