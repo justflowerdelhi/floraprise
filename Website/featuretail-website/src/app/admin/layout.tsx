@@ -37,12 +37,12 @@ export default function AdminLayout({
               <Link href="/admin/catalogue/categories" className="block hover:text-pink-600">
                 Categories
               </Link>
-              <a
+              <Link
                 href="/admin/catalogue/products"
                 className="block hover:text-pink-600"
               >
                 Products
-              </a>
+              </Link>
             </div>
 
           <Link href="/admin/inventory" className="block hover:text-pink-600">

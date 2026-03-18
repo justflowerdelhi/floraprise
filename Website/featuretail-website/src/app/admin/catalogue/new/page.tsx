@@ -133,7 +133,9 @@ export default function CreateProductPage() {
     formData.append("stock", product.stock || "0");
 
     formData.append("categoryId", product.categoryId || "");
-    formData.append("subCategoryId", product.subCategoryId || "");
+    if (product.subCategoryId) {
+      formData.append("subCategoryId", product.subCategoryId);
+    }
     formData.append("status", product.status || "draft");
 
     // VARIANTS SAFE
@@ -143,18 +145,26 @@ export default function CreateProductPage() {
         ? (window as any).generatedVariants
         : [];
 
-    const formattedVariants = rawVariants.map((v: any) => ({
+    const formattedVariants = rawVariants.map((v: any, i: number) => ({
       name: v.sku || "Variant",
       price: v.price || 0,
       stock: v.stock || 0,
-      imageNames: []
+      imageIndex: i
     }));
 
     formData.append("variants", JSON.stringify(formattedVariants));
 
+
     // IMAGES (CORRECT)
     images.forEach((img) => {
       formData.append("images", img);
+    });
+
+    // VARIANT FILES
+    variants.forEach((v: any) => {
+      if (v.file) {
+        formData.append("variantImages", v.file);
+      }
     });
 
     const res = await fetch("/api/admin/products", {
@@ -393,7 +403,7 @@ export default function CreateProductPage() {
               onChange={(e)=>setProduct({...product,subCategoryId:e.target.value})}
               className="w-full border p-2"
             >
-              <option value="">Select Subcategory</option>
+              <option value="">No Subcategory</option>
               {subCategories.map((s)=>(
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}

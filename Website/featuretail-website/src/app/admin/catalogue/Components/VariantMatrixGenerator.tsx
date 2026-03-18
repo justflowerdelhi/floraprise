@@ -152,11 +152,9 @@ export default function VariantMatrixGenerator({
             <tbody>
               {matrix.map((row, i) => (
                 <tr key={i}>
-
                   <td className="p-2 border">
                     {row.options.map((o: any) => o.value).join(" / ")}
                   </td>
-
                   <td className="p-2 border">
                     <input
                       className="border p-1 w-full"
@@ -168,7 +166,6 @@ export default function VariantMatrixGenerator({
                       }}
                     />
                   </td>
-
                   <td className="p-2 border">
                     <input
                       className="border p-1 w-full"
@@ -180,7 +177,6 @@ export default function VariantMatrixGenerator({
                       }}
                     />
                   </td>
-
                   <td className="p-2 border">
                     <input
                       className="border p-1 w-full"
@@ -191,8 +187,23 @@ export default function VariantMatrixGenerator({
                         setVariants(newVariants)
                       }}
                     />
+                    {/* Image upload per variant */}
+                    <input
+                      type="file"
+                      className="mt-1"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const updated = [...variants];
+                        updated[i].file = file;
+                        updated[i].preview = URL.createObjectURL(file);
+                        setVariants(updated);
+                      }}
+                    />
+                    {variants[i]?.preview && (
+                      <img src={variants[i].preview} className="w-12 h-12 mt-1" />
+                    )}
                   </td>
-
                 </tr>
               ))}
             </tbody>

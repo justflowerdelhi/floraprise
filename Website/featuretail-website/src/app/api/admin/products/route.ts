@@ -1,12 +1,27 @@
+export const dynamic = "force-dynamic";
+// Helper to save a file and return its URL
+async function saveFile(file: File) {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const fileName = Date.now() + '-' + file.name;
+  const filePath = path.join(process.cwd(), 'public/uploads', fileName);
+  fs.writeFileSync(filePath, buffer);
+  return '/uploads/' + fileName;
+}
 export async function GET() {
   try {
     const products = await prisma.product.findMany({
       include: {
-        images: true,
-        variants: true,
         category: true,
+        variants: {
+          include: {
+            images: true
+          }
+        },
+        images: true
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: {
+        createdAt: "desc"
+      }
     });
     return NextResponse.json(products);
   } catch (error: any) {
@@ -36,11 +51,18 @@ export async function POST(req: Request) {
     const stock = Number(formData.get("stock") || 0);
 
     const categoryId = formData.get("categoryId") as string;
-    const subCategoryId = formData.get("subCategoryId") as string;
+    const rawSubCategoryId = formData.get("subCategoryId") as string;
+    const subCategoryId =
+      rawSubCategoryId && rawSubCategoryId !== ""
+        ? rawSubCategoryId
+        : null;
     const status = formData.get("status") as string;
 
     // FILES
     const productFiles = formData.getAll("images") as File[];
+
+    // VARIANT FILES
+    const variantFiles = formData.getAll("variantImages") as File[];
 
     // VARIANTS
     let variants: any[] = [];
@@ -75,12 +97,21 @@ export async function POST(req: Request) {
     // =========================
     // VARIANTS
     // =========================
-    const variantData = variants.map((v: any) => ({
+    const variantData = await Promise.all(variants.map(async (v: any, i: number) => ({
       name: v.name,
       price: Number(v.price || 0),
       stock: Number(v.stock || 0),
-      images: { create: [] },
-    }));
+      images: {
+        create: variantFiles[i]
+          ? [
+              {
+                url: await saveFile(variantFiles[i]),
+                order: 0
+              }
+            ]
+          : []
+      },
+    })));
 
     // =========================
     // CREATE PRODUCT
