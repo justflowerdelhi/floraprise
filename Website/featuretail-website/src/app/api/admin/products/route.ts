@@ -96,10 +96,17 @@ export async function POST(req: Request) {
 
     if (data.variants) {
 
-      variants =
-        typeof data.variants === "string"
-          ? JSON.parse(data.variants)
-          : data.variants
+      try {
+        const raw = data.variants;
+        if (raw && typeof raw === "string") {
+          variants = JSON.parse(raw);
+        } else if (raw) {
+          variants = raw;
+        }
+      } catch (err) {
+        console.error("VARIANT PARSE ERROR:", err);
+        variants = [];
+      }
 
     }
 

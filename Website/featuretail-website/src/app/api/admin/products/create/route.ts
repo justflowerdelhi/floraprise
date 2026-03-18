@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 	const subCategoryId = formData.get("subCategoryId") as string;
 	const status = formData.get("status") as string;
 
-	const files = formData.getAll("images") as File[];
+	const files = (formData.getAll("images") as File[]) || [];
 
 	const uploadedImages: string[] = [];
 
