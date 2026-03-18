@@ -1,6 +1,6 @@
 "use client";
 
-import VariantMatrixGenerator from "../components/VariantMatrixGenerator";
+import VariantMatrixGenerator from "../Components/VariantMatrixGenerator";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -106,8 +106,8 @@ export default function CreateProductPage() {
   /* ---------------- IMAGE ---------------- */
 
   const handleImageUpload = (e: any) => {
-    const files = Array.from(e.target.files);
-    setImages(prev => [...prev, ...files]);
+    const files = Array.from(e.target.files) as File[];
+    setImages((prev) => [...prev, ...files]);
 
     const urls = files.map((f: any) => URL.createObjectURL(f));
     setPreviews(prev => [...prev, ...urls]);
@@ -417,8 +417,8 @@ export default function CreateProductPage() {
                   const { active, over } = event;
                   if (!over || active.id === over.id) return;
 
-                  const oldIndex = previews.indexOf(active.id);
-                  const newIndex = previews.indexOf(over.id);
+                  const oldIndex = previews.indexOf(String(active.id));
+                  const newIndex = previews.indexOf(String(over.id));
 
                   setPreviews(arrayMove(previews, oldIndex, newIndex));
                   setImages(arrayMove(images, oldIndex, newIndex));
