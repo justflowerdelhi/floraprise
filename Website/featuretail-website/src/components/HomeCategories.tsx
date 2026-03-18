@@ -2,13 +2,14 @@ import Link from "next/link"
 
 export default function HomeCategories(){
 
+
 const categories = [
-	{ name: "Art & Craft", slug: "art-craft", image: "/craft.png" },
-	{ name: "Home & Festive Decor", slug: "home-decor", image: "/decor.png" },
-	{ name: "Gift Packaging", slug: "gift-packaging", image: "/gift.png" },
-	{ name: "Paper Craft", slug: "paper-craft", image: "/paper.png" },
-	{ name: "Birthday Supplies", slug: "birthday-supplies", image: "/birthday.png" },
-	{ name: "Pipe Cleaners", slug: "pipe-cleaners", image: "/pipe.png" }
+  { name: "Art & Craft", slug: "Arts & Craft", image: "/craft.png", shop: true },
+  { name: "Home & Festive Decor", slug: "home-decor", image: "/decor.png" },
+  { name: "Gift Packaging", slug: "gift-packaging", image: "/gift.png" },
+  { name: "Paper Craft", slug: "paper-craft", image: "/paper.png" },
+  { name: "Birthday Supplies", slug: "birthday-supplies", image: "/birthday.png" },
+  { name: "Pipe Cleaners", slug: "pipe-cleaners", image: "/pipe.png" }
 ];
 
 return(
@@ -19,7 +20,10 @@ return(
 	</h2>
 	<div className="grid grid-cols-3 gap-6">
 		{categories.map(cat => (
-			<Link href={`/category/${cat.slug}`} key={cat.slug}>
+			<Link
+				href={cat.name === "Art & Craft" ? `/shop/Arts & Craft` : `/category/${cat.slug}`}
+				key={cat.slug}
+			>
 				<div className="border rounded-lg overflow-hidden hover:shadow-lg hover:scale-105 transition cursor-pointer">
 					<img
 						src={cat.image}

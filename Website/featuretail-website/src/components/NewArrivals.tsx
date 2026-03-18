@@ -1,7 +1,14 @@
-import { products } from "../data/products";
+"use client";
 import ProductCard from "./ProductCard";
+import { useEffect, useState } from "react";
 
 export default function NewArrivals() {
+  const [products, setProducts] = useState<any[]>([]);
+  useEffect(() => {
+    fetch("/api/products")
+      .then((res) => res.json())
+      .then((data) => setProducts(data));
+  }, []);
   const newProducts = products
     .filter((p) => p.stock > 0)
     .sort(
@@ -10,7 +17,6 @@ export default function NewArrivals() {
         new Date(a.createdAt).getTime()
     )
     .slice(0, 4);
-
   return (
     <section className="py-12 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4">

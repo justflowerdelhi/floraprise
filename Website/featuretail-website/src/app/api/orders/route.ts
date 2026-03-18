@@ -48,6 +48,22 @@ export async function POST(req: Request) {
       },
       include: { items: true },
     });
+
+    // Deduct inventory for each item
+    for (const item of body.items || []) {
+      if (item.variantId) {
+        await prisma.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: { decrement: item.qty } },
+        });
+      } else if (item.productId) {
+        await prisma.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.qty } },
+        });
+      }
+    }
+
     return NextResponse.json({ success: true, orderNumber, order });
   } catch (error: any) {
     console.error(error);

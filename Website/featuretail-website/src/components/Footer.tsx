@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Footer() {
   return (
     <footer className="bg-gray-100 mt-4">
@@ -14,20 +16,35 @@ export default function Footer() {
 
         <div>
           <h3 className="font-semibold mb-2">Quick Links</h3>
-          <ul className="space-y-1 text-sm text-gray-600">
-            <li>Shop</li>
-            <li>About</li>
-            <li>Contact</li>
-          </ul>
+              <ul className="space-y-1 text-sm text-gray-600">
+                <li>
+                  <Link href="/shop" className="hover:underline">Shop</Link>
+                </li>
+                <li>
+                  <Link href="/about" className="hover:underline">About</Link>
+                </li>
+                <li>
+                  <Link href="/contact" className="hover:underline">Contact</Link>
+                </li>
+              </ul>
         </div>
 
         <div>
           <h3 className="font-semibold mb-2">Customer Support</h3>
-          <ul className="space-y-1 text-sm text-gray-600">
-            <li>Shipping Policy</li>
-            <li>Return & Refund</li>
-            <li>Privacy Policy</li>
-          </ul>
+              <ul className="space-y-1 text-sm text-gray-600">
+                <li>
+                  <Link href="/shipping-policy" className="hover:underline">Shipping Policy</Link>
+                </li>
+                <li>
+                  <Link href="/return-refund" className="hover:underline">Return & Refund</Link>
+                </li>
+                <li>
+                  <Link href="/privacy-policy" className="hover:underline">Privacy Policy</Link>
+                </li>
+                <li>
+                  <Link href="/terms" className="hover:underline">Terms & Conditions</Link>
+                </li>
+              </ul>
         </div>
 
         <div>
