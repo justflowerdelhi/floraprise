@@ -186,6 +186,34 @@ public class OrderService
                 order.MarkPartiallyPaid(totalPaid);
 
             await _orderRepository.UpdateAsync(order);
+
+            // ── Update shift sales totals ──
+            if (request.LocationId.HasValue)
+            {
+                decimal cashTotal = 0, cardTotal = 0, upiTotal = 0, giftCardTotal = 0, otherTotal = 0;
+                foreach (var p in request.Payments)
+                {
+                    var methodStr = NormalizeEnumString(p.Method);
+                    if (!Enum.TryParse<PaymentMethod>(methodStr, true, out var m))
+                        m = PaymentMethod.Cash;
+
+                    switch (m)
+                    {
+                        case PaymentMethod.Cash: cashTotal += p.Amount; break;
+                        case PaymentMethod.Card: cardTotal += p.Amount; break;
+                        case PaymentMethod.Upi: upiTotal += p.Amount; break;
+                        case PaymentMethod.GiftCard: giftCardTotal += p.Amount; break;
+                        default: otherTotal += p.Amount; break;
+                    }
+                }
+
+                var shift = await _shiftRepository.GetActiveShiftAsync(companyId, request.LocationId.Value);
+                if (shift != null)
+                {
+                    shift.RecordSale(cashTotal, cardTotal, upiTotal, giftCardTotal, otherTotal);
+                    await _shiftRepository.UpdateAsync(shift);
+                }
+            }
         }
 
         // Walk-in orders with full payment: auto-confirm + complete
