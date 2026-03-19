@@ -1,109 +1,126 @@
-export default function ReturnRefund() {
+export default function ReturnRefundPage() {
   return (
-    <div className="max-w-3xl mx-auto py-10 px-4 prose prose-pink">
-      <h1>Refund & Return Policy – Featuretail.com</h1>
-      <p><b>Last Updated:</b> [Insert Date]</p>
-      <p>At Featuretail, we strive to ensure customer satisfaction with every purchase. This Refund & Return Policy outlines the conditions under which returns, replacements, and refunds are processed.</p>
-      <hr />
-      <h2>1. Eligibility for Returns</h2>
-      <p>You may request a return or replacement if:</p>
-      <ul>
-        <li>The product is <b>damaged, defective, or incorrect</b></li>
-        <li>The product is <b>unused, in original condition, and with original packaging</b></li>
-        <li>The request is raised within <b>48 hours of delivery</b></li>
-      </ul>
-      <p>Non-returnable items (unless damaged/defective):</p>
-      <ul>
-        <li>Perishable goods (e.g., flowers, cakes, food items)</li>
-        <li>Customized or personalized products</li>
-        <li>Digital/downloadable products</li>
-      </ul>
-      <hr />
-      <h2>2. Return Process</h2>
-      <p>To initiate a return:</p>
-      <ol>
-        <li>Email us at <a href="mailto:3a@featuretail.com">3a@featuretail.com</a></li>
-        <li>Provide:
-          <ul>
-            <li>Order ID</li>
+    <div className="max-w-4xl mx-auto px-4 py-10 text-gray-700">
+      
+      {/* Title */}
+      <h1 className="text-3xl font-bold mb-6 text-center">
+        Refund & Return Policy
+      </h1>
+
+      {/* Last Updated */}
+      <p className="mb-6 text-sm text-gray-500 text-center">
+        Last updated: {new Date().toLocaleDateString()}
+      </p>
+
+      <div className="space-y-8">
+
+        {/* Section 1 */}
+        <Section title="1. Eligibility for Returns">
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Product is damaged, defective, or incorrect</li>
+            <li>Product is unused, in original condition with packaging</li>
+            <li>Request raised within <strong>48 hours of delivery</strong></li>
+          </ul>
+
+          <p className="mt-3 font-medium">Non-returnable items:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Perishable goods (flowers, cakes, food items)</li>
+            <li>Customized or personalized products</li>
+            <li>Digital/downloadable products</li>
+          </ul>
+        </Section>
+
+        {/* Section 2 */}
+        <Section title="2. Return Process">
+          <p>To initiate a return:</p>
+          <ul className="list-disc pl-5 space-y-1 mt-2">
+            <li>Email us at 3a@featuretail.com</li>
+            <li>Provide Order ID</li>
             <li>Reason for return</li>
             <li>Photos/videos as proof (if applicable)</li>
           </ul>
-        </li>
-      </ol>
-      <p>Once approved:</p>
-      <ul>
-        <li>Our team will arrange a pickup <b>(where available)</b></li>
-        <li>Or you may be asked to ship the item to our return address</li>
-      </ul>
-      <hr />
-      <h2>3. Refund Policy</h2>
-      <p>Refunds are processed under the following conditions:</p>
-      <h3>a. Prepaid Orders</h3>
-      <ul>
-        <li>Refund will be issued to the <b>original payment method</b></li>
-        <li>Processing time: <b>5–7 business days</b> after approval</li>
-      </ul>
-      <h3>b. Cash on Delivery (COD)</h3>
-      <ul>
-        <li>Refund will be processed via:
-          <ul>
-            <li>Bank transfer (NEFT/IMPS), or</li>
-            <li>UPI (as provided by the customer)</li>
+
+          <p className="mt-3">
+            Once approved:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Pickup will be arranged (if available)</li>
+            <li>Or you may need to ship to our return address</li>
           </ul>
-        </li>
-      </ul>
-      <hr />
-      <h2>4. Replacement Policy</h2>
-      <ul>
-        <li>Eligible items may be <b>replaced instead of refunded</b>, based on availability</li>
-        <li>Replacement will be shipped within <b>2–5 business days</b> after approval</li>
-      </ul>
-      <hr />
-      <h2>5. Cancellation Policy</h2>
-      <ul>
-        <li>Orders can be cancelled <b>before shipment</b></li>
-        <li>Once shipped, cancellation is not allowed</li>
-        <li>Refunds for cancelled orders will be processed within <b>5–7 business days</b></li>
-      </ul>
-      <hr />
-      <h2>6. Non-Refundable Situations</h2>
-      <ul>
-        <li>Return request is made after the allowed timeframe</li>
-        <li>Product has been used, damaged by customer, or is missing packaging</li>
-        <li>Delivery failed due to incorrect address provided by the customer</li>
-      </ul>
-      <hr />
-      <h2>7. Late or Missing Refunds</h2>
-      <ul>
-        <li>If you haven’t received your refund:
-          <ul>
+        </Section>
+
+        {/* Section 3 */}
+        <Section title="3. Refund Policy">
+          <p className="font-medium">Prepaid Orders:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Refund to original payment method</li>
+            <li>Processed within 5–7 business days after approval</li>
+          </ul>
+
+          <p className="mt-3 font-medium">Cash on Delivery (COD):</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Refund via bank transfer (NEFT/IMPS)</li>
+            <li>UPI (as provided by customer)</li>
+          </ul>
+        </Section>
+
+        {/* Section 4 */}
+        <Section title="4. Replacement Policy">
+          <p>
+            Eligible items may be replaced instead of refunded based on availability.
+          </p>
+          <p className="mt-2">
+            Replacement will be shipped within <strong>2–5 business days</strong>.
+          </p>
+        </Section>
+
+        {/* Section 5 */}
+        <Section title="5. Cancellation Policy">
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Orders can be cancelled before shipment</li>
+            <li>Once shipped, cancellation is not allowed</li>
+            <li>Refunds processed within 5–7 business days</li>
+          </ul>
+        </Section>
+
+        {/* Section 6 */}
+        <Section title="6. Non-Refundable Situations">
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Return request made after allowed timeframe</li>
+            <li>Product damaged by customer</li>
+            <li>Missing packaging</li>
+            <li>Incorrect address provided</li>
+          </ul>
+        </Section>
+
+        {/* Section 7 */}
+        <Section title="7. Late or Missing Refunds">
+          <ul className="list-disc pl-5 space-y-1">
             <li>Check your bank account again</li>
-            <li>Contact your bank/payment provider (processing delays may occur)</li>
-            <li>If still unresolved, contact us at <a href="mailto:3a@featuretail.com">3a@featuretail.com</a></li>
+            <li>Contact your bank/payment provider</li>
           </ul>
-        </li>
-      </ul>
-      <hr />
-      <h2>8. Damaged or Missing Items</h2>
-      <ul>
-        <li>Report within <b>48 hours of delivery</b></li>
-        <li>Provide clear images/videos for verification</li>
-        <li>We will arrange a replacement or refund after validation</li>
-      </ul>
-      <hr />
-      <h2>9. Contact Us</h2>
-      <p>For any refund or return-related queries:</p>
-      <ul>
-        <li><b>Email:</b> <a href="mailto:3a@featuretail.com">3a@featuretail.com</a></li>
-        <li><b>Phone/WhatsApp:</b> 9971060931</li>
-        <li><b>Business Hours:</b> Mon–Sat, 10:00 AM – 6:00 PM IST</li>
-      </ul>
-      <hr />
-      <h2>10. Policy Updates</h2>
-      <p>Featuretail reserves the right to modify this policy at any time. Updates will be posted on this page with the revised date.</p>
-      <hr />
-      <p>Thank you for shopping with Featuretail!</p>
+        </Section>
+
+        {/* Section 8 */}
+        <Section title="8. Contact Us">
+          <div className="bg-gray-50 p-4 rounded-lg text-sm">
+            <p><strong>Email:</strong> 3a@featuretail.com</p>
+            <p><strong>Phone:</strong> +91-9971060931</p>
+            <p><strong>Hours:</strong> Mon–Sat, 10 AM – 6 PM IST</p>
+          </div>
+        </Section>
+
+      </div>
+    </div>
+  );
+}
+
+/* Reusable Section Component */
+function Section({ title, children }: any) {
+  return (
+    <div className="border-b pb-6">
+      <h2 className="text-xl font-semibold mb-3">{title}</h2>
+      <div className="text-sm leading-relaxed">{children}</div>
     </div>
   );
 }
