@@ -125,35 +125,8 @@ model Product {
   slug          String   @unique
   description   String?
 
-  // Bullet points (Amazon style)
-  bulletPoints  String?
-
-  // Pricing
   price         Float
-  comparePrice  Float?
-
-  // Inventory
   stock         Int      @default(0)
-  sku           String?
-
-  // Dimensions
-  weight        Float?
-  length        Float?
-  width         Float?
-  height        Float?
-
-  // Package dimensions
-  packageWeight Float?
-  packageLength Float?
-  packageWidth  Float?
-  packageHeight Float?
-
-  // SEO
-  metaTitle       String?
-  metaDescription String?
-  seoKeywords     String?
-
-  status        String   @default("draft")
 
   categoryId    String
   subCategoryId String?
@@ -165,8 +138,10 @@ model Product {
   subCategory   SubCategory? @relation(fields: [subCategoryId], references: [id])
 
   images        ProductImage[]
-  variants      ProductVariant[] // Added ProductVariant relation
+  variants      ProductVariant[]
   tags          ProductTag[]
+
+  orderItems    OrderItem[]   // ✅ ADD THIS
 }
 
 model ProductVariant {
@@ -175,8 +150,11 @@ model ProductVariant {
   price     Float?
   stock     Int?
   productId String
+
   product   Product  @relation(fields: [productId], references: [id])
   images    VariantImage[]
+
+  orderItems OrderItem[]   // ✅ ADD THIS
 }
 
 model VariantImage {

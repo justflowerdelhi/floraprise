@@ -47,6 +47,7 @@ export default function CheckoutPage() {
 
   const [sameAsShipping, setSameAsShipping] = useState(true);
   const [errors, setErrors] = useState<any>({});
+  const [loading, setLoading] = useState(false);
 
   const GST_RATE = 18;
 
@@ -161,45 +162,50 @@ export default function CheckoutPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async () => {
-    if (!validateForm()) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-
-    const billingData = sameAsShipping
-      ? formData.shipping
-      : formData.billing;
-
-    const totalDiscount = discount + couponDiscount;
-
-    const response = await fetch("/api/orders", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        paymentMethod,
+  const handleCheckout = async () => {
+    if (!validateForm()) return;
+    setLoading(true);
+    try {
+      const payload = {
+        paymentMethod: "COD",
         subtotal,
         shippingAmount: shipping,
-        discount: totalDiscount,
+        discount,
+        total,
         gstAmount,
-        total: finalTotal,
-        couponCode: couponCode ? couponCode.toUpperCase() : undefined,
         shipping: formData.shipping,
-        billing: billingData,
-        items: cart,
-      }),
-    });
+        billing: sameAsShipping
+          ? {
+              ...formData.shipping,
+              companyName: "",
+              gstNumber: "",
+            }
+          : formData.billing,
+        items: cart.map((item) => ({
+          productId: item.id,
+          variantId: item.variantId,
+          name: item.name,
+          variantName: item.variantName,
+          price: item.price,
+          qty: item.quantity,
+        })),
+      };
 
-    const result = await response.json();
-    const orderNumber = result.orderNumber || result.order?.orderNumber;
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
 
-    if (result.success && orderNumber) {
-      clearCart();
-      window.location.href = `/thank-you?order=${orderNumber}`;
-    } else {
-      alert("Something went wrong.");
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("Order placed: " + data.orderNumber);
+        clearCart();
+      } else {
+        alert(data.error);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -504,12 +510,13 @@ export default function CheckoutPage() {
           </div>
 
           <button
-            onClick={handleSubmit}
+            onClick={handleCheckout}
             className="w-full mt-6 bg-pink-600 hover:bg-pink-700 text-white py-3 rounded font-semibold"
+            disabled={loading}
           >
-            {paymentMethod === "prepaid"
-              ? "Proceed to Pay"
-              : "Place Order"}
+            {loading
+              ? (paymentMethod === "prepaid" ? "Processing..." : "Placing Order...")
+              : (paymentMethod === "prepaid" ? "Proceed to Pay" : "Place Order")}
           </button>
         </div>
       </div>

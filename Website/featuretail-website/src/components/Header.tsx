@@ -50,7 +50,7 @@ export default function Header() {
                 <>
                   {cart.map((item) => (
                     <div
-                      key={item.id}
+                      key={`${item.id}-${item.variantId || "default"}`}
                       className="flex justify-between text-sm mb-2"
                     >
                       <span>{item.name}</span>

@@ -9,7 +9,8 @@ export default function CartPage() {
   const {
     cart,
     removeFromCart,
-    updateQuantity,
+    increaseQty,
+    decreaseQty,
     subtotal,
     shipping,
     discount,
@@ -60,17 +61,7 @@ export default function CartPage() {
     }
   };
 
-  const increaseQuantity = (id: string) => {
-    const item = cart.find((i) => i.id === id);
-    if (!item) return;
-    updateQuantity(id, item.quantity + 1);
-  };
 
-  const decreaseQuantity = (id: string) => {
-    const item = cart.find((i) => i.id === id);
-    if (!item) return;
-    updateQuantity(id, Math.max(1, item.quantity - 1));
-  };
 
   if (cart.length === 0) {
     return (
@@ -91,23 +82,26 @@ export default function CartPage() {
         <div className="md:col-span-2 space-y-6">
           {cart.map((item) => (
             <div
-              key={item.id}
+              key={`${item.id}-${item.variantId || "default"}`}
               className="bg-white rounded-lg shadow-sm border p-4 flex gap-4 items-center"
             >
-              <Link href={`/shop/${item.category}/${item.slug}`}>
+              <Link href={`/shop/${item.categorySlug}/${item.slug}`}>
                 <div className="relative w-24 h-24 border rounded cursor-pointer">
-                  <Image
-                    src={item.images?.[0] ?? "/products/placeholder.jpg"}
-                    alt={item.name}
-                    fill
-                    className="object-contain p-2"
-                  />
+                  {item.image ? (
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : null}
                 </div>
               </Link>
 
               <div className="flex-1">
                 <h2 className="font-semibold text-base">
-                  {item.name}
+                  <Link href={`/shop/${item.categorySlug}/${item.slug}`}>
+                    {item.name}
+                  </Link>
                 </h2>
 
                 <p className="text-sm text-gray-500">
@@ -116,7 +110,7 @@ export default function CartPage() {
 
                 <div className="flex items-center gap-3 mt-3">
                   <button
-                    onClick={() => decreaseQuantity(item.id)}
+                    onClick={() => decreaseQty(item.id, item.variantId)}
                     className="w-8 h-8 border rounded flex items-center justify-center"
                   >
                     -
@@ -127,7 +121,7 @@ export default function CartPage() {
                   </span>
 
                   <button
-                    onClick={() => increaseQuantity(item.id)}
+                    onClick={() => increaseQty(item.id, item.variantId)}
                     className="w-8 h-8 border rounded flex items-center justify-center"
                   >
                     +
@@ -137,7 +131,7 @@ export default function CartPage() {
 
               <div className="text-right">
                 <p className="font-bold text-pink-600">
-                  ₹{item.price * item.quantity}
+                  ₹{(item.price * item.quantity).toFixed(2)}
                 </p>
 
                 <button

@@ -1,6 +1,12 @@
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    if (!body.items || body.items.length === 0) {
+      return NextResponse.json(
+        { error: "No items provided" },
+        { status: 400 }
+      );
+    }
     const shipping = body.shipping;
     const billing = body.billing;
 
@@ -51,7 +57,14 @@ export async function POST(req: Request) {
 
     // Deduct inventory for each item
     for (const item of body.items || []) {
+      if (item.qty <= 0) continue;
       if (item.variantId) {
+        const variant = await prisma.productVariant.findUnique({
+          where: { id: item.variantId },
+        });
+        if (!variant || variant.stock < item.qty) {
+          throw new Error("Insufficient stock for variant");
+        }
         await prisma.productVariant.update({
           where: { id: item.variantId },
           data: { stock: { decrement: item.qty } },

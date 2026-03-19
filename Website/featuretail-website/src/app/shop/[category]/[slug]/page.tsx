@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 "use client";
 
 import Image from "next/image";
@@ -101,13 +102,17 @@ export default function ProductPage() {
             onClick={() => setIsOpen(true)}
             className="relative w-full h-[400px] border rounded mb-4 overflow-hidden cursor-zoom-in"
           >
-            {selectedImage && (
+            {selectedImage ? (
               <Image
                 src={selectedImage}
                 alt={product.name}
                 fill
                 className="object-contain p-4"
               />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                No Image
+              </div>
             )}
           </div>
 
@@ -123,12 +128,14 @@ export default function ProductPage() {
                     : "border-gray-300"
                 }`}
               >
-                <Image
-                  src={img.url}
-                  alt={product.name}
-                  fill
-                  className="object-contain p-1"
-                />
+                {img?.url ? (
+                  <Image
+                    src={img.url}
+                    alt={product.name}
+                    fill
+                    className="object-contain p-1"
+                  />
+                ) : null}
               </div>
             ))}
           </div>
@@ -174,14 +181,21 @@ export default function ProductPage() {
 
           {/* ADD TO CART */}
           <button
-            onClick={() =>
+            onClick={() => {
               addToCart({
-                ...product,
+                id: product.id,
+                name: product.name,
+                slug: product.slug, // ✅ IMPORTANT
+                categorySlug: product.category?.slug, // ✅ FIX
+                price: price,
+                image:
+                  selectedVariant?.images?.[0]?.url ||
+                  product.images?.[0]?.url,
                 variantId: selectedVariant?.id,
                 variantName: selectedVariant?.name,
-                price,
-              })
-            }
+              });
+              toast.success(`${product.name} (${selectedVariant?.name || "Default"}) added 🛒`);
+            }}
             disabled={isOutOfStock}
             className="w-full md:w-auto bg-pink-600 hover:bg-pink-700 disabled:bg-gray-300 text-white px-8 py-3 rounded font-semibold"
           >
@@ -239,12 +253,18 @@ export default function ProductPage() {
               ‹
             </button>
 
-            <Image
-              src={selectedImage}
-              alt={product.name}
-              fill
-              className="object-contain"
-            />
+            {selectedImage ? (
+              <Image
+                src={selectedImage}
+                alt={product.name}
+                fill
+                className="object-contain"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                No Image
+              </div>
+            )}
 
             <button
               onClick={goNext}

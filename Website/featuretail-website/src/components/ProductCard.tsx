@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Product } from "../data/products";
 import { useCart } from "@/context/CartContext";
 import { useState } from "react";
+import toast from "react-hot-toast";
 
 interface Props {
   product: Product;
@@ -66,6 +67,7 @@ export default function ProductCard({ product }: Props) {
       <button
         onClick={() => {
           addToCart(product);
+          toast.success("Added to cart 🛒");
           setAdded(true);
           setTimeout(() => {
             setAdded(false);

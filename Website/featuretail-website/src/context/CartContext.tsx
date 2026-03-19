@@ -1,7 +1,10 @@
+
 "use client";
 
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { Product } from "../data/products";
+
+
 
 export interface CartItem extends Product {
   id: string; // ensure cart items always carry a unique identifier
@@ -31,6 +34,29 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
 
+  // Must be defined here so setCart is in scope
+  const increaseQty = (id: string, variantId?: string) => {
+    setCart((prev) =>
+      prev.map((item) =>
+        item.id === id && item.variantId === variantId
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      )
+    );
+  };
+
+  const decreaseQty = (id: string, variantId?: string) => {
+    setCart((prev) =>
+      prev
+        .map((item) =>
+          item.id === id && item.variantId === variantId
+            ? { ...item, quantity: item.quantity - 1 }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
+  };
+
   // Load cart from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem("cart");
@@ -45,28 +71,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "prepaid">("cod");
 
-  const addToCart = (product: Product) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.id === product.id);
+  const addToCart = (item: any) => {
+    setCart((prev: any[]) => {
+      const existing = prev.find(
+        (p) =>
+          p.id === item.id &&
+          p.variantId === item.variantId
+      );
+
       if (existing) {
-        return prev.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
+        return prev.map((p) =>
+          p.id === item.id &&
+          p.variantId === item.variantId
+            ? { ...p, quantity: p.quantity + 1 }
+            : p
         );
       }
-      return [...prev, { ...product, quantity: 1 }];
+
+      return [...prev, { ...item, quantity: 1 }];
     });
   };
 
-  const removeFromCart = (id: string) => {
-    setCart(cart.filter((item) => item.id !== id));
+  const removeFromCart = (id: string, variantId?: string) => {
+    setCart(cart.filter((item) => !(item.id === id && item.variantId === variantId)));
   };
 
-  const updateQuantity = (id: string, quantity: number) => {
+  const updateQuantity = (id: string, variantId: string | undefined, quantity: number) => {
     setCart(
       cart.map((item) =>
-        item.id === id ? { ...item, quantity } : item
+        item.id === id && item.variantId === variantId ? { ...item, quantity } : item
       )
     );
   };
@@ -107,6 +140,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         total,
         paymentMethod,
         setPaymentMethod,
+        increaseQty,
+        decreaseQty,
       }}
     >
       {children}
