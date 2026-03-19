@@ -88,10 +88,10 @@ export default function ProductPage() {
               <div
                 key={index}
                 onClick={() => setCurrentIndex(index)}
-                className={`relative w-20 h-20 border rounded cursor-pointer ${
+                className={`relative w-20 h-20 border rounded cursor-pointer transition ${
                   currentIndex === index
                     ? "border-pink-600"
-                    : "border-gray-300"
+                    : "border-gray-300 hover:border-gray-500"
                 }`}
               >
                 {img?.url && (
@@ -109,7 +109,7 @@ export default function ProductPage() {
 
         {/* CENTER - INFO */}
         <div className="md:col-span-2">
-          <h1 className="text-2xl font-semibold mb-2">
+          <h1 className="text-2xl font-semibold mb-2 leading-snug">
             {product.name}
           </h1>
 
@@ -170,7 +170,7 @@ export default function ProductPage() {
 
         {/* RIGHT - BUY BOX */}
         <div className="md:col-span-1">
-          <div className="border rounded-lg p-4 shadow-sm sticky top-20">
+          <div className="border rounded-lg p-4 shadow-sm sticky top-20 bg-white">
 
             <p className="text-2xl font-bold text-pink-600">
               ₹{price}
@@ -203,7 +203,7 @@ export default function ProductPage() {
                 );
               }}
               disabled={isOutOfStock}
-              className="w-full mt-2 bg-pink-600 hover:bg-pink-700 text-white py-2 rounded font-medium"
+              className="w-full mt-2 bg-pink-600 hover:bg-pink-700 text-white py-2 rounded font-medium transition"
             >
               Add to Cart
             </button>
