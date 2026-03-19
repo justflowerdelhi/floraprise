@@ -122,17 +122,24 @@ export default function CreateProductPage() {
   /* ---------------- SAVE ---------------- */
 
   const handleSubmit = async () => {
+
+    // Client-side validation for required fields
+    if (!product.name || !product.slug || !product.price || !product.stock || !product.categoryId) {
+      alert("Please fill all required fields: Name, Slug, Price, Stock, and Category.");
+      return;
+    }
+
     const formData = new FormData();
 
-    formData.append("name", product.name || "");
-    formData.append("slug", product.slug || "");
+    formData.append("name", product.name);
+    formData.append("slug", product.slug);
     formData.append("description", product.description || "");
     formData.append("bulletPoints", product.bulletPoints || "");
 
-    formData.append("price", product.price || "0");
-    formData.append("stock", product.stock || "0");
+    formData.append("price", product.price);
+    formData.append("stock", product.stock);
 
-    formData.append("categoryId", product.categoryId || "");
+    formData.append("categoryId", product.categoryId);
     if (product.subCategoryId) {
       formData.append("subCategoryId", product.subCategoryId);
     }

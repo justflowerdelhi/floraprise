@@ -1,12 +1,26 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import fs from "fs";
+import path from "path";
+
 export const dynamic = "force-dynamic";
-// Helper to save a file and return its URL
+
+// =========================
+// Helper to save file
+// =========================
 async function saveFile(file: File) {
   const buffer = Buffer.from(await file.arrayBuffer());
-  const fileName = Date.now() + '-' + file.name;
-  const filePath = path.join(process.cwd(), 'public/uploads', fileName);
+  const fileName = Date.now() + "-" + file.name;
+  const filePath = path.join(process.cwd(), "public/uploads", fileName);
+
   fs.writeFileSync(filePath, buffer);
-  return '/uploads/' + fileName;
+
+  return "/uploads/" + fileName;
 }
+
+// =========================
+// GET PRODUCTS
+// =========================
 export async function GET() {
   try {
     const products = await prisma.product.findMany({
@@ -14,15 +28,16 @@ export async function GET() {
         category: true,
         variants: {
           include: {
-            images: true
-          }
+            images: true,
+          },
         },
-        images: true
+        images: true,
       },
       orderBy: {
-        createdAt: "desc"
-      }
+        createdAt: "desc",
+      },
     });
+
     return NextResponse.json(products);
   } catch (error: any) {
     return NextResponse.json(
@@ -31,13 +46,10 @@ export async function GET() {
     );
   }
 }
-import { PrismaClient } from "@prisma/client";
-import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 
-const prisma = new PrismaClient();
-
+// =========================
+// CREATE PRODUCT
+// =========================
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
@@ -52,16 +64,16 @@ export async function POST(req: Request) {
 
     const categoryId = formData.get("categoryId") as string;
     const rawSubCategoryId = formData.get("subCategoryId") as string;
+
     const subCategoryId =
       rawSubCategoryId && rawSubCategoryId !== ""
         ? rawSubCategoryId
         : null;
+
     const status = formData.get("status") as string;
 
     // FILES
     const productFiles = formData.getAll("images") as File[];
-
-    // VARIANT FILES
     const variantFiles = formData.getAll("variantImages") as File[];
 
     // VARIANTS
@@ -75,43 +87,42 @@ export async function POST(req: Request) {
     // =========================
     // PRODUCT IMAGES
     // =========================
-    const productImages: any[] = [];
+    const productImages = await Promise.all(
+      productFiles.map(async (file, i) => {
+        if (!(file instanceof File)) return null;
 
-    for (let i = 0; i < productFiles.length; i++) {
-      const file = productFiles[i];
+        const url = await saveFile(file);
 
-      if (!(file instanceof File)) continue;
+        return {
+          url,
+          order: i, // ✅ correct ordering
+        };
+      })
+    );
 
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const fileName = Date.now() + "-" + file.name;
-
-      const filePath = path.join(process.cwd(), "public/uploads", fileName);
-      fs.writeFileSync(filePath, buffer);
-
-      productImages.push({
-        url: "/uploads/" + fileName,
-        order: i,
-      });
-    }
+    // remove nulls
+    const cleanProductImages = productImages.filter(Boolean);
 
     // =========================
     // VARIANTS
     // =========================
-    const variantData = await Promise.all(variants.map(async (v: any, i: number) => ({
-      name: v.name,
-      price: Number(v.price || 0),
-      stock: Number(v.stock || 0),
-      images: {
-        create: variantFiles[i]
-          ? [
-              {
-                url: await saveFile(variantFiles[i]),
-                order: 0
-              }
-            ]
-          : []
-      },
-    })));
+    const variantData = await Promise.all(
+      variants.map(async (v: any, i: number) => ({
+        name: v.name,
+        price: Number(v.price || 0),
+        stock: Number(v.stock || 0),
+        images: {
+          create: variantFiles[i]
+            ? [
+                {
+                  url: await saveFile(variantFiles[i]),
+                  order: 0, // ✅ first image
+                },
+              ]
+            : [],
+        },
+      }))
+    );
 
     // =========================
     // CREATE PRODUCT
@@ -126,11 +137,9 @@ export async function POST(req: Request) {
         status,
         categoryId,
         subCategoryId,
-
         images: {
-          create: productImages,
+          create: cleanProductImages as any,
         },
-
         variants: {
           create: variantData,
         },

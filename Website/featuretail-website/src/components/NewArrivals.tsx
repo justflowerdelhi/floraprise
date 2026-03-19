@@ -1,30 +1,33 @@
-"use client";
 import ProductCard from "./ProductCard";
-import { useEffect, useState } from "react";
 
-export default function NewArrivals() {
-  const [products, setProducts] = useState<any[]>([]);
-  useEffect(() => {
-    fetch("/api/products")
-      .then((res) => res.json())
-      .then((data) => setProducts(data));
-  }, []);
+async function getProducts() {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/products`, {
+    cache: "no-store",
+  });
+  return res.json();
+}
+
+export default async function NewArrivals() {
+  const products = await getProducts();
+
   const newProducts = products
-    .filter((p) => p.stock > 0)
+    .filter((p: any) => p.stock > 0)
     .sort(
-      (a, b) =>
+      (a: any, b: any) =>
         new Date(b.createdAt).getTime() -
         new Date(a.createdAt).getTime()
     )
     .slice(0, 4);
+
   return (
-    <section className="py-12 bg-gray-50">
+    <section className="py-6 md:py-10 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4">
-        <h2 className="text-3xl font-bold text-center mb-10">
+        <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 md:mb-10">
           🆕 New Arrivals
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {newProducts.map((product) => (
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+          {newProducts.map((product: any) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>

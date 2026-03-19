@@ -21,11 +21,11 @@ export default function ProductCard({ product }: Props) {
   const isOutOfStock = product.stock <= 0;
   const isBestSeller = product.tags?.includes("best-seller");
   const isNewArrival = Date.now() - new Date(product.createdAt).getTime() <= 1000 * 60 * 60 * 24 * 14; // 14 days
-  const primaryImage = product.images?.[0];
+  const primaryImage = product.images?.[0] || "/images/product-placeholder.png";
 
   return (
     <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition p-4 border border-gray-100 flex flex-col">
-      <Link href={`/shop/${product.category}/${product.slug}`} className="flex-1">
+      <Link href={`/shop/${product.category?.slug || "all"}/${product.slug}`} className="flex-1">
         <div>
           <div className="relative w-full h-48 mb-4">
             {isBestSeller && (
@@ -38,17 +38,18 @@ export default function ProductCard({ product }: Props) {
                 New
               </span>
             )}
-            <Image
-              src={primaryImage}
+            <img
+              src={
+                product.images && product.images.length > 0
+                  ? product.images[0].url
+                  : "/placeholder.jpg"
+              }
               alt={product.name}
-              fill
-              sizes="(max-width: 768px) 100vw, 25vw"
-              className="object-cover rounded-lg transition-transform duration-300 hover:scale-105"
-              priority={false}
+              className="w-full h-48 object-cover rounded"
             />
           </div>
 
-          <h3 className="font-semibold text-base mb-1 line-clamp-2 flex-1">
+          <h3 className="text-sm font-medium line-clamp-2">
             {product.name}
           </h3>
 

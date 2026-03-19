@@ -49,7 +49,7 @@ export default function CataloguePage() {
   const deleteProduct = async (id: string) => {
     if (!confirm("Delete this product?")) return;
 
-    await fetch(`/api/admin/products?id=${id}`, {
+    await fetch(`/api/admin/products/${id}`, {
       method: "DELETE",
     });
 

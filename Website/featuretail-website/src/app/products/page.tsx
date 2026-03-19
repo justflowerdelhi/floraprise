@@ -22,7 +22,7 @@ export default function ProductsPage() {
 
     if (!confirm("Delete product?")) return;
 
-    await fetch(`/api/admin/products?id=${id}`, {
+    await fetch(`/api/admin/products/${id}`, {
       method: "DELETE",
     });
 
