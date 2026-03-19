@@ -66,7 +66,13 @@ export default function ProductCard({ product }: Props) {
 
       <button
         onClick={() => {
-          addToCart(product);
+          addToCart({
+            ...product,
+            image:
+              product.images && product.images.length > 0
+                ? product.images[0]
+                : "/placeholder.jpg",
+          });
           toast.success("Added to cart 🛒");
           setAdded(true);
           setTimeout(() => {

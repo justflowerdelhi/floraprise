@@ -1,12 +1,11 @@
-import toast from "react-hot-toast";
 "use client";
 
+import Footer from "@/components/Footer";
+import toast from "react-hot-toast";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { categories } from "@/data/categories";
 
 export default function ProductPage() {
   const params = useParams<{ category: string; slug: string }>();
@@ -25,8 +24,6 @@ export default function ProductPage() {
       .then((res) => res.json())
       .then((data) => {
         setProduct(data);
-
-        // ✅ AUTO SELECT FIRST VARIANT
         if (data?.variants?.length > 0) {
           setSelectedVariant(data.variants[0]);
         }
@@ -34,73 +31,42 @@ export default function ProductPage() {
       .catch(() => setProduct(null));
   }, [params?.slug]);
 
-  // ✅ KEYBOARD NAV
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsOpen(false);
-      if (event.key === "ArrowRight") goNext();
-      if (event.key === "ArrowLeft") goPrev();
-    };
+  if (!product) {
+    return <div className="p-8 text-center">Loading...</div>;
+  }
 
-    if (isOpen) {
-      document.addEventListener("keydown", handleKey);
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [isOpen]);
-
-  // ✅ LOADING STATE
-  if (!product) return <div className="p-10 text-center">Loading...</div>;
-
-  // ✅ SAFE IMAGES (CRITICAL FIX)
   const images =
     selectedVariant?.images?.length > 0
       ? selectedVariant.images
       : product.images || [];
 
-  const selectedImage = images[currentIndex]?.url;
+  const selectedImage = images?.[currentIndex]?.url || "";
 
-  // ✅ FIXED NAVIGATION
+  const price = selectedVariant?.price ?? product.price ?? 0;
+
+  const isOutOfStock =
+    (selectedVariant?.stock ?? product.stock ?? 0) <= 0;
+
   const goNext = () => {
-    setCurrentIndex((prev) =>
-      prev === images.length - 1 ? 0 : prev + 1
-    );
+    if (!images.length) return;
+    setCurrentIndex((prev) => (prev + 1) % images.length);
   };
 
   const goPrev = () => {
-    setCurrentIndex((prev) =>
-      prev === 0 ? images.length - 1 : prev - 1
-    );
+    if (!images.length) return;
+    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
-  const categoryData = categories.find(
-    (c: any) => c.slug === product.category?.slug
-  );
-
-  const price = selectedVariant?.price || product.price;
-  const isOutOfStock = product.stock <= 0;
-
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10 pb-24">
+    <div className="max-w-7xl mx-auto px-4 py-6 pb-24">
 
-      {/* Breadcrumb */}
-      <div className="text-sm text-gray-500 mb-6">
-        <Link href="/">Home</Link> |{" "}
-        <Link href={`/shop/${product.category?.slug || "all"}`}>
-          {categoryData?.name || product.category?.name || "All"}
-        </Link>{" "}
-        | {product.name}
-      </div>
+      <div className="grid md:grid-cols-5 gap-8">
 
-      <div className="grid md:grid-cols-2 gap-12">
-
-        {/* IMAGE SECTION */}
-        <div>
+        {/* LEFT - IMAGES */}
+        <div className="md:col-span-2">
           <div
             onClick={() => setIsOpen(true)}
-            className="relative w-full h-[400px] border rounded mb-4 overflow-hidden cursor-zoom-in"
+            className="relative w-full h-[320px] border rounded mb-4 overflow-hidden cursor-zoom-in"
           >
             {selectedImage ? (
               <Image
@@ -128,24 +94,28 @@ export default function ProductPage() {
                     : "border-gray-300"
                 }`}
               >
-                {img?.url ? (
+                {img?.url && (
                   <Image
                     src={img.url}
                     alt={product.name}
                     fill
                     className="object-contain p-1"
                   />
-                ) : null}
+                )}
               </div>
             ))}
           </div>
         </div>
 
-        {/* DETAILS */}
-        <div>
-          <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
+        {/* CENTER - INFO */}
+        <div className="md:col-span-2">
+          <h1 className="text-2xl font-semibold mb-2">
+            {product.name}
+          </h1>
 
-          <p className="text-2xl text-pink-600 font-semibold mb-4">
+          <hr className="my-4" />
+
+          <p className="text-xl text-pink-600 font-bold mb-2">
             ₹{price}
           </p>
 
@@ -153,14 +123,13 @@ export default function ProductPage() {
           {product.variants?.length > 0 && (
             <div className="mb-6">
               <h3 className="font-semibold mb-2">Options</h3>
-
               <div className="flex gap-2 flex-wrap">
                 {product.variants.map((v: any) => (
                   <button
                     key={v.id}
                     onClick={() => {
                       setSelectedVariant(v);
-                      setCurrentIndex(0); // ✅ IMPORTANT FIX
+                      setCurrentIndex(0);
                     }}
                     className={`px-3 py-1 border rounded ${
                       selectedVariant?.id === v.id
@@ -179,54 +148,82 @@ export default function ProductPage() {
             {product.description}
           </p>
 
-          {/* ADD TO CART */}
-          <button
-            onClick={() => {
-              addToCart({
-                id: product.id,
-                name: product.name,
-                slug: product.slug, // ✅ IMPORTANT
-                categorySlug: product.category?.slug, // ✅ FIX
-                price: price,
-                image:
-                  selectedVariant?.images?.[0]?.url ||
-                  product.images?.[0]?.url,
-                variantId: selectedVariant?.id,
-                variantName: selectedVariant?.name,
-              });
-              toast.success(`${product.name} (${selectedVariant?.name || "Default"}) added 🛒`);
-            }}
-            disabled={isOutOfStock}
-            className="w-full md:w-auto bg-pink-600 hover:bg-pink-700 disabled:bg-gray-300 text-white px-8 py-3 rounded font-semibold"
-          >
-            {isOutOfStock ? "Back Soon" : "Add to Cart"}
-          </button>
-            <div className="mt-6 grid grid-cols-2 gap-4 text-sm text-gray-700">
-              <div className="flex items-center gap-2">
-                <span>🚚</span>
-                <span>Fast Shipping Across India</span>
-              </div>
+          {/* BULLET POINTS */}
+          {product.bulletPoints && (
+            <ul className="list-disc pl-5 mt-4 space-y-2 text-gray-700">
+              {product.bulletPoints
+                .split("\n")
+                .map((point: string, i: number) => (
+                  <li key={i}>{point}</li>
+                ))}
+            </ul>
+          )}
 
-              <div className="flex items-center gap-2">
-                <span>💳</span>
-                <span>Secure Payments via PayU</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span>🔄</span>
-                <span>Easy Return Support</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span>🏆</span>
-                <span>Trusted Brand Since 2016</span>
-              </div>
-            </div>
-
-          <div className="mt-4 text-sm text-gray-500">
-            {product.stock > 0 ? "In Stock" : "Out of Stock"}
+          {/* TRUST */}
+          <div className="mt-4 text-sm text-gray-700 space-y-2">
+            <p>🚚 Fast Shipping Across India</p>
+            <p>💳 Secure Payments via PayU</p>
+            <p>🔄 Easy Return Support</p>
+            <p>🏆 Trusted Brand Since 2016</p>
           </div>
         </div>
+
+        {/* RIGHT - BUY BOX */}
+        <div className="md:col-span-1">
+          <div className="border rounded-lg p-4 shadow-sm sticky top-20">
+
+            <p className="text-2xl font-bold text-pink-600">
+              ₹{price}
+            </p>
+
+            <p className="text-green-600 text-sm mt-1">
+              {isOutOfStock ? "Out of Stock" : "In Stock"}
+            </p>
+
+            <button className="w-full mt-4 bg-yellow-400 hover:bg-yellow-500 text-black py-2 rounded font-medium">
+              Buy Now
+            </button>
+
+            <button
+              onClick={() => {
+                addToCart({
+                  id: product.id,
+                  name: product.name,
+                  slug: product.slug,
+                  price,
+                  images:
+                    selectedVariant?.images?.[0]?.url ||
+                    product.images?.[0]?.url,
+                  variantId: selectedVariant?.id,
+                  variantName: selectedVariant?.name,
+                });
+
+                toast.success(
+                  `${product.name} (${selectedVariant?.name || "Default"}) added 🛒`
+                );
+              }}
+              disabled={isOutOfStock}
+              className="w-full mt-2 bg-pink-600 hover:bg-pink-700 text-white py-2 rounded font-medium"
+            >
+              Add to Cart
+            </button>
+
+            <div className="mt-4 text-xs text-gray-600 space-y-1">
+              <p>🚚 Free Delivery</p>
+              <p>🔁 7 Days Return</p>
+              <p>💳 COD Available</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* DESCRIPTION */}
+      <div className="mt-10 border-t pt-6">
+        <h2 className="text-xl font-semibold mb-4">
+          Product Description
+        </h2>
+        <p className="text-gray-700">{product.description}</p>
       </div>
 
       {/* LIGHTBOX */}
@@ -253,18 +250,12 @@ export default function ProductPage() {
               ‹
             </button>
 
-            {selectedImage ? (
-              <Image
-                src={selectedImage}
-                alt={product.name}
-                fill
-                className="object-contain"
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-400">
-                No Image
-              </div>
-            )}
+            <Image
+              src={selectedImage}
+              alt={product.name}
+              fill
+              className="object-contain"
+            />
 
             <button
               onClick={goNext}
@@ -275,6 +266,8 @@ export default function ProductPage() {
           </div>
         </div>
       )}
+
+      <Footer />
     </div>
   );
 }
