@@ -9,11 +9,12 @@ async function getProducts() {
 
 export default async function BestSellers() {
   const products = await getProducts();
-
+  if (!Array.isArray(products)) {
+    return null;
+  }
   const bestProducts = products
     .filter((p: any) => p.tags?.includes("best-seller") && p.stock > 0)
     .slice(0, 4);
-
   if (bestProducts.length === 0) return null;
 
   return (

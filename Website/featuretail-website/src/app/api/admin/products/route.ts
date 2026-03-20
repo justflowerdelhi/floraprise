@@ -134,7 +134,7 @@ export async function POST(req: Request) {
         description,
         price,
         stock,
-        status,
+        // status removed, not in Product model
         categoryId,
         subCategoryId,
         images: {

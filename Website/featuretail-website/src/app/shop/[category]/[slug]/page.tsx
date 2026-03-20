@@ -115,9 +115,7 @@ export default function ProductPage() {
 
           <hr className="my-4" />
 
-          <p className="text-xl text-pink-600 font-bold mb-2">
-            ₹{price}
-          </p>
+          
 
           {/* VARIANTS */}
           {product.variants?.length > 0 && (
@@ -191,11 +189,15 @@ export default function ProductPage() {
                   name: product.name,
                   slug: product.slug,
                   price,
-                  images:
-                    selectedVariant?.images?.[0]?.url ||
-                    product.images?.[0]?.url,
+                  images: product.images,
+                  category: product.category,
+                  stock: selectedVariant?.stock ?? product.stock ?? 0,
+                  createdAt: product.createdAt,
+                  description: product.description,
+                  features: product.features,
                   variantId: selectedVariant?.id,
                   variantName: selectedVariant?.name,
+                  quantity: 1,
                 });
 
                 toast.success(

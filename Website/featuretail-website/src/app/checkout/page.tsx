@@ -2,6 +2,7 @@
 
 import { useCart } from "@/context/CartContext";
 import { useState } from "react";
+import Footer from "@/components/Footer";
 
 export default function CheckoutPage() {
   const {
@@ -9,7 +10,6 @@ export default function CheckoutPage() {
     subtotal,
     shipping,
     discount,
-    couponCode,
     couponDiscount,
     total,
     paymentMethod,
@@ -46,24 +46,26 @@ export default function CheckoutPage() {
   });
 
   const [sameAsShipping, setSameAsShipping] = useState(true);
-  const [errors, setErrors] = useState<any>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
+  /* ---------------- GST ---------------- */
   const GST_RATE = 18;
-
-  const taxableAmount = subtotal - discount;
-
+  const taxableAmount = subtotal - discount - couponDiscount;
   const gstAmount = (taxableAmount * GST_RATE) / (100 + GST_RATE);
-
   const cgst = gstAmount / 2;
   const sgst = gstAmount / 2;
 
-  const finalTotal = subtotal + shipping - discount;
+  /* ---------------- FINAL TOTAL ---------------- */
+  const finalTotal =
+    subtotal + shipping - discount - couponDiscount;
 
   if (cart.length === 0) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-4 text-center">
-        <h1 className="text-2xl font-bold">Your cart is empty</h1>
+        <h1 className="text-2xl font-bold">
+          Your cart is empty
+        </h1>
       </div>
     );
   }
@@ -72,106 +74,63 @@ export default function CheckoutPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     type: "shipping" | "billing"
   ) => {
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [type]: {
-        ...formData[type],
+        ...prev[type],
         [e.target.name]: e.target.value,
       },
-    });
+    }));
   };
 
   const validateForm = () => {
-    const newErrors: any = {};
+    const newErrors: Record<string, string> = {};
+    const s = formData.shipping;
 
-    const shipping = formData.shipping;
+    if (!s.name.trim()) newErrors.name = "Full Name is required";
+    if (!s.address.trim()) newErrors.address = "Address is required";
+    if (!s.city.trim()) newErrors.city = "City is required";
+    if (!s.state.trim()) newErrors.state = "State is required";
+    if (!s.pincode.trim()) newErrors.pincode = "Pincode is required";
+    if (!s.phone.trim()) newErrors.phone = "Phone is required";
+    if (!s.email.trim()) newErrors.email = "Email is required";
 
-    // Required Fields
-    if (!shipping.name.trim()) newErrors.name = "Full Name is required";
-    if (!shipping.address.trim()) newErrors.address = "Address is required";
-    if (!shipping.city.trim()) newErrors.city = "City is required";
-    if (!shipping.state.trim()) newErrors.state = "State is required";
-    if (!shipping.pincode.trim()) newErrors.pincode = "Pincode is required";
-    if (!shipping.phone.trim()) newErrors.phone = "Phone number is required";
-    if (!shipping.email.trim()) newErrors.email = "Email is required";
-
-    // Email format
-    if (
-      shipping.email &&
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shipping.email)
-    ) {
-      newErrors.email = "Invalid email format";
+    if (s.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email)) {
+      newErrors.email = "Invalid email";
     }
 
-    // Indian Phone validation (10 digits)
-    if (
-      shipping.phone &&
-      !/^[6-9]\d{9}$/.test(shipping.phone)
-    ) {
-      newErrors.phone = "Invalid 10-digit mobile number";
+    if (s.phone && !/^[6-9]\d{9}$/.test(s.phone)) {
+      newErrors.phone = "Invalid mobile";
     }
 
-    // Indian Pincode validation (6 digits)
-    if (
-      shipping.pincode &&
-      !/^\d{6}$/.test(shipping.pincode)
-    ) {
-      newErrors.pincode = "Invalid 6-digit pincode";
+    if (s.pincode && !/^\d{6}$/.test(s.pincode)) {
+      newErrors.pincode = "Invalid pincode";
     }
 
-    // Billing validation when not same as shipping
     if (!sameAsShipping) {
-      const billing = formData.billing;
-
-      if (!billing.name.trim()) newErrors.billingName = "Full Name is required";
-      if (!billing.address.trim()) newErrors.billingAddress = "Address is required";
-      if (!billing.city.trim()) newErrors.billingCity = "City is required";
-      if (!billing.state.trim()) newErrors.billingState = "State is required";
-      if (!billing.pincode.trim()) newErrors.billingPincode = "Pincode is required";
-      if (!billing.phone.trim()) newErrors.billingPhone = "Phone number is required";
-      if (!billing.email.trim()) newErrors.billingEmail = "Email is required";
-
-      if (
-        billing.email &&
-        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(billing.email)
-      ) {
-        newErrors.billingEmail = "Invalid email format";
-      }
-
-      if (
-        billing.phone &&
-        !/^[6-9]\d{9}$/.test(billing.phone)
-      ) {
-        newErrors.billingPhone = "Invalid 10-digit mobile number";
-      }
-
-      if (
-        billing.pincode &&
-        !/^\d{6}$/.test(billing.pincode)
-      ) {
-        newErrors.billingPincode = "Invalid 6-digit pincode";
-      }
-
-      if (billing.gstNumber && !isValidGST(billing.gstNumber)) {
-        newErrors.billingGstNumber = "Invalid GST Number format";
+      const b = formData.billing;
+      if (b.gstNumber && !isValidGST(b.gstNumber)) {
+        newErrors.billingGstNumber = "Invalid GST";
       }
     }
 
     setErrors(newErrors);
-
     return Object.keys(newErrors).length === 0;
   };
 
   const handleCheckout = async () => {
     if (!validateForm()) return;
+
     setLoading(true);
+
     try {
       const payload = {
-        paymentMethod: "COD",
+        paymentMethod,
         subtotal,
         shippingAmount: shipping,
         discount,
-        total,
+        couponDiscount,
+        total: finalTotal,
         gstAmount,
         shipping: formData.shipping,
         billing: sameAsShipping
@@ -193,6 +152,9 @@ export default function CheckoutPage() {
 
       const res = await fetch("/api/orders", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(payload),
       });
 
@@ -202,267 +164,73 @@ export default function CheckoutPage() {
         alert("Order placed: " + data.orderNumber);
         clearCart();
       } else {
-        alert(data.error);
+        alert(data.error || "Something went wrong");
       }
+    } catch {
+      alert("Checkout failed");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+    <>
+      <div className="max-w-6xl mx-auto px-4 py-10">
+        <h1 className="text-3xl font-bold mb-8">Checkout</h1>
 
-      <div className="grid md:grid-cols-2 gap-10">
-        
-        {/* Customer Form */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold mb-4">
-            Shipping Details
-          </h2>
+        <div className="grid md:grid-cols-2 gap-10">
+          
+          {/* ✅ SHIPPING FORM */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold mb-4">
+              Shipping Details
+            </h2>
 
-          <input
-            type="text"
-            name="name"
-            placeholder="Full Name"
-            className={`w-full border p-3 rounded ${
-              errors.name ? "border-red-500" : ""
-            }`}
-            onChange={(e) => handleChange(e, "shipping")}
-          />
-          {errors.name && (
-            <p className="text-red-500 text-sm mt-1">
-              {errors.name}
-            </p>
-          )}
+            <input name="name" placeholder="Full Name"
+              className="w-full border p-3 rounded"
+              onChange={(e) => handleChange(e, "shipping")} />
 
-          <input
-            type="text"
-            name="phone"
-            placeholder="Mobile Number"
-            className={`w-full border p-3 rounded ${
-              errors.phone ? "border-red-500" : ""
-            }`}
-            onChange={(e) => handleChange(e, "shipping")}
-          />
-          {errors.phone && (
-            <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
-          )}
+            <input name="phone" placeholder="Mobile Number"
+              className="w-full border p-3 rounded"
+              onChange={(e) => handleChange(e, "shipping")} />
 
-          <input
-            type="email"
-            name="email"
-            placeholder="Email Address"
-            className={`w-full border p-3 rounded ${
-              errors.email ? "border-red-500" : ""
-            }`}
-            onChange={(e) => handleChange(e, "shipping")}
-          />
-          {errors.email && (
-            <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-          )}
+            <input name="email" placeholder="Email"
+              className="w-full border p-3 rounded"
+              onChange={(e) => handleChange(e, "shipping")} />
 
-          <textarea
-            name="address"
-            placeholder="Full Address"
-            className={`w-full border p-3 rounded ${
-              errors.address ? "border-red-500" : ""
-            }`}
-            onChange={(e) => handleChange(e, "shipping")}
-          />
-          {errors.address && (
-            <p className="text-red-500 text-sm mt-1">{errors.address}</p>
-          )}
+            <textarea name="address" placeholder="Address"
+              className="w-full border p-3 rounded"
+              onChange={(e) => handleChange(e, "shipping")} />
 
-          <div className="grid grid-cols-2 gap-4">
-            <input
-              type="text"
-              name="city"
-              placeholder="City"
-              className={`border p-3 rounded ${
-                errors.city ? "border-red-500" : ""
-              }`}
-              onChange={(e) => handleChange(e, "shipping")}
-            />
-            {errors.city && (
-              <p className="text-red-500 text-sm mt-1 col-span-2">
-                {errors.city}
-              </p>
-            )}
-            <input
-              type="text"
-              name="state"
-              placeholder="State"
-              className={`border p-3 rounded ${
-                errors.state ? "border-red-500" : ""
-              }`}
-              onChange={(e) => handleChange(e, "shipping")}
-            />
-            {errors.state && (
-              <p className="text-red-500 text-sm mt-1 col-span-2">
-                {errors.state}
-              </p>
-            )}
-          </div>
+            <input name="city" placeholder="City"
+              className="w-full border p-3 rounded"
+              onChange={(e) => handleChange(e, "shipping")} />
 
-          <input
-            type="text"
-            name="pincode"
-            placeholder="Pincode"
-            className={`w-full border p-3 rounded ${
-              errors.pincode ? "border-red-500" : ""
-            }`}
-            onChange={(e) => handleChange(e, "shipping")}
-          />
-          {errors.pincode && (
-            <p className="text-red-500 text-sm mt-1">{errors.pincode}</p>
-          )}
+            <input name="state" placeholder="State"
+              className="w-full border p-3 rounded"
+              onChange={(e) => handleChange(e, "shipping")} />
 
-          <div className="mt-6 flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={sameAsShipping}
-              onChange={() => setSameAsShipping(!sameAsShipping)}
-            />
-            <label className="text-sm font-medium">
-              Billing address same as Shipping
-            </label>
-          </div>
+            <input name="pincode" placeholder="Pincode"
+              className="w-full border p-3 rounded"
+              onChange={(e) => handleChange(e, "shipping")} />
 
-          {!sameAsShipping && (
-            <div className="mt-8 space-y-4">
-              <h2 className="text-xl font-semibold mb-4">
-                Billing Details
-              </h2>
-
+            {/* Billing Toggle */}
+            <div className="flex items-center gap-2">
               <input
-                type="text"
-                name="companyName"
-                placeholder="Company Name (Optional)"
-                className="w-full border p-3 rounded"
-                onChange={(e) => handleChange(e, "billing")}
+                type="checkbox"
+                checked={sameAsShipping}
+                onChange={() => setSameAsShipping(!sameAsShipping)}
               />
-
-              <input
-                type="text"
-                name="gstNumber"
-                placeholder="GST Number (Optional)"
-                className={`w-full border p-3 rounded ${
-                  errors.billingGstNumber ? "border-red-500" : ""
-                }`}
-                onChange={(e) => handleChange(e, "billing")}
-              />
-              {errors.billingGstNumber && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.billingGstNumber}
-                </p>
-              )}
-
-              <input
-                type="text"
-                name="name"
-                placeholder="Full Name"
-                className={`w-full border p-3 rounded ${
-                  errors.billingName ? "border-red-500" : ""
-                }`}
-                onChange={(e) => handleChange(e, "billing")}
-              />
-              {errors.billingName && (
-                <p className="text-red-500 text-sm mt-1">{errors.billingName}</p>
-              )}
-
-              <input
-                type="text"
-                name="phone"
-                placeholder="Mobile Number"
-                className={`w-full border p-3 rounded ${
-                  errors.billingPhone ? "border-red-500" : ""
-                }`}
-                onChange={(e) => handleChange(e, "billing")}
-              />
-              {errors.billingPhone && (
-                <p className="text-red-500 text-sm mt-1">{errors.billingPhone}</p>
-              )}
-
-              <input
-                type="email"
-                name="email"
-                placeholder="Email Address"
-                className={`w-full border p-3 rounded ${
-                  errors.billingEmail ? "border-red-500" : ""
-                }`}
-                onChange={(e) => handleChange(e, "billing")}
-              />
-              {errors.billingEmail && (
-                <p className="text-red-500 text-sm mt-1">{errors.billingEmail}</p>
-              )}
-
-              <textarea
-                name="address"
-                placeholder="Full Address"
-                className={`w-full border p-3 rounded ${
-                  errors.billingAddress ? "border-red-500" : ""
-                }`}
-                onChange={(e) => handleChange(e, "billing")}
-              />
-              {errors.billingAddress && (
-                <p className="text-red-500 text-sm mt-1">{errors.billingAddress}</p>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  name="city"
-                  placeholder="City"
-                  className={`border p-3 rounded ${
-                    errors.billingCity ? "border-red-500" : ""
-                  }`}
-                  onChange={(e) => handleChange(e, "billing")}
-                />
-                {errors.billingCity && (
-                  <p className="text-red-500 text-sm mt-1 col-span-2">
-                    {errors.billingCity}
-                  </p>
-                )}
-                <input
-                  type="text"
-                  name="state"
-                  placeholder="State"
-                  className={`border p-3 rounded ${
-                    errors.billingState ? "border-red-500" : ""
-                  }`}
-                  onChange={(e) => handleChange(e, "billing")}
-                />
-                {errors.billingState && (
-                  <p className="text-red-500 text-sm mt-1 col-span-2">
-                    {errors.billingState}
-                  </p>
-                )}
-              </div>
-
-              <input
-                type="text"
-                name="pincode"
-                placeholder="Pincode"
-                className={`w-full border p-3 rounded ${
-                  errors.billingPincode ? "border-red-500" : ""
-                }`}
-                onChange={(e) => handleChange(e, "billing")}
-              />
-              {errors.billingPincode && (
-                <p className="text-red-500 text-sm mt-1">{errors.billingPincode}</p>
-              )}
+              <span>Billing same as shipping</span>
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Order Summary */}
-        <div className="border p-6 rounded-lg h-fit">
-          <h2 className="text-xl font-semibold mb-4">
-            Order Summary
-          </h2>
+          {/* ORDER SUMMARY */}
+          <div className="border p-6 rounded-lg h-fit">
+            <h2 className="text-xl font-semibold mb-4">
+              Order Summary
+            </h2>
 
-          <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span>Subtotal</span>
               <span>₹{subtotal.toFixed(2)}</span>
@@ -470,56 +238,36 @@ export default function CheckoutPage() {
 
             <div className="flex justify-between">
               <span>Shipping</span>
-              <span>
-                {shipping === 0 ? "Free" : `₹${shipping}`}
-              </span>
+              <span>{shipping === 0 ? "Free" : `₹${shipping}`}</span>
             </div>
 
-            {discount > 0 && (
-              <div className="flex justify-between text-green-600">
-                <span>Prepaid Discount</span>
-                <span>- ₹{discount.toFixed(2)}</span>
-              </div>
-            )}
+            <div className="flex justify-between">
+              <span>CGST</span>
+              <span>₹{cgst.toFixed(2)}</span>
+            </div>
 
-            {gstAmount > 0 && (
-              <>
-                <div className="flex justify-between">
-                  <span>CGST (9%)</span>
-                  <span>₹{cgst.toFixed(2)}</span>
-                </div>
+            <div className="flex justify-between">
+              <span>SGST</span>
+              <span>₹{sgst.toFixed(2)}</span>
+            </div>
 
-                <div className="flex justify-between">
-                  <span>SGST (9%)</span>
-                  <span>₹{sgst.toFixed(2)}</span>
-                </div>
-              </>
-            )}
-
-            <div className="border-t pt-3 flex justify-between font-bold text-lg">
+            <div className="border-t pt-3 flex justify-between font-bold">
               <span>Total</span>
-              <span>₹{total.toFixed(2)}</span>
+              <span>₹{finalTotal.toFixed(2)}</span>
             </div>
 
-            <div className="mt-4 text-sm text-gray-600">
-              Payment Method:{" "}
-              <strong>
-                {paymentMethod === "cod" ? "Cash on Delivery" : "Prepaid"}
-              </strong>
-            </div>
+            <button
+              onClick={handleCheckout}
+              className="w-full mt-6 bg-pink-600 text-white py-3 rounded"
+            >
+              Place Order
+            </button>
           </div>
 
-          <button
-            onClick={handleCheckout}
-            className="w-full mt-6 bg-pink-600 hover:bg-pink-700 text-white py-3 rounded font-semibold"
-            disabled={loading}
-          >
-            {loading
-              ? (paymentMethod === "prepaid" ? "Processing..." : "Placing Order...")
-              : (paymentMethod === "prepaid" ? "Proceed to Pay" : "Place Order")}
-          </button>
         </div>
       </div>
-    </div>
+
+      <Footer />
+    </>
   );
 }

@@ -56,23 +56,17 @@ export async function PUT(
         name: body.name ?? undefined,
         slug: body.slug ?? undefined,
         description: body.description ?? undefined,
-        bulletPoints: body.bulletPoints ?? undefined,
         price: body.price ? Number(body.price) : undefined,
-        comparePrice: body.comparePrice ? Number(body.comparePrice) : undefined,
-        stock: body.stock ? Number(body.stock) : undefined,
-        sku: body.sku ?? undefined,
-        weight: body.weight ? Number(body.weight) : undefined,
-        length: body.length ? Number(body.length) : undefined,
-        width: body.width ? Number(body.width) : undefined,
-        height: body.height ? Number(body.height) : undefined,
-        packageWeight: body.packageWeight ? Number(body.packageWeight) : undefined,
-        packageLength: body.packageLength ? Number(body.packageLength) : undefined,
-        packageWidth: body.packageWidth ? Number(body.packageWidth) : undefined,
-        packageHeight: body.packageHeight ? Number(body.packageHeight) : undefined,
-        metaTitle: body.metaTitle ?? undefined,
-        metaDescription: body.metaDescription ?? undefined,
-        seoKeywords: body.seoKeywords ?? undefined,
-        status: body.status ?? undefined,
+        // width removed, not in Product model
+        // height removed, not in Product model
+        // packageWeight removed, not in Product model
+        // packageLength removed, not in Product model
+        // packageWidth removed, not in Product model
+        // packageHeight removed, not in Product model
+        // metaTitle removed, not in Product model
+        // metaDescription removed, not in Product model
+        // seoKeywords removed, not in Product model
+        // status removed, not in Product model
         categoryId: body.categoryId ?? undefined,
         subCategoryId: body.subCategoryId ?? undefined
       }

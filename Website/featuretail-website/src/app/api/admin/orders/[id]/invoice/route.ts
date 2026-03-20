@@ -60,7 +60,7 @@ export async function GET(
 
     /* ---------------- ORDER INFO ---------------- */
 
-    const status = order.status || "pending";
+    const status = order.orderStatus || "pending";
     doc
       .text(`Order ID: ${order.id}`, 350, 120)
       .text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`)

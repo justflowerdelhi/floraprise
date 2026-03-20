@@ -8,14 +8,16 @@ import { Product } from "../data/products";
 
 export interface CartItem extends Product {
   id: string; // ensure cart items always carry a unique identifier
+  variantId?: string;
+  variantName?: string;
   quantity: number;
 }
 
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (product: Product) => void;
-  removeFromCart: (id: string) => void;
-  updateQuantity: (id: string, quantity: number) => void;
+  addToCart: (item: CartItem) => void;
+  removeFromCart: (id: string, variantId?: string) => void;
+  updateQuantity: (id: string, variantId: string | undefined, quantity: number) => void;
   clearCart: () => void;
   subtotal: number;
   shipping: number;
@@ -27,6 +29,8 @@ interface CartContextType {
   total: number;
   paymentMethod: "cod" | "prepaid";
   setPaymentMethod: (method: "cod" | "prepaid") => void;
+  increaseQty: (id: string, variantId?: string) => void;
+  decreaseQty: (id: string, variantId?: string) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -71,8 +75,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "prepaid">("cod");
 
-  const addToCart = (item: any) => {
-    setCart((prev: any[]) => {
+  const addToCart = (item: CartItem) => {
+    setCart((prev: CartItem[]) => {
       const existing = prev.find(
         (p) =>
           p.id === item.id &&
@@ -83,12 +87,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return prev.map((p) =>
           p.id === item.id &&
           p.variantId === item.variantId
-            ? { ...p, quantity: p.quantity + 1 }
+            ? { ...p, quantity: p.quantity + (item.quantity || 1) }
             : p
         );
       }
 
-      return [...prev, { ...item, quantity: 1 }];
+      return [...prev, { ...item, quantity: item.quantity || 1 }];
     });
   };
 

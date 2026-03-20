@@ -62,7 +62,7 @@ export async function POST(req: Request) {
         const variant = await prisma.productVariant.findUnique({
           where: { id: item.variantId },
         });
-        if (!variant || variant.stock < item.qty) {
+        if (!variant || variant.stock == null || variant.stock < item.qty) {
           throw new Error("Insufficient stock for variant");
         }
         await prisma.productVariant.update({

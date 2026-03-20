@@ -9,7 +9,9 @@ async function getProducts() {
 
 export default async function NewArrivals() {
   const products = await getProducts();
-
+  if (!Array.isArray(products)) {
+    return null;
+  }
   const newProducts = products
     .filter((p: any) => p.stock > 0)
     .sort(
@@ -18,7 +20,6 @@ export default async function NewArrivals() {
         new Date(a.createdAt).getTime()
     )
     .slice(0, 4);
-
   return (
     <section className="py-6 md:py-10 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4">
