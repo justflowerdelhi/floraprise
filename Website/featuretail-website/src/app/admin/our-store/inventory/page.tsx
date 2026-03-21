@@ -240,6 +240,7 @@ export default function InventoryPage() {
             <th className="p-2">SKU</th>
             <th className="p-2">Product</th>
             <th className="p-2">Location</th>
+            <th className="p-2">Supplier</th>
             <th className="p-2">Price</th>
             <th className="p-2">Stock</th>
             <th className="p-2">Value</th>
@@ -267,15 +268,40 @@ export default function InventoryPage() {
                 </td>
 
                 <td className="p-2">
+                  <input
+                    defaultValue={item.supplier || ""}
+                    className="border rounded px-2 py-1 w-full"
+                    onBlur={(e) =>
+                      updateField(item.id, "supplier", e.target.value)
+                    }
+                  />
+                </td>
+
+                <td className="p-2">
                   <input type="number" defaultValue={item.purchasePrice || 0}
                     onBlur={(e) => updateField(item.id, "purchasePrice", Number(e.target.value))}
                   />
                 </td>
 
-                <td className="p-2">
-                  <input type="number" defaultValue={item.stock}
-                    onBlur={(e) => updateField(item.id, "stock", Number(e.target.value))}
-                  />
+                <td className="p-2 text-center">
+                  <div
+                    className={`px-2 py-1 rounded font-semibold ${
+                      item.stock > 20
+                        ? "bg-green-100 text-green-700"
+                        : item.stock >= 5
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    <input
+                      type="number"
+                      defaultValue={item.stock}
+                      className="w-16 text-center bg-transparent outline-none"
+                      onBlur={(e) =>
+                        updateField(item.id, "stock", Number(e.target.value))
+                      }
+                    />
+                  </div>
                 </td>
 
                 <td className="p-2 text-green-600 font-medium">

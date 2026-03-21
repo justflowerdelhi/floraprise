@@ -69,17 +69,26 @@ export default function CartPage() {
                   key={item.id + item.variantId}
                   className="flex items-center gap-4 border-b pb-4"
                 >
-                  <Image
-                    src={
-                      item.images && item.images[0]
-                        ? item.images[0].url
-                        : "/placeholder.png"
+                  {(() => {
+                    const firstImage = item.images?.[0];
+                    let imageUrl = "/placeholder.png";
+                    if (firstImage) {
+                      if (typeof firstImage === "string") {
+                        imageUrl = firstImage;
+                      } else if (typeof firstImage === "object" && "url" in firstImage) {
+                        imageUrl = (firstImage as any).url;
+                      }
                     }
-                    alt={item.name}
-                    width={80}
-                    height={80}
-                    className="rounded"
-                  />
+                    return (
+                      <Image
+                        src={imageUrl}
+                        alt={item.name}
+                        width={80}
+                        height={80}
+                        className="rounded object-cover"
+                      />
+                    );
+                  })()}
 
                   <div className="flex-1">
                     <h2 className="font-semibold">{item.name}</h2>

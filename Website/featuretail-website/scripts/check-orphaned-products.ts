@@ -4,12 +4,11 @@ const prisma = new PrismaClient();
 
 async function checkOrphanedProducts() {
   // Find products with missing categories
-  const productsWithInvalidCategory = await prisma.product.findMany({
-    where: {
-      category: null,
-    },
-  });
+  const products = await prisma.product.findMany({
+  include: { category: true },
+});
 
+const orphaned = products.filter(p => !p.category);
   // Find products with no images
   const productsWithNoImages = await prisma.product.findMany({
     where: {

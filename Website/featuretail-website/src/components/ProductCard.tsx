@@ -22,11 +22,20 @@ export default function ProductCard({ product }: Props) {
   const isOutOfStock = product.stock <= 0;
   const isBestSeller = product.tags?.includes("best-seller");
   const isNewArrival = Date.now() - new Date(product.createdAt).getTime() <= 1000 * 60 * 60 * 24 * 14; // 14 days
-  const primaryImage = product.images?.[0] || "/images/product-placeholder.png";
+  const firstImage = product.images?.[0];
+  const imageUrl =
+    typeof firstImage === "string"
+      ? firstImage
+      : firstImage?.url || "/placeholder.jpg";
+
+  const categorySlug =
+    typeof product.category === "string"
+      ? product.category
+      : product.category?.slug ?? "all";
 
   return (
     <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition p-4 border border-gray-100 flex flex-col">
-      <Link href={`/shop/${product.category?.slug || "all"}/${product.slug}`} className="flex-1">
+      <Link href={`/shop/${categorySlug}/${product.slug}`} className="flex-1">
         <div>
           <div className="relative w-full h-48 mb-4">
             {isBestSeller && (
@@ -41,9 +50,16 @@ export default function ProductCard({ product }: Props) {
             )}
             <img
               src={
-                product.images && product.images.length > 0
-                  ? product.images[0].url
-                  : "/placeholder.jpg"
+                (() => {
+                  const firstImage = product.images?.[0];
+                  if (typeof firstImage === "string") {
+                    return firstImage;
+                  } else if (firstImage && typeof firstImage === "object" && "url" in firstImage) {
+                    return firstImage.url;
+                  } else {
+                    return "/placeholder.jpg";
+                  }
+                })()
               }
               alt={product.name}
               className="w-full h-48 object-cover rounded"

@@ -69,12 +69,14 @@ export default function ProductPage() {
             className="relative w-full h-[320px] border rounded mb-4 overflow-hidden cursor-zoom-in"
           >
             {selectedImage ? (
-              <Image
-                src={selectedImage}
-                alt={product.name}
-                fill
-                className="object-contain p-4"
-              />
+              <div className="relative w-full h-64">
+                <Image
+                  src={selectedImage}
+                  alt={product.name}
+                  fill
+                  className="object-contain p-4"
+                />
+              </div>
             ) : (
               <div className="flex items-center justify-center h-full text-gray-400">
                 No Image
@@ -95,12 +97,14 @@ export default function ProductPage() {
                 }`}
               >
                 {img?.url && (
-                  <Image
-                    src={img.url}
-                    alt={product.name}
-                    fill
-                    className="object-contain p-1"
-                  />
+                  <div className="relative w-full h-64">
+                    <Image
+                      src={img.url}
+                      alt={product.name}
+                      fill
+                      className="object-contain p-1"
+                    />
+                  </div>
                 )}
               </div>
             ))}
@@ -252,12 +256,14 @@ export default function ProductPage() {
               ‹
             </button>
 
-            <Image
-              src={selectedImage}
-              alt={product.name}
-              fill
-              className="object-contain"
-            />
+            <div className="relative w-full h-64">
+              <Image
+                src={selectedImage}
+                alt={product.name}
+                fill
+                className="object-contain"
+              />
+            </div>
 
             <button
               onClick={goNext}

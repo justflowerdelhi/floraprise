@@ -3,6 +3,22 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+function LogoutButton() {
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/admin/login";
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleLogout}
+      className="block w-full text-left text-red-600 hover:text-red-800 mt-6"
+    >
+      Logout
+    </button>
+  );
+}
+
 export default function AdminLayout({
   children,
 }: {
@@ -74,6 +90,7 @@ export default function AdminLayout({
           <Link href="/admin/settings" className="block hover:text-pink-600">
             Settings
           </Link>
+          <LogoutButton />
         </nav>
       </aside>
 

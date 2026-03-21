@@ -1,3 +1,6 @@
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+import { sendOrderEmail } from "../_lib/mail";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -55,6 +58,18 @@ export async function POST(req: Request) {
       include: { items: true },
     });
 
+    // Send order confirmation email
+    try {
+      await sendOrderEmail({
+        to: order.shippingEmail,
+        name: order.shippingName,
+        orderNumber: order.orderNumber,
+        total: order.total
+      });
+    } catch (err) {
+      console.error("EMAIL ERROR:", err);
+    }
+
     // Deduct inventory for each item
     for (const item of body.items || []) {
       if (item.qty <= 0) continue;
@@ -83,8 +98,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message || "Order creation failed" }, { status: 500 });
   }
 }
-import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
@@ -93,7 +106,6 @@ export async function GET() {
         createdAt: "desc",
       },
     });
-
     return NextResponse.json(orders);
   } catch (error) {
     console.error(error);
