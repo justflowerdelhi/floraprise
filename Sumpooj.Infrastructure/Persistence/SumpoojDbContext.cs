@@ -29,6 +29,7 @@ public class SumpoojDbContext
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<ProductBatch> ProductBatches => Set<ProductBatch>();
     public DbSet<InventoryAdjustment> InventoryAdjustments => Set<InventoryAdjustment>();
+    public DbSet<InventoryLedger> InventoryLedgers { get; set; }
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
     public DbSet<Order> Orders => Set<Order>();
@@ -174,6 +175,12 @@ public class SumpoojDbContext
                 _tenantContext == null ||
                 !_tenantContext.CompanyId.HasValue ||
                 a.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<InventoryLedger>()
+            .HasQueryFilter(l =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                l.CompanyId == _tenantContext.CompanyId);
 
         modelBuilder.Entity<PurchaseOrder>()
             .HasQueryFilter(po =>

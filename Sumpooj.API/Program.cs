@@ -183,6 +183,7 @@ builder.Services.AddScoped<SupplierService>();
 
 builder.Services.AddScoped<IProductBatchRepository, ProductBatchRepository>();
 builder.Services.AddScoped<IInventoryAdjustmentRepository, InventoryAdjustmentRepository>();
+builder.Services.AddScoped<IInventoryLedgerRepository, InventoryLedgerRepository>();
 builder.Services.AddScoped<InventoryService>();
 
 builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();

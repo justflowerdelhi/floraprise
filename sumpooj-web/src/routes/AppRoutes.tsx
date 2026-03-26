@@ -14,6 +14,8 @@ import ProductsListPage from '../pages/products/ProductsListPage';
 import PurchaseEntryForm from '../pages/purchases/PurchaseEntryForm';
 import PurchaseListPage from '../pages/purchases/PurchaseListPage';
 import InventoryBatchDashboard from '../pages/inventory/InventoryBatchDashboard';
+import InventoryLedgerPage from '../pages/inventory/InventoryLedger';
+import DailyInventoryReportPage from '../pages/inventory/daily-report';
 import AdjustmentEntryPage from '../pages/adjustments/AdjustmentEntryPage';
 import ExpiryAlertCenter from '../pages/expiry-alerts/ExpiryAlertCenter';
 import StockMovementLedger from '../pages/stock-ledger/StockMovementLedger';
@@ -234,6 +236,8 @@ export default function AppRoutes() {
 
           {/* ─── Inventory ──────────────────────────────── */}
           <Route path="/inventory" element={<InventoryBatchDashboard />} />
+          <Route path="/inventory/ledger" element={<InventoryLedgerPage />} />
+          <Route path="/inventory/daily-report" element={<DailyInventoryReportPage />} />
           <Route path="/purchases" element={<PurchaseListPage />} />
           <Route path="/purchases/new" element={<PurchaseEntryForm />} />
           <Route path="/adjustments/new" element={<AdjustmentEntryPage />} />

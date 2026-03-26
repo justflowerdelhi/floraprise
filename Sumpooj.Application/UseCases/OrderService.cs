@@ -14,6 +14,7 @@ public class OrderService
     private readonly ILocationRepository _locationRepository;
     private readonly IShiftRepository _shiftRepository;
     private readonly IPaymentRepository _paymentRepository;
+    private readonly IInventoryLedgerRepository _inventoryLedgerRepository;
     private readonly IProductBatchRepository _productBatchRepository;
     private readonly IFinishedGoodsBatchRepository _finishedGoodsBatchRepository;
     private readonly IJournalEntryRepository _journalEntryRepository;
@@ -25,6 +26,7 @@ public class OrderService
         ILocationRepository locationRepository,
         IShiftRepository shiftRepository,
         IPaymentRepository paymentRepository,
+        IInventoryLedgerRepository inventoryLedgerRepository,
         IProductBatchRepository productBatchRepository,
         IFinishedGoodsBatchRepository finishedGoodsBatchRepository,
         IJournalEntryRepository journalEntryRepository)
@@ -35,6 +37,7 @@ public class OrderService
         _locationRepository = locationRepository;
         _shiftRepository = shiftRepository;
         _paymentRepository = paymentRepository;
+        _inventoryLedgerRepository = inventoryLedgerRepository;
         _productBatchRepository = productBatchRepository;
         _finishedGoodsBatchRepository = finishedGoodsBatchRepository;
         _journalEntryRepository = journalEntryRepository;
@@ -470,6 +473,18 @@ public class OrderService
             {
                 product.AdjustStock(-item.Quantity);
                 await _productRepository.UpdateAsync(product);
+
+                await _inventoryLedgerRepository.AddAsync(
+                    new InventoryLedger(
+                        companyId,
+                        product.Id,
+                        order.OrderNumber,
+                        "SALE",
+                        -item.Quantity,
+                        product.StockQuantity,
+                        "POS Sale"
+                    )
+                );
             }
         }
     }

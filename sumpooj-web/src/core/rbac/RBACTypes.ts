@@ -556,6 +556,20 @@ export const MENU_SECTIONS: MenuSection[] = [
         path: '/expiry-alerts',
         permissions: ['inventory:view'],
       },
+      {
+        id: 'inventory-ledger',
+        label: 'Inventory Ledger',
+        icon: 'Ledger',
+        path: '/inventory/ledger',
+        permissions: ['inventory:view'],
+      },
+      {
+        id: 'daily-inventory-report',
+        label: 'Daily Report',
+        icon: 'CalendarToday',
+        path: '/inventory/daily-report',
+        permissions: ['inventory:view'],
+      },
     ],
   },
   {
@@ -717,6 +731,7 @@ export const ROUTE_ACCESS: RouteConfig[] = [
   { path: '/purchases/new', permissions: ['inventory:purchase'] },
   { path: '/adjustments/new', permissions: ['inventory:adjust'] },
   { path: '/expiry-alerts', permissions: ['inventory:view'] },
+  { path: '/inventory/ledger', permissions: ['inventory:view'] },
   { path: '/health-dashboard', permissions: ['reports:view'] },
   { path: '/profit-intelligence', permissions: ['reports:profit'] },
   { path: '/valuation', permissions: ['reports:inventory'] },

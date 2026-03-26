@@ -181,3 +181,27 @@ export const getStockMovements = async (params: StockMovementParams = {}) => {
   const res = await api.get('/inventory/movements', { params });
   return res.data;
 };
+
+// ─── Inventory Ledger ───────────────────────────────────────
+
+export const getInventoryLedger = async (productId: string) => {
+  const res = await api.get(`/inventory/ledger/${productId}`);
+  return res.data;
+};
+
+// ─── Daily Inventory Report ──────────────────────────────────
+
+export interface DailyInventoryReportRow {
+  productId: string;
+  productName: string;
+  openingStock: number;
+  purchased: number;
+  sold: number;
+  adjustments: number;
+  closingStock: number;
+}
+
+export const getDailyInventoryReport = async (date: string): Promise<DailyInventoryReportRow[]> => {
+  const res = await api.get('/inventory/daily-report', { params: { date } });
+  return res.data;
+};

@@ -15,12 +15,22 @@ public class InventoryController : ControllerBase
 {
     private readonly InventoryService _service;
     private readonly IProductRepository _productRepository;
+    private readonly IInventoryLedgerRepository _repo;
+    private readonly ITenantContext _tenant;
 
-    public InventoryController(InventoryService service, IProductRepository productRepository)
+    public InventoryController(
+        InventoryService service,
+        IProductRepository productRepository,
+        IInventoryLedgerRepository repo,
+        ITenantContext tenant)
     {
         _service = service;
         _productRepository = productRepository;
+        _repo = repo;
+        _tenant = tenant;
     }
+
+    private Guid CompanyId => _tenant.CompanyId!.Value;
 
     #region Batches
 
@@ -104,6 +114,13 @@ public class InventoryController : ControllerBase
 
     #endregion
 
+    [HttpGet("ledger/{productId}")]
+    public async Task<IActionResult> GetLedger(Guid productId)
+    {
+        var data = await _repo.GetByProductAsync(CompanyId, productId);
+        return Ok(data);
+    }
+
     [HttpGet("available-flowers")]
     public async Task<IActionResult> GetAvailableFlowers()
     {
@@ -151,6 +168,13 @@ public class InventoryController : ControllerBase
             })
             .ToList();
 
+        return Ok(result);
+    }
+
+    [HttpGet("daily-report")]
+    public async Task<IActionResult> GetDailyReport([FromQuery] DateTime date)
+    {
+        var result = await _service.GetDailyInventoryReportAsync(date);
         return Ok(result);
     }
 

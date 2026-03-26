@@ -11,17 +11,20 @@ public class InventoryService
     private readonly IInventoryAdjustmentRepository _adjustmentRepo;
     private readonly IProductRepository _productRepo;
     private readonly ITenantContext _tenant;
+    private readonly IInventoryLedgerRepository _ledgerRepo;
 
     public InventoryService(
         IProductBatchRepository batchRepo,
         IInventoryAdjustmentRepository adjustmentRepo,
         IProductRepository productRepo,
-        ITenantContext tenant)
+        ITenantContext tenant,
+        IInventoryLedgerRepository ledgerRepo)
     {
         _batchRepo = batchRepo;
         _adjustmentRepo = adjustmentRepo;
         _productRepo = productRepo;
         _tenant = tenant;
+        _ledgerRepo = ledgerRepo;
     }
 
     #region Batches
@@ -294,6 +297,67 @@ public class InventoryService
 
         await _adjustmentRepo.AddAsync(adjustment);
         return adjustment.Id;
+    }
+
+    public async Task<List<DailyInventoryReportDto>> GetDailyInventoryReportAsync(DateTime date)
+    {
+        if (_tenant.CompanyId == null)
+            throw new InvalidOperationException("Company context required");
+
+        var companyId = _tenant.CompanyId.Value;
+
+        var start = date.Date;
+        var end = start.AddDays(1);
+
+        var products = await _productRepo.GetAllAsync(companyId);
+
+        var result = new List<DailyInventoryReportDto>();
+
+        foreach (var product in products)
+        {
+            var ledger = await _ledgerRepo.GetByProductAsync(companyId, product.Id);
+
+            // Opening Stock (all ledger entries before this day)
+            var opening = ledger
+                .Where(x => x.CreatedAtUtc < start)
+                .Sum(x => x.QuantityChange);
+
+            // Today's entries
+            var today = ledger
+                .Where(x => x.CreatedAtUtc >= start && x.CreatedAtUtc < end)
+                .ToList();
+
+            // Purchased (positive entries of type PURCHASE)
+            var purchased = today
+                .Where(x => x.QuantityChange > 0 && x.ReferenceType == "PURCHASE")
+                .Sum(x => x.QuantityChange);
+
+            // Sold (negative entries of type SALE)
+            var sold = today
+                .Where(x => x.ReferenceType == "SALE")
+                .Sum(x => Math.Abs(x.QuantityChange));
+
+            // Adjustments (damage, spoil, etc.)
+            var adjustments = today
+                .Where(x => x.ReferenceType == "ADJUSTMENT")
+                .Sum(x => x.QuantityChange);
+
+            // Closing
+            var closing = opening + purchased + adjustments - sold;
+
+            result.Add(new DailyInventoryReportDto
+            {
+                ProductId = product.Id,
+                ProductName = product.Name,
+                OpeningStock = opening,
+                Purchased = purchased,
+                Sold = sold,
+                Adjustments = adjustments,
+                ClosingStock = closing
+            });
+        }
+
+        return result;
     }
 
     #endregion
