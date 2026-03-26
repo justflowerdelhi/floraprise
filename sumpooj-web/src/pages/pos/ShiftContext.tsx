@@ -39,7 +39,7 @@ interface ShiftContextValue {
   /** The locationId this provider is bound to */
   locationId: string;
   /** Open a new shift with the given cash amount */
-  openShift: (openingCash: number) => Promise<void>;
+  openShift: (params: { locationId: string; openingCash: number }) => Promise<void>;
   /** Close the active shift */
   closeShift: (closingCashCount: number, notes?: string) => Promise<void>;
   /** Re-fetch the active shift from the server */
@@ -122,10 +122,16 @@ export const ShiftProvider: React.FC<ShiftProviderProps> = ({ children }) => {
 
   // ─── Open shift ─────────────────────────────────────────
   const openShift = useCallback(
-    async (openingCash: number) => {
+    async ({ locationId: reqLocationId, openingCash }: { locationId: string; openingCash: number }) => {
       try {
         setError(null);
-        await apiOpenShift({ locationId: selectedLocationId, openingCash });
+
+        if (!selectedLocationId) {
+          alert('Location missing — cannot open shift');
+          return;
+        }
+
+        await apiOpenShift({ locationId: reqLocationId || selectedLocationId, openingCash });
         await refreshShift();
       } catch (err: unknown) {
         const msg =

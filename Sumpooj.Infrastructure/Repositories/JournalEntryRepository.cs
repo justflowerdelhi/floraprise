@@ -26,6 +26,22 @@ public class JournalEntryRepository : IJournalEntryRepository
         await _db.SaveChangesAsync();
     }
 
+    public async Task<List<JournalEntry>> GetAllAsync(Guid companyId)
+    {
+        return await _db.JournalEntries
+            .AsNoTracking()
+            .Where(j => j.CompanyId == companyId)
+            .ToListAsync();
+    }
+
+    public async Task<List<Account>> GetAccountsAsync(Guid companyId)
+    {
+        return await _db.Accounts
+            .AsNoTracking()
+            .Where(a => a.CompanyId == companyId)
+            .ToListAsync();
+    }
+
     public async Task<Guid> GetOrCreateAccountIdAsync(Guid companyId, string code, string name, string type)
     {
         var account = await _db.Accounts

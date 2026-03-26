@@ -40,21 +40,35 @@ const ShiftOpenModal: React.FC = () => {
 
   const handleOpen = useCallback(async () => {
     const amount = parseFloat(openingCash);
+
     if (isNaN(amount) || amount < 0) {
       setLocalError('Enter a valid cash amount (0 or more)');
       return;
     }
 
     try {
+      console.log("OPEN SHIFT CLICKED");
+      console.log("Payload:", {
+        locationId,
+        openingCash: amount,
+      });
+
       setLocalError(null);
       setSubmitting(true);
-      await openShift(amount);
-    } catch {
+
+      await openShift({
+        locationId,
+        openingCash: amount,
+      });
+
+      console.log("SHIFT OPEN SUCCESS");
+    } catch (err) {
+      console.error("SHIFT OPEN ERROR:", err);
       setLocalError('Failed to open shift. Please try again.');
     } finally {
       setSubmitting(false);
     }
-  }, [openingCash, openShift]);
+  }, [openingCash, openShift, locationId]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

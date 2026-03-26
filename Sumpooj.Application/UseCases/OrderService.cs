@@ -14,6 +14,7 @@ public class OrderService
     private readonly ILocationRepository _locationRepository;
     private readonly IShiftRepository _shiftRepository;
     private readonly IPaymentRepository _paymentRepository;
+    private readonly IProductBatchRepository _productBatchRepository;
     private readonly IFinishedGoodsBatchRepository _finishedGoodsBatchRepository;
     private readonly IJournalEntryRepository _journalEntryRepository;
 
@@ -24,6 +25,7 @@ public class OrderService
         ILocationRepository locationRepository,
         IShiftRepository shiftRepository,
         IPaymentRepository paymentRepository,
+        IProductBatchRepository productBatchRepository,
         IFinishedGoodsBatchRepository finishedGoodsBatchRepository,
         IJournalEntryRepository journalEntryRepository)
     {
@@ -33,6 +35,7 @@ public class OrderService
         _locationRepository = locationRepository;
         _shiftRepository = shiftRepository;
         _paymentRepository = paymentRepository;
+        _productBatchRepository = productBatchRepository;
         _finishedGoodsBatchRepository = finishedGoodsBatchRepository;
         _journalEntryRepository = journalEntryRepository;
     }
@@ -401,14 +404,20 @@ public class OrderService
         await DeductInventoryForOrderAsync(companyId, order);
 
         // Create accounting journal entries
+        var cashAccountId = await _journalEntryRepository
+            .GetOrCreateAccountIdAsync(companyId, "1000", "Cash", "Asset");
+
+        var revenueAccountId = await _journalEntryRepository
+            .GetOrCreateAccountIdAsync(companyId, "4000", "Sales Revenue", "Income");
+
         var manualEntries = new List<JournalEntry>
         {
             new JournalEntry(companyId, saleDate, order.OrderNumber, "SALE",
-                $"Manual Sale {order.OrderNumber} — {method} payment",
-                order.TotalAmount, 0, null),
+                $"Manual Sale {order.OrderNumber} — Cash payment",
+                order.TotalAmount, 0, cashAccountId),
             new JournalEntry(companyId, saleDate, order.OrderNumber, "SALE",
                 $"Manual Sale {order.OrderNumber} — Revenue",
-                0, order.TotalAmount, null),
+                0, order.TotalAmount, revenueAccountId),
         };
         await _journalEntryRepository.AddRangeAsync(manualEntries);
 
@@ -427,24 +436,40 @@ public class OrderService
     {
         foreach (var item in order.Items)
         {
-            // First, try to find as a regular product
             var product = await _productRepository.GetByIdAsync(item.ProductId);
-            if (product != null)
+
+            if (product == null) continue;
+
+            // Case 1: Batch-based inventory
+            if (product.TrackBatch)
             {
-                if (product.TrackInventory)
+                var batches = await _productBatchRepository.GetBatchesByProductIdAsync(product.Id);
+
+                var remainingQty = item.Quantity;
+
+                foreach (var batch in batches.OrderBy(b => b.ExpiryDate ?? DateTime.MaxValue))
                 {
-                    product.AdjustStock(-item.Quantity);
-                    await _productRepository.UpdateAsync(product);
+                    if (remainingQty <= 0) break;
+
+                    var deduct = Math.Min(batch.QuantityRemaining, remainingQty);
+
+                    batch.DeductQuantity(deduct);
+                    await _productBatchRepository.UpdateAsync(batch);
+
+                    remainingQty -= deduct;
                 }
+
+                if (remainingQty > 0)
+                    throw new Exception($"Not enough stock for product {product.Name}");
+
                 continue;
             }
 
-            // If not a product, try finished goods batch (production items)
-            var batch = await _finishedGoodsBatchRepository.GetByIdAsync(companyId, item.ProductId);
-            if (batch != null)
+            // Case 2: Simple inventory
+            if (product.TrackInventory)
             {
-                batch.Deduct(item.Quantity);
-                await _finishedGoodsBatchRepository.UpdateAsync(batch);
+                product.AdjustStock(-item.Quantity);
+                await _productRepository.UpdateAsync(product);
             }
         }
     }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sumpooj.Application.Accounting;
 using Sumpooj.Application.Interfaces;
+using Sumpooj.Application.UseCases;
 using Sumpooj.Domain.Entities;
 using Sumpooj.Infrastructure.Persistence;
 
@@ -15,11 +16,13 @@ public class AccountingController : ControllerBase
 {
     private readonly SumpoojDbContext _db;
     private readonly ITenantContext _tenantContext;
+    private readonly AccountingService _accountingService;
 
-    public AccountingController(SumpoojDbContext db, ITenantContext tenantContext)
+    public AccountingController(SumpoojDbContext db, ITenantContext tenantContext, AccountingService accountingService)
     {
         _db = db;
         _tenantContext = tenantContext;
+        _accountingService = accountingService;
     }
 
     private Guid CompanyId => _tenantContext.CompanyId
@@ -210,12 +213,47 @@ public class AccountingController : ControllerBase
     [HttpGet("profit-loss")]
     public async Task<IActionResult> GetProfitLoss()
     {
-        var cid = CompanyId;
-        var revenue = await _db.Orders.Where(o => o.CompanyId == cid).SumAsync(o => o.TotalAmount);
-        var cogs = await _db.Orders.Where(o => o.CompanyId == cid).SumAsync(o => o.SubTotal) * 0.4m;
-        var expenses = await _db.Expenses.Where(e => e.CompanyId == cid && e.IsActive).SumAsync(e => e.Amount);
+        var entries = await _db.JournalEntries
+            .Where(j => j.CompanyId == CompanyId)
+            .ToListAsync();
+
+        var accounts = await _db.Accounts
+            .Where(a => a.CompanyId == CompanyId)
+            .ToDictionaryAsync(a => a.Id);
+
+        decimal revenue = 0;
+        decimal expenses = 0;
+        decimal cogs = 0;
+
+        foreach (var e in entries.Where(x => x.AccountId != null))
+        {
+            var acc = accounts[e.AccountId!.Value];
+
+            if (acc.Type.Equals("Income", StringComparison.OrdinalIgnoreCase))
+            {
+                revenue += (e.Credit - e.Debit);
+            }
+            else if (acc.Type.Equals("Expense", StringComparison.OrdinalIgnoreCase))
+            {
+                expenses += (e.Debit - e.Credit);
+            }
+            else if (acc.Type.Equals("COGS", StringComparison.OrdinalIgnoreCase))
+            {
+                cogs += (e.Debit - e.Credit);
+            }
+        }
+
         var grossProfit = revenue - cogs;
-        return Ok(new ProfitLossDto { Revenue = revenue, Cogs = cogs, Expenses = expenses, GrossProfit = grossProfit, NetProfit = grossProfit - expenses });
+        var netProfit = grossProfit - expenses;
+
+        return Ok(new ProfitLossDto
+        {
+            Revenue = revenue,
+            Cogs = cogs,
+            Expenses = expenses,
+            GrossProfit = grossProfit,
+            NetProfit = netProfit
+        });
     }
 
     [HttpGet("tax-summary")]
@@ -244,29 +282,14 @@ public class AccountingController : ControllerBase
     [HttpGet("trial-balance")]
     public async Task<IActionResult> GetTrialBalance()
     {
-        var cid = CompanyId;
-        var accounts = await _db.Accounts.Where(a => a.CompanyId == cid).ToListAsync();
-        var entries = await _db.JournalEntries.Where(j => j.CompanyId == cid).ToListAsync();
+        var result = await _accountingService.GetTrialBalanceAsync(CompanyId);
+        return Ok(result);
+    }
 
-        var grouped = entries
-            .Where(j => j.AccountId.HasValue)
-            .GroupBy(j => j.AccountId!.Value)
-            .ToDictionary(g => g.Key, g => new { Debit = g.Sum(j => j.Debit), Credit = g.Sum(j => j.Credit) });
-
-        var result = accounts.Select(a =>
-        {
-            grouped.TryGetValue(a.Id, out var totals);
-            return new TrialBalanceRowDto
-            {
-                AccountId = a.Id,
-                Code = a.Code,
-                Name = a.Name,
-                Type = a.Type,
-                Debit = totals?.Debit ?? 0,
-                Credit = totals?.Credit ?? 0,
-            };
-        }).Where(r => r.Debit != 0 || r.Credit != 0).OrderBy(r => r.Code).ToList();
-
+    [HttpGet("balance-sheet")]
+    public async Task<IActionResult> GetBalanceSheet()
+    {
+        var result = await _accountingService.GetBalanceSheetAsync(CompanyId);
         return Ok(result);
     }
 }

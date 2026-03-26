@@ -21,12 +21,13 @@ public class ShiftRepository : IShiftRepository
     }
 
     public async Task<Shift?> GetActiveShiftAsync(Guid companyId, Guid locationId)
-    {
-        return await _db.Shifts
-            .FirstOrDefaultAsync(s => s.CompanyId == companyId &&
-                                      s.LocationId == locationId &&
-                                      s.Status == ShiftStatus.Open);
-    }
+{
+    return await _db.Shifts
+        .FirstOrDefaultAsync(s =>
+            s.CompanyId == companyId &&
+            s.LocationId == locationId &&
+            s.ClosedAt == null);
+}
 
     public async Task<List<Shift>> GetHistoryAsync(Guid companyId, Guid locationId, int count = 20)
     {

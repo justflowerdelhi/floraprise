@@ -218,6 +218,8 @@ builder.Services.AddScoped<IDayCloseRepository, DayCloseRepository>();
 builder.Services.AddScoped<DayCloseService>();
 
 builder.Services.AddScoped<IJournalEntryRepository, JournalEntryRepository>();
+builder.Services.AddScoped<IAccountRepository, AccountRepository>();
+builder.Services.AddScoped<AccountingService>();
 
 builder.Services.AddScoped<IShiftRepository, ShiftRepository>();
 builder.Services.AddScoped<ShiftService>();
@@ -331,6 +333,8 @@ app.MapControllers();
 #endregion
 
 #region Data Seed
+var failOnSeedError = builder.Configuration.GetValue("Database:FailOnSeedError", !app.Environment.IsDevelopment());
+
 try
 {
     await DataSeeder.SeedAsync(app.Services);
@@ -341,8 +345,13 @@ try
 catch (Exception ex)
 {
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
-    logger.LogError(ex, "An error occurred during data seeding.");
-    throw; // Re-throw to prevent the app from starting with an unseeded database
+    if (failOnSeedError)
+    {
+        logger.LogError(ex, "An error occurred during data seeding.");
+        throw; // Keep strict behavior when configured.
+    }
+
+    logger.LogWarning(ex, "Data seeding failed, but startup will continue because Database:FailOnSeedError is false.");
 }
 
 #endregion

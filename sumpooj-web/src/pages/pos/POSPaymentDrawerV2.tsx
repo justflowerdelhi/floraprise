@@ -7,7 +7,7 @@
  * - Billing info management
  * - Auto-reset after completion
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Close as CloseIcon,
   AttachMoney as CashIcon,
@@ -23,6 +23,16 @@ import { usePOS } from './POSContext';
 import type { POSPaymentMethod, POSPaymentEntry, POSBillingInfo } from './POSTypes';
 import { formatCurrency } from '../../core/i18n';
 import { createOrder } from '../../api/order.api';
+import { searchCustomers } from '../../api/customer.api';
+
+interface CustomerSuggestion {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+}
+
+const normalizePhone = (phone: string) => phone.replace(/[^\d+]/g, '');
 
 const PAYMENT_METHODS: { method: POSPaymentMethod; label: string; icon: React.ReactElement }[] = [
   { method: 'CASH', label: 'Cash', icon: <CashIcon /> },
@@ -56,6 +66,29 @@ const POSPaymentDrawerV2: React.FC = () => {
     email: '',
     phone: '',
   });
+  const [customerSuggestions, setCustomerSuggestions] = useState<CustomerSuggestion[]>([]);
+  const [activeSuggestField, setActiveSuggestField] = useState<'name' | 'phone' | null>(null);
+  const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
+
+  const nameSuggestions = useMemo(() => {
+    const seen = new Set<string>();
+    return customerSuggestions.filter((customer) => {
+      const key = customer.name.trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [customerSuggestions]);
+
+  const phoneSuggestions = useMemo(() => {
+    const seen = new Set<string>();
+    return customerSuggestions.filter((customer) => {
+      const key = normalizePhone(customer.phone || '');
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [customerSuggestions]);
 
   // Initialize billing from customer when drawer opens
   useEffect(() => {
@@ -71,6 +104,53 @@ const POSPaymentDrawerV2: React.FC = () => {
       setInputAmount(remainingAmount.toFixed(2));
     }
   }, [isOpen, state.customer, remainingAmount]);
+
+  // Dynamic autosuggest while typing in name/phone fields.
+  useEffect(() => {
+    if (!isOpen || !activeSuggestField) return;
+
+    const query = (activeSuggestField === 'phone' ? (localBilling.phone ?? '') : localBilling.name).trim();
+    if (query.length < 2) {
+      setCustomerSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setIsSearchingCustomers(true);
+      try {
+        const data = await searchCustomers({ Query: query, PageSize: 20 });
+        const items = Array.isArray(data) ? data : data?.items ?? [];
+        if (cancelled) return;
+        setCustomerSuggestions(
+          items
+            .filter((customer: CustomerSuggestion) => !!(customer?.name || customer?.phone))
+            .map((customer: CustomerSuggestion) => ({
+              id: customer.id,
+              name: customer.name || '',
+              phone: customer.phone || '',
+              email: customer.email || '',
+            })),
+        );
+      } catch {
+        if (!cancelled) setCustomerSuggestions([]);
+      } finally {
+        if (!cancelled) setIsSearchingCustomers(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isOpen, activeSuggestField, localBilling.name, localBilling.phone]);
+
+  useEffect(() => {
+    if (isOpen) return;
+    setCustomerSuggestions([]);
+    setActiveSuggestField(null);
+    setIsSearchingCustomers(false);
+  }, [isOpen]);
 
   // Update context billing when local changes
   useEffect(() => {
@@ -101,11 +181,50 @@ const POSPaymentDrawerV2: React.FC = () => {
     setInputAmount(amount.toFixed(2));
   }, []);
 
+  const handleNameChange = useCallback((name: string) => {
+    setLocalBilling((prev) => {
+      const next = { ...prev, name };
+      const match = customerSuggestions.find(
+        (customer) => customer.name.trim().toLowerCase() === name.trim().toLowerCase(),
+      );
+      if (!match) return next;
+      return {
+        ...next,
+        phone: next.phone || match.phone || '',
+        email: next.email || match.email || '',
+      };
+    });
+  }, [customerSuggestions]);
+
+  const handlePhoneChange = useCallback((phone: string) => {
+    setLocalBilling((prev) => {
+      const next = { ...prev, phone };
+      const normalized = normalizePhone(phone);
+      if (!normalized) return next;
+      const match = customerSuggestions.find((customer) => {
+        const candidate = normalizePhone(customer.phone || '');
+        return candidate && candidate === normalized;
+      });
+      if (!match) return next;
+      return {
+        ...next,
+        name: next.name || match.name || '',
+        email: next.email || match.email || '',
+      };
+    });
+  }, [customerSuggestions]);
+
   const handleComplete = useCallback(async () => {
     const canComplete = isFullyPaid || (state.orderIntent === 'PICKUP_LATER' && paidAmount > 0);
     if (!canComplete) return;
 
     try {
+      console.log('FINAL ORDER PAYLOAD', {
+        locationId: state.session.locationId,
+        customerId: state.customer?.id,
+        payments: state.payments,
+      });
+
       await createOrder({
         customerId: state.customer?.id ?? null,
         deliveryDate: state.deliveryDetails?.deliveryDate ?? null,
@@ -128,6 +247,10 @@ const POSPaymentDrawerV2: React.FC = () => {
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           unit: 'pcs',
+        })),
+        payments: state.payments.map((payment) => ({
+          method: payment.method,
+          amount: payment.amount,
         })),
       });
     } catch (err) {
@@ -346,10 +469,10 @@ const POSPaymentDrawerV2: React.FC = () => {
               <div className="space-y-3">
                 <input
                   type="text"
+                  list="pos-customer-name-suggestions"
                   value={localBilling.name}
-                  onChange={(e) =>
-                    setLocalBilling((prev) => ({ ...prev, name: e.target.value }))
-                  }
+                  onFocus={() => setActiveSuggestField('name')}
+                  onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="Name"
                   className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
                              focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -366,14 +489,31 @@ const POSPaymentDrawerV2: React.FC = () => {
                 />
                 <input
                   type="tel"
+                  list="pos-customer-phone-suggestions"
                   value={localBilling.phone || ''}
-                  onChange={(e) =>
-                    setLocalBilling((prev) => ({ ...prev, phone: e.target.value }))
-                  }
+                  onFocus={() => setActiveSuggestField('phone')}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
                   placeholder="Phone (optional)"
                   className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
                              focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
+                {isSearchingCustomers && (
+                  <p className="text-[11px] text-gray-500">Searching customers...</p>
+                )}
+                <datalist id="pos-customer-name-suggestions">
+                  {nameSuggestions.map((customer) => (
+                    <option key={`name-${customer.id}`} value={customer.name}>
+                      {customer.phone || customer.email || ''}
+                    </option>
+                  ))}
+                </datalist>
+                <datalist id="pos-customer-phone-suggestions">
+                  {phoneSuggestions.map((customer) => (
+                    <option key={`phone-${customer.id}`} value={customer.phone}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </datalist>
               </div>
             </div>
           )}

@@ -132,6 +132,25 @@ public class TrialBalanceRowDto
     public decimal Credit { get; set; }
 }
 
+public class BalanceSheetRowDto
+{
+    public Guid AccountId { get; set; }
+    public string Code { get; set; } = default!;
+    public string Name { get; set; } = default!;
+    public string Type { get; set; } = default!;
+    public decimal Amount { get; set; }
+}
+
+public class BalanceSheetDto
+{
+    public List<BalanceSheetRowDto> Assets { get; set; } = [];
+    public List<BalanceSheetRowDto> Liabilities { get; set; } = [];
+    public List<BalanceSheetRowDto> Equity { get; set; } = [];
+    public decimal TotalAssets { get; set; }
+    public decimal TotalLiabilities { get; set; }
+    public decimal TotalEquity { get; set; }
+}
+
 public class ManualSaleRequest
 {
     public string OrderSource { get; set; } = "MANUAL";

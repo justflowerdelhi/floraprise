@@ -112,7 +112,12 @@ export const getOrderByNumber = async (orderNumber: string) => {
 };
 
 export const createOrder = async (data: CreateOrderRequest) => {
+  console.log("🚀 FINAL API PAYLOAD:", data);  // 🔥 THIS WILL ALWAYS RUN
+
   const res = await api.post('/Orders', data);
+
+  console.log("✅ API RESPONSE:", res.data);
+
   return res.data;
 };
 
