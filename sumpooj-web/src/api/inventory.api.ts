@@ -205,3 +205,46 @@ export const getDailyInventoryReport = async (date: string): Promise<DailyInvent
   const res = await api.get('/inventory/daily-report', { params: { date } });
   return res.data;
 };
+
+// ─── Inventory Reconciliation ───────────────────────────────
+
+export interface InventoryReconciliationRow {
+  productId: string;
+  productName: string;
+  trackInventory: boolean;
+  trackBatch: boolean;
+  productStockQuantity: number;
+  batchStockQuantity: number;
+  difference: number;
+  batchCount: number;
+}
+
+export const getInventoryReconciliation = async (
+  mismatchesOnly = true,
+): Promise<InventoryReconciliationRow[]> => {
+  const res = await api.get('/inventory/reconciliation', { params: { mismatchesOnly } });
+  return res.data;
+};
+
+export interface ReconciliationApplyRequest {
+  productId: string;
+  expectedDifference?: number;
+  reason: string;
+  notes?: string;
+}
+
+export interface ReconciliationApplyResult {
+  productId: string;
+  productName: string;
+  beforeDifference: number;
+  appliedQuantity: number;
+  afterDifference: number;
+  appliedAdjustmentType: string;
+}
+
+export const applyInventoryReconciliationFix = async (
+  payload: ReconciliationApplyRequest,
+): Promise<ReconciliationApplyResult> => {
+  const res = await api.post('/inventory/reconciliation/apply', payload);
+  return res.data;
+};

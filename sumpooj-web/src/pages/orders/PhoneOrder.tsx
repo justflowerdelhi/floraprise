@@ -49,6 +49,10 @@ import type { SavedGiftCard } from '../gift-cards';
 import { processOrderInventory, inferFulfillmentMode } from '../inventory/InventoryMovementService';
 import { searchProducts } from '../../api/product.api';
 import { searchCustomers } from '../../api/customer.api';
+import {
+  findCustomerByName,
+  findCustomerByPhone,
+} from '../../utils/customerLookup';
 
 const PhoneOrder: React.FC = () => {
   const theme = useTheme();
@@ -111,6 +115,50 @@ const PhoneOrder: React.FC = () => {
   const [attachedGiftCard, setAttachedGiftCard] = useState<SavedGiftCard | null>(null);
 
   useEffect(() => { setOrderSource('PHONE'); }, [setOrderSource]);
+
+  const applyMatchedCustomer = useCallback((customer: Customer) => {
+    setSelectedCustomer(customer);
+    setCustomerName(customer.name || '');
+    setCustomerPhone(customer.phone || '');
+  }, []);
+
+  const resolveCustomerByName = useCallback(
+    (value: string): Customer | null => findCustomerByName(customers, value),
+    [customers],
+  );
+
+  const resolveCustomerByPhone = useCallback(
+    (value: string): Customer | null => findCustomerByPhone(customers, value),
+    [customers],
+  );
+
+  const handleCustomerNameInput = useCallback(
+    (value: string) => {
+      setCustomerName(value);
+      const match = resolveCustomerByName(value);
+      if (match) {
+        applyMatchedCustomer(match);
+      } else if (!value.trim()) {
+        setSelectedCustomer(null);
+        setCustomerPhone('');
+      }
+    },
+    [applyMatchedCustomer, resolveCustomerByName],
+  );
+
+  const handleCustomerPhoneInput = useCallback(
+    (value: string) => {
+      setCustomerPhone(value);
+      const match = resolveCustomerByPhone(value);
+      if (match) {
+        applyMatchedCustomer(match);
+      } else if (!value.trim()) {
+        setSelectedCustomer(null);
+        setCustomerName('');
+      }
+    },
+    [applyMatchedCustomer, resolveCustomerByPhone],
+  );
 
   // Filtered customer suggestions based on name or phone input
   const customerSuggestions = useMemo(() => {
@@ -355,15 +403,13 @@ const PhoneOrder: React.FC = () => {
                   getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.name}
                   value={selectedCustomer}
                   inputValue={customerName}
-                  onInputChange={(_e, val) => setCustomerName(val)}
+                  onInputChange={(_e, val) => handleCustomerNameInput(val)}
                   onChange={(_e, val) => {
                     if (val && typeof val !== 'string') {
-                      setSelectedCustomer(val);
-                      setCustomerName(val.name);
-                      setCustomerPhone(val.phone);
+                      applyMatchedCustomer(val);
                     } else {
                       setSelectedCustomer(null);
-                      if (typeof val === 'string') setCustomerName(val);
+                      if (typeof val === 'string') handleCustomerNameInput(val);
                     }
                   }}
                   renderOption={(props, option) => (
@@ -405,15 +451,13 @@ const PhoneOrder: React.FC = () => {
                   getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.phone}
                   value={selectedCustomer}
                   inputValue={customerPhone}
-                  onInputChange={(_e, val) => setCustomerPhone(val)}
+                  onInputChange={(_e, val) => handleCustomerPhoneInput(val)}
                   onChange={(_e, val) => {
                     if (val && typeof val !== 'string') {
-                      setSelectedCustomer(val);
-                      setCustomerName(val.name);
-                      setCustomerPhone(val.phone);
+                      applyMatchedCustomer(val);
                     } else {
                       setSelectedCustomer(null);
-                      if (typeof val === 'string') setCustomerPhone(val);
+                      if (typeof val === 'string') handleCustomerPhoneInput(val);
                     }
                   }}
                   renderOption={(props, option) => (

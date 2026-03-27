@@ -465,12 +465,53 @@ public class OrderService
                 if (remainingQty > 0)
                     throw new Exception($"Not enough stock for product {product.Name}");
 
+                // Keep aggregate product stock synchronized with batch-level deductions.
+                // This is used by inventory dropdowns and should match sum of active batches.
+                product.AdjustStock(-item.Quantity);
+                await _productRepository.UpdateAsync(product);
+
+                await _inventoryLedgerRepository.AddAsync(
+                    new InventoryLedger(
+                        companyId,
+                        product.Id,
+                        order.OrderNumber,
+                        "SALE",
+                        -item.Quantity,
+                        product.StockQuantity,
+                        "POS Sale (Batch)"
+                    )
+                );
+
                 continue;
             }
 
             // Case 2: Simple inventory
             if (product.TrackInventory)
             {
+                // Some products may have received batches even when TrackBatch is false.
+                // Consume those batches FIFO as well so batch dashboard stays aligned with stock.
+                var batches = await _productBatchRepository.GetBatchesByProductIdAsync(product.Id);
+                if (batches.Count > 0)
+                {
+                    var remainingQty = item.Quantity;
+
+                    foreach (var batch in batches.OrderBy(b => b.ExpiryDate ?? DateTime.MaxValue))
+                    {
+                        if (remainingQty <= 0) break;
+
+                        var deduct = Math.Min(batch.QuantityRemaining, remainingQty);
+                        if (deduct <= 0) continue;
+
+                        batch.DeductQuantity(deduct);
+                        await _productBatchRepository.UpdateAsync(batch);
+
+                        remainingQty -= deduct;
+                    }
+
+                    if (remainingQty > 0)
+                        throw new Exception($"Not enough batch stock for product {product.Name}");
+                }
+
                 product.AdjustStock(-item.Quantity);
                 await _productRepository.UpdateAsync(product);
 

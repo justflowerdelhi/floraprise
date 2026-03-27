@@ -1,46 +1,53 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { RouteDetail, Driver, Delivery } from '../types/deliveryRouteTypes';
-import { Button, Card, CardContent, Typography, Chip, Select, MenuItem, CircularProgress, IconButton, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Alert, Button, Card, CardContent, Typography, Chip, Select, MenuItem, CircularProgress, IconButton, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { useParams } from 'react-router-dom';
 import { useToast } from '../hooks/useToast';
+import { apiClient } from '../core/api/apiClient';
+
+type DraftRouteOption = {
+  id: string;
+  name: string;
+};
 
 const fetchRouteDetail = async (routeId: string): Promise<RouteDetail> => {
-  const res = await fetch(`/api/delivery-routes/${routeId}`);
-  return await res.json() as RouteDetail;
+  const res = await apiClient.get(`/delivery-routes/${routeId}`);
+  return res.data as RouteDetail;
 };
 const fetchAvailableDrivers = async (): Promise<Driver[]> => {
-  const res = await fetch('/api/staff/available-drivers');
-  return await res.json();
+  const res = await apiClient.get('/staff/available-drivers');
+  return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+};
+const fetchDraftRoutes = async (date: string, excludeRouteId: string): Promise<DraftRouteOption[]> => {
+  const res = await apiClient.get('/delivery-routes', { params: { date, status: 'Draft' } });
+  const items = Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+  return items.filter((route: DraftRouteOption) => route.id !== excludeRouteId);
 };
 const reorderStop = async (routeId: string, stopId: string, newPosition: number): Promise<void> => {
-  await fetch(`/api/delivery-routes/${routeId}/reorder-stop`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ stopId, newPosition })
+  await apiClient.put(`/delivery-routes/${routeId}/reorder-stop`, {
+    stopId,
+    newPosition,
   });
 };
 const moveStop = async (routeId: string, stopId: string, targetRouteId: string): Promise<void> => {
-  await fetch(`/api/delivery-routes/${routeId}/move-stop`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ stopId, targetRouteId })
+  await apiClient.put(`/delivery-routes/${routeId}/move-stop`, {
+    stopId,
+    targetRouteId,
   });
 };
 const assignDriver = async (routeId: string, driverId: string): Promise<void> => {
-  await fetch(`/api/delivery-routes/${routeId}/assign-driver`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ driverId })
+  await apiClient.put(`/delivery-routes/${routeId}/assign-driver`, {
+    driverId,
   });
 };
 const startRoute = async (routeId: string): Promise<void> => {
-  await fetch(`/api/delivery-routes/${routeId}/start`, { method: 'PUT' });
+  await apiClient.put(`/delivery-routes/${routeId}/start`);
 };
 const completeRoute = async (routeId: string): Promise<void> => {
-  await fetch(`/api/delivery-routes/${routeId}/complete`, { method: 'PUT' });
+  await apiClient.put(`/delivery-routes/${routeId}/complete`);
 };
 
 export default function DeliveryRouteDetailPage() {
@@ -49,42 +56,54 @@ export default function DeliveryRouteDetailPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [selectedDriver, setSelectedDriver] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
   const toast = useToast();
   const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [moveStopId, setMoveStopId] = useState<string | null>(null);
   const [targetDraftRouteId, setTargetDraftRouteId] = useState<string>('');
-  const [draftRoutes, setDraftRoutes] = useState<RouteDetail[]>([]);
+  const [draftRoutes, setDraftRoutes] = useState<DraftRouteOption[]>([]);
 
-  const loadRoute = async () => {
+  const loadRoute = useCallback(async () => {
     setLoading(true);
+    setError('');
     if (!routeId) {
       setLoading(false);
       return;
     }
-    const data = await fetchRouteDetail(routeId);
-    setRoute(data);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    loadRoute();
+    try {
+      const data = await fetchRouteDetail(routeId);
+      setRoute(data);
+    } catch (err: any) {
+      setRoute(null);
+      setError(err?.response?.data?.message ?? err?.message ?? 'Failed to load route details.');
+    } finally {
+      setLoading(false);
+    }
   }, [routeId]);
 
   useEffect(() => {
+    loadRoute();
+  }, [loadRoute]);
+
+  useEffect(() => {
     if (route && route.status === 'Draft') {
-      fetchAvailableDrivers().then(setDrivers);
+      fetchAvailableDrivers().then(setDrivers).catch(() => setDrivers([]));
     }
   }, [route]);
 
   useEffect(() => {
-    async function fetchDraftRoutes() {
+    async function loadDraftRoutes() {
       if (route && route.status === 'Draft') {
-        const res = await fetch(`/api/delivery-routes?date=${route.routeDate}&status=Draft`);
-        const data = await res.json();
-        setDraftRoutes(data.filter((r: RouteDetail) => r.id !== route.id));
+        try {
+          const routeDate = String(route.routeDate).slice(0, 10);
+          const data = await fetchDraftRoutes(routeDate, route.id);
+          setDraftRoutes(data);
+        } catch {
+          setDraftRoutes([]);
+        }
       }
     }
-    fetchDraftRoutes();
+    loadDraftRoutes();
   }, [route]);
 
   const handleAssignDriver = async () => {
@@ -155,10 +174,19 @@ export default function DeliveryRouteDetailPage() {
     setLoading(false);
   };
 
-  if (!route) return <div style={{textAlign:'center',marginTop:40}}><CircularProgress /></div>;
+  if (loading && !route) return <div style={{textAlign:'center',marginTop:40}}><CircularProgress /></div>;
+
+  if (!route) {
+    return (
+      <div style={{ maxWidth: 800, margin: '40px auto', padding: 24 }}>
+        <Alert severity="error">{error || 'Route not found.'}</Alert>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: 24 }}>
+      {error && <Alert severity="error" style={{ marginBottom: 16 }}>{error}</Alert>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
         <Typography variant="h5">{route.name}</Typography>
         <Chip label={route.status} color={route.status === 'Completed' ? 'success' : route.status === 'Assigned' ? 'primary' : route.status === 'InProgress' ? 'warning' : 'default'} />
@@ -254,7 +282,7 @@ export default function DeliveryRouteDetailPage() {
               style={{ minWidth: 200 }}
             >
               <MenuItem value="" disabled>Select Route</MenuItem>
-              {draftRoutes.map((r: RouteDetail) => (
+              {draftRoutes.map((r: DraftRouteOption) => (
                 <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>
               ))}
             </Select>

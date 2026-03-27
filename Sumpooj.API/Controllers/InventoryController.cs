@@ -151,11 +151,7 @@ public class InventoryController : ControllerBase
     [HttpGet("products")]
     public async Task<IActionResult> GetProducts()
     {
-        var tenantContext = HttpContext.RequestServices.GetRequiredService<ITenantContext>();
-        var companyId = tenantContext.CompanyId
-            ?? throw new UnauthorizedAccessException("Company context required");
-
-        var products = await _productRepository.GetAllAsync(companyId);
+        var products = await _productRepository.GetAllAsync(CompanyId);
         var result = products
             .Where(p => p.IsActive)
             .Select(p => new
@@ -176,6 +172,28 @@ public class InventoryController : ControllerBase
     {
         var result = await _service.GetDailyInventoryReportAsync(date);
         return Ok(result);
+    }
+
+    [HttpGet("reconciliation")]
+    public async Task<IActionResult> GetReconciliation([FromQuery] bool mismatchesOnly = true)
+    {
+        var result = await _service.GetStockReconciliationAsync(mismatchesOnly);
+        return Ok(result);
+    }
+
+    [HttpPost("reconciliation/apply")]
+    public async Task<IActionResult> ApplyReconciliationFix([FromBody] ReconciliationApplyRequest request)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var result = await _service.ApplyReconciliationFixAsync(request, userId);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     private Guid GetCurrentUserId()

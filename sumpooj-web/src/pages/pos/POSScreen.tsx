@@ -15,7 +15,7 @@ import type { POSCustomer } from "./POSCustomerTypes";
 import { searchProducts, normalizeProducts } from "../../api/product.api";
 import { searchCustomers } from "../../api/customer.api";
 
-import { getFinishedBatches } from "../production/api/production.api";
+import { fetchSellableFinishedGoods } from "../../api/order.api";
 import { setPOSCatalogCache } from "./utils/posCatalogCache";
 
 import { getActiveShift } from "../../api/shift.api";
@@ -96,27 +96,29 @@ const POSScreen: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const [productResult, batchResult] = await Promise.all([
+      const [productResult, finishedGoodsResult] = await Promise.all([
         searchProducts({ PageSize: 200, IsActive: true }).catch(() => []),
-        getFinishedBatches().catch(() => []),
+        fetchSellableFinishedGoods().catch(() => []),
       ]);
 
       const rawProducts = Array.isArray(productResult) ? productResult : productResult?.items ?? [];
-      const rawBatches = Array.isArray(batchResult) ? batchResult
-        : batchResult?.items ?? batchResult?.data ?? [];
+      const rawFinishedGoods = Array.isArray(finishedGoodsResult)
+        ? finishedGoodsResult
+        : finishedGoodsResult?.items ?? finishedGoodsResult?.data ?? [];
 
       const normalizedProducts = normalizeProducts(rawProducts);
 
-      const finishedGoodsProducts = rawBatches.map((b: any) => ({
-        id: "FG-" + b.id,
-        name: b.recipeName || b.name || "Ready Bouquet",
-        sku: b.batchCode || b.id,
-        barcode: b.barcode,
+      const finishedGoodsProducts = rawFinishedGoods.map((fg: any) => ({
+        id: `FG-${fg.id}`,
+        name: fg.name || fg.recipeName || "Ready Bouquet",
+        sku: fg.sku || fg.batchCode || fg.id,
+        barcode: fg.barcode,
+        finishedBarcode: fg.barcode,
         category: "Bouquets",
-        sellingPrice: b.price ?? 499,
-        costPrice: 0,
+        sellingPrice: Number(fg.retailPrice) || Number(fg.sellingPrice) || 0,
+        costPrice: Number(fg.costPrice) || 0,
         taxRate: 0,
-        availableStock: b.quantityAvailable ?? b.quantity ?? 1,
+        availableStock: Number(fg.stockQuantity) || Number(fg.quantityAvailable) || 0,
         isPerishable: true,
         trackBatch: false,
         imageUrl: "",
@@ -124,8 +126,8 @@ const POSScreen: React.FC = () => {
       }));
 
       const mergedProducts = [
-        ...normalizedProducts,
         ...finishedGoodsProducts,
+        ...normalizedProducts,
       ];
 
       setPOSCatalogCache(mergedProducts);

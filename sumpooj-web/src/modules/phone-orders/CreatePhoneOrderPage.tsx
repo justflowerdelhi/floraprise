@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -15,7 +15,13 @@ import {
   Typography,
 } from '@mui/material';
 import { AddCircleOutline as AddIcon, Save as SaveIcon } from '@mui/icons-material';
+import { CustomerDatalist } from '../../components/CustomerDatalist';
 import { useApiCall } from '../../hooks/useApiCall';
+import { searchCustomers } from '../../api/customer.api';
+import {
+  findCustomerByName,
+  findCustomerByPhone,
+} from '../../utils\customerLookup';
 import { createPhoneOrder } from './phoneOrders.api';
 
 const TIME_SLOT_OPTIONS = [
@@ -25,6 +31,13 @@ const TIME_SLOT_OPTIONS = [
   '4:00 PM – 6:00 PM',
   'Custom',
 ];
+
+type CustomerSuggestion = {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+};
 
 const CreatePhoneOrderPage: React.FC = () => {
   const navigate = useNavigate();
@@ -42,6 +55,8 @@ const CreatePhoneOrderPage: React.FC = () => {
   const [occasion, setOccasion] = useState('');
   const [budget, setBudget] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
+  const [customerSuggestions, setCustomerSuggestions] = useState<CustomerSuggestion[]>([]);
+  const [activeSuggestField, setActiveSuggestField] = useState<'name' | 'phone' | null>(null);
 
   // ── Touched state (for showing validation errors after blur) ───────────
 
@@ -55,6 +70,65 @@ const CreatePhoneOrderPage: React.FC = () => {
   const handleBlur = (field: keyof typeof touched) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
+
+  useEffect(() => {
+    if (!activeSuggestField) return;
+
+    const query = activeSuggestField === 'phone' ? phoneNumber.trim() : customerName.trim();
+    if (query.length < 2) {
+      setCustomerSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const data = await searchCustomers({ Query: query, PageSize: 20 });
+        const items = Array.isArray(data) ? data : data?.items ?? [];
+        if (cancelled) return;
+        setCustomerSuggestions(
+          items
+            .filter((customer: CustomerSuggestion) => !!(customer?.name || customer?.phone))
+            .map((customer: CustomerSuggestion) => ({
+              id: customer.id,
+              name: customer.name || '',
+              phone: customer.phone || '',
+              email: customer.email || '',
+            })),
+        );
+      } catch {
+        if (!cancelled) setCustomerSuggestions([]);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activeSuggestField, customerName, phoneNumber]);
+
+  const applyMatchedCustomer = useCallback((customer: CustomerSuggestion) => {
+    setCustomerName(customer.name || '');
+    setPhoneNumber(customer.phone || '');
+  }, []);
+
+  const handleCustomerNameChange = useCallback((value: string) => {
+    setCustomerName(value);
+    setActiveSuggestField('name');
+
+    const match = findCustomerByName(customerSuggestions, value);
+
+    if (match) applyMatchedCustomer(match);
+  }, [applyMatchedCustomer, customerSuggestions]);
+
+  const handlePhoneNumberChange = useCallback((value: string) => {
+    setPhoneNumber(value);
+    setActiveSuggestField('phone');
+
+    const match = findCustomerByPhone(customerSuggestions, value);
+
+    if (match) applyMatchedCustomer(match);
+  }, [applyMatchedCustomer, customerSuggestions]);
 
   // ── Validation ─────────────────────────────────────────────────────────
 
@@ -122,27 +196,39 @@ const CreatePhoneOrderPage: React.FC = () => {
               <TextField
                 label="Customer Name"
                 value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                onBlur={() => handleBlur('customerName')}
+                onChange={(e) => handleCustomerNameChange(e.target.value)}
+                onFocus={() => setActiveSuggestField('name')}
+                onBlur={() => {
+                  handleBlur('customerName');
+                  setTimeout(() => setActiveSuggestField(null), 100);
+                }}
                 fullWidth
                 required
                 size="small"
+                slotProps={{ htmlInput: { list: 'phone-order-customer-names' } }}
                 error={touched.customerName && !!errors.customerName}
                 helperText={touched.customerName && errors.customerName}
               />
+              <CustomerDatalist id="phone-order-customer-names" customers={customerSuggestions} field="name" />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Phone Number"
                 value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                onBlur={() => handleBlur('phoneNumber')}
+                onChange={(e) => handlePhoneNumberChange(e.target.value)}
+                onFocus={() => setActiveSuggestField('phone')}
+                onBlur={() => {
+                  handleBlur('phoneNumber');
+                  setTimeout(() => setActiveSuggestField(null), 100);
+                }}
                 fullWidth
                 required
                 size="small"
+                slotProps={{ htmlInput: { list: 'phone-order-customer-phones' } }}
                 error={touched.phoneNumber && !!errors.phoneNumber}
                 helperText={touched.phoneNumber && errors.phoneNumber}
               />
+              <CustomerDatalist id="phone-order-customer-phones" customers={customerSuggestions} field="phone" />
             </Grid>
 
             {/* ── Order Type ──────────────────────────────── */}

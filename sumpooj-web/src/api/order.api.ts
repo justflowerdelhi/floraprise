@@ -147,8 +147,14 @@ export const cancelOrder = async (id: string, data?: CancelOrderRequest) => {
 };
 
 // ─── Finished Goods (Production items for Walk-In POS) ──────
+import { apiClient } from '../core/api/apiClient';
 
 export const fetchSellableFinishedGoods = async () => {
-  const res = await api.get('/production/finished-goods/sellable');
-  return Array.isArray(res.data) ? res.data : [];
+  const res = await apiClient.get('/production/finished-goods/sellable');
+  const data = res.data;
+  if (Array.isArray(data)) return data;
+  // Handle paginated shape: { items: [...] } or { $values: [...] }
+  if (data && Array.isArray(data.items)) return data.items;
+  if (data && Array.isArray(data.$values)) return data.$values;
+  return [];
 };

@@ -21,12 +21,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import SwapVertIcon from '@mui/icons-material/SwapVert';
 
 import type { FilterState, BatchStatus } from '../data/inventory.data';
-import {
-  STORAGE_LOCATIONS,
-  PRODUCT_TYPES,
-  SUPPLIERS,
-  DEFAULT_FILTERS,
-} from '../data/inventory.data';
+import { DEFAULT_FILTERS } from '../data/inventory.data';
 import type { InventoryBatch } from '../data/inventory.data';
 import { exportCSV } from '../utils/inventory.utils';
 
@@ -35,6 +30,9 @@ interface FilterBarProps {
   onChange: (f: FilterState) => void;
   batches: InventoryBatch[];
   darkMode: boolean;
+  storageLocations: string[];
+  suppliers: string[];
+  productTypes: string[];
 }
 
 const STATUS_OPTIONS: { value: BatchStatus | 'all'; label: string }[] = [
@@ -62,7 +60,15 @@ const SORT_OPTIONS = [
   { value: 'value', label: 'Value' },
 ];
 
-const FilterBar = ({ filters, onChange, batches, darkMode }: FilterBarProps) => {
+const FilterBar = ({
+  filters,
+  onChange,
+  batches,
+  darkMode,
+  storageLocations,
+  suppliers,
+  productTypes,
+}: FilterBarProps) => {
   const theme = useTheme();
 
   const up = (patch: Partial<FilterState>) =>
@@ -200,7 +206,7 @@ const FilterBar = ({ filters, onChange, batches, darkMode }: FilterBarProps) => 
           sx={fieldSx}
         >
           <MenuItem value="">All Locations</MenuItem>
-          {STORAGE_LOCATIONS.map((l) => (
+          {storageLocations.map((l) => (
             <MenuItem key={l} value={l}>
               {l}
             </MenuItem>
@@ -216,7 +222,7 @@ const FilterBar = ({ filters, onChange, batches, darkMode }: FilterBarProps) => 
           sx={fieldSx}
         >
           <MenuItem value="">All Suppliers</MenuItem>
-          {SUPPLIERS.map((s) => (
+          {suppliers.map((s) => (
             <MenuItem key={s} value={s}>
               {s}
             </MenuItem>
@@ -232,7 +238,7 @@ const FilterBar = ({ filters, onChange, batches, darkMode }: FilterBarProps) => 
           sx={fieldSx}
         >
           <MenuItem value="">All Types</MenuItem>
-          {PRODUCT_TYPES.map((t) => (
+          {productTypes.map((t) => (
             <MenuItem key={t} value={t}>
               {t}
             </MenuItem>

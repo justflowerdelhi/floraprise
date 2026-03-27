@@ -24,6 +24,7 @@ import type { POSPaymentMethod, POSPaymentEntry, POSBillingInfo } from './POSTyp
 import { formatCurrency } from '../../core/i18n';
 import { createOrder } from '../../api/order.api';
 import { searchCustomers } from '../../api/customer.api';
+import { CustomerDatalist } from '../../components/CustomerDatalist';
 
 interface CustomerSuggestion {
   id: string;
@@ -69,26 +70,6 @@ const POSPaymentDrawerV2: React.FC = () => {
   const [customerSuggestions, setCustomerSuggestions] = useState<CustomerSuggestion[]>([]);
   const [activeSuggestField, setActiveSuggestField] = useState<'name' | 'phone' | null>(null);
   const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
-
-  const nameSuggestions = useMemo(() => {
-    const seen = new Set<string>();
-    return customerSuggestions.filter((customer) => {
-      const key = customer.name.trim().toLowerCase();
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [customerSuggestions]);
-
-  const phoneSuggestions = useMemo(() => {
-    const seen = new Set<string>();
-    return customerSuggestions.filter((customer) => {
-      const key = normalizePhone(customer.phone || '');
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [customerSuggestions]);
 
   // Initialize billing from customer when drawer opens
   useEffect(() => {
@@ -500,20 +481,8 @@ const POSPaymentDrawerV2: React.FC = () => {
                 {isSearchingCustomers && (
                   <p className="text-[11px] text-gray-500">Searching customers...</p>
                 )}
-                <datalist id="pos-customer-name-suggestions">
-                  {nameSuggestions.map((customer) => (
-                    <option key={`name-${customer.id}`} value={customer.name}>
-                      {customer.phone || customer.email || ''}
-                    </option>
-                  ))}
-                </datalist>
-                <datalist id="pos-customer-phone-suggestions">
-                  {phoneSuggestions.map((customer) => (
-                    <option key={`phone-${customer.id}`} value={customer.phone}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </datalist>
+                <CustomerDatalist id="pos-customer-name-suggestions" customers={customerSuggestions} field="name" />
+                <CustomerDatalist id="pos-customer-phone-suggestions" customers={customerSuggestions} field="phone" />
               </div>
             </div>
           )}

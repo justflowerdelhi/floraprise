@@ -34,6 +34,12 @@ interface ComponentRow extends RecipeComponent {
   _key: string; // for React key
 }
 
+const getApiErrorMessage = (err: any): string =>
+  err?.response?.data?.message ||
+  err?.response?.data?.title ||
+  err?.message ||
+  'Failed to load data';
+
 const FloralRecipeForm = () => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
@@ -59,6 +65,7 @@ const FloralRecipeForm = () => {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+      setError('');
       try {
         const products = await getInventoryProducts();
         setInventoryProducts(products);
@@ -75,8 +82,8 @@ const FloralRecipeForm = () => {
             setImageUrls(recipe.sampleImages ?? []);
           }
         }
-      } catch {
-        setError('Failed to load data');
+      } catch (err: any) {
+        setError(getApiErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -155,8 +162,13 @@ const FloralRecipeForm = () => {
         setSuccess('Recipe created successfully!');
         setTimeout(() => navigate('/production/recipes'), 1200);
       }
-    } catch {
-      setError('Failed to save recipe. Please try again.');
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.title ||
+        err?.message ||
+        'Failed to save recipe. Please try again.';
+      setError(msg);
     } finally {
       setSaving(false);
     }

@@ -3,12 +3,10 @@
  * 3-4 column responsive grid for the POS center area
  */
 import React, { useMemo, useRef, useCallback } from 'react';
-import { useFinishedGoodsPOS } from '../production/hooks/useProductionPOS';
 import ProductCard from './ProductCard';
 import { Grid } from "react-window";
 import { AutoSizer } from "react-virtualized-auto-sizer";
 import type { Product } from './POSTypes';
-import { getPOSCatalogCache } from './utils/posCatalogCache';
 
 interface ProductGridProps {
   products: Product[];
@@ -42,32 +40,20 @@ const ProductGrid: React.FC<ProductGridProps> = ({
   locationId,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  // Combine finished goods with products
-  const { items: finishedGoods } = useFinishedGoodsPOS(locationId);
-  const finishedGoodsAsProducts = finishedGoods.map(fg => ({
-    id: fg.productId,
-    name: fg.name,
-    sku: fg.batchCode || '',
-    barcode: fg.barcode || '',
-    category: 'Bouquets & Arrangements', // Match POS filter
-    availableStock: fg.quantityAvailable,
-    sellingPrice: fg.sellingPrice,
-    ...fg,
-  }));
-  const combinedProducts = [
-    ...products.filter(p => p.availableStock && p.availableStock > 0),
-    ...finishedGoodsAsProducts.filter(fg => fg.quantityAvailable > 0)
-  ];
+
   // Filter combined products
   const filteredProducts = useMemo(() => {
-    let result = combinedProducts;
+    let result = products.filter((product) => Number(product.availableStock) > 0);
+
     // Category filter
     if (selectedCategory !== "all") {
+      const allowedCategories = CATEGORY_MAP[selectedCategory] ?? [];
       result = result.filter(
         (p) =>
-          p.category?.toLowerCase().replace(/\s/g, "-") === selectedCategory
+          allowedCategories.includes(p.category ?? '')
       );
     }
+
     // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -76,12 +62,15 @@ const ProductGrid: React.FC<ProductGridProps> = ({
           p.name.toLowerCase().includes(q) ||
           p.sku?.toLowerCase().includes(q) ||
           (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+          (p.finishedBarcode && p.finishedBarcode.toLowerCase().includes(q)) ||
           (p.internalBarcode && p.internalBarcode.toLowerCase().includes(q)) ||
+          (p.batchBarcode && p.batchBarcode.toLowerCase().includes(q)) ||
           (p.recipeName && p.recipeName.toLowerCase().includes(q))
       );
     }
+
     return result;
-  }, [combinedProducts, searchQuery, selectedCategory]);
+  }, [products, searchQuery, selectedCategory]);
 
   // Handle product add with optimistic feedback
   const handleAdd = useCallback((product: Product) => {
@@ -116,7 +105,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
   }
   // ...existing code...
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+    <div className="grid items-start content-start grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3">
       {filteredProducts.map((product) => (
         <ProductCard
           key={product.id}

@@ -570,6 +570,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         path: '/inventory/daily-report',
         permissions: ['inventory:view'],
       },
+      {
+        id: 'inventory-reconciliation',
+        label: 'Reconciliation',
+        icon: 'CompareArrows',
+        path: '/inventory/reconciliation',
+        permissions: ['inventory:view'],
+      },
     ],
   },
   {
@@ -732,6 +739,7 @@ export const ROUTE_ACCESS: RouteConfig[] = [
   { path: '/adjustments/new', permissions: ['inventory:adjust'] },
   { path: '/expiry-alerts', permissions: ['inventory:view'] },
   { path: '/inventory/ledger', permissions: ['inventory:view'] },
+  { path: '/inventory/reconciliation', permissions: ['inventory:view'] },
   { path: '/health-dashboard', permissions: ['reports:view'] },
   { path: '/profit-intelligence', permissions: ['reports:profit'] },
   { path: '/valuation', permissions: ['reports:inventory'] },

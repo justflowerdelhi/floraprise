@@ -54,6 +54,28 @@ public class InventorySummaryDto
     public decimal TotalRetailValue { get; set; }
 }
 
+public class InventoryReconciliationDto
+{
+    public Guid ProductId { get; set; }
+    public string ProductName { get; set; } = default!;
+    public bool TrackInventory { get; set; }
+    public bool TrackBatch { get; set; }
+    public int ProductStockQuantity { get; set; }
+    public int BatchStockQuantity { get; set; }
+    public int Difference { get; set; }
+    public int BatchCount { get; set; }
+}
+
+public class ReconciliationApplyResultDto
+{
+    public Guid ProductId { get; set; }
+    public string ProductName { get; set; } = default!;
+    public int BeforeDifference { get; set; }
+    public int AppliedQuantity { get; set; }
+    public int AfterDifference { get; set; }
+    public string AppliedAdjustmentType { get; set; } = default!;
+}
+
 public class ExpiryAlertDto
 {
     public Guid BatchId { get; set; }

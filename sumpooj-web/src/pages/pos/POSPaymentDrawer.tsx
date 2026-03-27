@@ -17,12 +17,18 @@ import { Drawer } from '@mui/material';
 import type { POSPaymentMethod, POSPaymentEntry, POSBillingInfo, OrderIntent } from './POSTypes';
 import type { POSCustomer } from './POSCustomerTypes';
 import { formatCurrency } from '../../core/i18n';
+import { CustomerDatalist } from '../../components/CustomerDatalist';
+import {
+  findCustomerByName,
+  findCustomerByPhone,
+} from '../../utils/customerLookup';
 
 interface POSPaymentDrawerProps {
   open: boolean;
   onClose: () => void;
   grandTotal: number;
   selectedCustomer: POSCustomer | null;
+  customers: POSCustomer[];
   onComplete: (payments: POSPaymentEntry[], billingInfo: POSBillingInfo) => void;
   onPartialSave?: (payments: POSPaymentEntry[], billingInfo: POSBillingInfo, paidAmount: number, remainingAmount: number) => void;
   initialMethod?: 'cash' | 'card' | 'split' | 'more';
@@ -42,6 +48,7 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
   onClose,
   grandTotal,
   selectedCustomer,
+  customers,
   onComplete,
   onPartialSave,
   initialMethod = 'split',
@@ -56,6 +63,16 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
     phone: '',
   });
 
+  const applyMatchedCustomer = useCallback((customer: POSCustomer) => {
+    setBillingInfo((prev) => ({
+      ...prev,
+      name: customer.name || prev.name || '',
+      phone: customer.phone || prev.phone || '',
+      email: customer.email || prev.email || '',
+      deliveryAddress: customer.preferredAddress || prev.deliveryAddress || '',
+    }));
+  }, []);
+
   // Auto-fill billing from customer
   useEffect(() => {
     if (open && selectedCustomer) {
@@ -63,9 +80,27 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
         name: selectedCustomer.name || '',
         email: selectedCustomer.email || '',
         phone: selectedCustomer.phone || '',
+        deliveryAddress: selectedCustomer.preferredAddress || '',
       });
     }
   }, [open, selectedCustomer]);
+
+  const handleBillingNameChange = useCallback((name: string) => {
+    setBillingInfo((prev) => ({ ...prev, name }));
+    const match = findCustomerByName(customers, name);
+
+    if (match) {
+      applyMatchedCustomer(match);
+    }
+  }, [applyMatchedCustomer, customers]);
+
+  const handleBillingPhoneChange = useCallback((phone: string) => {
+    setBillingInfo((prev) => ({ ...prev, phone }));
+    const match = findCustomerByPhone(customers, phone);
+    if (match) {
+      applyMatchedCustomer(match);
+    }
+  }, [applyMatchedCustomer, customers]);
 
   // Reset state when opening
   useEffect(() => {
@@ -313,21 +348,25 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
               <input
                 type="text"
                 value={billingInfo.name}
-                onChange={(e) => setBillingInfo(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) => handleBillingNameChange(e.target.value)}
                 placeholder="Customer Name *"
+                list="pos-payment-customer-names"
                 className={`w-full h-10 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                   !billingInfo.name.trim() ? 'border-red-300' : 'border-gray-200'
                 }`}
               />
+              <CustomerDatalist id="pos-payment-customer-names" customers={customers} field="name" />
               <input
                 type="tel"
                 value={billingInfo.phone || ''}
-                onChange={(e) => setBillingInfo(prev => ({ ...prev, phone: e.target.value }))}
+                onChange={(e) => handleBillingPhoneChange(e.target.value)}
                 placeholder="Mobile Number *"
+                list="pos-payment-customer-phones"
                 className={`w-full h-10 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                   !(billingInfo.phone ?? '').trim() ? 'border-red-300' : 'border-gray-200'
                 }`}
               />
+              <CustomerDatalist id="pos-payment-customer-phones" customers={customers} field="phone" />
               <input
                 type="email"
                 value={billingInfo.email}

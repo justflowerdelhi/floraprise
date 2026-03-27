@@ -50,3 +50,11 @@ public class AdjustmentSearchRequest
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 20;
 }
+
+public class ReconciliationApplyRequest
+{
+    public Guid ProductId { get; set; }
+    public int? ExpectedDifference { get; set; }
+    public string Reason { get; set; } = "Stock reconciliation correction";
+    public string? Notes { get; set; }
+}

@@ -23,6 +23,7 @@ import type { POSOrderType, POSCustomer, POSPaymentEntry, POSBillingInfo } from 
 import { POS_SHORTCUTS } from './POSTypes';
 import { searchProducts, normalizeProducts } from '../../api/product.api';
 import { searchCustomers } from '../../api/customer.api';
+import { fetchSellableFinishedGoods } from '../../api/order.api';
 import { formatCurrency } from '../../core/i18n';
 
 const POSLayout: React.FC = () => {
@@ -66,14 +67,34 @@ const POSLayout: React.FC = () => {
       setIsLoading(true);
       setError('');
       try {
-        const [prodRes, custRes] = await Promise.all([
+        const [prodRes, custRes, finishedGoodsRes] = await Promise.all([
           searchProducts({ IsActive: true, PageSize: 500 }).catch(() => []),
           searchCustomers({ PageSize: 500 }).catch(() => []),
+          fetchSellableFinishedGoods().catch(() => []),
         ]);
         const prodItems = Array.isArray(prodRes) ? prodRes : prodRes?.items ?? [];
         const normalized = normalizeProducts(prodItems);
 
-        setProducts(normalized);
+        const finishedGoodsItems = (Array.isArray(finishedGoodsRes) ? finishedGoodsRes : [])
+          .filter((fg: any) => !currentLocationId || fg.locationId === currentLocationId)
+          .map((fg: any) => ({
+            id: `FG-${fg.id}`,
+            name: fg.name || fg.recipeName || 'Ready Bouquet',
+            sku: fg.sku || fg.batchCode || fg.id,
+            barcode: fg.barcode,
+            finishedBarcode: fg.barcode,
+            category: 'Bouquets',
+            sellingPrice: Number(fg.retailPrice) || Number(fg.sellingPrice) || 0,
+            costPrice: Number(fg.costPrice) || 0,
+            taxRate: 0,
+            availableStock: Number(fg.stockQuantity) || Number(fg.quantityAvailable) || 0,
+            isPerishable: true,
+            trackBatch: false,
+            imageUrl: '',
+            batches: [],
+          } as Product));
+
+        setProducts([...finishedGoodsItems, ...normalized]);
         const custItems = Array.isArray(custRes) ? custRes : custRes?.items ?? [];
         setCustomers(custItems);
       } catch (err) {
@@ -84,7 +105,7 @@ const POSLayout: React.FC = () => {
       }
     };
     loadData();
-  }, []);
+  }, [currentLocationId]);
 
   // Set order source
   useEffect(() => {
@@ -374,6 +395,7 @@ const POSLayout: React.FC = () => {
         onClose={() => setPaymentDrawerOpen(false)}
         grandTotal={state.totals.grandTotal}
         selectedCustomer={selectedCustomer}
+        customers={customers}
         onComplete={handlePaymentComplete}
         onPartialSave={handlePartialSave}
         initialMethod={paymentMethod}

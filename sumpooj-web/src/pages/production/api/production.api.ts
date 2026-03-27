@@ -19,6 +19,46 @@ import type {
   InventoryProduct,
 } from "../types/ProductionTypes";
 
+type InventoryProductLike = Partial<InventoryProduct> & {
+  id?: string;
+  productId?: string;
+  name?: string;
+  productName?: string;
+  productType?: string;
+  quantityAvailable?: number;
+  availableUnits?: number;
+  unitCost?: number;
+  unitPrice?: number;
+  locationId?: string;
+};
+
+const extractArrayPayload = (payload: unknown): unknown[] => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
+
+  const candidate = payload as {
+    items?: unknown;
+    Items?: unknown;
+    data?: unknown;
+    results?: unknown;
+  };
+
+  if (Array.isArray(candidate.items)) return candidate.items;
+  if (Array.isArray(candidate.Items)) return candidate.Items;
+  if (Array.isArray(candidate.data)) return candidate.data;
+  if (Array.isArray(candidate.results)) return candidate.results;
+  return [];
+};
+
+const normalizeInventoryProduct = (p: InventoryProductLike): InventoryProduct => ({
+  id: String(p.id ?? p.productId ?? ""),
+  name: String(p.name ?? p.productName ?? ""),
+  productType: String(p.productType ?? "Unknown"),
+  quantityAvailable: Number(p.quantityAvailable ?? p.availableUnits ?? 0),
+  unitCost: Number(p.unitCost ?? p.unitPrice ?? 0),
+  locationId: String(p.locationId ?? ""),
+});
+
 // ─── Recipes ────────────────────────────────────────────────
 
 export const getRecipes = async (): Promise<FloralRecipe[]> => {
@@ -125,38 +165,28 @@ export const createWastageEntry = async (
 // ─── Inventory Products (for component selection) ───────────
 
 export const getInventoryProducts = async (locationId?: string) => {
+  const params = locationId ? { locationId } : undefined;
+
   try {
-    const res = await fetch('/api/inventory/products');
-    return await res.json();
+    const res = await apiClient.get('/inventory/products', { params });
+    const normalized = extractArrayPayload(res.data)
+      .map((p) => normalizeInventoryProduct(p as InventoryProductLike))
+      .filter((p) => p.id && p.name);
+
+    if (normalized.length > 0) return normalized;
   } catch {
-    // fallback mock data
-    return [
-      {
-        id: 'rose-red',
-        name: 'Red Rose',
-        unitCost: 12,
-        quantityAvailable: 200,
-      },
-      {
-        id: 'lily-white',
-        name: 'White Lily',
-        unitCost: 18,
-        quantityAvailable: 120,
-      },
-      {
-        id: 'baby-breath',
-        name: 'Baby Breath',
-        unitCost: 5,
-        quantityAvailable: 300,
-      },
-      {
-        id: 'wrapping-paper',
-        name: 'Wrapping Paper',
-        unitCost: 8,
-        quantityAvailable: 500,
-      },
-    ];
+    // Fall back to production-scoped endpoint below.
   }
+
+  // Production fallback requires a locationId in backend contract.
+  if (!locationId) {
+    return [];
+  }
+
+  const fallbackRes = await apiClient.get('/production/inventory-products', { params });
+  return safeArray<InventoryProductLike>(extractArrayPayload(fallbackRes.data))
+    .map((p) => normalizeInventoryProduct(p))
+    .filter((p) => p.id && p.name);
 };
 
 // ─── Image Upload ───────────────────────────────────────────

@@ -34,6 +34,66 @@ import SummaryCards from './components/SummaryCards';
 import FilterBar from './components/FilterBar';
 import BatchTable from './components/BatchTable';
 
+type ApiBatchDto = {
+  id: string;
+  productId: string;
+  productName: string;
+  productType?: string | null;
+  batchNumber: string;
+  quantityReceived: number;
+  quantityRemaining: number;
+  costPerUnit: number;
+  sellingPricePerUnit: number;
+  receivedDate: string;
+  expiryDate?: string | null;
+  supplierName?: string | null;
+  locationId?: string | null;
+  locationName?: string | null;
+  storageLocation?: string | null;
+};
+
+const mapApiBatchToInventoryBatch = (b: ApiBatchDto): InventoryBatch => ({
+  id: b.id,
+  productId: b.productId,
+  productName: b.productName,
+  productType: b.productType ?? 'Unknown',
+  batchCode: b.batchNumber,
+  receivedDate: b.receivedDate,
+  expiryDate: b.expiryDate ?? null,
+  quantityReceived: b.quantityReceived,
+  quantityRemaining: b.quantityRemaining,
+  supplier: b.supplierName ?? undefined,
+  locationId: b.locationId ?? b.locationName ?? 'unknown',
+  storageLocation: b.storageLocation ?? b.locationName ?? 'Unspecified',
+  costPerUnit: b.costPerUnit,
+  sellingPricePerUnit: b.sellingPricePerUnit,
+  isPerishable: b.expiryDate != null,
+  stemsInStock: b.quantityRemaining,
+  usedUnits: 0,
+  damagedUnits: 0,
+});
+
+const uniqueSorted = (items: string[]): string[] =>
+  Array.from(new Set(items.filter((x) => x && x.trim().length > 0))).sort((a, b) =>
+    a.localeCompare(b),
+  );
+
+const extractBatchItems = (payload: unknown): ApiBatchDto[] => {
+  if (Array.isArray(payload)) return payload as ApiBatchDto[];
+  if (!payload || typeof payload !== 'object') return [];
+
+  const candidate = payload as {
+    items?: unknown;
+    Items?: unknown;
+    data?: unknown;
+  };
+
+  if (Array.isArray(candidate.items)) return candidate.items as ApiBatchDto[];
+  if (Array.isArray(candidate.Items)) return candidate.Items as ApiBatchDto[];
+  if (Array.isArray(candidate.data)) return candidate.data as ApiBatchDto[];
+  return [];
+};
+
 const InventoryBatchDashboard = () => {
   const theme = useTheme();
   const { execute, loading: apiLoading } = useApiCall();
@@ -53,14 +113,24 @@ const InventoryBatchDashboard = () => {
   useEffect(() => {
     let cancelled = false;
     const loadBatches = async () => {
-      const data = await execute(() => searchBatches(), {
-        errorMessage: 'Failed to load inventory batches',
-      });
-      if (!cancelled && data) {
-        setBatches(data.items ?? data);
-        toast.info(`Loaded ${(data.items ?? data).length} batches`);
+      try {
+        const data = await execute(() => searchBatches({ Page: 1, PageSize: 1000 }), {
+          errorMessage: 'Failed to load inventory batches',
+        });
+
+        if (!cancelled && data) {
+          const rawItems = extractBatchItems(data);
+          const liveBatches = rawItems.map(mapApiBatchToInventoryBatch);
+          setBatches(liveBatches);
+          toast.info(`Loaded ${liveBatches.length} batches`);
+
+          if (liveBatches.length === 0) {
+            toast.warning('No inventory batches were returned by the API.');
+          }
+        }
+      } finally {
+        if (!cancelled) setInitialLoad(false);
       }
-      if (!cancelled) setInitialLoad(false);
     };
     loadBatches();
     return () => {
@@ -78,6 +148,21 @@ const InventoryBatchDashboard = () => {
   const filtered = useMemo(
     () => filterAndSort(batches, filters),
     [batches, filters],
+  );
+
+  const storageLocations = useMemo(
+    () => uniqueSorted(batches.map((b) => b.storageLocation)),
+    [batches],
+  );
+
+  const suppliers = useMemo(
+    () => uniqueSorted(batches.map((b) => b.supplier ?? '')),
+    [batches],
+  );
+
+  const productTypes = useMemo(
+    () => uniqueSorted(batches.map((b) => b.productType)),
+    [batches],
   );
 
   // Reset page on filter change
@@ -200,10 +285,20 @@ const InventoryBatchDashboard = () => {
             onChange={handleFilterChange}
             batches={filtered}
             darkMode={darkMode}
+            storageLocations={storageLocations}
+            suppliers={suppliers}
+            productTypes={productTypes}
           />
         </Box>
 
         {/* ── Batch Table ─────────────────────────────────── */}
+        {!loading && batches.length === 0 && (
+          <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+            No batch records were loaded. Please verify inventory batch data exists and the API is
+            reachable.
+          </Alert>
+        )}
+
         <BatchTable
           batches={filtered}
           loading={loading}

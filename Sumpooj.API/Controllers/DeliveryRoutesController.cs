@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Sumpooj.Application.Deliveries;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Domain.Entities;
@@ -36,27 +37,103 @@ public class DeliveryRoutesController : ControllerBase
     private Guid CompanyId => _tenantContext.CompanyId
         ?? throw new UnauthorizedAccessException("Company context required");
 
+    private static bool IsMissingDeliveryRoutesTable(PostgresException ex) =>
+        ex.SqlState == PostgresErrorCodes.UndefinedTable
+        && ex.MessageText.Contains("DeliveryRoutes", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>
     /// List delivery routes for a given date.
     /// Frontend: GET /api/delivery-routes?date=2025-01-15
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> GetRoutes([FromQuery] DateTime? date)
+    public async Task<IActionResult> GetRoutes([FromQuery] DateTime? date, [FromQuery] string? status)
     {
         var targetDate = date?.Date ?? DateTime.UtcNow.Date;
+        targetDate = DateTime.SpecifyKind(targetDate, DateTimeKind.Utc);
 
-        var routes = await _db.DeliveryRoutes
-            .Where(r => r.RouteDate.Date == targetDate)
-            .Select(r => new
+        var query = _db.DeliveryRoutes.Where(r => r.RouteDate.Date == targetDate);
+
+        if (!string.IsNullOrWhiteSpace(status)
+            && Enum.TryParse<DeliveryRouteStatus>(status, true, out var routeStatus))
+        {
+            query = query.Where(r => r.Status == routeStatus);
+        }
+
+        try
+        {
+            var routes = await query
+                .Select(r => new
+                {
+                    id = r.Id.ToString(),
+                    name = r.Name,
+                    stopCount = _db.Deliveries.Count(d => d.DeliveryRouteId == r.Id),
+                    status = r.Status.ToString(),
+                })
+                .ToListAsync();
+
+            return Ok(routes);
+        }
+        catch (PostgresException ex) when (IsMissingDeliveryRoutesTable(ex))
+        {
+            return Ok(Array.Empty<object>());
+        }
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetRouteDetail(Guid id)
+    {
+        try
+        {
+            var route = await _db.DeliveryRoutes
+                .Where(r => r.Id == id)
+                .Select(r => new
+                {
+                    id = r.Id.ToString(),
+                    name = r.Name,
+                    status = r.Status.ToString(),
+                    routeDate = r.RouteDate,
+                    deliveryPersonName = _db.Staff
+                        .Where(s => s.Id == r.DeliveryPersonId)
+                        .Select(s => s.Name)
+                        .FirstOrDefault()
+                })
+                .FirstOrDefaultAsync();
+
+            if (route == null)
+                return NotFound(new { message = "Route not found" });
+
+            var deliveries = await (from d in _db.Deliveries
+                                    join o in _db.Orders on d.SalesOrderId equals o.Id
+                                    join c in _db.Customers on o.CustomerId equals c.Id
+                                    where d.DeliveryRouteId == id
+                                    orderby d.StopOrder
+                                    select new
+                                    {
+                                        id = d.Id.ToString(),
+                                        stopOrder = d.StopOrder ?? 0,
+                                        orderNumber = o.OrderNumber,
+                                        customerName = c.Name,
+                                        timeSlot = d.TimeSlot,
+                                        postalCode = d.PostalCode,
+                                        status = d.Status.ToString()
+                                    })
+                .AsNoTracking()
+                .ToListAsync();
+
+            return Ok(new
             {
-                id = r.Id.ToString(),
-                name = r.Name,
-                stopCount = _db.Deliveries.Count(d => d.DeliveryRouteId == r.Id),
-                status = r.Status.ToString(),
-            })
-            .ToListAsync();
-
-        return Ok(routes);
+                route.id,
+                route.name,
+                route.status,
+                route.routeDate,
+                route.deliveryPersonName,
+                deliveries,
+            });
+        }
+        catch (PostgresException ex) when (IsMissingDeliveryRoutesTable(ex))
+        {
+            return NotFound(new { message = "Delivery routes are not available until the database migration is applied." });
+        }
     }
 
     /// <summary>
@@ -66,34 +143,44 @@ public class DeliveryRoutesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateRoute([FromBody] CreateRouteRequest request)
     {
-        var routeDate = DateTime.SpecifyKind(DateTime.Parse(request.RouteDate).Date, DateTimeKind.Utc);
-        var routeName = $"Route-{routeDate:yyyyMMdd}-{Guid.NewGuid().ToString()[..4]}";
-
-        var route = new DeliveryRoute(Guid.Empty, routeDate, routeName);
-        _db.DeliveryRoutes.Add(route);
-        await _db.SaveChangesAsync();
-
-        // Assign deliveries to this route
-        if (request.DeliveryIds is { Count: > 0 })
+        try
         {
-            var deliveryGuids = request.DeliveryIds
-                .Where(id => Guid.TryParse(id, out _))
-                .Select(Guid.Parse)
-                .ToList();
+            var routeDate = DateTime.SpecifyKind(DateTime.Parse(request.RouteDate).Date, DateTimeKind.Utc);
+            var routeName = $"Route-{routeDate:yyyyMMdd}-{Guid.NewGuid().ToString()[..4]}";
 
-            var deliveries = await _db.Deliveries
-                .Where(d => deliveryGuids.Contains(d.Id))
-                .ToListAsync();
-
-            var stopOrder = 1;
-            foreach (var delivery in deliveries)
-            {
-                delivery.AssignToRoute(route.Id, stopOrder++);
-            }
+            var route = new DeliveryRoute(Guid.Empty, routeDate, routeName);
+            _db.DeliveryRoutes.Add(route);
             await _db.SaveChangesAsync();
-        }
 
-        return Ok(new { routeId = route.Id.ToString() });
+            // Assign deliveries to this route
+            if (request.DeliveryIds is { Count: > 0 })
+            {
+                var deliveryGuids = request.DeliveryIds
+                    .Where(id => Guid.TryParse(id, out _))
+                    .Select(Guid.Parse)
+                    .ToList();
+
+                var deliveries = await _db.Deliveries
+                    .Where(d => deliveryGuids.Contains(d.Id))
+                    .ToListAsync();
+
+                var stopOrder = 1;
+                foreach (var delivery in deliveries)
+                {
+                    delivery.AssignToRoute(route.Id, stopOrder++);
+                }
+                await _db.SaveChangesAsync();
+            }
+
+            return Ok(new { routeId = route.Id.ToString() });
+        }
+        catch (PostgresException ex) when (IsMissingDeliveryRoutesTable(ex))
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                message = "Delivery routes database table is missing. Apply the latest database migration to enable this feature."
+            });
+        }
     }
 
     [HttpPut("{id}/assign-driver")]
@@ -109,6 +196,78 @@ public class DeliveryRoutesController : ControllerBase
         {
             return BadRequest(new { error = ex.Message });
         }
+    }
+
+    [HttpPut("{id:guid}/reorder-stop")]
+    public async Task<IActionResult> ReorderStop(Guid id, [FromBody] ReorderRouteStopRequest request)
+    {
+        var route = await _db.DeliveryRoutes.FirstOrDefaultAsync(r => r.Id == id);
+        if (route == null)
+            return NotFound(new { message = "Route not found" });
+
+        if (route.Status != DeliveryRouteStatus.Draft)
+            return BadRequest(new { message = "Only Draft routes can be reordered" });
+
+        var deliveries = await _db.Deliveries
+            .Where(d => d.DeliveryRouteId == id)
+            .OrderBy(d => d.StopOrder)
+            .ToListAsync();
+
+        var moving = deliveries.FirstOrDefault(d => d.Id == request.StopId);
+        if (moving == null)
+            return NotFound(new { message = "Stop not found on this route" });
+
+        var targetIndex = Math.Clamp(request.NewPosition, 1, deliveries.Count) - 1;
+        deliveries.Remove(moving);
+        deliveries.Insert(targetIndex, moving);
+
+        for (var i = 0; i < deliveries.Count; i++)
+        {
+            _db.Entry(deliveries[i]).Property(d => d.StopOrder).CurrentValue = i + 1;
+        }
+
+        await _db.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpPut("{id:guid}/move-stop")]
+    public async Task<IActionResult> MoveStop(Guid id, [FromBody] MoveRouteStopRequest request)
+    {
+        var sourceRoute = await _db.DeliveryRoutes.FirstOrDefaultAsync(r => r.Id == id);
+        if (sourceRoute == null)
+            return NotFound(new { message = "Source route not found" });
+
+        var targetRoute = await _db.DeliveryRoutes.FirstOrDefaultAsync(r => r.Id == request.TargetRouteId);
+        if (targetRoute == null)
+            return NotFound(new { message = "Target route not found" });
+
+        if (sourceRoute.Status != DeliveryRouteStatus.Draft || targetRoute.Status != DeliveryRouteStatus.Draft)
+            return BadRequest(new { message = "Stops can only be moved between Draft routes" });
+
+        if (sourceRoute.RouteDate.Date != targetRoute.RouteDate.Date)
+            return BadRequest(new { message = "Stops can only be moved between routes on the same date" });
+
+        var sourceDeliveries = await _db.Deliveries
+            .Where(d => d.DeliveryRouteId == id)
+            .OrderBy(d => d.StopOrder)
+            .ToListAsync();
+
+        var moving = sourceDeliveries.FirstOrDefault(d => d.Id == request.StopId);
+        if (moving == null)
+            return NotFound(new { message = "Stop not found on this route" });
+
+        sourceDeliveries.Remove(moving);
+        for (var i = 0; i < sourceDeliveries.Count; i++)
+        {
+            _db.Entry(sourceDeliveries[i]).Property(d => d.StopOrder).CurrentValue = i + 1;
+        }
+
+        var targetStopCount = await _db.Deliveries.CountAsync(d => d.DeliveryRouteId == request.TargetRouteId);
+        _db.Entry(moving).Property(d => d.DeliveryRouteId).CurrentValue = request.TargetRouteId;
+        _db.Entry(moving).Property(d => d.StopOrder).CurrentValue = targetStopCount + 1;
+
+        await _db.SaveChangesAsync();
+        return Ok();
     }
 
     [HttpPut("{id}/start")]
@@ -149,4 +308,16 @@ public class CreateRouteRequest
 {
     public string RouteDate { get; set; } = default!;
     public List<string> DeliveryIds { get; set; } = new();
+}
+
+public class ReorderRouteStopRequest
+{
+    public Guid StopId { get; set; }
+    public int NewPosition { get; set; }
+}
+
+public class MoveRouteStopRequest
+{
+    public Guid StopId { get; set; }
+    public Guid TargetRouteId { get; set; }
 }

@@ -167,6 +167,192 @@ public class InventoryService
         };
     }
 
+    public async Task<List<InventoryReconciliationDto>> GetStockReconciliationAsync(bool mismatchesOnly = true)
+    {
+        if (_tenant.CompanyId == null)
+            throw new InvalidOperationException("Company context required");
+
+        var companyId = _tenant.CompanyId.Value;
+        var products = await _productRepo.GetAllAsync(companyId);
+        var (batches, _) = await _batchRepo.SearchAsync(null, null, null, null, true, null, null, 1, int.MaxValue);
+
+        var batchByProduct = batches
+            .GroupBy(b => b.ProductId)
+            .ToDictionary(g => g.Key, g => new
+            {
+                Quantity = g.Sum(x => x.QuantityRemaining),
+                Count = g.Count()
+            });
+
+        var rows = new List<InventoryReconciliationDto>();
+
+        foreach (var product in products.Where(p => p.IsActive && p.TrackInventory))
+        {
+            var hasBatch = batchByProduct.TryGetValue(product.Id, out var batchInfo);
+            var batchQty = hasBatch ? batchInfo!.Quantity : 0;
+            var batchCount = hasBatch ? batchInfo!.Count : 0;
+            var diff = product.StockQuantity - batchQty;
+
+            if (mismatchesOnly && diff == 0)
+                continue;
+
+            rows.Add(new InventoryReconciliationDto
+            {
+                ProductId = product.Id,
+                ProductName = product.Name,
+                TrackInventory = product.TrackInventory,
+                TrackBatch = product.TrackBatch,
+                ProductStockQuantity = product.StockQuantity,
+                BatchStockQuantity = batchQty,
+                Difference = diff,
+                BatchCount = batchCount,
+            });
+        }
+
+        return rows
+            .OrderByDescending(r => Math.Abs(r.Difference))
+            .ThenBy(r => r.ProductName)
+            .ToList();
+    }
+
+    public async Task<ReconciliationApplyResultDto> ApplyReconciliationFixAsync(ReconciliationApplyRequest request, Guid userId)
+    {
+        if (_tenant.CompanyId == null)
+            throw new InvalidOperationException("Company context required");
+
+        var product = await _productRepo.GetByIdAsync(request.ProductId)
+            ?? throw new KeyNotFoundException("Product not found");
+
+        if (!product.TrackInventory)
+            throw new InvalidOperationException("Product is not inventory-tracked");
+
+        var batches = await _batchRepo.GetBatchesByProductIdAsync(product.Id);
+        var batchStock = batches.Sum(b => b.QuantityRemaining);
+        var beforeDiff = product.StockQuantity - batchStock;
+
+        if (request.ExpectedDifference.HasValue && request.ExpectedDifference.Value != beforeDiff)
+            throw new InvalidOperationException(
+                $"Reconciliation changed since page load. Expected {request.ExpectedDifference.Value}, current {beforeDiff}.");
+
+        if (beforeDiff == 0)
+        {
+            return new ReconciliationApplyResultDto
+            {
+                ProductId = product.Id,
+                ProductName = product.Name,
+                BeforeDifference = beforeDiff,
+                AppliedQuantity = 0,
+                AfterDifference = 0,
+                AppliedAdjustmentType = "NONE"
+            };
+        }
+
+        // Policy: align Batch stock to Product stock so inventory batch dashboard reflects corrected quantity.
+        // beforeDiff = Product - Batch
+        // beforeDiff > 0 => batch is short, add to batch
+        // beforeDiff < 0 => batch is high, deduct from batch
+        var quantity = Math.Abs(beforeDiff);
+        var reason = string.IsNullOrWhiteSpace(request.Reason)
+            ? "Stock reconciliation correction"
+            : request.Reason.Trim();
+
+        var noteParts = new List<string>
+        {
+            $"Reconciliation fix applied. BeforeDiff={beforeDiff}, ProductStock={product.StockQuantity}, BatchStock={batchStock}."
+        };
+
+        if (!string.IsNullOrWhiteSpace(request.Notes))
+            noteParts.Add(request.Notes.Trim());
+
+        if (beforeDiff > 0)
+        {
+            // Batch stock lower than product stock -> add to latest batch (or create one).
+            var targetBatch = batches
+                .OrderByDescending(b => b.ReceivedDate)
+                .FirstOrDefault();
+
+            if (targetBatch == null)
+            {
+                var batchNumber = await _batchRepo.GenerateBatchNumberAsync(product.Id);
+                targetBatch = new ProductBatch(
+                    companyId: _tenant.CompanyId.Value,
+                    productId: product.Id,
+                    batchNumber: batchNumber,
+                    quantityReceived: quantity,
+                    costPerUnit: product.CostPrice,
+                    receivedDate: DateTime.UtcNow,
+                    expiryDate: null,
+                    supplierId: null,
+                    locationId: null,
+                    storageLocation: "Reconciliation");
+                await _batchRepo.AddAsync(targetBatch);
+            }
+            else
+            {
+                targetBatch.AddQuantity(quantity);
+                await _batchRepo.UpdateAsync(targetBatch);
+            }
+
+            var addAdjustment = new InventoryAdjustment(
+                companyId: _tenant.CompanyId.Value,
+                productId: product.Id,
+                batchId: targetBatch.Id,
+                adjustmentType: AdjustmentType.Correction,
+                quantity: quantity,
+                costPerUnit: targetBatch.CostPerUnit,
+                reason: reason,
+                adjustedByUserId: userId);
+            addAdjustment.AddNotes(string.Join(" ", noteParts));
+            await _adjustmentRepo.AddAsync(addAdjustment);
+        }
+        else
+        {
+            // Batch stock higher than product stock -> deduct from batches FIFO.
+            var remaining = quantity;
+            foreach (var batch in batches.OrderBy(b => b.ExpiryDate ?? DateTime.MaxValue).ThenBy(b => b.ReceivedDate))
+            {
+                if (remaining <= 0) break;
+
+                var deduct = Math.Min(batch.QuantityRemaining, remaining);
+                if (deduct <= 0) continue;
+
+                batch.DeductQuantity(deduct);
+                await _batchRepo.UpdateAsync(batch);
+
+                var deductAdjustment = new InventoryAdjustment(
+                    companyId: _tenant.CompanyId.Value,
+                    productId: product.Id,
+                    batchId: batch.Id,
+                    adjustmentType: AdjustmentType.Correction,
+                    quantity: deduct,
+                    costPerUnit: batch.CostPerUnit,
+                    reason: reason,
+                    adjustedByUserId: userId);
+                deductAdjustment.AddNotes(string.Join(" ", noteParts));
+                await _adjustmentRepo.AddAsync(deductAdjustment);
+
+                remaining -= deduct;
+            }
+
+            if (remaining > 0)
+                throw new InvalidOperationException($"Unable to deduct enough batch stock for product {product.Name}");
+        }
+
+        var refreshedBatches = await _batchRepo.GetBatchesByProductIdAsync(product.Id);
+        var afterBatchStock = refreshedBatches.Sum(b => b.QuantityRemaining);
+        var afterDiff = product.StockQuantity - afterBatchStock;
+
+        return new ReconciliationApplyResultDto
+        {
+            ProductId = product.Id,
+            ProductName = product.Name,
+            BeforeDifference = beforeDiff,
+            AppliedQuantity = quantity,
+            AfterDifference = afterDiff,
+            AppliedAdjustmentType = "CORRECTION"
+        };
+    }
+
     public async Task<List<InventoryBatchProjection>> GetBatchSummaryAsync()
     {
         var (batches, _) = await _batchRepo.SearchAsync(null, null, null, null, true, null, null, 1, int.MaxValue);

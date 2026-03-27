@@ -66,10 +66,12 @@ const WalkInPOS: React.FC = () => {
           searchProducts({ IsActive: true, PageSize: 500 }).catch(() => []),
           searchCustomers({ PageSize: 500 }).catch(() => []),
           getAllSuppliers().catch(() => []),
-          fetchSellableFinishedGoods().catch(() => []),
+          fetchSellableFinishedGoods().catch((err) => { console.error('❌ fetchSellableFinishedGoods failed:', err?.response?.status, err?.message); return []; }),
         ]);
         const prodItems = Array.isArray(prodRes) ? prodRes : prodRes?.items ?? [];
         const normalizedProducts = normalizeProducts(prodItems);
+
+        console.log('✅ Finished goods response:', finishedGoodsRes);
 
         // Merge finished goods as products
         const finishedGoods: Product[] = (Array.isArray(finishedGoodsRes) ? finishedGoodsRes : []).map((fg: any) => ({
@@ -164,24 +166,26 @@ const WalkInPOS: React.FC = () => {
         (p) =>
           p.name.toLowerCase().includes(q) ||
           p.sku.toLowerCase().includes(q) ||
-          (!!p.barcode && !p.isPerishable && p.barcode.includes(q)),
+          (!!p.barcode && !p.isPerishable && p.barcode.includes(q)) ||
+          (!!p.finishedBarcode && p.finishedBarcode.includes(q)),
       );
     }
     return list;
-  }, [search, categoryFilter]);
+  }, [products, search, categoryFilter]);
 
   const handleBarcodeSubmit = () => {
     const searchTerm = search.trim();
     if (!searchTerm) return;
     
-    // Search order: externalBarcode → internalBarcode → batchBarcode → finishedBarcode
+    // Search order: finishedBarcode (perishable finished goods) → externalBarcode → internalBarcode → batchBarcode
     const product = products.find((p) => {
-      if (p.isPerishable) return false; // Skip perishables (use batch)
+      // Allow finished goods (perishable, but scannable by their barcode)
+      if (p.finishedBarcode && p.finishedBarcode === searchTerm) return true;
+      if (p.isPerishable) return false; // Skip other perishables (use batch)
       return (
         p.barcode === searchTerm ||
         p.internalBarcode === searchTerm ||
-        p.batchBarcode === searchTerm ||
-        p.finishedBarcode === searchTerm
+        p.batchBarcode === searchTerm
       );
     });
     

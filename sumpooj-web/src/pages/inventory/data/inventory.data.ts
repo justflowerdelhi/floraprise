@@ -1,5 +1,5 @@
 /**
- * Inventory Batch Dashboard — Types, Constants & Mock Data
+ * Inventory Batch Dashboard — Types & Shared Constants
  * Florist POS + ERP SaaS Platform
  */
 
