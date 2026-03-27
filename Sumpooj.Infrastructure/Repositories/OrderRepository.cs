@@ -244,6 +244,56 @@ public class OrderRepository : IOrderRepository
                             o.Status != OrderStatus.Cancelled);
     }
 
+    public async Task<decimal> GetSalesByDateRangeAsync(Guid companyId, DateTime fromInclusive, DateTime toExclusive)
+    {
+        return await _db.Orders
+            .Where(o => o.CompanyId == companyId &&
+                        o.IsActive &&
+                        o.OrderDate >= fromInclusive &&
+                        o.OrderDate < toExclusive &&
+                        o.Status != OrderStatus.Cancelled)
+            .Select(o => (decimal?)o.TotalAmount)
+            .SumAsync() ?? 0m;
+    }
+
+    public async Task<decimal> GetEstimatedCogsByDateAsync(Guid companyId, DateTime date)
+    {
+        var dayStart = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+        var dayEnd = dayStart.AddDays(1);
+
+        var cogs = await (
+            from o in _db.Orders
+            join oi in _db.OrderItems on o.Id equals EF.Property<Guid>(oi, "OrderId")
+            join p in _db.Products on oi.ProductId equals p.Id
+            where o.CompanyId == companyId
+                  && o.IsActive
+                  && o.Status != OrderStatus.Cancelled
+                  && o.OrderDate >= dayStart
+                  && o.OrderDate < dayEnd
+            select (decimal?)(p.CostPrice * oi.Quantity)
+        ).SumAsync();
+
+        return cogs ?? 0m;
+    }
+
+    public async Task<List<DailySalesPointDto>> GetDailySalesByDateRangeAsync(Guid companyId, DateTime fromInclusive, DateTime toExclusive)
+    {
+        return await _db.Orders
+            .Where(o => o.CompanyId == companyId &&
+                        o.IsActive &&
+                        o.OrderDate >= fromInclusive &&
+                        o.OrderDate < toExclusive &&
+                        o.Status != OrderStatus.Cancelled)
+            .GroupBy(o => o.OrderDate.Date)
+            .Select(g => new DailySalesPointDto
+            {
+                Date = g.Key,
+                Sales = g.Sum(x => x.TotalAmount)
+            })
+            .OrderBy(x => x.Date)
+            .ToListAsync();
+    }
+
     public async Task<int> GetOrderCountByStaffAsync(Guid companyId, Guid staffId, DateTime from, DateTime to)
     {
         return await _db.Orders

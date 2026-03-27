@@ -22,8 +22,17 @@ public interface IOrderRepository
     Task<int> GetTodaysOrderCountAsync(Guid companyId);
     Task<decimal> GetTodaysSalesAsync(Guid companyId);
     Task<int> GetPendingDeliveriesCountAsync(Guid companyId, DateTime date);
+    Task<decimal> GetSalesByDateRangeAsync(Guid companyId, DateTime fromInclusive, DateTime toExclusive);
+    Task<decimal> GetEstimatedCogsByDateAsync(Guid companyId, DateTime date);
+    Task<List<DailySalesPointDto>> GetDailySalesByDateRangeAsync(Guid companyId, DateTime fromInclusive, DateTime toExclusive);
 
     // Staff performance
     Task<int> GetOrderCountByStaffAsync(Guid companyId, Guid staffId, DateTime from, DateTime to);
     Task<decimal> GetRevenueByCashierAsync(Guid companyId, Guid staffId, DateTime from, DateTime to);
+}
+
+public class DailySalesPointDto
+{
+    public DateTime Date { get; set; }
+    public decimal Sales { get; set; }
 }

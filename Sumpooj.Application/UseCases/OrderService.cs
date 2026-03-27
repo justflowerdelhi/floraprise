@@ -562,6 +562,7 @@ public class OrderService
     /// <summary>
     /// Creates double-entry journal entries for a POS sale.
     /// Dr Cash/Card/UPI → Cr Sales Revenue
+    /// Dr Cost of Goods Sold → Cr Inventory
     /// </summary>
     private async Task CreateSaleJournalEntriesAsync(Guid companyId, Order order, CreateOrderRequest request)
     {
@@ -570,6 +571,12 @@ public class OrderService
             // Look up (or auto-create) the Sales Revenue account
             var revenueAccountId = await _journalEntryRepository
                 .GetOrCreateAccountIdAsync(companyId, "4000", "Sales Revenue", "Income");
+
+            // Look up (or auto-create) COGS and Inventory accounts for stock-out posting.
+            var cogsAccountId = await _journalEntryRepository
+                .GetOrCreateAccountIdAsync(companyId, "5000", "Cost of Goods Sold", "Expense");
+            var inventoryAccountId = await _journalEntryRepository
+                .GetOrCreateAccountIdAsync(companyId, "1200", "Inventory", "Asset");
 
             var entries = new List<JournalEntry>();
             var now = DateTime.UtcNow;
@@ -622,6 +629,41 @@ public class OrderService
                 if (order.LocationId.HasValue)
                     creditEntry.SetLocation(order.LocationId.Value);
                 entries.Add(creditEntry);
+            }
+
+            // Post COGS for the sold products: Dr COGS / Cr Inventory.
+            decimal totalCogs = 0m;
+            foreach (var item in order.Items)
+            {
+                var product = await _productRepository.GetByIdAsync(companyId, item.ProductId);
+                if (product == null)
+                    continue;
+
+                if (!product.TrackInventory)
+                    continue;
+
+                var lineCogs = product.CostPrice * item.Quantity;
+                if (lineCogs > 0)
+                    totalCogs += lineCogs;
+            }
+
+            if (totalCogs > 0)
+            {
+                var cogsDebit = new JournalEntry(
+                    companyId, now, orderRef, "SALE",
+                    $"POS Sale {orderRef} - COGS",
+                    totalCogs, 0, cogsAccountId);
+                if (order.LocationId.HasValue)
+                    cogsDebit.SetLocation(order.LocationId.Value);
+                entries.Add(cogsDebit);
+
+                var inventoryCredit = new JournalEntry(
+                    companyId, now, orderRef, "SALE",
+                    $"POS Sale {orderRef} - Inventory reduction",
+                    0, totalCogs, inventoryAccountId);
+                if (order.LocationId.HasValue)
+                    inventoryCredit.SetLocation(order.LocationId.Value);
+                entries.Add(inventoryCredit);
             }
 
             if (entries.Count > 0)

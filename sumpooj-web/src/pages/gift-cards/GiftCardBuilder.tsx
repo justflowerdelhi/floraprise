@@ -169,7 +169,9 @@ export default function GiftCardBuilder({ form, onChange }: Props) {
                   height: 120,
                   borderRadius: 2,
                   cursor: 'pointer',
-                  backgroundImage: `url(${template.image})`,
+                  // Always render a visible style tile: gradient is the base,
+                  // image overlay appears when the asset exists.
+                  backgroundImage: `url(${template.image}), ${template.gradient}`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                   border:

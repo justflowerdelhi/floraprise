@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, IconButton } from '@mui/material';
+import { Alert, Box, Button, Paper, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, IconButton } from '@mui/material';
 import { Edit, Block } from '@mui/icons-material';
 import ExpenseForm from './ExpenseForm';
 import { categoryIcons } from '../accounting.constants.tsx';
@@ -14,6 +14,7 @@ const ExpenseManager: React.FC = () => {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleAdd = () => {
     setEditData(null);
@@ -26,14 +27,19 @@ const ExpenseManager: React.FC = () => {
   };
 
   const handleFormSubmit = async (data: any) => {
-    if (editData) {
-      // updateExpense(editData.id, data); // Function not implemented
-    } else {
-      await addExpense(data);
+    try {
+      if (editData) {
+        // updateExpense(editData.id, data); // Function not implemented
+      } else {
+        await addExpense(data);
+      }
+      const expensesData = await getExpenses();
+      setExpenses(Array.isArray(expensesData) ? expensesData : []);
+      setFormOpen(false);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to save expense. Please try again.';
+      setErrorMsg(msg);
     }
-    const expensesData = await getExpenses();
-    setExpenses(Array.isArray(expensesData) ? expensesData : []);
-    setFormOpen(false);
   };
 
   const handleDisable = async (expense: any) => {
@@ -62,12 +68,12 @@ const ExpenseManager: React.FC = () => {
           <TableBody>
             {expenses.map((exp: any) => (
               <TableRow key={exp.id}>
-                <TableCell>{exp.date}</TableCell>
+                <TableCell>{exp.expenseDate ? new Date(exp.expenseDate).toLocaleDateString() : ''}</TableCell>
                 <TableCell>{categoryIcons[exp.category]} {exp.category}</TableCell>
-                <TableCell>{exp.vendor}</TableCell>
+                <TableCell>{exp.description || ''}</TableCell>
                 <TableCell>{exp.amount}</TableCell>
-                <TableCell>{exp.paymentMethod}</TableCell>
-                <TableCell>{exp.location}</TableCell>
+                <TableCell>–</TableCell>
+                <TableCell>–</TableCell>
                 <TableCell>
                   <IconButton onClick={() => handleEdit(exp)}><Edit /></IconButton>
                   <IconButton onClick={() => handleDisable(exp)} disabled={!exp.isActive}><Block /></IconButton>
@@ -83,6 +89,10 @@ const ExpenseManager: React.FC = () => {
         </Table>
       </TableContainer>
       <ExpenseForm open={formOpen} onClose={() => setFormOpen(false)} onSubmit={handleFormSubmit} initialData={editData} />
+      <Snackbar open={!!errorMsg} autoHideDuration={6000} onClose={() => setErrorMsg(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity="error" onClose={() => setErrorMsg(null)}>{errorMsg}</Alert>
+      </Snackbar>
     </Box>
   );
 };

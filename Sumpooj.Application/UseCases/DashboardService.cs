@@ -37,31 +37,38 @@ public class DashboardService
 
     private async Task<AdminDashboardDto> GetAdminDashboardAsync(Guid companyId)
     {
+        var utcToday = DateTime.UtcNow.Date;
+        var monthStart = new DateTime(utcToday.Year, utcToday.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var tomorrow = utcToday.AddDays(1);
+
         var todaysSales = await _orderRepository.GetTodaysSalesAsync(companyId);
-        var ordersToday = await _orderRepository.GetTodaysOrderCountAsync(companyId);
-        var deliveriesScheduled = await _orderRepository.GetPendingDeliveriesCountAsync(companyId, DateTime.Today);
+        var deliveriesScheduled = await _orderRepository.GetPendingDeliveriesCountAsync(companyId, utcToday);
+        var monthRevenue = await _orderRepository.GetSalesByDateRangeAsync(companyId, monthStart, tomorrow);
+        var estimatedCogsToday = await _orderRepository.GetEstimatedCogsByDateAsync(companyId, utcToday);
         var lowStockItems = await _productRepository.GetLowStockCountAsync(companyId);
         var expiringBatches = (await _batchRepository.GetExpiryAlertsAsync(companyId, 7)).Count;
 
-        // Build 7-day sales trend
-        var salesTrend = new List<SalesTrendPoint>();
-        for (int i = 6; i >= 0; i--)
-        {
-            var date = DateTime.Today.AddDays(-i);
-            var label = i == 0 ? "Today" : date.ToString("ddd");
-            // Reuse today's figure for today; for past days, approximate
-            var daySales = i == 0 ? todaysSales : 0m;
-            salesTrend.Add(new SalesTrendPoint { Day = label, Sales = daySales });
-        }
+        var trendStart = utcToday.AddDays(-6);
+        var salesByDate = await _orderRepository.GetDailySalesByDateRangeAsync(companyId, trendStart, tomorrow);
+        var trendMap = salesByDate.ToDictionary(x => x.Date.Date, x => x.Sales);
+
+        var salesTrend = Enumerable.Range(0, 7)
+            .Select(offset => trendStart.AddDays(offset))
+            .Select(date => new SalesTrendPoint
+            {
+                Day = date == utcToday ? "Today" : date.ToString("ddd"),
+                Sales = trendMap.TryGetValue(date, out var sales) ? sales : 0m
+            })
+            .ToList();
 
         return new AdminDashboardDto
         {
             TodaySales = todaysSales,
-            MonthRevenue = todaysSales, // Simplified — would need monthly aggregate
-            GrossProfitToday = todaysSales * 0.35m,
+            MonthRevenue = monthRevenue,
+            GrossProfitToday = Math.Max(0m, todaysSales - estimatedCogsToday),
             InventoryValue = 0, // Would need inventory valuation query
             WastageToday = 0,
-            NetworkOrdersPending = 0,
+            NetworkOrdersPending = deliveriesScheduled,
             ExpiringBouquets = expiringBatches,
             UpcomingWeddings = 0, // Would need events query
             SalesTrend = salesTrend

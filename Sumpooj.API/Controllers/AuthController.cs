@@ -109,20 +109,28 @@ public class AuthController : ControllerBase
             // Audit: successful login
             if (user.CompanyId.HasValue)
             {
-                var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-                await _auditLogService.LogAsync(
-                    user.CompanyId.Value,
-                    user.Id,
-                    user.Email,
-                    primaryRole,
-                    AuditActions.Login,
-                    "User",
-                    user.Id,
-                    user.Email,
-                    description: $"User {user.Email} logged in successfully",
-                    ipAddress: ip,
-                    requestPath: "/api/auth/login",
-                    httpMethod: "POST");
+                try
+                {
+                    var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+                    await _auditLogService.LogAsync(
+                        user.CompanyId.Value,
+                        user.Id,
+                        user.Email,
+                        primaryRole,
+                        AuditActions.Login,
+                        "User",
+                        user.Id,
+                        user.Email,
+                        description: $"User {user.Email} logged in successfully",
+                        ipAddress: ip,
+                        requestPath: "/api/auth/login",
+                        httpMethod: "POST");
+                }
+                catch (Exception auditEx)
+                {
+                    // Authentication should succeed even if audit persistence fails.
+                    _logger.LogWarning(auditEx, "Audit logging failed during login for: {Email}", request.Email);
+                }
             }
 
             return Ok(new

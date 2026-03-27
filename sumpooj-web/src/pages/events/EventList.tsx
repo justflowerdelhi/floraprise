@@ -46,6 +46,46 @@ const fmtCurrency = (value: number) => formatCurrency(value);
 const fmtDate = (dateStr: string) =>
   new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
+const normalizeEventStatus = (status: string): EventStatus => {
+  const s = (status || '').toUpperCase();
+  if (s === 'INQUIRY') return 'INQUIRY';
+  if (s === 'PROPOSALSENT' || s === 'QUOTED') return 'QUOTED';
+  if (s === 'CONFIRMED') return 'CONFIRMED';
+  if (s === 'INPRODUCTION' || s === 'IN_PRODUCTION') return 'IN_PRODUCTION';
+  if (s === 'COMPLETED') return 'COMPLETED';
+  if (s === 'CANCELLED') return 'CANCELLED';
+  return 'INQUIRY';
+};
+
+const normalizeEventType = (eventType: string): EventType => {
+  const t = (eventType || '').toUpperCase();
+  if (t === 'WEDDING') return 'WEDDING';
+  if (t === 'CORPORATE') return 'CORPORATE';
+  if (t === 'FUNERAL') return 'FUNERAL';
+  if (t === 'PARTY') return 'PARTY';
+  return 'OTHER';
+};
+
+const toBackendStatus = (status?: EventStatus | ''): string | undefined => {
+  if (!status) return undefined;
+  if (status === 'INQUIRY') return 'Inquiry';
+  if (status === 'QUOTED') return 'ProposalSent';
+  if (status === 'IN_PRODUCTION') return 'InProduction';
+  if (status === 'CONFIRMED') return 'Confirmed';
+  if (status === 'COMPLETED') return 'Completed';
+  if (status === 'CANCELLED') return 'Cancelled';
+  return undefined;
+};
+
+const toBackendEventType = (eventType?: EventType | ''): string | undefined => {
+  if (!eventType) return undefined;
+  if (eventType === 'WEDDING') return 'Wedding';
+  if (eventType === 'CORPORATE') return 'Corporate';
+  if (eventType === 'FUNERAL') return 'Funeral';
+  if (eventType === 'PARTY') return 'Party';
+  return 'Other';
+};
+
 // ─── Stats Card Component ───────────────────────────────────
 
 interface StatCardProps {
@@ -82,7 +122,7 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, color, icon }) => {
 // ─── Status Chip Component ──────────────────────────────────
 
 const StatusChip: React.FC<{ status: EventStatus }> = ({ status }) => {
-  const config = STATUS_CONFIG[status];
+  const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.INQUIRY;
   return (
     <Chip
       label={`${config.icon} ${config.label}`}
@@ -100,7 +140,7 @@ const StatusChip: React.FC<{ status: EventStatus }> = ({ status }) => {
 // ─── Event Type Chip Component ──────────────────────────────
 
 const EventTypeChip: React.FC<{ eventType: EventType }> = ({ eventType }) => {
-  const config = EVENT_TYPE_CONFIG[eventType];
+  const config = EVENT_TYPE_CONFIG[eventType] ?? EVENT_TYPE_CONFIG.OTHER;
   return (
     <Chip
       label={`${config.icon} ${config.label}`}
@@ -141,8 +181,8 @@ const EventList: React.FC = () => {
     const res = await execute(
       () => searchEvents({
         Query: filters.search || undefined,
-        Status: filters.status || undefined,
-        EventType: filters.eventType || undefined,
+        Status: toBackendStatus(filters.status),
+        EventType: toBackendEventType(filters.eventType),
         FromDate: filters.dateFrom || undefined,
         ToDate: filters.dateTo || undefined,
         Page: page + 1,
@@ -151,7 +191,15 @@ const EventList: React.FC = () => {
       { errorMessage: 'Failed to load events' }
     );
     if (res) {
-      setEvents(res.items ?? res ?? []);
+      const rawItems = (res.items ?? res ?? []) as any[];
+      const mapped = rawItems.map((e: any) => ({
+        ...e,
+        eventType: normalizeEventType(e.eventType),
+        status: normalizeEventStatus(e.status),
+        clientPhone: e.clientPhone ?? '',
+        assignedDesigner: e.assignedDesigner ?? e.assignedDesignerName ?? '',
+      }));
+      setEvents(mapped);
       setTotalCount(res.totalCount ?? 0);
     }
   }, [execute, filters, page, rowsPerPage]);

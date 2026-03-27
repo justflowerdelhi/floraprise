@@ -51,12 +51,8 @@ export const createJournalEntry = (entry: JournalEntry) => {
 };
 
 export async function getJournalEntries() {
-  try {
-    const res = await api.get('/accounting/journal');
-    return res.data;
-  } catch {
-    return journalEntries;
-  }
+  const res = await api.get('/accounting/journal');
+  return res.data;
 }
 
 /* ---------------- EXPENSES ---------------- */
@@ -67,17 +63,14 @@ export async function addExpense(data: any) {
     location: data.location || "Main"
   });
 
-  try {
-    const res = await api.post('/accounting/expenses', {
-      category: data.category || 'Other',
-      amount: data.amount,
-      description: data.description,
-      expenseDate: data.date,
-    });
-    return res.data;
-  } catch {
-    return { id: "EXP-" + Date.now(), ...data };
-  }
+  const description = [data.vendor, data.notes].filter(Boolean).join(' | ') || undefined;
+  const res = await api.post('/accounting/expenses', {
+    category: data.category || 'Other',
+    amount: data.amount,
+    description,
+    expenseDate: data.date,
+  });
+  return res.data;
 }
 
 export async function getExpenses() {
@@ -140,9 +133,9 @@ export async function getProfitLossReportData() {
   try {
     const res = await api.get('/accounting/profit-loss');
     const d = res.data;
-    return { totalRevenue: d.revenue, totalExpenses: d.expenses, grossProfit: d.grossProfit, netProfit: d.netProfit };
+    return { totalRevenue: d.revenue, totalExpenses: d.expenses, cogs: d.cogs, grossProfit: d.grossProfit, netProfit: d.netProfit };
   } catch {
-    return { totalRevenue: 0, totalExpenses: 0, grossProfit: 0, netProfit: 0 };
+    return { totalRevenue: 0, totalExpenses: 0, cogs: 0, grossProfit: 0, netProfit: 0 };
   }
 }
 

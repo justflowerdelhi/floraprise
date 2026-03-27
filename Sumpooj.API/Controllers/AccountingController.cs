@@ -159,9 +159,43 @@ public class AccountingController : ControllerBase
     [HttpPost("expenses")]
     public async Task<IActionResult> CreateExpense([FromBody] CreateExpenseRequest req)
     {
+        if (req.Amount <= 0)
+            return BadRequest(new { message = "Expense amount must be greater than zero." });
+
         var date = string.IsNullOrEmpty(req.ExpenseDate) ? DateTime.UtcNow : DateTime.Parse(req.ExpenseDate).ToUniversalTime();
         var expense = new Expense(CompanyId, req.Category, req.Amount, req.Description, date);
+
+        var expenseAccount = await GetOrCreateExpenseAccountAsync(req.Category);
+        var cashAccount = await GetOrCreateCashAccountAsync();
+
+        // Record both source document (Expense) and accounting impact (JournalEntries).
         _db.Expenses.Add(expense);
+
+        var reference = expense.Id.ToString();
+        var description = string.IsNullOrWhiteSpace(req.Description)
+            ? $"Expense: {req.Category}"
+            : req.Description!;
+
+        _db.JournalEntries.Add(new JournalEntry(
+            CompanyId,
+            date,
+            reference,
+            "EXPENSE",
+            description,
+            debit: req.Amount,
+            credit: 0,
+            accountId: expenseAccount.Id));
+
+        _db.JournalEntries.Add(new JournalEntry(
+            CompanyId,
+            date,
+            reference,
+            "EXPENSE",
+            description,
+            debit: 0,
+            credit: req.Amount,
+            accountId: cashAccount.Id));
+
         await _db.SaveChangesAsync();
         return Ok(new ExpenseDto { Id = expense.Id, Category = expense.Category, Amount = expense.Amount, Description = expense.Description, ExpenseDate = expense.ExpenseDate.ToString("o"), IsActive = true });
     }
@@ -191,10 +225,25 @@ public class AccountingController : ControllerBase
     [HttpGet("journal")]
     public async Task<IActionResult> GetJournalEntries()
     {
-        var list = await _db.JournalEntries
-            .Where(j => j.CompanyId == CompanyId).OrderByDescending(j => j.EntryDate)
-            .Select(j => new JournalEntryDto { Id = j.Id, Date = j.EntryDate.ToString("yyyy-MM-dd"), Reference = j.Reference, ReferenceType = j.ReferenceType, Description = j.Description, Debit = j.Debit, Credit = j.Credit, AccountId = j.AccountId })
+        // Materialize entities first — EF Core / Npgsql cannot translate
+        // DateTime.ToString("yyyy-MM-dd") inside a SQL SELECT projection.
+        var entities = await _db.JournalEntries
+            .Where(j => j.CompanyId == CompanyId)
+            .OrderByDescending(j => j.EntryDate)
             .ToListAsync();
+
+        var list = entities.Select(j => new JournalEntryDto
+        {
+            Id = j.Id,
+            Date = j.EntryDate.ToString("yyyy-MM-dd"),
+            Reference = j.Reference,
+            ReferenceType = j.ReferenceType,
+            Description = j.Description,
+            Debit = j.Debit,
+            Credit = j.Credit,
+            AccountId = j.AccountId
+        }).ToList();
+
         return Ok(list);
     }
 
@@ -228,18 +277,24 @@ public class AccountingController : ControllerBase
         foreach (var e in entries.Where(x => x.AccountId != null))
         {
             var acc = accounts[e.AccountId!.Value];
+            var accountType = acc.Type?.Trim() ?? string.Empty;
+            var accountName = acc.Name?.Trim() ?? string.Empty;
+            var isCogsAccount =
+                acc.Code == "5000"
+                || accountName.Contains("cost of goods sold", StringComparison.OrdinalIgnoreCase)
+                || accountName.Equals("COGS", StringComparison.OrdinalIgnoreCase);
 
-            if (acc.Type.Equals("Income", StringComparison.OrdinalIgnoreCase))
+            if (accountType.Equals("Income", StringComparison.OrdinalIgnoreCase))
             {
                 revenue += (e.Credit - e.Debit);
             }
-            else if (acc.Type.Equals("Expense", StringComparison.OrdinalIgnoreCase))
-            {
-                expenses += (e.Debit - e.Credit);
-            }
-            else if (acc.Type.Equals("COGS", StringComparison.OrdinalIgnoreCase))
+            else if (isCogsAccount)
             {
                 cogs += (e.Debit - e.Credit);
+            }
+            else if (accountType.Equals("Expense", StringComparison.OrdinalIgnoreCase))
+            {
+                expenses += (e.Debit - e.Credit);
             }
         }
 
@@ -291,5 +346,69 @@ public class AccountingController : ControllerBase
     {
         var result = await _accountingService.GetBalanceSheetAsync(CompanyId);
         return Ok(result);
+    }
+
+    private async Task<Account> GetOrCreateExpenseAccountAsync(string category)
+    {
+        var normalizedCategory = string.IsNullOrWhiteSpace(category) ? "General" : category.Trim();
+        var normalizedName = normalizedCategory.EndsWith("expense", StringComparison.OrdinalIgnoreCase)
+            ? normalizedCategory
+            : $"{normalizedCategory} Expense";
+
+        var categoryLower = normalizedCategory.ToLowerInvariant();
+        var nameLower = normalizedName.ToLowerInvariant();
+
+        var existing = await _db.Accounts
+            .Where(a => a.CompanyId == CompanyId && a.IsActive && a.Type == "Expense")
+            .FirstOrDefaultAsync(a =>
+                a.Name.ToLower() == categoryLower
+                || a.Name.ToLower() == nameLower);
+
+        if (existing != null)
+            return existing;
+
+        var code = await GetNextNumericAccountCodeAsync(5100);
+        var account = new Account(CompanyId, code, normalizedName, "Expense");
+        _db.Accounts.Add(account);
+        return account;
+    }
+
+    private async Task<Account> GetOrCreateCashAccountAsync()
+    {
+        var cash = await _db.Accounts
+            .Where(a => a.CompanyId == CompanyId && a.IsActive && a.Type == "Asset")
+            .FirstOrDefaultAsync(a => a.Name.ToLower().Contains("cash"));
+
+        if (cash != null)
+            return cash;
+
+        var asset = await _db.Accounts
+            .Where(a => a.CompanyId == CompanyId && a.IsActive && a.Type == "Asset")
+            .OrderBy(a => a.Code)
+            .FirstOrDefaultAsync();
+
+        if (asset != null)
+            return asset;
+
+        var code = await GetNextNumericAccountCodeAsync(1000);
+        var account = new Account(CompanyId, code, "Cash", "Asset");
+        _db.Accounts.Add(account);
+        return account;
+    }
+
+    private async Task<string> GetNextNumericAccountCodeAsync(int defaultStart)
+    {
+        var max = await _db.Accounts
+            .Where(a => a.CompanyId == CompanyId)
+            .Select(a => a.Code)
+            .ToListAsync();
+
+        var maxNumeric = max
+            .Select(c => int.TryParse(c, out var n) ? n : 0)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        var next = Math.Max(defaultStart, maxNumeric + 10);
+        return next.ToString();
     }
 }

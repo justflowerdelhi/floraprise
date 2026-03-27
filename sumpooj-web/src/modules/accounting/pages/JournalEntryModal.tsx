@@ -9,6 +9,12 @@ export interface JournalEntryModalProps {
 
 const JournalEntryModal: React.FC<JournalEntryModalProps> = ({ open, onClose, entry }) => {
   if (!entry) return null;
+
+  // API entries are flat (debit/credit/accountId) while local mock entries have `lines`.
+  const lines = Array.isArray(entry.lines)
+    ? entry.lines
+    : [{ account: entry.accountName || entry.accountId || 'N/A', debit: entry.debit || 0, credit: entry.credit || 0 }];
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>Journal Entry Details</DialogTitle>
@@ -27,9 +33,9 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({ open, onClose, en
             </TableRow>
           </TableHead>
           <TableBody>
-            {entry.lines.map((line: any, idx: number) => (
+            {lines.map((line: any, idx: number) => (
               <TableRow key={idx}>
-                <TableCell>{line.account}</TableCell>
+                <TableCell>{line.account || line.accountId || 'N/A'}</TableCell>
                 <TableCell>{line.debit}</TableCell>
                 <TableCell>{line.credit}</TableCell>
               </TableRow>
