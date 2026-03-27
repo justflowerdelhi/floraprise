@@ -20,6 +20,13 @@ import DeliveryDetailsForm from './DeliveryDetailsForm';
 import PickupDetailsForm from './PickupDetailsForm';
 import { usePOS } from './POSContext';
 import type { OrderIntent } from './POSTypes';
+
+const formatLastOrderDate = (value?: string) => {
+  if (!value) return 'No previous orders';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'No previous orders';
+  return parsed.toLocaleDateString();
+};
 import { formatCurrency } from '../../core/i18n';
 
 // ─── Props ──────────────────────────────────────────────────
@@ -220,6 +227,12 @@ const DetailsTab: React.FC<DetailsTabProps> = ({ onNext, onBack }) => {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Customer</p>
             <p className="text-sm font-medium text-gray-900">{state.customer.name}</p>
             {state.customer.phone && <p className="text-xs text-gray-500">{state.customer.phone}</p>}
+            <p className="text-xs text-gray-500 mt-1">
+              Total Orders: <span className="font-medium text-gray-700">{state.customer.totalOrders ?? 0}</span>
+            </p>
+            <p className="text-xs text-gray-500">
+              Last Order: <span className="font-medium text-gray-700">{formatLastOrderDate(state.customer.lastOrderDate)}</span>
+            </p>
           </div>
         )}
       </aside>

@@ -44,6 +44,40 @@ public class CustomerRepository : ICustomerRepository
         return (items, total);
     }
 
+    public async Task<Customer?> FindByPhoneOrNameAsync(Guid companyId, string? phone, string? name)
+    {
+        var normalizedPhone = NormalizeDigits(phone);
+        if (!string.IsNullOrWhiteSpace(normalizedPhone))
+        {
+            // Evaluate phone normalization in memory to handle varied stored formats.
+            var phoneCandidates = await _db.Customers
+                .AsNoTracking()
+                .Where(c => c.CompanyId == companyId && c.IsActive && c.Phone != null && c.Name != "Walk-In Customer")
+                .ToListAsync();
+
+            var byPhone = phoneCandidates.FirstOrDefault(c => NormalizeDigits(c.Phone) == normalizedPhone);
+            if (byPhone != null) return byPhone;
+        }
+
+        var normalizedName = (name ?? string.Empty).Trim().ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(normalizedName))
+        {
+            return await _db.Customers
+                .AsNoTracking()
+                .Where(c => c.CompanyId == companyId && c.IsActive && c.Name != "Walk-In Customer")
+                .OrderBy(c => c.CreatedAtUtc)
+                .FirstOrDefaultAsync(c => c.Name.ToLower() == normalizedName);
+        }
+
+        return null;
+    }
+
+    private static string NormalizeDigits(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+        return new string(value.Where(char.IsDigit).ToArray());
+    }
+
     public Task<Customer?> GetByIdAsync(Guid id)
         => _db.Customers.FirstOrDefaultAsync(c => c.Id == id);
 

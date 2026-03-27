@@ -5,6 +5,7 @@ namespace Sumpooj.Application.Interfaces;
 public interface ICustomerRepository
 {
     Task<Customer?> GetByIdAsync(Guid id);
+    Task<Customer?> FindByPhoneOrNameAsync(Guid companyId, string? phone, string? name);
     Task AddAsync(Customer customer);
     Task UpdateAsync(Customer customer);
     Task<Customer> GetOrCreateWalkInCustomerAsync(Guid companyId);

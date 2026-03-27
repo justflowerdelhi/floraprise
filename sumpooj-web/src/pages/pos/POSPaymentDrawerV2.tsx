@@ -10,7 +10,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Close as CloseIcon,
-  AttachMoney as CashIcon,
+  CurrencyRupee as CashIcon,
   CreditCard as CardIcon,
   QrCode as UpiIcon,
   AccountBalanceWallet as StoreCreditIcon,
@@ -24,7 +24,7 @@ import type { POSPaymentMethod, POSPaymentEntry, POSBillingInfo } from './POSTyp
 import { formatCurrency } from '../../core/i18n';
 import { createOrder } from '../../api/order.api';
 import { searchCustomers } from '../../api/customer.api';
-import { CustomerDatalist } from '../../components/CustomerDatalist';
+import { getCrmCustomer360 } from '../../api/crm.api';
 
 interface CustomerSuggestion {
   id: string;
@@ -34,6 +34,13 @@ interface CustomerSuggestion {
 }
 
 const normalizePhone = (phone: string) => phone.replace(/[^\d+]/g, '');
+
+const formatLastOrderDate = (value?: string) => {
+  if (!value) return 'No previous orders';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'No previous orders';
+  return parsed.toLocaleDateString();
+};
 
 const PAYMENT_METHODS: { method: POSPaymentMethod; label: string; icon: React.ReactElement }[] = [
   { method: 'CASH', label: 'Cash', icon: <CashIcon /> },
@@ -50,6 +57,7 @@ const POSPaymentDrawerV2: React.FC = () => {
     addPayment,
     removePayment,
     setBillingInfo,
+    setCustomer,
     completeTransaction,
     paidAmount,
     remainingAmount,
@@ -133,6 +141,23 @@ const POSPaymentDrawerV2: React.FC = () => {
     setIsSearchingCustomers(false);
   }, [isOpen]);
 
+  // Auto-match customer when suggestions load (handles datalist selection timing gap)
+  useEffect(() => {
+    if (!isOpen || !customerSuggestions.length) return;
+
+    const name = localBilling.name.trim();
+    const phone = normalizePhone(localBilling.phone ?? '');
+
+    const match =
+      customerSuggestions.find((c) => c.name.trim().toLowerCase() === name.toLowerCase()) ??
+      (phone ? customerSuggestions.find((c) => normalizePhone(c.phone || '') === phone) : undefined);
+
+    if (match && match.id !== state.customer?.id) {
+      enrichCustomerFromMatch(match.id, match);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerSuggestions]);
+
   // Update context billing when local changes
   useEffect(() => {
     if (isOpen && (localBilling.name || localBilling.email)) {
@@ -162,6 +187,41 @@ const POSPaymentDrawerV2: React.FC = () => {
     setInputAmount(amount.toFixed(2));
   }, []);
 
+  const enrichCustomerFromMatch = useCallback(async (matchId: string, fallback: CustomerSuggestion) => {
+    // Only fetch if not already set to this customer
+    if (state.customer?.id === matchId) return;
+    try {
+      const data = await getCrmCustomer360(matchId);
+      if (data?.customer) {
+        setCustomer({
+          id: data.customer.id,
+          tenantId: (data.customer as any).tenantId ?? '',
+          name: data.customer.name,
+          phone: data.customer.phone ?? '',
+          email: data.customer.email ?? '',
+          preferredAddress: (data.customer as any).preferredAddress ?? '',
+          createdAt: (data.customer as any).createdAt ?? '',
+          tags: data.customer.tags ?? [],
+          lifetimeValue: data.customer.lifetimeValue ?? 0,
+          totalOrders: data.customer.totalOrders ?? 0,
+          averageOrderValue: data.customer.averageOrderValue ?? 0,
+          referralCount: data.customer.referralCount ?? 0,
+          loyaltyPoints: data.customer.loyaltyPoints ?? 0,
+          loyaltyTier: data.customer.loyaltyTier ?? '',
+          loyaltyPointsEarned: data.customer.loyaltyPointsEarned ?? 0,
+          loyaltyPointsRedeemed: data.customer.loyaltyPointsRedeemed ?? 0,
+          totalProfit: data.customer.totalProfit ?? 0,
+          profitMargin: data.customer.profitMargin ?? 0,
+          marketingConsent: data.customer.marketingConsent ?? false,
+          lastOrderDate: data.customer.lastOrderDate,
+          notes: (data.customer as any).notes,
+        });
+      }
+    } catch {
+      // Non-critical — silently ignore
+    }
+  }, [state.customer?.id, setCustomer]);
+
   const handleNameChange = useCallback((name: string) => {
     setLocalBilling((prev) => {
       const next = { ...prev, name };
@@ -169,13 +229,14 @@ const POSPaymentDrawerV2: React.FC = () => {
         (customer) => customer.name.trim().toLowerCase() === name.trim().toLowerCase(),
       );
       if (!match) return next;
+      enrichCustomerFromMatch(match.id, match);
       return {
         ...next,
         phone: next.phone || match.phone || '',
         email: next.email || match.email || '',
       };
     });
-  }, [customerSuggestions]);
+  }, [customerSuggestions, enrichCustomerFromMatch]);
 
   const handlePhoneChange = useCallback((phone: string) => {
     setLocalBilling((prev) => {
@@ -187,13 +248,14 @@ const POSPaymentDrawerV2: React.FC = () => {
         return candidate && candidate === normalized;
       });
       if (!match) return next;
+      enrichCustomerFromMatch(match.id, match);
       return {
         ...next,
         name: next.name || match.name || '',
         email: next.email || match.email || '',
       };
     });
-  }, [customerSuggestions]);
+  }, [customerSuggestions, enrichCustomerFromMatch]);
 
   const handleComplete = useCallback(async () => {
     const canComplete = isFullyPaid || (state.orderIntent === 'PICKUP_LATER' && paidAmount > 0);
@@ -395,7 +457,7 @@ const POSPaymentDrawerV2: React.FC = () => {
               <div className="flex gap-2 mb-3">
                 <div className="flex-1 relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    $
+                    Rs
                   </span>
                   <input
                     type="number"
@@ -433,9 +495,32 @@ const POSPaymentDrawerV2: React.FC = () => {
                     onClick={() => handleQuickAmount(amount)}
                     className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
                   >
-                    ${amount}
+                    Rs {amount}
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Customer 360 Summary — always visible when a customer is selected */}
+          {state.customer && (
+            <div className="px-6 py-3 bg-white border-b border-gray-200">
+              <div className="rounded-lg border border-purple-100 bg-purple-50 px-3 py-2">
+                <p className="text-xs text-gray-700">
+                  <span className="font-semibold">Customer:</span> {state.customer.name}
+                  {state.customer.phone ? ` (${state.customer.phone})` : ''}
+                </p>
+                <p className="mt-0.5 text-xs text-gray-600">
+                  Total Orders: <span className="font-medium text-gray-800">{state.customer.totalOrders ?? 0}</span>
+                  {' • '}
+                  Last Order: <span className="font-medium text-gray-800">{formatLastOrderDate(state.customer.lastOrderDate)}</span>
+                  {state.customer.loyaltyPoints ? (
+                    <>
+                      {' • '}
+                      Points: <span className="font-medium text-gray-800">{state.customer.loyaltyPoints}</span>
+                    </>
+                  ) : null}
+                </p>
               </div>
             </div>
           )}
@@ -447,42 +532,101 @@ const POSPaymentDrawerV2: React.FC = () => {
                 Billing Info
                 {requiresBilling && <span className="text-red-500 ml-1">*</span>}
               </h3>
+
               <div className="space-y-3">
+                {/* Name field with custom suggestion dropdown */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    autoComplete="new-password"
+                    value={localBilling.name}
+                    onFocus={() => setActiveSuggestField('name')}
+                    onBlur={() => setTimeout(() => setActiveSuggestField(null), 150)}
+                    onChange={(e) => { setActiveSuggestField('name'); handleNameChange(e.target.value); }}
+                    placeholder="Customer Name"
+                    className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
+                               focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  {activeSuggestField === 'name' && customerSuggestions.length > 0 && (
+                    <ul className="absolute z-50 left-0 right-0 top-11 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {customerSuggestions.map((c) => (
+                        <li
+                          key={c.id}
+                          onMouseDown={() => {
+                            handleNameChange(c.name);
+                            setLocalBilling((prev) => ({
+                              ...prev,
+                              name: c.name,
+                              phone: prev.phone || c.phone || '',
+                              email: prev.email || c.email || '',
+                            }));
+                            enrichCustomerFromMatch(c.id, c);
+                            setActiveSuggestField(null);
+                          }}
+                          className="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-purple-50"
+                        >
+                          <span className="font-medium text-gray-800">{c.name}</span>
+                          <span className="text-xs text-gray-500">{c.phone}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                {/* Phone field with custom suggestion dropdown */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="new-password"
+                    value={localBilling.phone || ''}
+                    onFocus={() => setActiveSuggestField('phone')}
+                    onBlur={() => setTimeout(() => setActiveSuggestField(null), 150)}
+                    onChange={(e) => { setActiveSuggestField('phone'); handlePhoneChange(e.target.value); }}
+                    placeholder="Phone"
+                    className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
+                               focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  {activeSuggestField === 'phone' && customerSuggestions.length > 0 && (
+                    <ul className="absolute z-50 left-0 right-0 top-11 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {customerSuggestions.map((c) => (
+                        <li
+                          key={c.id}
+                          onMouseDown={() => {
+                            handlePhoneChange(c.phone);
+                            setLocalBilling((prev) => ({
+                              ...prev,
+                              phone: c.phone,
+                              name: prev.name || c.name || '',
+                              email: prev.email || c.email || '',
+                            }));
+                            enrichCustomerFromMatch(c.id, c);
+                            setActiveSuggestField(null);
+                          }}
+                          className="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-purple-50"
+                        >
+                          <span className="font-medium text-gray-800">{c.phone}</span>
+                          <span className="text-xs text-gray-500">{c.name}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
                 <input
                   type="text"
-                  list="pos-customer-name-suggestions"
-                  value={localBilling.name}
-                  onFocus={() => setActiveSuggestField('name')}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="Name"
-                  className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
-                             focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                <input
-                  type="email"
+                  autoComplete="new-password"
                   value={localBilling.email}
                   onChange={(e) =>
                     setLocalBilling((prev) => ({ ...prev, email: e.target.value }))
                   }
-                  placeholder="Email"
-                  className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
-                             focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                <input
-                  type="tel"
-                  list="pos-customer-phone-suggestions"
-                  value={localBilling.phone || ''}
-                  onFocus={() => setActiveSuggestField('phone')}
-                  onChange={(e) => handlePhoneChange(e.target.value)}
-                  placeholder="Phone (optional)"
+                  placeholder="Email (optional)"
                   className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg
                              focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
                 {isSearchingCustomers && (
                   <p className="text-[11px] text-gray-500">Searching customers...</p>
                 )}
-                <CustomerDatalist id="pos-customer-name-suggestions" customers={customerSuggestions} field="name" />
-                <CustomerDatalist id="pos-customer-phone-suggestions" customers={customerSuggestions} field="phone" />
               </div>
             </div>
           )}

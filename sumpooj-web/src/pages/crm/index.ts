@@ -55,6 +55,7 @@ export { ReminderWidget } from './SmartReminderDashboard';
 export { default as CustomerListPage } from './CustomerListPage';
 
 export { default as LoyaltyProgramPage } from './LoyaltyProgramPage';
+export { default as CustomerLedgerPage } from './CustomerLedgerPage';
 
 // Loyalty Components
 export {

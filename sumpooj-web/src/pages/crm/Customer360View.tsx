@@ -3,7 +3,7 @@
 // Florist ERP SaaS — CRM & Customer Intelligence
 // =============================================================================
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box,
   Paper,
@@ -33,6 +33,7 @@ import {
   DialogActions,
   Tooltip,
   Alert,
+  CircularProgress,
   useTheme,
 } from '@mui/material';
 import {
@@ -51,6 +52,7 @@ import {
   CardGiftcard,
   Timeline,
   AttachMoney,
+  ReceiptLong,
   Loyalty,
   Notes,
   WhatsApp,
@@ -58,6 +60,7 @@ import {
   EmojiEvents,
   Warning,
 } from '@mui/icons-material';
+import { useNavigate, useParams } from 'react-router-dom';
 import type {
   Customer,
   CustomerOrderSummary,
@@ -70,12 +73,9 @@ import {
   formatCurrency,
   getPointsToNextTier,
   daysSince,
-  MOCK_CUSTOMERS,
-  MOCK_CUSTOMER_ORDERS,
-  MOCK_CUSTOMER_EVENTS,
-  MOCK_LOYALTY_TRANSACTIONS,
 } from './CRMTypes';
 import { updateCustomerNotes } from '../../api/customer.api';
+import { getCrmCustomer360 } from '../../api/crm.api';
 
 // -----------------------------------------------------------------------------
 // Tab Panel Component
@@ -484,23 +484,81 @@ interface Customer360ViewProps {
 export default function Customer360View({ customerId, onBack }: Customer360ViewProps) {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  const navigate = useNavigate();
+  const params = useParams<{ customerId: string }>();
+  const resolvedCustomerId = customerId ?? params.customerId;
   
   const [tabValue, setTabValue] = useState(0);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [orders, setOrders] = useState<CustomerOrderSummary[]>([]);
+  const [events, setEvents] = useState<CustomerEventSummary[]>([]);
+  const [loyaltyTransactions, setLoyaltyTransactions] = useState<LoyaltyTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - replace with API call
-  const customer = MOCK_CUSTOMERS.find((c) => c.id === customerId) || MOCK_CUSTOMERS[0];
-  const orders = MOCK_CUSTOMER_ORDERS;
-  const events = MOCK_CUSTOMER_EVENTS;
-  const loyaltyTransactions = MOCK_LOYALTY_TRANSACTIONS;
+  useEffect(() => {
+    if (!resolvedCustomerId) {
+      setError('Customer not found.');
+      setLoading(false);
+      return;
+    }
+
+    let active = true;
+    async function loadCustomer() {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getCrmCustomer360(resolvedCustomerId);
+        if (active) {
+          setCustomer(result.customer);
+          setOrders(result.orders);
+          setEvents(result.events);
+          setLoyaltyTransactions(result.loyaltyTransactions);
+        }
+      } catch (err) {
+        console.error('Failed to load customer 360:', err);
+        if (active) {
+          setError('Failed to load customer details from the server.');
+          setCustomer(null);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadCustomer();
+    return () => {
+      active = false;
+    };
+  }, [resolvedCustomerId]);
+
+  if (loading) {
+    return (
+      <Box sx={{ p: 3, minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error || !customer) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">{error ?? 'Customer not found.'}</Alert>
+      </Box>
+    );
+  }
 
   const tierConfig = LOYALTY_TIER_CONFIGS[customer.loyaltyTier];
   const lastOrderDays = daysSince(customer.lastOrderDate);
 
   const handleSaveNotes = async (notes: string) => {
-    if (!customerId) return;
+    if (!resolvedCustomerId) return;
     try {
-      await updateCustomerNotes(customerId, notes || null);
+      await updateCustomerNotes(resolvedCustomerId, notes || null);
+      setCustomer((prev) => (prev ? { ...prev, notes } : prev));
     } catch (err) {
       console.error('Failed to save notes:', err);
     }
@@ -515,9 +573,24 @@ export default function Customer360View({ customerId, onBack }: Customer360ViewP
             <ArrowBack />
           </IconButton>
         )}
+        {!onBack && (
+          <IconButton onClick={() => navigate('/crm/customers')}>
+            <ArrowBack />
+          </IconButton>
+        )}
         <Typography variant="h5" fontWeight={600}>
           Customer Profile
         </Typography>
+        {resolvedCustomerId && (
+          <Button
+            size="small"
+            startIcon={<ReceiptLong />}
+            onClick={() => navigate(`/crm/customer-ledger?customerId=${resolvedCustomerId}`)}
+            sx={{ ml: 'auto' }}
+          >
+            Open Ledger
+          </Button>
+        )}
       </Box>
 
       <Grid container spacing={3}>

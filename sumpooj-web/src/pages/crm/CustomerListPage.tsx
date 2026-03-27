@@ -3,7 +3,7 @@
 // Florist ERP SaaS — CRM & Customer Intelligence
 // =============================================================================
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Paper,
@@ -37,6 +37,8 @@ import {
   Select,
   FormControl,
   InputLabel,
+  Alert,
+  CircularProgress,
   useTheme,
 } from '@mui/material';
 import {
@@ -60,6 +62,7 @@ import {
   CheckCircle,
   Clear,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import type {
   Customer,
   CustomerTagType,
@@ -72,11 +75,11 @@ import {
   formatCurrency,
   daysSince,
   isWithinDays,
-  MOCK_CUSTOMERS,
 } from './CRMTypes';
 import { LoyaltyTierBadge, PointsDisplay } from './LoyaltyComponents';
 import { getCurrencySymbol } from '../../core/i18n';
 import { createCustomer } from '../../api/customer.api';
+import { getCrmCustomers } from '../../api/crm.api';
 
 // -----------------------------------------------------------------------------
 // Filter Panel
@@ -236,9 +239,10 @@ interface CustomerRowProps {
   customer: Customer;
   onView: (id: string) => void;
   onEdit: (id: string) => void;
+  onOpenLedger: (id: string) => void;
 }
 
-function CustomerRow({ customer, onView, onEdit }: CustomerRowProps) {
+function CustomerRow({ customer, onView, onEdit, onOpenLedger }: CustomerRowProps) {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const lastOrderDays = daysSince(customer.lastOrderDate);
   const tierConfig = LOYALTY_TIER_CONFIGS[customer.loyaltyTier];
@@ -384,6 +388,9 @@ function CustomerRow({ customer, onView, onEdit }: CustomerRowProps) {
           </MenuItem>
           <MenuItem onClick={() => { onEdit(customer.id); setMenuAnchor(null); }}>
             Edit Customer
+          </MenuItem>
+          <MenuItem onClick={() => { onOpenLedger(customer.id); setMenuAnchor(null); }}>
+            Open Ledger
           </MenuItem>
           <Divider />
           <MenuItem>Add Tag</MenuItem>
@@ -540,16 +547,50 @@ interface CustomerListPageProps {
 }
 
 export default function CustomerListPage({ onViewCustomer }: CustomerListPageProps) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<CustomerSearchFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadCustomers() {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getCrmCustomers({ page: 1, pageSize: 500 });
+        if (active) {
+          setCustomers(result.items);
+        }
+      } catch (err) {
+        console.error('Failed to load CRM customers:', err);
+        if (active) {
+          setError('Failed to load customers from the server.');
+          setCustomers([]);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadCustomers();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Filter customers
   const filteredCustomers = useMemo(() => {
-    return MOCK_CUSTOMERS.filter((customer) => {
+    return customers.filter((customer) => {
       // Search query
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -589,7 +630,14 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
 
       return true;
     });
-  }, [searchQuery, filters]);
+  }, [customers, searchQuery, filters]);
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(filteredCustomers.length / rowsPerPage) - 1);
+    if (page > maxPage) {
+      setPage(maxPage);
+    }
+  }, [filteredCustomers.length, rowsPerPage, page]);
 
   // Paginated customers
   const paginatedCustomers = filteredCustomers.slice(
@@ -599,25 +647,29 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
 
   // Stats
   const stats = useMemo(() => ({
-    total: MOCK_CUSTOMERS.length,
-    vip: MOCK_CUSTOMERS.filter((c) => c.tags.includes('VIP')).length,
-    atRisk: MOCK_CUSTOMERS.filter((c) => {
+    total: customers.length,
+    vip: customers.filter((c) => c.tags.includes('VIP')).length,
+    atRisk: customers.filter((c) => {
       const days = daysSince(c.lastOrderDate);
       return days !== null && days > 60;
     }).length,
-    birthdaySoon: MOCK_CUSTOMERS.filter((c) => isWithinDays(c.birthday, 7)).length,
-  }), []);
+    birthdaySoon: customers.filter((c) => isWithinDays(c.birthday, 7)).length,
+  }), [customers]);
 
   const handleViewCustomer = (id: string) => {
     if (onViewCustomer) {
       onViewCustomer(id);
     } else {
-      console.log('View customer:', id);
+      navigate(`/crm/customers/${id}`);
     }
   };
 
   const handleEditCustomer = (id: string) => {
     console.log('Edit customer:', id);
+  };
+
+  const handleOpenLedger = (id: string) => {
+    navigate(`/crm/customer-ledger?customerId=${id}`);
   };
 
   const handleCreateCustomer = async (customer: Partial<Customer>) => {
@@ -627,6 +679,8 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
         email: customer.email,
         phone: customer.phone,
       });
+      const result = await getCrmCustomers({ page: 1, pageSize: 500 });
+      setCustomers(result.items);
     } catch (err) {
       console.error('Failed to create customer:', err);
     }
@@ -668,6 +722,19 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
           </Button>
         </Stack>
       </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <>
 
       {/* Quick Stats */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -785,6 +852,7 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
                   customer={customer}
                   onView={handleViewCustomer}
                   onEdit={handleEditCustomer}
+                  onOpenLedger={handleOpenLedger}
                 />
               ))}
               {paginatedCustomers.length === 0 && (
@@ -818,6 +886,8 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
         onClose={() => setCreateDialogOpen(false)}
         onSave={handleCreateCustomer}
       />
+        </>
+      )}
     </Box>
   );
 }

@@ -10,6 +10,7 @@ import type { Product } from "../orders/OrderTypes";
 import type { POSCustomer } from "./POSCustomerTypes";
 import { startBarcodeScanner } from "./utils/barcodeScanner";
 import { getPOSCatalogCache } from "./utils/posCatalogCache";
+import { getCrmCustomer360 } from "../../api/crm.api";
 
 interface ProductsTabProps {
   products: Product[];
@@ -140,12 +141,45 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
     setQuickQtyValue("");
   };
 
-  const handleCustomerSelect = (customer: POSCustomer | null) => {
-    setCustomer(customer);
+  const handleCustomerSelect = async (customer: POSCustomer | null) => {
+    if (!customer) {
+      setCustomer(null);
+      setCustomerDrawerOpen(false);
+      return;
+    }
+
+    // Fetch full customer data with order statistics from CRM 360
+    try {
+      const customer360 = await getCrmCustomer360(customer.id);
+      if (customer360?.customer) {
+        // Merge CRM data with POS customer object
+        const enrichedCustomer = {
+          ...customer,
+          totalOrders: customer360.customer.totalOrders,
+          lastOrderDate: customer360.customer.lastOrderDate,
+        };
+        setCustomer(enrichedCustomer);
+      } else {
+        // Fallback: use customer as-is if CRM fetch fails
+        setCustomer(customer);
+      }
+    } catch (err) {
+      console.error('Failed to fetch customer details:', err);
+      // Fallback: use customer as-is
+      setCustomer(customer);
+    }
+    
     setCustomerDrawerOpen(false);
   };
 
   const hasItems = state.items.length > 0;
+
+  const formatLastOrderDate = (value?: string) => {
+    if (!value) return 'No previous orders';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return 'No previous orders';
+    return parsed.toLocaleDateString();
+  };
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -188,6 +222,20 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
         </button>
 
       </div>
+
+      {state.customer && (
+        <div className="border-b bg-purple-50/60 px-4 py-2">
+          <p className="text-xs text-gray-700">
+            <span className="font-semibold">Customer:</span> {state.customer.name}
+            {state.customer.phone ? ` (${state.customer.phone})` : ''}
+          </p>
+          <p className="text-xs text-gray-600 mt-0.5">
+            Total Orders: <span className="font-medium text-gray-800">{state.customer.totalOrders ?? 0}</span>
+            {' • '}
+            Last Order: <span className="font-medium text-gray-800">{formatLastOrderDate(state.customer.lastOrderDate)}</span>
+          </p>
+        </div>
+      )}
 
       {/* Categories */}
       <div className="flex gap-2 overflow-x-auto px-3 py-2 border-b bg-white">

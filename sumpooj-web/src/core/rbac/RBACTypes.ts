@@ -434,6 +434,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         permissions: ['crm:view'],
       },
       {
+        id: 'crm-customer-ledger',
+        label: 'Customer Ledger',
+        icon: 'MenuBook',
+        path: '/crm/customer-ledger',
+        permissions: ['crm:view'],
+      },
+      {
         id: 'crm-reminders',
         label: 'Reminders',
         icon: 'NotificationsActive',
@@ -612,6 +619,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         permissions: ['settings:edit'],
       },
       {
+        id: 'discount-rules',
+        label: 'Discount Rules',
+        icon: 'Percent',
+        path: '/settings/discount-rules',
+        permissions: ['settings:edit'],
+      },
+      {
         id: 'payment-gateways',
         label: 'Payment Gateways',
         icon: 'CreditCard',
@@ -751,10 +765,12 @@ export const ROUTE_ACCESS: RouteConfig[] = [
   { path: '/categories', permissions: ['products:view'] },
   { path: '/customers', permissions: ['customers:view'] },
   { path: '/crm/customers', permissions: ['crm:view'] },
+  { path: '/crm/customer-ledger', permissions: ['crm:view'] },
   { path: '/crm/reminders', permissions: ['crm:reminders'] },
   { path: '/crm/loyalty', permissions: ['crm:loyalty'] },
   { path: '/subscription', permissions: ['settings:billing'] },
   { path: '/settings/tenant', permissions: ['settings:edit'] },
+  { path: '/settings/discount-rules', permissions: ['settings:edit'] },
   { path: '/day-close', permissions: ['pos:day_close'] },
 ];
 

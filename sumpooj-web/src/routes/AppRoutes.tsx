@@ -1,8 +1,7 @@
-import { POSProvider } from '../pages/pos/POSContext';
 /**
  * AppRoutes.tsx — Production-Ready Route Configuration
  */
-import BouquetScanner from "../pages/ai/BouquetScanner";
+import { lazy, Suspense } from 'react';
 import { Navigate, Routes, Route } from 'react-router-dom';
 import Login from '../pages/auth/Login';
 import RequireAuth from '../auth/RequireAuth';
@@ -32,29 +31,28 @@ import ManualSaleEntry from "../pages/pos/ManualSaleEntry";
 
 import ProfitDashboard from '../pages/profit-intelligence/ProfitDashboard';
 import ExternalOrdersInbox from '../pages/orders/ExternalOrdersInbox';
-import DeliveryRoutesPage from '../pages/DeliveryRoutesPage';
-import DeliveryRouteDetailPage from '../pages/DeliveryRouteDetailPage';
+const DeliveryRoutesPage = lazy(() => import('../pages/DeliveryRoutesPage'));
+const DeliveryRouteDetailPage = lazy(() => import('../pages/DeliveryRouteDetailPage'));
 
 // Phone-Orders Module
-import PhoneOrderPage from '../modules/phone-orders/PhoneOrderPage';
-import PhoneOrdersHome from '../modules/phone-orders/PhoneOrdersHome';
-import UnifiedPhoneOrderPage from '../modules/phone-orders/UnifiedPhoneOrderPage';
-import PhoneOrdersListPage from '../modules/phone-orders/PhoneOrdersListPage';
-import ProductionDashboard from '../modules/phone-orders/ProductionDashboard';
-import DeliveryScheduler from '../pages/orders/DeliveryScheduler';
-import DeliveryBoardPage from '../modules/deliveries/DeliveryBoardPage';
+const PhoneOrderPage = lazy(() => import('../modules/phone-orders/PhoneOrderPage'));
+const PhoneOrdersHome = lazy(() => import('../modules/phone-orders/PhoneOrdersHome'));
+const UnifiedPhoneOrderPage = lazy(() => import('../modules/phone-orders/UnifiedPhoneOrderPage'));
+const PhoneOrdersListPage = lazy(() => import('../modules/phone-orders/PhoneOrdersListPage'));
+const ProductionDashboard = lazy(() => import('../modules/phone-orders/ProductionDashboard'));
+const DeliveryBoardPage = lazy(() => import('../modules/deliveries/DeliveryBoardPage'));
 import OrderList from '../pages/orders/OrderList';
-import WireVendorsPage from '../pages/orders/WireVendorsPage';
-import WireSettlementsPage from '../pages/orders/WireSettlementsPage';
+const WireVendorsPage = lazy(() => import('../pages/orders/WireVendorsPage'));
+const WireSettlementsPage = lazy(() => import('../pages/orders/WireSettlementsPage'));
 import RefundScreen from '../pages/refunds/RefundScreen';
 
 // Event Module
-import EventList from '../pages/events/EventList';
-import EventForm from '../pages/events/EventForm';
-import ProposalList from '../pages/events/ProposalList';
-import ProposalBuilder from '../pages/events/ProposalBuilder';
-import EventPaymentPage from '../pages/events/EventPaymentPage';
-import EventProductionPage from '../pages/events/EventProductionPage';
+const EventList = lazy(() => import('../pages/events/EventList'));
+const EventForm = lazy(() => import('../pages/events/EventForm'));
+const ProposalList = lazy(() => import('../pages/events/ProposalList'));
+const ProposalBuilder = lazy(() => import('../pages/events/ProposalBuilder'));
+const EventPaymentPage = lazy(() => import('../pages/events/EventPaymentPage'));
+const EventProductionPage = lazy(() => import('../pages/events/EventProductionPage'));
 
 // Staff & Performance
 import StaffList from '../pages/staff/StaffList';
@@ -63,62 +61,102 @@ import StaffForm from '../pages/staff/StaffForm';
 import StaffAttendancePage from "../pages/staff/StaffAttendance";
 
 // Tasks
-import { MyTasksPage } from '../pages/tasks';
+const MyTasksPage = lazy(() =>
+  import('../pages/tasks').then((module) => ({ default: module.MyTasksPage }))
+);
 
 // Subscription
-import { SubscriptionPage } from '../pages/subscription';
+const SubscriptionPage = lazy(() =>
+  import('../pages/subscription').then((module) => ({ default: module.SubscriptionPage }))
+);
 
 // Settings
-import TenantSettingsPage from '../pages/settings/TenantSettingsPage';
-import PaymentGatewaySettings from '../pages/settings/PaymentGatewaySettings';
-import TaxRulesSettings from '../pages/settings/TaxRulesSettings';
-import LocationsSettings from '../pages/settings/LocationsSettings';
-import DeliveryZonesSettings from '../pages/settings/DeliveryZonesSettings';
+const TenantSettingsPage = lazy(() => import('../pages/settings/TenantSettingsPage'));
+const PaymentGatewaySettings = lazy(() => import('../pages/settings/PaymentGatewaySettings'));
+const TaxRulesSettings = lazy(() => import('../pages/settings/TaxRulesSettings'));
+const LocationsSettings = lazy(() => import('../pages/settings/LocationsSettings'));
+const DeliveryZonesSettings = lazy(() => import('../pages/settings/DeliveryZonesSettings'));
+const DiscountRulesSettings = lazy(() => import('../pages/settings/DiscountRulesSettings'));
 
 // Suppliers
 import SuppliersPage from '../pages/suppliers/SuppliersPage';
 
 // Admin
-import AuditLogsPage from '../pages/admin/AuditLogsPage';
-import PlatformAdminDashboard from '../pages/admin/PlatformAdminDashboard';
-import CompanyManagementPage from '../pages/admin/CompanyManagementPage';
-import PlatformAnalyticsPage from '../pages/admin/PlatformAnalyticsPage';
-import PlatformSettingsPage from '../pages/admin/PlatformSettingsPage';
-import AdminDemoRequestsPage from '../pages/admin/AdminDemoRequestsPage';
+const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
+const PlatformAdminDashboard = lazy(() => import('../pages/admin/PlatformAdminDashboard'));
+const CompanyManagementPage = lazy(() => import('../pages/admin/CompanyManagementPage'));
+const PlatformAnalyticsPage = lazy(() => import('../pages/admin/PlatformAnalyticsPage'));
+const PlatformSettingsPage = lazy(() => import('../pages/admin/PlatformSettingsPage'));
+const AdminDemoRequestsPage = lazy(() => import('../pages/admin/AdminDemoRequestsPage'));
 
 // Categories
-import { CategoryManagementPage } from '../pages/categories';
+const CategoryManagementPage = lazy(() =>
+  import('../pages/categories').then((module) => ({ default: module.CategoryManagementPage }))
+);
 
 // Onboarding
 import OnboardingWizard from '../pages/onboarding/OnboardingWizard';
 
 // Day Close
-import { DayCloseScreen } from '../pages/day-close';
+const DayCloseScreen = lazy(() =>
+  import('../pages/day-close').then((module) => ({ default: module.DayCloseScreen }))
+);
 
 // CRM & Customer Intelligence
-import { CustomerListPage, Customer360View, SmartReminderDashboard, LoyaltyProgramPage } from '../pages/crm';
+const CustomerListPage = lazy(() =>
+  import('../pages/crm').then((module) => ({ default: module.CustomerListPage }))
+);
+const Customer360View = lazy(() =>
+  import('../pages/crm').then((module) => ({ default: module.Customer360View }))
+);
+const SmartReminderDashboard = lazy(() =>
+  import('../pages/crm').then((module) => ({ default: module.SmartReminderDashboard }))
+);
+const LoyaltyProgramPage = lazy(() =>
+  import('../pages/crm').then((module) => ({ default: module.LoyaltyProgramPage }))
+);
+const CustomerLedgerPage = lazy(() =>
+  import('../pages/crm').then((module) => ({ default: module.CustomerLedgerPage }))
+);
 
 // Gift Cards
-import { GiftCardPage } from '../pages/gift-cards';
+const GiftCardPage = lazy(() =>
+  import('../pages/gift-cards').then((module) => ({ default: module.GiftCardPage }))
+);
 // Removed duplicate import of BouquetScanner
+const BouquetScanner = lazy(() => import('../pages/ai/BouquetScanner'));
 
 // Floral Production Engine
-import {
-  FloralRecipeList,
-  FloralRecipeForm,
-  ProductionScreen,
-  FinishedGoodsInventory,
-  CustomBouquetBuilder,
-  WastageLogPage,
-} from '../pages/production';
+const FloralRecipeList = lazy(() =>
+  import('../pages/production').then((module) => ({ default: module.FloralRecipeList }))
+);
+const FloralRecipeForm = lazy(() =>
+  import('../pages/production').then((module) => ({ default: module.FloralRecipeForm }))
+);
+const ProductionScreen = lazy(() =>
+  import('../pages/production').then((module) => ({ default: module.ProductionScreen }))
+);
+const FinishedGoodsInventory = lazy(() =>
+  import('../pages/production').then((module) => ({ default: module.FinishedGoodsInventory }))
+);
+const CustomBouquetBuilder = lazy(() =>
+  import('../pages/production').then((module) => ({ default: module.CustomBouquetBuilder }))
+);
+const WastageLogPage = lazy(() =>
+  import('../pages/production').then((module) => ({ default: module.WastageLogPage }))
+);
 
-import ProductionJobDetailPage from '../pages/production/ProductionJobDetailPage';
+const ProductionJobDetailPage = lazy(() => import('../pages/production/ProductionJobDetailPage'));
 
 // Role-Based Dashboard
-import { DashboardPage } from '../pages/dashboard';
+const DashboardPage = lazy(() =>
+  import('../pages/dashboard').then((module) => ({ default: module.DashboardPage }))
+);
 
 // Home / Control Center
-import { HomeDashboard } from '../pages/home';
+const HomeDashboard = lazy(() =>
+  import('../pages/home').then((module) => ({ default: module.HomeDashboard }))
+);
 
 // Production-Ready SaaS Infrastructure
 import { RBACProvider } from '../core/rbac/RBACContext';
@@ -127,18 +165,26 @@ import { FeatureGate } from '../core/tenant';
 import { DiscountApprovalProvider } from '../core/rbac/DiscountApprovalModal';
 
 // Accounting
-import AccountingDashboard from "../modules/accounting/pages/AccountingDashboard";
-import ChartOfAccounts from "../modules/accounting/pages/ChartOfAccounts";
-import AccountLedger from "../modules/accounting/pages/AccountLedger";
-import ExpenseManager from "../modules/accounting/pages/ExpenseManager";
-import JournalViewer from "../modules/accounting/pages/JournalViewer";
-import ProfitLossReport from "../modules/accounting/pages/ProfitLossReport";
-import TaxSummary from "../modules/accounting/pages/TaxSummary";
-import TrialBalance from "../modules/accounting/pages/TrialBalance";
-import BalanceSheet from "../modules/accounting/pages/BalanceSheet";
+const AccountingDashboard = lazy(() => import('../modules/accounting/pages/AccountingDashboard'));
+const ChartOfAccounts = lazy(() => import('../modules/accounting/pages/ChartOfAccounts'));
+const AccountLedger = lazy(() => import('../modules/accounting/pages/AccountLedger'));
+const ExpenseManager = lazy(() => import('../modules/accounting/pages/ExpenseManager'));
+const JournalViewer = lazy(() => import('../modules/accounting/pages/JournalViewer'));
+const ProfitLossReport = lazy(() => import('../modules/accounting/pages/ProfitLossReport'));
+const TaxSummary = lazy(() => import('../modules/accounting/pages/TaxSummary'));
+const TrialBalance = lazy(() => import('../modules/accounting/pages/TrialBalance'));
+const BalanceSheet = lazy(() => import('../modules/accounting/pages/BalanceSheet'));
 
 // Production Intelligence
-import ProductionIntelligenceDashboard from "../modules/production/ProductionIntelligenceDashboard";
+const ProductionIntelligenceDashboard = lazy(() => import('../modules/production/ProductionIntelligenceDashboard'));
+
+function RouteFallback() {
+  return (
+    <div style={{ display: 'grid', placeItems: 'center', minHeight: '40vh', fontSize: 14 }}>
+      Loading...
+    </div>
+  );
+}
 
 /** Wrapper that wires ShiftProvider (reads location from LocationContext) + POSLayout */
 function POSWithShift() {
@@ -157,6 +203,7 @@ export default function AppRoutes() {
   return (
     <RBACProvider>
       <DiscountApprovalProvider>
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Navigate to="/home" replace />} />
@@ -297,6 +344,7 @@ export default function AppRoutes() {
           <Route path="/settings/tax-rules" element={<TaxRulesSettings />} />
           <Route path="/settings/locations" element={<LocationsSettings />} />
           <Route path="/settings/delivery-zones" element={<DeliveryZonesSettings />} />
+          <Route path="/settings/discount-rules" element={<DiscountRulesSettings />} />
           <Route path="/day-close" element={<DayCloseScreen />} />
 
           {/* ─── Admin ──────────────────────────────────── */}
@@ -310,6 +358,7 @@ export default function AppRoutes() {
           {/* ─── CRM & Customer Intelligence ────────────── */}
           <Route path="/crm/customers" element={<CustomerListPage />} />
           <Route path="/crm/customers/:customerId" element={<Customer360View />} />
+          <Route path="/crm/customer-ledger" element={<CustomerLedgerPage />} />
           <Route path="/crm/reminders" element={<SmartReminderDashboard />} />
           <Route path="/crm/loyalty" element={<LoyaltyProgramPage />} />
 
@@ -351,6 +400,7 @@ export default function AppRoutes() {
           />
         </Route>
       </Routes>
+      </Suspense>
       </DiscountApprovalProvider>
     </RBACProvider>
   );

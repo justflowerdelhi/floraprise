@@ -167,17 +167,31 @@ const POSLayout: React.FC = () => {
     setPaymentDrawerOpen(true);
   }, [state.items.length]);
 
-  const handlePaymentComplete = useCallback((payments: POSPaymentEntry[], billingInfo: POSBillingInfo) => {
+  const handlePaymentComplete = useCallback((payments: POSPaymentEntry[], billingInfo: POSBillingInfo, selectedCustomerId?: string | null) => {
     // Create order via API
     const createOrder = async () => {
       try {
+        const normalizePhone = (value?: string | null) => (value ?? '').replace(/\D/g, '');
+        const resolvedCustomerId =
+          selectedCustomerId
+          || selectedCustomer?.id
+          || customers.find((c) => {
+            const billingPhone = normalizePhone(billingInfo.phone);
+            const customerPhone = normalizePhone(c.phone);
+            if (billingPhone && customerPhone && billingPhone === customerPhone) return true;
+            const billingName = (billingInfo.name ?? '').trim().toLowerCase();
+            const customerName = (c.name ?? '').trim().toLowerCase();
+            return billingName.length > 0 && billingName === customerName;
+          })?.id
+          || null;
+
         const orderPayload = {
-          customerId: selectedCustomer?.id || null,
+          customerId: resolvedCustomerId,
           locationId: currentLocationId || null,
           deliveryDate: billingInfo.deliveryDate || null,
           deliveryAddress: billingInfo.deliveryAddress || null,
-          recipientName: billingInfo.recipientName || null,
-          recipientPhone: billingInfo.recipientPhone || null,
+          recipientName: billingInfo.recipientName || billingInfo.name || null,
+          recipientPhone: billingInfo.recipientPhone || billingInfo.phone || null,
           cardMessage: billingInfo.cardMessage || null,
           deliveryPriority: billingInfo.deliveryPriority || 'NORMAL',
           timeSlot: billingInfo.timeSlot || null,
@@ -210,19 +224,33 @@ const POSLayout: React.FC = () => {
       }
     };
     createOrder();
-  }, [state.items, state.totals, clearCart, showSnackbar, selectedCustomer, orderType, currentLocationId]);
+  }, [state.items, state.totals, clearCart, showSnackbar, selectedCustomer, orderType, currentLocationId, customers]);
 
-  const handlePartialSave = useCallback((payments: POSPaymentEntry[], billingInfo: POSBillingInfo, paidAmount: number, remainingAmount: number) => {
+  const handlePartialSave = useCallback((payments: POSPaymentEntry[], billingInfo: POSBillingInfo, paidAmount: number, remainingAmount: number, selectedCustomerId?: string | null) => {
     // Create order with balance via API
     const createOrderWithBalance = async () => {
       try {
+        const normalizePhone = (value?: string | null) => (value ?? '').replace(/\D/g, '');
+        const resolvedCustomerId =
+          selectedCustomerId
+          || selectedCustomer?.id
+          || customers.find((c) => {
+            const billingPhone = normalizePhone(billingInfo.phone);
+            const customerPhone = normalizePhone(c.phone);
+            if (billingPhone && customerPhone && billingPhone === customerPhone) return true;
+            const billingName = (billingInfo.name ?? '').trim().toLowerCase();
+            const customerName = (c.name ?? '').trim().toLowerCase();
+            return billingName.length > 0 && billingName === customerName;
+          })?.id
+          || null;
+
         const orderPayload = {
-          customerId: selectedCustomer?.id || null,
+          customerId: resolvedCustomerId,
           locationId: currentLocationId || null,
           deliveryDate: billingInfo.deliveryDate || null,
           deliveryAddress: billingInfo.deliveryAddress || null,
-          recipientName: billingInfo.recipientName || null,
-          recipientPhone: billingInfo.recipientPhone || null,
+          recipientName: billingInfo.recipientName || billingInfo.name || null,
+          recipientPhone: billingInfo.recipientPhone || billingInfo.phone || null,
           cardMessage: billingInfo.cardMessage || null,
           deliveryPriority: billingInfo.deliveryPriority || 'NORMAL',
           timeSlot: billingInfo.timeSlot || null,
@@ -255,7 +283,7 @@ const POSLayout: React.FC = () => {
       }
     };
     createOrderWithBalance();
-  }, [state.items, clearCart, showSnackbar, selectedCustomer, orderType, currentLocationId]);
+  }, [state.items, clearCart, showSnackbar, selectedCustomer, orderType, currentLocationId, customers]);
 
   const handleUpdateQty = useCallback((lineId: string, qty: number, product: Product) => {
     updateQty(lineId, qty, product);

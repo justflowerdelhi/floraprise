@@ -3,7 +3,7 @@
 // Florist ERP SaaS — CRM Intelligence
 // =============================================================================
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Paper,
@@ -27,6 +27,7 @@ import {
   Tooltip,
   Divider,
   Alert,
+  CircularProgress,
   useTheme,
 } from '@mui/material';
 import {
@@ -56,9 +57,9 @@ import type {
 } from './CRMTypes';
 import {
   REMINDER_CONFIGS,
-  MOCK_REMINDERS,
   daysUntil,
 } from './CRMTypes';
+import { getCrmReminders } from '../../api/crm.api';
 
 // -----------------------------------------------------------------------------
 // Icon Mapping
@@ -301,7 +302,39 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<ReminderType | 'ALL'>('ALL');
   const [filterAnchor, setFilterAnchor] = useState<null | HTMLElement>(null);
-  const [reminders, setReminders] = useState<SmartReminder[]>(MOCK_REMINDERS);
+  const [reminders, setReminders] = useState<SmartReminder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadReminders() {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getCrmReminders();
+        if (active) {
+          setReminders(result);
+        }
+      } catch (err) {
+        console.error('Failed to load CRM reminders:', err);
+        if (active) {
+          setError('Failed to load reminders from the server.');
+          setReminders([]);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadReminders();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Filter and categorize reminders
   const categorizedReminders = useMemo(() => {
@@ -404,6 +437,18 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
       </Box>
 
       {/* Stats Cards */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 6, sm: 3 }}>
           <StatsCard
@@ -542,6 +587,8 @@ export default function SmartReminderDashboard({ onViewCustomer }: SmartReminder
           ))}
         </Grid>
       )}
+        </>
+      )}
     </Box>
   );
 }
@@ -559,8 +606,32 @@ interface ReminderWidgetProps {
 export function ReminderWidget({ maxItems = 5, onViewAll, onViewCustomer }: ReminderWidgetProps) {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  const [reminders, setReminders] = useState<SmartReminder[]>([]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadReminders() {
+      try {
+        const result = await getCrmReminders();
+        if (active) {
+          setReminders(result);
+        }
+      } catch (err) {
+        console.error('Failed to load reminder widget data:', err);
+        if (active) {
+          setReminders([]);
+        }
+      }
+    }
+
+    void loadReminders();
+    return () => {
+      active = false;
+    };
+  }, []);
   
-  const urgentReminders = MOCK_REMINDERS
+  const urgentReminders = reminders
     .filter((r) => !r.dismissed && (r.priority === 'HIGH' || r.priority === 'URGENT'))
     .slice(0, maxItems);
 

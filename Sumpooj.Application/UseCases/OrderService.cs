@@ -107,8 +107,37 @@ public class OrderService
         var customerId = request.CustomerId.GetValueOrDefault();
         if (customerId == Guid.Empty)
         {
-            var walkInCustomer = await _customerRepository.GetOrCreateWalkInCustomerAsync(companyId);
-            customerId = walkInCustomer.Id;
+            var matchedCustomer = await _customerRepository.FindByPhoneOrNameAsync(
+                companyId,
+                request.RecipientPhone,
+                request.RecipientName);
+
+            if (matchedCustomer != null)
+            {
+                customerId = matchedCustomer.Id;
+            }
+            else
+            {
+                var recipientName = request.RecipientName?.Trim();
+                var recipientPhone = request.RecipientPhone?.Trim();
+
+                if (!string.IsNullOrWhiteSpace(recipientName) || !string.IsNullOrWhiteSpace(recipientPhone))
+                {
+                    var customer = new Customer(
+                        companyId,
+                        recipientName ?? "POS Customer",
+                        null,
+                        recipientPhone);
+
+                    await _customerRepository.AddAsync(customer);
+                    customerId = customer.Id;
+                }
+                else
+                {
+                    var walkInCustomer = await _customerRepository.GetOrCreateWalkInCustomerAsync(companyId);
+                    customerId = walkInCustomer.Id;
+                }
+            }
         }
         else
         {

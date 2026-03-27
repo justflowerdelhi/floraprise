@@ -1,9 +1,13 @@
 import axios from 'axios';
 import type { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 
+const useCredentials = import.meta.env.VITE_API_WITH_CREDENTIALS === 'true';
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
-  withCredentials: true,
+  // Token auth does not require browser credentials by default.
+  // Set VITE_API_WITH_CREDENTIALS=true only when API relies on cookies.
+  withCredentials: useCredentials,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
