@@ -1,7 +1,21 @@
 import { useState } from "react";
+import type { AxiosError } from "axios";
 import api from "../../api/axios";
+import { analyzeBouquet } from "../../api/ai";
 
 export default function BouquetScanner() {
+  type FlowerItem = {
+    flower?: string;
+    type?: string;
+    color?: string;
+    stem_count?: number;
+    stemCount?: number;
+  };
+
+  const getStemCount = (flower: FlowerItem): number => {
+    const value = flower.stem_count ?? flower.stemCount ?? 0;
+    return typeof value === "number" ? value : Number(value) || 0;
+  };
 
   const stemPrices: any = {
     rose: 1.2,
@@ -19,11 +33,12 @@ export default function BouquetScanner() {
   const [recipe, setRecipe] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const flowerList = Array.isArray(flowers) ? flowers : [];
 
   const totalStems = flowerList.reduce(
-    (sum, f) => sum + (f.stem_count || 0),
+    (sum, f) => sum + getStemCount(f),
     0
   );
 
@@ -41,7 +56,7 @@ export default function BouquetScanner() {
         }
       });
 
-      flowerCost += price * (f.stem_count || 0);
+      flowerCost += price * getStemCount(f);
     });
 
     const laborCost = 5;
@@ -69,6 +84,7 @@ export default function BouquetScanner() {
     setFlowers([]);
     setRecipe(null);
     setSaved(false);
+    setErrorMessage(null);
   };
 
   const analyze = async () => {
@@ -76,23 +92,24 @@ export default function BouquetScanner() {
     if (!image) return;
 
     setLoading(true);
-
-    const formData = new FormData();
-    formData.append("file", image);
+    setErrorMessage(null);
 
     try {
-      const res = await api.post("/ai/analyze-bouquet", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      const data = res.data;
+      const data = await analyzeBouquet(image);
 
       setFlowers(data.flowers || []);
       setStyle(data.style || "");
       setShape(data.shape || "");
       setHeight(data.height || "");
+      if (!(data.flowers || []).length) {
+        setErrorMessage("No bouquet details detected. Try a clearer image and re-analyze.");
+      }
     } catch (err) {
       console.error("Bouquet analysis failed:", err);
       setFlowers([]);
+      const axiosErr = err as AxiosError<{ error?: string; message?: string }>;
+      const apiError = axiosErr.response?.data?.error || axiosErr.response?.data?.message;
+      setErrorMessage(apiError || "Bouquet analysis failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -105,7 +122,7 @@ export default function BouquetScanner() {
     const components = flowerList.map((f) => ({
       flower: f.flower || f.type,
       color: f.color,
-      stems: f.stem_count
+      stems: getStemCount(f)
     }));
 
     setRecipe({
@@ -197,13 +214,16 @@ export default function BouquetScanner() {
       {image && (
         <button
           onClick={analyze}
+          disabled={loading}
           style={{
             marginTop: 15,
             background: "#2e7d32",
             color: "white",
             border: "none",
             padding: "10px 18px",
-            borderRadius: 6
+            borderRadius: 6,
+            cursor: loading ? "not-allowed" : "pointer",
+            opacity: loading ? 0.8 : 1
           }}
         >
           🔍 Analyze Bouquet
@@ -211,6 +231,11 @@ export default function BouquetScanner() {
       )}
 
       {loading && <p>Analyzing bouquet...</p>}
+      {errorMessage && (
+        <p style={{ marginTop: 10, color: "#c62828" }}>
+          {errorMessage}
+        </p>
+      )}
 
 
       {/* Detected Flowers */}
@@ -236,7 +261,7 @@ export default function BouquetScanner() {
           {flowerList.map((f, i) => (
 
             <div key={i}>
-              🌸 <b>{f.flower || f.type}</b> ({f.color}) — {f.stem_count} stems
+              🌸 <b>{f.flower || f.type}</b> ({f.color}) — {getStemCount(f)} stems
             </div>
 
           ))}

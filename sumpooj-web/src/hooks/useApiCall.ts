@@ -32,7 +32,7 @@ interface ApiCallReturn {
  */
 function extractErrorMessage(err: unknown): string {
   if (typeof err === 'object' && err !== null && 'response' in err) {
-    const axiosErr = err as AxiosError<{ message?: string; title?: string; errors?: Record<string, string[]> }>;
+    const axiosErr = err as AxiosError<{ message?: string; title?: string; error?: string; errors?: Record<string, string[]> }>;
     const data = axiosErr.response?.data;
 
     // Validation errors (ASP.NET style)
@@ -42,6 +42,7 @@ function extractErrorMessage(err: unknown): string {
     }
 
     // Standard message field
+    if (data?.error) return data.error;
     if (data?.message) return data.message;
     if (data?.title) return data.title;
 
@@ -49,7 +50,7 @@ function extractErrorMessage(err: unknown): string {
     const status = axiosErr.response?.status;
     if (status === 400) return 'Invalid request. Please check your input.';
     if (status === 401) return 'Session expired. Please log in again.';
-    if (status === 403) return 'You do not have permission for this action.';
+    if (status === 403) return 'You do not have permission for this action. Please use a Company Admin account.';
     if (status === 404) return 'The requested resource was not found.';
     if (status === 409) return 'A conflict occurred. The resource may have been modified.';
     if (status === 422) return 'Validation failed. Please check your input.';

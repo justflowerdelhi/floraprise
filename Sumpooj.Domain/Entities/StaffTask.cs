@@ -41,7 +41,20 @@ public class StaffTask : BaseEntity
 
     public void SetDueDate(DateTime? dueDate)
     {
-        DueDate = dueDate;
+        if (!dueDate.HasValue)
+        {
+            DueDate = null;
+            MarkUpdated();
+            return;
+        }
+
+        var value = dueDate.Value;
+        DueDate = value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+        };
         MarkUpdated();
     }
 

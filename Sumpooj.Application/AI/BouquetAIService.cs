@@ -87,9 +87,8 @@ public partial class BouquetAIService
             throw new AIUsageLimitException(
                 $"Monthly limit reached ({_settings.MonthlyLimitPerCompany} per company). Resets next month.");
 
-        // Build the vision request
-        var base64 = Convert.ToBase64String(imageBytes);
-        var dataUri = $"data:{contentType};base64,{base64}";
+        // Build the vision request from raw bytes to avoid oversized data-URI failures.
+        var mediaType = string.IsNullOrWhiteSpace(contentType) ? "image/jpeg" : contentType;
 
         var client = new OpenAIClient(_settings.ApiKey);
         var chatClient = client.GetChatClient(Model);
@@ -98,7 +97,7 @@ public partial class BouquetAIService
         {
             new UserChatMessage(
                 ChatMessageContentPart.CreateTextPart(AnalysisPrompt),
-                ChatMessageContentPart.CreateImagePart(new Uri(dataUri))
+                ChatMessageContentPart.CreateImagePart(BinaryData.FromBytes(imageBytes), mediaType)
             )
         };
 
@@ -138,11 +137,25 @@ public partial class BouquetAIService
             {
                 foreach (var f in flowers.EnumerateArray())
                 {
+                    var stemCount = 0;
+                    if (f.TryGetProperty("stem_count", out var snakeStemCount))
+                    {
+                        stemCount = snakeStemCount.ValueKind == JsonValueKind.Number
+                            ? snakeStemCount.GetInt32()
+                            : int.TryParse(snakeStemCount.GetString(), out var parsed) ? parsed : 0;
+                    }
+                    else if (f.TryGetProperty("stemCount", out var camelStemCount))
+                    {
+                        stemCount = camelStemCount.ValueKind == JsonValueKind.Number
+                            ? camelStemCount.GetInt32()
+                            : int.TryParse(camelStemCount.GetString(), out var parsed) ? parsed : 0;
+                    }
+
                     result.Flowers.Add(new FlowerDetection
                     {
                         Flower = f.TryGetProperty("flower", out var fn) ? fn.GetString() ?? "" : "",
                         Color = f.TryGetProperty("color", out var c) ? c.GetString() ?? "" : "",
-                        StemCount = f.TryGetProperty("stem_count", out var sc) ? sc.GetInt32() : 0,
+                        StemCount = stemCount,
                     });
                 }
             }

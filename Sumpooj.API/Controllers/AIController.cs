@@ -13,17 +13,23 @@ namespace Sumpooj.API.Controllers;
 [Authorize(Policy = "CompanyOnly")]
 public class AIController : ControllerBase
 {
+    private readonly ILogger<AIController> _logger;
+    private readonly IWebHostEnvironment _environment;
     private readonly GiftCardAIService _giftCardAI;
     private readonly BouquetAIService _bouquetAI;
     private readonly ProductionService _productionService;
     private readonly ITenantContext _tenantContext;
 
     public AIController(
+        ILogger<AIController> logger,
+        IWebHostEnvironment environment,
         GiftCardAIService giftCardAI,
         BouquetAIService bouquetAI,
         ProductionService productionService,
         ITenantContext tenantContext)
     {
+        _logger = logger;
+        _environment = environment;
         _giftCardAI = giftCardAI;
         _bouquetAI = bouquetAI;
         _productionService = productionService;
@@ -53,6 +59,20 @@ public class AIController : ControllerBase
         catch (AIUsageLimitException ex)
         {
             return StatusCode(429, new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(503, new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Gift card generation failed for user {UserId} in company {CompanyId}", UserId, CompanyId);
+            return StatusCode(500, new
+            {
+                error = _environment.IsDevelopment()
+                    ? ex.Message
+                    : "Gift card generation failed. Please try again later."
+            });
         }
     }
 
@@ -93,6 +113,20 @@ public class AIController : ControllerBase
         catch (AIUsageLimitException ex)
         {
             return StatusCode(429, new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(503, new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Bouquet analysis failed for user {UserId} in company {CompanyId}", UserId, CompanyId);
+            return StatusCode(500, new
+            {
+                error = _environment.IsDevelopment()
+                    ? ex.Message
+                    : "Bouquet analysis failed. Please try again later."
+            });
         }
     }
 

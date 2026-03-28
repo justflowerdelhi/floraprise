@@ -43,6 +43,46 @@ import {
 } from './TaskTypes';
 import CreateTaskDialog from './CreateTaskDialog';
 
+const normalizeTaskStatus = (value: unknown): TaskStatus => {
+  if (typeof value !== 'string') return 'PENDING';
+
+  const normalized = value
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[\s-]+/g, '_')
+    .toUpperCase();
+  if (normalized === 'PENDING' || normalized === 'IN_PROGRESS' || normalized === 'COMPLETED') {
+    return normalized;
+  }
+
+  return 'PENDING';
+};
+
+const normalizeTaskPriority = (value: unknown): 'LOW' | 'MEDIUM' | 'HIGH' => {
+  if (typeof value !== 'string') return 'MEDIUM';
+
+  const normalized = value.toUpperCase();
+  if (normalized === 'LOW' || normalized === 'MEDIUM' || normalized === 'HIGH') {
+    return normalized;
+  }
+
+  return 'MEDIUM';
+};
+
+const normalizeTask = (raw: any): Task => ({
+  id: raw.id,
+  tenantId: raw.tenantId ?? raw.companyId ?? '',
+  locationId: raw.locationId ?? '',
+  title: raw.title ?? '',
+  description: raw.description ?? '',
+  relatedEntityType: raw.relatedEntityType ? String(raw.relatedEntityType).toUpperCase() : undefined,
+  relatedEntityId: raw.relatedEntityId ? String(raw.relatedEntityId) : undefined,
+  assignedTo: raw.assignedTo ?? raw.assignedToStaffId ?? '',
+  dueDate: raw.dueDate ?? undefined,
+  status: normalizeTaskStatus(raw.status),
+  priority: normalizeTaskPriority(raw.priority),
+  createdAt: raw.createdAt ?? raw.createdAtUtc ?? new Date().toISOString(),
+});
+
 // ─── Entity Icon Mapping ────────────────────────────────────
 
 const ENTITY_ICONS: Record<RelatedEntityType, React.ReactNode> = {
@@ -131,7 +171,7 @@ interface TaskCardProps {
 const TaskCard: React.FC<TaskCardProps> = ({ task, showAssignee, onStatusChange, staffList, locations }) => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
-  const statusConfig = TASK_STATUS_CONFIG[task.status];
+  const statusConfig = TASK_STATUS_CONFIG[task.status] ?? TASK_STATUS_CONFIG.PENDING;
   const priorityConfig = task.priority ? TASK_PRIORITY_CONFIG[task.priority] : null;
   const entityConfig = task.relatedEntityType ? ENTITY_TYPE_CONFIG[task.relatedEntityType] : null;
   const action = getStatusAction(task.status);
@@ -361,16 +401,19 @@ const MyTasksPage: React.FC = () => {
         let taskData: Task[];
         if (isManagerOrAdmin) {
           const result = await searchTasks();
-          taskData = Array.isArray(result) ? result : (result.items ?? []);
+          const items = Array.isArray(result) ? result : (result.items ?? []);
+          taskData = items.map(normalizeTask);
         } else if (isDriver) {
           const staffId = user?.id?.replace('user-', 'staff-') ?? '';
           const result = await getTasksByStaff(staffId);
-          const allTasks: Task[] = Array.isArray(result) ? result : (result.items ?? []);
+          const items = Array.isArray(result) ? result : (result.items ?? []);
+          const allTasks: Task[] = items.map(normalizeTask);
           taskData = allTasks.filter((t) => t.relatedEntityType === 'DELIVERY');
         } else {
           const staffId = user?.id?.replace('user-', 'staff-') ?? '';
           const result = await getTasksByStaff(staffId);
-          taskData = Array.isArray(result) ? result : (result.items ?? []);
+          const items = Array.isArray(result) ? result : (result.items ?? []);
+          taskData = items.map(normalizeTask);
         }
         setRawTasks(taskData);
       } catch {
@@ -478,6 +521,11 @@ const MyTasksPage: React.FC = () => {
     : isDriver
       ? 'Your delivery assignments'
       : 'Your assigned work items';
+
+  const selectedStatusLabel =
+    filterStatus !== 'ALL'
+      ? TASK_STATUS_CONFIG[filterStatus as TaskStatus]?.label ?? 'Selected'
+      : '';
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
@@ -618,7 +666,7 @@ const MyTasksPage: React.FC = () => {
           </Typography>
           <Typography variant="body2" sx={{ color: dk ? 'rgba(255,255,255,0.3)' : 'text.disabled', mt: 0.5 }}>
             {filterStatus !== 'ALL'
-              ? `No ${TASK_STATUS_CONFIG[filterStatus as TaskStatus].label.toLowerCase()} tasks`
+              ? `No ${selectedStatusLabel.toLowerCase()} tasks`
               : 'Create a task to get started'}
           </Typography>
         </Card>

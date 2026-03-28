@@ -44,8 +44,7 @@ import {
 } from '@mui/icons-material';
 import { useTenant } from '../../core/tenant/TenantContext';
 import type { TenantPlan, PlanConfig } from '../../core/tenant/TenantTypes';
-import { PLAN_CONFIGS, formatPlanPrice, getUsagePercentage } from '../../core/tenant/TenantTypes';
-import { getCurrencySymbol } from '../../core/i18n';
+import { PLAN_CONFIGS, ONE_TIME_SETUP_COST, getUsagePercentage } from '../../core/tenant/TenantTypes';
 import type { FeatureFlag } from '../../core/tenant/FeatureFlags';
 import { FEATURE_METADATA, hasFeature } from '../../core/tenant/FeatureFlags';
 
@@ -170,7 +169,13 @@ export default function SubscriptionPage() {
                 </Typography>
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="h5" fontWeight={600}>
-                    {formatPlanPrice(plan)}<Typography component="span" variant="body2" color="text.secondary">/month</Typography>
+                    Rs {planConfig.monthlyPrice.toLocaleString()}<Typography component="span" variant="body2" color="text.secondary">/month</Typography>
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    Annual: Rs {planConfig.yearlyPrice.toLocaleString()}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                    One-time Setup Cost: Rs {ONE_TIME_SETUP_COST.toLocaleString()}/-
                   </Typography>
                 </Box>
               </Box>
@@ -356,9 +361,9 @@ export default function SubscriptionPage() {
             }
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2">Yearly billing</Typography>
+                <Typography variant="body2">Annual billing</Typography>
                 <Chip
-                  label="Save 17%"
+                  label="Best Annual Value"
                   size="small"
                   sx={{
                     bgcolor: alpha('#4caf50', 0.2),
@@ -373,8 +378,8 @@ export default function SubscriptionPage() {
         </Box>
         
         <Grid container spacing={3}>
-          {(['STARTER', 'GROWTH', 'PRO', 'ENTERPRISE'] as TenantPlan[]).map((planId) => (
-            <Grid size={{ xs: 12, sm: 6, lg: 3 }} key={planId}>
+          {(['GROWTH', 'PRO', 'ENTERPRISE'] as TenantPlan[]).map((planId) => (
+            <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={planId}>
               <PlanCard
                 plan={planId}
                 currentPlan={plan}
@@ -404,7 +409,7 @@ export default function SubscriptionPage() {
           {selectedPlan && (
             <Typography>
               You're about to upgrade to the <strong>{PLAN_CONFIGS[selectedPlan].name}</strong> plan
-              at <strong>{formatPlanPrice(selectedPlan)}/month</strong>.
+              at <strong>Rs {PLAN_CONFIGS[selectedPlan].monthlyPrice.toLocaleString()}/month</strong>.
               {yearlyBilling && ' (billed annually)'}
             </Typography>
           )}
@@ -620,7 +625,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
           
           <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.5 }}>
             <Typography variant="h3" fontWeight={700}>
-              {getCurrencySymbol()}{monthlyEquivalent}
+              Rs {monthlyEquivalent.toLocaleString()}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               /month
@@ -629,9 +634,13 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
           
           {yearlyBilling && (
             <Typography variant="caption" color="text.secondary">
-              {getCurrencySymbol()}{price} billed annually
+              Rs {price.toLocaleString()} billed annually
             </Typography>
           )}
+
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+            One-time Setup Cost: Rs {ONE_TIME_SETUP_COST.toLocaleString()}/-
+          </Typography>
         </Box>
         
         <Divider sx={{ mb: 2 }} />

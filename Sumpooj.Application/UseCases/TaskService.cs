@@ -9,11 +9,16 @@ public class TaskService
 {
     private readonly ITaskRepository _taskRepository;
     private readonly IStaffRepository _staffRepository;
+    private readonly ITaskAssignmentNotificationService _taskAssignmentNotificationService;
 
-    public TaskService(ITaskRepository taskRepository, IStaffRepository staffRepository)
+    public TaskService(
+        ITaskRepository taskRepository,
+        IStaffRepository staffRepository,
+        ITaskAssignmentNotificationService taskAssignmentNotificationService)
     {
         _taskRepository = taskRepository;
         _staffRepository = staffRepository;
+        _taskAssignmentNotificationService = taskAssignmentNotificationService;
     }
 
     public async Task<TaskDto?> GetByIdAsync(Guid companyId, Guid id)
@@ -77,6 +82,16 @@ public class TaskService
         }
 
         await _taskRepository.AddAsync(task);
+
+        await _taskAssignmentNotificationService.NotifyTaskAssignedAsync(
+            staff.Name,
+            staff.Phone,
+            task.Title,
+            task.Description,
+            task.Priority.ToString(),
+            task.DueDate,
+            isReassignment: false);
+
         return task.Id;
     }
 
@@ -101,7 +116,21 @@ public class TaskService
         {
             var staff = await _staffRepository.GetByIdAsync(companyId, request.AssignedToStaffId.Value)
                 ?? throw new KeyNotFoundException("Staff not found");
+
+            var isChanged = task.AssignedToStaffId != request.AssignedToStaffId.Value;
             task.Reassign(request.AssignedToStaffId.Value);
+
+            if (isChanged)
+            {
+                await _taskAssignmentNotificationService.NotifyTaskAssignedAsync(
+                    staff.Name,
+                    staff.Phone,
+                    task.Title,
+                    task.Description,
+                    task.Priority.ToString(),
+                    task.DueDate,
+                    isReassignment: true);
+            }
         }
 
         if (request.DueDate.HasValue)

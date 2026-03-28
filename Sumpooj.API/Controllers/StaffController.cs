@@ -11,17 +11,23 @@ namespace Sumpooj.API.Controllers;
 [Authorize(Policy = "CompanyOnly")]
 public class StaffController : ControllerBase
 {
+    private readonly ILogger<StaffController> _logger;
+    private readonly IWebHostEnvironment _environment;
     private readonly StaffService _staffService;
     private readonly ITenantContext _tenantContext;
     private readonly IOrderRepository _orderRepo;
     private readonly IDeliveryRepository _deliveryRepo;
 
     public StaffController(
+        ILogger<StaffController> logger,
+        IWebHostEnvironment environment,
         StaffService staffService,
         ITenantContext tenantContext,
         IOrderRepository orderRepo,
         IDeliveryRepository deliveryRepo)
     {
+        _logger = logger;
+        _environment = environment;
         _staffService = staffService;
         _tenantContext = tenantContext;
         _orderRepo = orderRepo;
@@ -30,6 +36,17 @@ public class StaffController : ControllerBase
 
     private Guid CompanyId => _tenantContext.CompanyId 
         ?? throw new UnauthorizedAccessException("Company context required");
+
+    private static string GetInnermostMessage(Exception ex)
+    {
+        var current = ex;
+        while (current.InnerException != null)
+        {
+            current = current.InnerException;
+        }
+
+        return current.Message;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
@@ -79,17 +96,58 @@ public class StaffController : ControllerBase
     [Authorize(Policy = "CompanyAdmin")]
     public async Task<IActionResult> Create([FromBody] CreateStaffRequest request)
     {
-        var result = await _staffService.CreateAsync(CompanyId, request);
-
-        return CreatedAtAction(nameof(GetById), new { id = result.StaffId }, new { id = result.StaffId });
+        try
+        {
+            var result = await _staffService.CreateAsync(CompanyId, request);
+            return CreatedAtAction(nameof(GetById), new { id = result.StaffId }, new { id = result.StaffId });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create staff for company {CompanyId}. Name={Name}, Role={Role}", CompanyId, request.Name, request.Role);
+            return StatusCode(500, new
+            {
+                error = _environment.IsDevelopment()
+                    ? GetInnermostMessage(ex)
+                    : "Failed to create staff member. Please try again later."
+            });
+        }
     }
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = "CompanyAdmin")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateStaffRequest request)
     {
-        await _staffService.UpdateAsync(CompanyId, id, request);
-        return NoContent();
+        try
+        {
+            await _staffService.UpdateAsync(CompanyId, id, request);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update staff {StaffId} for company {CompanyId}", id, CompanyId);
+            return StatusCode(500, new
+            {
+                error = _environment.IsDevelopment()
+                    ? GetInnermostMessage(ex)
+                    : "Failed to update staff member. Please try again later."
+            });
+        }
     }
 
     [HttpDelete("{id:guid}")]

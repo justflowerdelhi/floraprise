@@ -167,6 +167,12 @@ builder.Services.AddScoped<ICompanyService, CompanyService>();
 
 // AI Services
 var openAISettings = builder.Configuration.GetSection("OpenAI").Get<OpenAISettings>() ?? new OpenAISettings();
+if (string.IsNullOrWhiteSpace(openAISettings.ApiKey))
+{
+    openAISettings.ApiKey = builder.Configuration["OPENAI_API_KEY"]
+        ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+        ?? string.Empty;
+}
 builder.Services.AddSingleton(openAISettings);
 builder.Services.AddScoped<IAIUsageRepository, AIUsageRepository>();
 builder.Services.AddScoped<GiftCardAIService>();
@@ -291,6 +297,7 @@ builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 // Marketing — Demo Requests
 builder.Services.AddScoped<IDemoRequestRepository, DemoRequestRepository>();
 builder.Services.AddScoped<ILeadNotificationService, LeadNotificationService>();
+builder.Services.AddScoped<ITaskAssignmentNotificationService, TaskAssignmentNotificationService>();
 builder.Services.AddScoped<DemoRequestService>();
 
 // Audit Action Filter (auto-logs all mutating API actions)
@@ -338,6 +345,50 @@ var failOnSeedError = builder.Configuration.GetValue("Database:FailOnSeedError",
 
 try
 {
+    // Self-heal for older databases that missed the IdentityUserId staff migration.
+    await using (var scope = app.Services.CreateAsyncScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<SumpoojDbContext>();
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'Staff'
+                      AND column_name = 'IdentityUserId'
+                ) THEN
+                    ALTER TABLE "Staff" ADD COLUMN "IdentityUserId" uuid NULL;
+                END IF;
+            END $$;
+            """);
+
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE INDEX IF NOT EXISTS "IX_Staff_IdentityUserId" ON "Staff" ("IdentityUserId");
+            """);
+
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'FK_Staff_AspNetUsers_IdentityUserId'
+                ) THEN
+                    ALTER TABLE "Staff"
+                    ADD CONSTRAINT "FK_Staff_AspNetUsers_IdentityUserId"
+                    FOREIGN KEY ("IdentityUserId")
+                    REFERENCES "AspNetUsers" ("Id")
+                    ON DELETE RESTRICT;
+                END IF;
+            END $$;
+            """);
+    }
+
     await DataSeeder.SeedAsync(app.Services);
 
     // Migrate existing products to use dynamic CategoryId

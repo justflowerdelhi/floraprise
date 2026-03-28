@@ -225,7 +225,10 @@ const StaffForm: React.FC = () => {
 
     const result = await execute(
       () => isEdit && staffId ? updateStaffApi(staffId, payload) : createStaffApi(payload as any),
-      { successMessage: isEdit ? 'Staff member updated successfully!' : 'Staff member created successfully!' }
+      {
+        successMessage: isEdit ? 'Staff member updated successfully!' : 'Staff member created successfully!',
+        errorMessage: isEdit ? 'Failed to update staff member' : 'Failed to create staff member',
+      }
     );
 
     if (result) {

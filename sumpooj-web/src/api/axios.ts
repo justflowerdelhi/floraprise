@@ -62,6 +62,11 @@ export function getRefreshToken(): string | null {
 
 // ─── Request: attach Bearer token ───────────────────────────
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // Let the browser set multipart boundaries for FormData payloads.
+  if (config.data instanceof FormData) {
+    config.headers.delete('Content-Type');
+  }
+
   const token = _authToken;
   if (token && token !== 'undefined' && token !== 'null') {
     config.headers.set('Authorization', `Bearer ${token}`);

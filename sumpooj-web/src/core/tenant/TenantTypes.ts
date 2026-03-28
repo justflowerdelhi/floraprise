@@ -186,6 +186,8 @@ export interface PlanConfig {
   recommended?: boolean;
 }
 
+export const ONE_TIME_SETUP_COST = 2499;
+
 export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
   STARTER: {
     id: 'STARTER',
@@ -211,15 +213,16 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
   GROWTH: {
     id: 'GROWTH',
     name: 'Growth',
-    description: 'For growing florists ready to expand',
-    monthlyPrice: 79,
-    yearlyPrice: 790,
+    description: 'For growing florists who need advanced operations and AI tools',
+    monthlyPrice: 799,
+    yearlyPrice: 5999,
     features: [
       'Everything in Starter',
       'Wedding & Event Module',
       'Profit Intelligence Dashboard',
       'Advanced Inventory Tracking',
       'Customer Insights',
+      'AI Smart Bouquet',
       'Priority Support',
     ],
     limits: {
@@ -233,9 +236,9 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
   PRO: {
     id: 'PRO',
     name: 'Pro',
-    description: 'For established florists with multiple locations',
-    monthlyPrice: 199,
-    yearlyPrice: 1990,
+    description: 'For established florists managing larger teams and workflows',
+    monthlyPrice: 1199,
+    yearlyPrice: 9999,
     features: [
       'Everything in Growth',
       'Multi-Location Support',
@@ -255,11 +258,12 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
   ENTERPRISE: {
     id: 'ENTERPRISE',
     name: 'Enterprise',
-    description: 'For large-scale florist operations',
-    monthlyPrice: 499,
-    yearlyPrice: 4990,
+    description: 'For large-scale florist operations with digital commerce needs',
+    monthlyPrice: 1699,
+    yearlyPrice: 15999,
     features: [
       'Everything in Pro',
+      'Ecommerce Website',
       'Unlimited Locations',
       'API Access',
       'Custom Integrations',
