@@ -247,6 +247,10 @@ builder.Services.AddScoped<DeliveryZoneService>();
 builder.Services.AddScoped<IWireOrderRepository, WireOrderRepository>();
 builder.Services.AddScoped<WireOrderService>();
 
+// Corporate Clients (B2B)
+builder.Services.AddScoped<ICorporateRepository, CorporateRepository>();
+builder.Services.AddScoped<CorporateService>();
+
 // Proposals
 builder.Services.AddScoped<IProposalRepository, ProposalRepository>();
 builder.Services.AddScoped<ProposalService>();
@@ -302,6 +306,11 @@ builder.Services.AddScoped<DemoRequestService>();
 
 // Audit Action Filter (auto-logs all mutating API actions)
 builder.Services.AddScoped<AuditActionFilter>();
+
+if (builder.Configuration.GetValue("Corporate:EnableBirthdayAutomation", false))
+{
+    builder.Services.AddHostedService<CorporateBirthdayAutomationHostedService>();
+}
 
 #endregion
 

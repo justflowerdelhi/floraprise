@@ -52,7 +52,8 @@ public enum OrderStatus
     OutForDelivery,
     Delivered,
     Cancelled,
-    Failed
+    Failed,
+    AutoCreated
 }
 
 public enum PaymentStatus
@@ -60,7 +61,28 @@ public enum PaymentStatus
     Unpaid,
     PartiallyPaid,
     Paid,
-    Refunded
+    Refunded,
+    Credit
+}
+
+public enum CustomerType
+{
+    Retail,
+    Corporate
+}
+
+public enum CorporateBillingStatus
+{
+    Pending,
+    Invoiced,
+    Paid
+}
+
+public enum CorporateInvoiceStatus
+{
+    Draft,
+    Sent,
+    Paid
 }
 
 public enum DeliveryPriority

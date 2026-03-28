@@ -19,6 +19,7 @@ public class OrderService
     private readonly IFinishedGoodsBatchRepository _finishedGoodsBatchRepository;
     private readonly IJournalEntryRepository _journalEntryRepository;
     private readonly IDeliveryRepository _deliveryRepository;
+    private readonly ICorporateRepository _corporateRepository;
 
     public OrderService(
         IOrderRepository orderRepository,
@@ -31,7 +32,8 @@ public class OrderService
         IProductBatchRepository productBatchRepository,
         IFinishedGoodsBatchRepository finishedGoodsBatchRepository,
         IJournalEntryRepository journalEntryRepository,
-        IDeliveryRepository deliveryRepository)
+        IDeliveryRepository deliveryRepository,
+        ICorporateRepository corporateRepository)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
@@ -44,6 +46,7 @@ public class OrderService
         _finishedGoodsBatchRepository = finishedGoodsBatchRepository;
         _journalEntryRepository = journalEntryRepository;
         _deliveryRepository = deliveryRepository;
+        _corporateRepository = corporateRepository;
     }
 
     public async Task<OrderDto?> GetByIdAsync(Guid companyId, Guid id)
@@ -354,6 +357,8 @@ public class OrderService
         }
 
         await _orderRepository.UpdateAsync(order);
+
+        await HandleCorporateFulfillmentPostingAsync(companyId, order);
     }
 
     public async Task UpdateFulfillmentStatusAsync(Guid companyId, Guid id, string status)
@@ -374,6 +379,8 @@ public class OrderService
             }
 
             await _orderRepository.UpdateAsync(order);
+
+            await HandleCorporateFulfillmentPostingAsync(companyId, order);
         }
     }
 
@@ -597,6 +604,87 @@ public class OrderService
 
                 continue;
             }
+        }
+    }
+
+    private async Task HandleCorporateFulfillmentPostingAsync(Guid companyId, Order order)
+    {
+        if (order.CustomerType != CustomerType.Corporate)
+            return;
+
+        var meta = await _corporateRepository.GetOrderMetaByOrderIdAsync(companyId, order.Id);
+        if (meta == null)
+            return;
+
+        var shouldPostInventory = order.Status == OrderStatus.Delivered || order.FulfillmentStatus == FulfillmentStatus.Completed;
+        if (!shouldPostInventory || meta.IsInventoryPosted)
+            return;
+
+        await DeductInventoryForOrderAsync(companyId, order);
+        await CreateCorporateCogsEntriesAsync(companyId, order);
+
+        meta.MarkInventoryPosted();
+        await _corporateRepository.UpdateOrderMetaAsync(meta);
+    }
+
+    private async Task CreateCorporateCogsEntriesAsync(Guid companyId, Order order)
+    {
+        try
+        {
+            var cogsAccountId = await _journalEntryRepository
+                .GetOrCreateAccountIdAsync(companyId, "5000", "Cost of Goods Sold", "Expense");
+            var inventoryAccountId = await _journalEntryRepository
+                .GetOrCreateAccountIdAsync(companyId, "1200", "Inventory", "Asset");
+
+            decimal totalCogs = 0m;
+            var finishedBatches = await _finishedGoodsBatchRepository.GetAllAsync(companyId);
+
+            foreach (var item in order.Items)
+            {
+                var finishedBatch = ResolveFinishedGoodsBatch(order, item, finishedBatches);
+                if (finishedBatch != null)
+                {
+                    var unitCost = finishedBatch.QuantityProduced > 0
+                        ? finishedBatch.TotalCost / finishedBatch.QuantityProduced
+                        : 0m;
+                    var finishedGoodsCogs = unitCost * item.Quantity;
+                    if (finishedGoodsCogs > 0)
+                        totalCogs += finishedGoodsCogs;
+                    continue;
+                }
+
+                var product = await _productRepository.GetByIdAsync(companyId, item.ProductId);
+                if (product != null && product.TrackInventory)
+                {
+                    var lineCogs = product.CostPrice * item.Quantity;
+                    if (lineCogs > 0)
+                        totalCogs += lineCogs;
+                }
+            }
+
+            if (totalCogs <= 0)
+                return;
+
+            var now = DateTime.UtcNow;
+            var entries = new List<JournalEntry>
+            {
+                new(companyId, now, order.OrderNumber, "CORPORATE_COGS",
+                    $"Corporate order {order.OrderNumber} - COGS", totalCogs, 0, cogsAccountId),
+                new(companyId, now, order.OrderNumber, "CORPORATE_COGS",
+                    $"Corporate order {order.OrderNumber} - Inventory reduction", 0, totalCogs, inventoryAccountId)
+            };
+
+            if (order.LocationId.HasValue)
+            {
+                entries[0].SetLocation(order.LocationId.Value);
+                entries[1].SetLocation(order.LocationId.Value);
+            }
+
+            await _journalEntryRepository.AddRangeAsync(entries);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[OrderService] Corporate COGS posting failed: {ex.Message}");
         }
     }
 

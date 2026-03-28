@@ -27,6 +27,7 @@ public class Order : BaseEntity
         PaymentStatus = PaymentStatus.Unpaid;
         FulfillmentStatus = FulfillmentStatus.Draft;
         OrderSource = OrderSource.WalkIn;
+        CustomerType = CustomerType.Retail;
         IsActive = true;
     }
 
@@ -43,6 +44,7 @@ public class Order : BaseEntity
     public FulfillmentStatus FulfillmentStatus { get; private set; }
     public OrderSource OrderSource { get; private set; }
     public OrderType OrderType { get; private set; }
+    public CustomerType CustomerType { get; private set; }
     public bool IsActive { get; private set; }
     public string? TimeSlot { get; private set; }
 
@@ -80,7 +82,7 @@ public class Order : BaseEntity
 
     public void AddItem(Guid productId, string productName, int quantity, decimal unitPrice)
     {
-        if (Status != OrderStatus.Pending && Status != OrderStatus.Confirmed)
+        if (Status != OrderStatus.Pending && Status != OrderStatus.Confirmed && Status != OrderStatus.AutoCreated)
             throw new InvalidOperationException("Cannot modify items for orders in current status");
 
         var item = new OrderItem(productId, productName, quantity, unitPrice);
@@ -90,7 +92,7 @@ public class Order : BaseEntity
 
     public void RemoveItem(Guid productId)
     {
-        if (Status != OrderStatus.Pending && Status != OrderStatus.Confirmed)
+        if (Status != OrderStatus.Pending && Status != OrderStatus.Confirmed && Status != OrderStatus.AutoCreated)
             throw new InvalidOperationException("Cannot modify items for orders in current status");
 
         var item = _items.FirstOrDefault(i => i.ProductId == productId);
@@ -137,6 +139,12 @@ public class Order : BaseEntity
     public void SetOrderType(OrderType type)
     {
         OrderType = type;
+        MarkUpdated();
+    }
+
+    public void SetCustomerType(CustomerType customerType)
+    {
+        CustomerType = customerType;
         MarkUpdated();
     }
 
@@ -195,10 +203,19 @@ public class Order : BaseEntity
 
     public void Confirm()
     {
-        if (Status != OrderStatus.Pending)
-            throw new InvalidOperationException("Only pending orders can be confirmed");
+        if (Status != OrderStatus.Pending && Status != OrderStatus.AutoCreated)
+            throw new InvalidOperationException("Only pending or auto-created orders can be confirmed");
 
         Status = OrderStatus.Confirmed;
+        MarkUpdated();
+    }
+
+    public void MarkAutoCreated()
+    {
+        if (Status != OrderStatus.Pending)
+            throw new InvalidOperationException("Only pending orders can be marked auto-created");
+
+        Status = OrderStatus.AutoCreated;
         MarkUpdated();
     }
 
@@ -287,6 +304,12 @@ public class Order : BaseEntity
     public void MarkPartiallyPaid(decimal amountPaid)
     {
         PaymentStatus = PaymentStatus.PartiallyPaid;
+        MarkUpdated();
+    }
+
+    public void MarkCredit()
+    {
+        PaymentStatus = PaymentStatus.Credit;
         MarkUpdated();
     }
 

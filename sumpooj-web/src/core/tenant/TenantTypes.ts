@@ -241,6 +241,7 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
     yearlyPrice: 9999,
     features: [
       'Everything in Growth',
+      'Corporate Client Management',
       'Multi-Location Support',
       'External Integrations',
       'Staff Analytics & Performance',
@@ -263,6 +264,7 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
     yearlyPrice: 15999,
     features: [
       'Everything in Pro',
+      'Corporate Client Management',
       'Ecommerce Website',
       'Unlimited Locations',
       'API Access',

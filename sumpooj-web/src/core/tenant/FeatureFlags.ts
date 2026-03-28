@@ -22,6 +22,7 @@ export type FeatureFlag =
   | 'EXTERNAL_INTEGRATION'
   | 'STAFF_ANALYTICS'
   | 'CUSTOM_BRANDING'
+  | 'CORPORATE_CLIENT_MANAGEMENT'
   | 'API_ACCESS'
   | 'ADVANCED_REPORTS';
 
@@ -130,6 +131,13 @@ export const FEATURE_METADATA: Record<FeatureFlag, FeatureMetadata> = {
     requiredPlan: 'PRO',
     category: 'pro',
   },
+  CORPORATE_CLIENT_MANAGEMENT: {
+    id: 'CORPORATE_CLIENT_MANAGEMENT',
+    name: 'Corporate Client Management',
+    description: 'Manage B2B corporate clients, invoices, orders, and receivables workflows',
+    requiredPlan: 'PRO',
+    category: 'pro',
+  },
   ADVANCED_REPORTS: {
     id: 'ADVANCED_REPORTS',
     name: 'Advanced Reports',
@@ -183,6 +191,7 @@ export const PLAN_FEATURES: Record<TenantPlan, FeatureFlag[]> = {
     'EXTERNAL_INTEGRATION',
     'STAFF_ANALYTICS',
     'CUSTOM_BRANDING',
+    'CORPORATE_CLIENT_MANAGEMENT',
     'ADVANCED_REPORTS',
   ],
   ENTERPRISE: [
@@ -199,6 +208,7 @@ export const PLAN_FEATURES: Record<TenantPlan, FeatureFlag[]> = {
     'EXTERNAL_INTEGRATION',
     'STAFF_ANALYTICS',
     'CUSTOM_BRANDING',
+    'CORPORATE_CLIENT_MANAGEMENT',
     'ADVANCED_REPORTS',
     'API_ACCESS',
   ],
@@ -266,6 +276,10 @@ export const ROUTE_FEATURE_MAP: Record<string, FeatureFlag> = {
   '/staff': 'STAFF_ANALYTICS',
   '/staff/performance': 'STAFF_ANALYTICS',
   '/integrations': 'EXTERNAL_INTEGRATION',
+  '/crm/corporate-clients': 'CORPORATE_CLIENT_MANAGEMENT',
+  '/corporate/clients': 'CORPORATE_CLIENT_MANAGEMENT',
+  '/corporate/orders': 'CORPORATE_CLIENT_MANAGEMENT',
+  '/corporate/invoices': 'CORPORATE_CLIENT_MANAGEMENT',
 
   // Wire management routes
   '/wire-vendors': 'WIRE_MANAGEMENT',

@@ -97,6 +97,13 @@ public class SumpoojDbContext
     // Marketing
     public DbSet<DemoRequest> DemoRequests => Set<DemoRequest>();
 
+    // Corporate clients
+    public DbSet<CorporateClient> CorporateClients => Set<CorporateClient>();
+    public DbSet<CorporateEmployee> CorporateEmployees => Set<CorporateEmployee>();
+    public DbSet<CorporateOrderMeta> CorporateOrderMetas => Set<CorporateOrderMeta>();
+    public DbSet<CorporateInvoice> CorporateInvoices => Set<CorporateInvoice>();
+    public DbSet<CorporateInvoiceLine> CorporateInvoiceLines => Set<CorporateInvoiceLine>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -212,6 +219,36 @@ public class SumpoojDbContext
                 !_tenantContext.CompanyId.HasValue ||
                 c.CompanyId == _tenantContext.CompanyId);
 
+        modelBuilder.Entity<CorporateClient>()
+            .HasQueryFilter(c =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                c.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<CorporateEmployee>()
+            .HasQueryFilter(e =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                e.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<CorporateOrderMeta>()
+            .HasQueryFilter(m =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                m.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<CorporateInvoice>()
+            .HasQueryFilter(i =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                i.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<CorporateInvoiceLine>()
+            .HasQueryFilter(l =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                l.CompanyId == _tenantContext.CompanyId);
+
         modelBuilder.Entity<Shift>()
             .HasQueryFilter(s =>
                 _tenantContext == null ||
@@ -318,6 +355,59 @@ public class SumpoojDbContext
         modelBuilder.Entity<Order>()
             .Property(o => o.OrderType)
             .HasDefaultValue(OrderType.Standard);
+
+        modelBuilder.Entity<Order>()
+            .Property(o => o.CustomerType)
+            .HasDefaultValue(CustomerType.Retail);
+
+        modelBuilder.Entity<CorporateClient>()
+            .HasIndex(c => new { c.CompanyId, c.Name });
+
+        modelBuilder.Entity<CorporateClient>()
+            .HasOne(c => c.Customer)
+            .WithMany()
+            .HasForeignKey(c => c.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CorporateEmployee>()
+            .HasOne(e => e.Client)
+            .WithMany()
+            .HasForeignKey(e => e.ClientId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<CorporateOrderMeta>()
+            .HasIndex(m => new { m.CompanyId, m.OrderId })
+            .IsUnique();
+
+        modelBuilder.Entity<CorporateOrderMeta>()
+            .HasOne(m => m.Order)
+            .WithMany()
+            .HasForeignKey(m => m.OrderId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<CorporateOrderMeta>()
+            .HasOne(m => m.Client)
+            .WithMany()
+            .HasForeignKey(m => m.ClientId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CorporateOrderMeta>()
+            .HasOne(m => m.Employee)
+            .WithMany()
+            .HasForeignKey(m => m.EmployeeId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<CorporateInvoice>()
+            .HasOne(i => i.Client)
+            .WithMany()
+            .HasForeignKey(i => i.ClientId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CorporateInvoice>()
+            .HasMany(i => i.Lines)
+            .WithOne(l => l.Invoice)
+            .HasForeignKey(l => l.InvoiceId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Order>()
             .Property(o => o.InvoiceNumber)

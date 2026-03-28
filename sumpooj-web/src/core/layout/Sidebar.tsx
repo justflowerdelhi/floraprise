@@ -45,6 +45,9 @@ import {
   AutoAwesome,
   DeleteSweep,
   CardGiftcard,
+  Bolt,
+  BusinessCenter,
+  AccountBalance,
   Category,
   Settings,
   Store,
@@ -96,6 +99,14 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 // ─── Section Colors ─────────────────────────────────────────
 
 const SECTION_COLORS: Record<string, string> = {
+  operations: '#2E7D32',
+  'events-group': '#C62828',
+  'staff-group': '#EF6C00',
+  products: '#FB8C00',
+  business: '#1565C0',
+  'accounting-group': '#1976d2',
+  'reports-group': '#6A1B9A',
+  'settings-group': '#B26A00',
   sales: '#2E7D32',      // Flora Green
   orders: '#2196f3',
   inventory: '#ff9800',
@@ -107,8 +118,180 @@ const SECTION_COLORS: Record<string, string> = {
   staff: '#ff5722',
   crm: '#5B2E91',        // FloraPrice Purple
   reports: '#5B2E91',    // FloraPrice Purple
-  settings: '#F4C430',   // Accent Yellow
+  settings: '#B26A00',   // High-contrast amber
   platform: '#1B5E20',   // Dark Green for Platform Admin
+};
+
+const GROUP_MAP = {
+  operations: ['sales', 'orders'],
+  events: ['events'],
+  staff: ['staff'],
+  products: ['inventory', 'catalog', 'production'],
+  business: ['crm', 'ai', 'gift-cards', 'platform'],
+  accounting: ['accounting'],
+  reports: ['reports'],
+  settings: ['settings'],
+} as const;
+
+const GROUP_ICONS: Record<'operations' | 'events' | 'staff' | 'products' | 'business' | 'accounting' | 'reports' | 'settings', React.ReactNode> = {
+  operations: <Bolt sx={{ fontSize: 18 }} />,
+  events: <Celebration sx={{ fontSize: 18 }} />,
+  staff: <People sx={{ fontSize: 18 }} />,
+  products: <Inventory2 sx={{ fontSize: 18 }} />,
+  business: <BusinessCenter sx={{ fontSize: 18 }} />,
+  accounting: <AccountBalance sx={{ fontSize: 18 }} />,
+  reports: <Assessment sx={{ fontSize: 18 }} />,
+  settings: <Settings sx={{ fontSize: 18 }} />,
+};
+
+interface GroupedMenuSection extends MenuSection {
+  icon?: React.ReactNode;
+}
+
+const buildGroupedSections = (menuSections: MenuSection[]): GroupedMenuSection[] => {
+  const byId = new Map(menuSections.map((s) => [s.id, s]));
+
+  const orders = byId.get('orders');
+  const accounting = byId.get('accounting');
+
+  const wireItemIds = new Set(['wire-vendors', 'wire-settlements']);
+  const businessOrderItemIds = new Set(['corporate-orders', 'corporate-auto-orders']);
+  const productionReportItemIds = new Set(['production-intelligence', 'production-wastage']);
+  const inventoryReportItemIds = new Set(['inventory-ledger', 'daily-inventory-report']);
+  const wireItems = orders?.items.filter((i) => wireItemIds.has(i.id)) ?? [];
+  const businessOrderItems = orders?.items.filter((i) => businessOrderItemIds.has(i.id)) ?? [];
+
+  // Remove wire items from Orders so they only appear under Business/Accounting context.
+  const operationsSections = GROUP_MAP.operations
+    .map((id) => {
+      const section = byId.get(id);
+      if (!section) return undefined;
+      if (id !== 'orders') return section;
+      return {
+        ...section,
+        items: section.items.filter((i) => !wireItemIds.has(i.id) && !businessOrderItemIds.has(i.id)),
+      };
+    })
+    .filter((s): s is MenuSection => Boolean(s));
+
+  const eventSections = GROUP_MAP.events
+    .map((id) => byId.get(id))
+    .filter((s): s is MenuSection => Boolean(s));
+
+  const staffSections = GROUP_MAP.staff
+    .map((id) => byId.get(id))
+    .filter((s): s is MenuSection => Boolean(s));
+
+  const productsSections = GROUP_MAP.products
+    .map((id) => {
+      const section = byId.get(id);
+      if (!section) return undefined;
+      if (id === 'production') {
+        return {
+          ...section,
+          items: section.items.filter((i) => !productionReportItemIds.has(i.id)),
+        };
+      }
+      if (id === 'inventory') {
+        return {
+          ...section,
+          items: section.items.filter((i) => !inventoryReportItemIds.has(i.id)),
+        };
+      }
+      return {
+        ...section,
+        items: section.items,
+      };
+    })
+    .filter((s): s is MenuSection => Boolean(s));
+
+  const businessSections = GROUP_MAP.business
+    .map((id) => {
+      const section = byId.get(id);
+      if (!section) return undefined;
+      if (id === 'crm') {
+        return {
+          ...section,
+          items: [...section.items, ...businessOrderItems],
+        };
+      }
+      return section;
+    })
+    .filter((s): s is MenuSection => Boolean(s));
+
+  const accountingSections = GROUP_MAP.accounting
+    .map((id) => {
+      const section = byId.get(id);
+      if (!section) return undefined;
+      if (id !== 'accounting' || !accounting) return section;
+      return {
+        ...section,
+        items: [...accounting.items, ...wireItems],
+      };
+    })
+    .filter((s): s is MenuSection => Boolean(s));
+
+  const reportsSections = GROUP_MAP.reports
+    .map((id) => byId.get(id))
+    .filter((s): s is MenuSection => Boolean(s));
+
+  const productionReportItems = byId.get('production')?.items.filter((i) => productionReportItemIds.has(i.id)) ?? [];
+  const inventoryReportItems = byId.get('inventory')?.items.filter((i) => inventoryReportItemIds.has(i.id)) ?? [];
+
+  const settingsSections = GROUP_MAP.settings
+    .map((id) => byId.get(id))
+    .filter((s): s is MenuSection => Boolean(s));
+
+  return [
+    {
+      id: 'operations',
+      title: 'OPERATIONS',
+      icon: GROUP_ICONS.operations,
+      items: operationsSections.flatMap((s) => s.items),
+    },
+    {
+      id: 'products',
+      title: 'PRODUCTS & STOCK',
+      icon: GROUP_ICONS.products,
+      items: productsSections.flatMap((s) => s.items),
+    },
+    {
+      id: 'events-group',
+      title: 'EVENTS',
+      icon: GROUP_ICONS.events,
+      items: eventSections.flatMap((s) => s.items),
+    },
+    {
+      id: 'staff-group',
+      title: 'STAFF',
+      icon: GROUP_ICONS.staff,
+      items: staffSections.flatMap((s) => s.items),
+    },
+    {
+      id: 'business',
+      title: 'BUSINESS',
+      icon: GROUP_ICONS.business,
+      items: businessSections.flatMap((s) => s.items),
+    },
+    {
+      id: 'accounting-group',
+      title: 'ACCOUNTING',
+      icon: GROUP_ICONS.accounting,
+      items: accountingSections.flatMap((s) => s.items),
+    },
+    {
+      id: 'reports-group',
+      title: 'REPORTS',
+      icon: GROUP_ICONS.reports,
+      items: [...reportsSections.flatMap((s) => s.items), ...productionReportItems, ...inventoryReportItems],
+    },
+    {
+      id: 'settings-group',
+      title: 'SETTINGS',
+      icon: GROUP_ICONS.settings,
+      items: settingsSections.flatMap((s) => s.items),
+    },
+  ].filter((section) => section.items.length > 0);
 };
 
 // ─── Sidebar Props ──────────────────────────────────────────
@@ -234,7 +417,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, collapsed, sectionColor, onNa
 // ─── Section Component ──────────────────────────────────────
 
 interface SectionProps {
-  section: MenuSection;
+  section: GroupedMenuSection;
   collapsed: boolean;
   defaultExpanded?: boolean;
   onNavigate?: () => void;
@@ -257,20 +440,32 @@ const Section: React.FC<SectionProps> = ({ section, collapsed, defaultExpanded =
           onClick={() => setExpanded(!expanded)}
           sx={{
             py: 0.75,
-            px: 2,
-            borderRadius: 0,
+            px: 1.5,
+            mx: 1,
+            borderRadius: 1.5,
+            bgcolor: alpha(sectionColor, dk ? 0.3 : 0.14),
+            border: `1px solid ${alpha(sectionColor, dk ? 0.55 : 0.28)}`,
             '&:hover': {
-              bgcolor: 'transparent',
+              bgcolor: alpha(sectionColor, dk ? 0.42 : 0.22),
             },
           }}
         >
+          <ListItemIcon
+            sx={{
+              minWidth: 24,
+              color: dk ? alpha('#ffffff', 0.9) : alpha(sectionColor, 0.92),
+              mr: 1,
+            }}
+          >
+            {section.icon ?? <Dashboard sx={{ fontSize: 18 }} />}
+          </ListItemIcon>
           <Typography
             variant="caption"
             sx={{
               fontWeight: 700,
               textTransform: 'uppercase',
               letterSpacing: 1,
-              color: dk ? 'rgba(255,255,255,0.4)' : 'text.disabled',
+              color: dk ? alpha('#ffffff', 0.95) : alpha(sectionColor, 0.95),
               flexGrow: 1,
               fontSize: '0.7rem',
             }}
@@ -278,9 +473,9 @@ const Section: React.FC<SectionProps> = ({ section, collapsed, defaultExpanded =
             {section.title}
           </Typography>
           {expanded ? (
-            <CollapseIcon sx={{ fontSize: 18, color: dk ? 'rgba(255,255,255,0.3)' : 'text.disabled' }} />
+            <CollapseIcon sx={{ fontSize: 18, color: dk ? alpha('#ffffff', 0.9) : alpha(sectionColor, 0.9) }} />
           ) : (
-            <ExpandIcon sx={{ fontSize: 18, color: dk ? 'rgba(255,255,255,0.3)' : 'text.disabled' }} />
+            <ExpandIcon sx={{ fontSize: 18, color: dk ? alpha('#ffffff', 0.9) : alpha(sectionColor, 0.9) }} />
           )}
         </ListItemButton>
       )}
@@ -337,33 +532,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }))
     .filter((section) => section.items.length > 0);
 
-  
-
-  // Rearranged menu order
-  const desiredOrder = [
-    'sales',
-    'orders',
-    'inventory',
-    'catalog',
-    'production',
-    'ai', // Floraprise AI above Gift Cards
-    'gift-cards',
-    'accounting',
-    'events',
-    'staff',
-    'crm',
-    'reports',
-    'settings',
-    'platform', // Platform Admin at the bottom
-  ];
-  menuSections = menuSections.sort((a, b) => {
-    const ai = desiredOrder.indexOf(a.id);
-    const bi = desiredOrder.indexOf(b.id);
-    if (ai === -1 && bi === -1) return 0;
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
-  });
+  const groupedSections = buildGroupedSections(menuSections);
 
   return (
     <Box
@@ -456,12 +625,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           },
         }}
       >
-        {menuSections.map((section, index) => (
+        {groupedSections.map((section, index) => (
           <Section
             key={section.id}
             section={section}
             collapsed={collapsed}
-            defaultExpanded={index < 2} // First two sections expanded by default
+            defaultExpanded={index === 0} // OPERATIONS expanded by default
             onNavigate={onNavigate}
           />
         ))}

@@ -120,6 +120,14 @@ const CustomerLedgerPage = lazy(() =>
   import('../pages/crm').then((module) => ({ default: module.CustomerLedgerPage }))
 );
 
+// Corporate (B2B)
+const CorporateClientsPage = lazy(() => import('../pages/corporate/CorporateClientsPage'));
+const CorporateClientWorkspacePage = lazy(() => import('../pages/corporate/CorporateClientWorkspacePage'));
+const CorporateDashboardPage = lazy(() => import('../pages/corporate/CorporateDashboardPage'));
+const CorporateOrdersPage = lazy(() => import('../pages/corporate/CorporateOrdersPage'));
+const CorporateInvoicesPage = lazy(() => import('../pages/corporate/CorporateInvoicesPage'));
+const AutoCreatedCorporateOrdersPage = lazy(() => import('../pages/corporate/AutoCreatedCorporateOrdersPage'));
+
 // Gift Cards
 const GiftCardPage = lazy(() =>
   import('../pages/gift-cards').then((module) => ({ default: module.GiftCardPage }))
@@ -363,6 +371,14 @@ export default function AppRoutes() {
           <Route path="/crm/customer-ledger" element={<CustomerLedgerPage />} />
           <Route path="/crm/reminders" element={<SmartReminderDashboard />} />
           <Route path="/crm/loyalty" element={<LoyaltyProgramPage />} />
+          <Route path="/crm/corporate-clients" element={<CorporateClientsPage />} />
+          <Route path="/corporate/clients/:clientId" element={<CorporateClientWorkspacePage />} />
+          <Route path="/corporate/dashboard" element={<CorporateDashboardPage />} />
+
+          {/* ─── Corporate Orders (B2B) ─────────────────── */}
+          <Route path="/corporate/orders" element={<CorporateOrdersPage />} />
+          <Route path="/corporate/orders/auto-created" element={<AutoCreatedCorporateOrdersPage />} />
+          <Route path="/corporate/invoices" element={<CorporateInvoicesPage />} />
 
           {/* ─── Floraprise AI ───────────────────────────── */}
           <Route path="/ai/bouquet-scanner" element={<BouquetScanner />} />
