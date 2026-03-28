@@ -66,6 +66,22 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (token && token !== 'undefined' && token !== 'null') {
     config.headers.set('Authorization', `Bearer ${token}`);
   }
+
+  // Auto-attach locationId so location-aware modules stay scoped after login.
+  if (!isAuthRequest(config.url) && !hasLocationIdParam(config.params)) {
+    const locationId = resolveRequestLocationId();
+    if (locationId) {
+      if (config.params instanceof URLSearchParams) {
+        config.params.set('locationId', locationId);
+      } else {
+        config.params = {
+          ...(typeof config.params === 'object' && config.params ? config.params : {}),
+          locationId,
+        };
+      }
+    }
+  }
+
   return config;
 });
 
@@ -81,6 +97,61 @@ function onRefreshed(newToken: string) {
 
 function addRefreshSubscriber(cb: (token: string) => void) {
   refreshSubscribers.push(cb);
+}
+
+const LOCATION_STORAGE_KEY = 'app:currentLocationId';
+const USER_STORAGE_KEY = 'app:user';
+const ALL_LOCATIONS_ID = 'ALL';
+
+function isAuthRequest(url?: string): boolean {
+  if (!url) return false;
+  return url.includes('/auth/');
+}
+
+function readPersistedLocationId(): string | null {
+  try {
+    const locationId = localStorage.getItem(LOCATION_STORAGE_KEY);
+    if (!locationId || locationId === 'undefined' || locationId === 'null') {
+      return null;
+    }
+    if (locationId === ALL_LOCATIONS_ID) {
+      return null;
+    }
+    return locationId;
+  } catch {
+    return null;
+  }
+}
+
+function readUserPrimaryLocationId(): string | null {
+  try {
+    const userRaw = localStorage.getItem(USER_STORAGE_KEY);
+    if (!userRaw) return null;
+    const user = JSON.parse(userRaw) as { primaryLocationId?: string | null };
+    const locationId = user?.primaryLocationId;
+    if (!locationId || locationId === ALL_LOCATIONS_ID) return null;
+    return locationId;
+  } catch {
+    return null;
+  }
+}
+
+function resolveRequestLocationId(): string | null {
+  return readPersistedLocationId() ?? readUserPrimaryLocationId();
+}
+
+function hasLocationIdParam(params: unknown): boolean {
+  if (!params) return false;
+
+  if (params instanceof URLSearchParams) {
+    return params.has('locationId');
+  }
+
+  if (typeof params === 'object') {
+    return Object.prototype.hasOwnProperty.call(params, 'locationId');
+  }
+
+  return false;
 }
 
 api.interceptors.response.use(

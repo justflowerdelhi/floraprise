@@ -13,9 +13,11 @@ public class ProductionService
     private readonly IProductionMaterialUsageRepository _materialRepo;
     private readonly IProductionMaintenanceLogRepository _maintenanceRepo;
     private readonly IProductionWastageLogRepository _wastageRepo;
+    private readonly IInventoryAdjustmentRepository _inventoryAdjustmentRepo;
     private readonly IOrderRepository _orderRepo;
     private readonly IProductRepository _productRepo;
     private readonly ILocationRepository _locationRepo;
+    private readonly IInventoryLedgerRepository _inventoryLedgerRepo;
 
     public ProductionService(
         IFloralRecipeRepository recipeRepo,
@@ -24,9 +26,11 @@ public class ProductionService
         IProductionMaterialUsageRepository materialRepo,
         IProductionMaintenanceLogRepository maintenanceRepo,
         IProductionWastageLogRepository wastageRepo,
+        IInventoryAdjustmentRepository inventoryAdjustmentRepo,
         IOrderRepository orderRepo,
         IProductRepository productRepo,
-        ILocationRepository locationRepo)
+        ILocationRepository locationRepo,
+        IInventoryLedgerRepository inventoryLedgerRepo)
     {
         _recipeRepo = recipeRepo;
         _batchRepo = batchRepo;
@@ -34,9 +38,11 @@ public class ProductionService
         _materialRepo = materialRepo;
         _maintenanceRepo = maintenanceRepo;
         _wastageRepo = wastageRepo;
+        _inventoryAdjustmentRepo = inventoryAdjustmentRepo;
         _orderRepo = orderRepo;
         _productRepo = productRepo;
         _locationRepo = locationRepo;
+        _inventoryLedgerRepo = inventoryLedgerRepo;
     }
 
     // ─── Recipes ────────────────────────────────────────────
@@ -191,6 +197,134 @@ public class ProductionService
 
     // ─── Custom Bouquet ─────────────────────────────────────
 
+    public async Task<SellableFinishedGoodDto> CreateCustomBouquetAndSellAsync(Guid companyId, CustomBouquetRequest request)
+    {
+        if (request.Components.Count == 0)
+            throw new InvalidOperationException("At least one component is required");
+
+        if (request.LocationId == Guid.Empty)
+            throw new InvalidOperationException("Location is required to create a custom bouquet");
+
+        var bouquetName = string.IsNullOrWhiteSpace(request.Name) ||
+                          string.Equals(request.Name.Trim(), "Custom Bouquet", StringComparison.OrdinalIgnoreCase)
+            ? GenerateCustomBouquetName(request.Components)
+            : request.Name.Trim();
+
+        var recipe = new FloralRecipe(
+            companyId,
+            bouquetName,
+            string.IsNullOrWhiteSpace(request.Category) ? "Custom" : request.Category,
+            request.SellingPrice,
+            request.LaborCost);
+
+        var ledgerReference = $"CUSTOM-{DateTime.UtcNow:yyyyMMddHHmmss}";
+
+        foreach (var component in request.Components)
+        {
+            var product = await _productRepo.GetByIdAsync(companyId, component.ProductId)
+                ?? throw new InvalidOperationException($"Component product not found: {component.ProductId}");
+
+            if (!product.TrackInventory)
+                throw new InvalidOperationException($"Component {product.Name} is not inventory tracked");
+
+            if (component.Quantity <= 0)
+                throw new InvalidOperationException($"Quantity must be greater than zero for {product.Name}");
+
+            if (product.StockQuantity < component.Quantity)
+                throw new InvalidOperationException(
+                    $"Insufficient stock for {product.Name}. Available: {product.StockQuantity}, required: {component.Quantity}");
+
+            product.AdjustStock(-component.Quantity);
+            await _productRepo.UpdateAsync(product);
+
+            await _inventoryLedgerRepo.AddAsync(
+                new InventoryLedger(
+                    companyId,
+                    product.Id,
+                    ledgerReference,
+                    "ADJUSTMENT",
+                    -component.Quantity,
+                    product.StockQuantity,
+                    $"Custom bouquet component usage: {bouquetName}"
+                )
+            );
+
+            recipe.Components.Add(new RecipeComponent(recipe.Id, product.Id, product.Name, component.Quantity, product.CostPrice));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Image))
+        {
+            recipe.Update(recipe.Name, recipe.Category, recipe.SellingPrice, recipe.LaborCost, request.Image);
+        }
+
+        await _recipeRepo.AddAsync(recipe);
+
+        var location = await _locationRepo.GetByIdAsync(companyId, request.LocationId)
+            ?? throw new InvalidOperationException("Location not found");
+
+        var batchCount = (await _batchRepo.GetAllAsync(companyId)).Count;
+        var batchCode = $"FG-{DateTime.UtcNow:yyyyMMdd}-{(batchCount + 1):D3}";
+        var barcode = $"890123456{(batchCount + 1):D4}";
+        var totalCost = request.Components.Sum(c => c.UnitCost * c.Quantity) + (request.LaborCost ?? 0m);
+        var expectedExpiry = DateTime.UtcNow.AddDays(3);
+
+        var batch = new FinishedGoodsBatch(
+            companyId,
+            recipe.Id,
+            recipe.Name,
+            batchCode,
+            barcode,
+            quantityProduced: 1,
+            expectedExpiry,
+            request.LocationId,
+            location.Name,
+            totalCost);
+
+        await _batchRepo.AddAsync(batch);
+
+        return new SellableFinishedGoodDto
+        {
+            Id = batch.Id,
+            Name = recipe.Name,
+            Sku = batch.BatchCode,
+            Barcode = batch.Barcode,
+            Category = "Bouquets",
+            ProductType = "FinishedGood",
+            RetailPrice = recipe.SellingPrice,
+            CostPrice = totalCost,
+            StockQuantity = batch.QuantityAvailable,
+            IsActive = true,
+            IsPerishable = true,
+            RecipeId = recipe.Id,
+            RecipeName = recipe.Name,
+            BatchCode = batch.BatchCode,
+            LocationId = batch.LocationId,
+            LocationName = batch.LocationName,
+        };
+    }
+
+    private static string GenerateCustomBouquetName(List<CustomBouquetComponent> components)
+    {
+        if (components.Count == 0)
+            return $"Custom Bouquet {DateTime.UtcNow:HHmm}";
+
+        var ordered = components
+            .OrderByDescending(c => c.Quantity)
+            .ThenBy(c => c.ProductName)
+            .ToList();
+
+        var main = ordered[0];
+        var stamp = DateTime.UtcNow.ToString("HHmm");
+
+        if (ordered.Count == 1)
+            return $"{main.Quantity} {main.ProductName} Bouquet {stamp}";
+
+        if (ordered.Count == 2)
+            return $"{main.Quantity} {main.ProductName} + {ordered[1].ProductName} {stamp}";
+
+        return $"{main.Quantity} {main.ProductName} Mixed Bouquet {stamp}";
+    }
+
     public async Task<FloralRecipeDto> SaveCustomBouquetAsRecipeAsync(Guid companyId, CustomBouquetSaveRequest request)
     {
         var createReq = new CreateRecipeRequest
@@ -229,12 +363,83 @@ public class ProductionService
         }).ToList();
     }
 
-    public async Task<MaintenanceLogDto> CreateMaintenanceAsync(Guid companyId, MaintenanceRequest request)
+    public async Task<MaintenanceLogDto> CreateMaintenanceAsync(
+        Guid companyId,
+        MaintenanceRequest request,
+        Guid userId,
+        string? userName)
     {
-        var batch = await _batchRepo.GetByIdAsync(companyId, request.FinishedBatchId);
-        var batchCode = batch?.BatchCode ?? "";
+        var batch = await _batchRepo.GetByIdAsync(companyId, request.FinishedBatchId)
+            ?? throw new InvalidOperationException("Finished batch not found");
+
+        if (batch.Status != FinishedBatchStatus.Active || batch.QuantityAvailable <= 0)
+            throw new InvalidOperationException("Only active finished goods with available quantity can be repaired");
+
+        if (request.Replacements.Count == 0)
+            throw new InvalidOperationException("At least one replacement item is required");
+
+        var batchCode = batch.BatchCode;
 
         var log = new ProductionMaintenanceLog(companyId, request.FinishedBatchId, batchCode, request.Notes);
+        if (!string.IsNullOrWhiteSpace(userName))
+        {
+            log.SetPerformedBy(userName);
+        }
+
+        foreach (var replacement in request.Replacements)
+        {
+            var product = await _productRepo.GetByIdAsync(companyId, replacement.ProductId)
+                ?? throw new InvalidOperationException($"Replacement product not found: {replacement.ProductId}");
+
+            if (!product.TrackInventory)
+                throw new InvalidOperationException($"Product {product.Name} is not inventory-tracked and cannot be used for repair deductions");
+
+            if (replacement.QuantityReplaced <= 0)
+                throw new InvalidOperationException($"Replacement quantity must be greater than 0 for {product.Name}");
+
+            if (product.StockQuantity < replacement.QuantityReplaced)
+                throw new InvalidOperationException(
+                    $"Insufficient stock for {product.Name}. Available: {product.StockQuantity}, required: {replacement.QuantityReplaced}");
+
+            product.AdjustStock(-replacement.QuantityReplaced);
+            await _productRepo.UpdateAsync(product);
+
+            var wastageReason = ParseWastageReason(replacement.Reason);
+            var inventoryAdjustment = new InventoryAdjustment(
+                companyId,
+                product.Id,
+                batchId: null,
+                adjustmentType: ToAdjustmentType(wastageReason),
+                quantity: replacement.QuantityReplaced,
+                costPerUnit: product.CostPrice,
+                reason: BuildRepairReason(batch, product.Name, replacement.Reason),
+                adjustedByUserId: userId);
+
+            inventoryAdjustment.AddNotes($"Finished batch: {batch.BatchCode} ({batch.RecipeName})");
+            if (!string.IsNullOrWhiteSpace(request.Notes))
+            {
+                inventoryAdjustment.AddNotes(request.Notes!);
+            }
+
+            await _inventoryAdjustmentRepo.AddAsync(inventoryAdjustment);
+
+            var wastageLog = new ProductionWastageLog(
+                companyId,
+                product.Id,
+                product.Name,
+                replacement.QuantityReplaced,
+                wastageReason,
+                batch.Id,
+                batch.BatchCode);
+
+            if (!string.IsNullOrWhiteSpace(userName))
+            {
+                wastageLog.SetCreatedBy(userName);
+            }
+
+            await _wastageRepo.AddAsync(wastageLog);
+        }
+
         log.SetReplacements(JsonSerializer.Serialize(request.Replacements));
 
         await _maintenanceRepo.AddAsync(log);
@@ -246,6 +451,7 @@ public class ProductionService
             BatchCode = batchCode,
             Replacements = request.Replacements,
             PerformedAt = log.PerformedAt.ToString("o"),
+            PerformedBy = log.PerformedBy,
             Notes = log.Notes
         };
     }
@@ -290,6 +496,24 @@ public class ProductionService
             CreatedAt = log.CreatedAtUtc.ToString("o")
         };
     }
+
+    private static WastageReason ParseWastageReason(string value)
+    {
+        if (Enum.TryParse<WastageReason>(value, true, out var result))
+            return result;
+
+        return WastageReason.Spoiled;
+    }
+
+    private static AdjustmentType ToAdjustmentType(WastageReason reason) => reason switch
+    {
+        WastageReason.Damaged => AdjustmentType.Damaged,
+        WastageReason.Wilted => AdjustmentType.Spoiled,
+        _ => AdjustmentType.Spoiled,
+    };
+
+    private static string BuildRepairReason(FinishedGoodsBatch batch, string productName, string reason)
+        => $"Repair replacement for {batch.RecipeName} ({batch.BatchCode}) using {productName}; issue: {reason}";
 
     // ─── Production Jobs ────────────────────────────────────
 

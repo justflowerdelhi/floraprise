@@ -88,6 +88,7 @@ const CompanyManagementPage = lazy(() => import('../pages/admin/CompanyManagemen
 const PlatformAnalyticsPage = lazy(() => import('../pages/admin/PlatformAnalyticsPage'));
 const PlatformSettingsPage = lazy(() => import('../pages/admin/PlatformSettingsPage'));
 const AdminDemoRequestsPage = lazy(() => import('../pages/admin/AdminDemoRequestsPage'));
+const DataCleanupPage = lazy(() => import('../pages/admin/DataCleanupPage'));
 
 // Categories
 const CategoryManagementPage = lazy(() =>
@@ -345,6 +346,7 @@ export default function AppRoutes() {
           <Route path="/settings/locations" element={<LocationsSettings />} />
           <Route path="/settings/delivery-zones" element={<DeliveryZonesSettings />} />
           <Route path="/settings/discount-rules" element={<DiscountRulesSettings />} />
+          <Route path="/settings/data-cleanup" element={<DataCleanupPage />} />
           <Route path="/day-close" element={<DayCloseScreen />} />
 
           {/* ─── Admin ──────────────────────────────────── */}

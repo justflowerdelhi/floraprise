@@ -108,22 +108,29 @@ const POSScreen: React.FC = () => {
 
       const normalizedProducts = normalizeProducts(rawProducts);
 
-      const finishedGoodsProducts = rawFinishedGoods.map((fg: any) => ({
-        id: `FG-${fg.id}`,
+      const finishedGoodsProducts = rawFinishedGoods
+        .map((fg: any) => {
+        const finishedGoodsId = String(fg.id ?? fg.Id ?? '').trim();
+        if (!finishedGoodsId) return null;
+
+        return ({
+        id: finishedGoodsId,
         name: fg.name || fg.recipeName || "Ready Bouquet",
         sku: fg.sku || fg.batchCode || fg.id,
-        barcode: fg.barcode,
-        finishedBarcode: fg.barcode,
+        barcode: fg.barcode || fg.Barcode,
+        finishedBarcode: fg.barcode || fg.Barcode,
         category: "Bouquets",
-        sellingPrice: Number(fg.retailPrice) || Number(fg.sellingPrice) || 0,
-        costPrice: Number(fg.costPrice) || 0,
+        sellingPrice: Number(fg.retailPrice ?? fg.RetailPrice) || Number(fg.sellingPrice) || 0,
+        costPrice: Number(fg.costPrice ?? fg.CostPrice) || 0,
         taxRate: 0,
-        availableStock: Number(fg.stockQuantity) || Number(fg.quantityAvailable) || 0,
+        availableStock: Number(fg.stockQuantity ?? fg.StockQuantity) || Number(fg.quantityAvailable) || 0,
         isPerishable: true,
         trackBatch: false,
         imageUrl: "",
         batches: [],
-      }));
+      } as Product);
+      })
+      .filter((fg: Product | null): fg is Product => fg !== null);
 
       const mergedProducts = [
         ...finishedGoodsProducts,

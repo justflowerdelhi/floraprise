@@ -25,6 +25,7 @@ import LightModeIcon from '@mui/icons-material/LightMode';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import SaveIcon from '@mui/icons-material/Save';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { useAuth } from '../../auth/AuthContext';
 
 import type { AdjustmentProduct, AdjustmentRecord } from './data/adjustment.data';
 import {
@@ -41,6 +42,8 @@ import AdjustmentForm from './components/AdjustmentForm';
 import WastageSummaryPanel from './components/WastageSummaryPanel';
 
 const AdjustmentEntryPage = () => {
+  const { user } = useAuth();
+
   // ── State ──────────────────────────────────────────────────
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -68,23 +71,42 @@ const AdjustmentEntryPage = () => {
     mode: 'onChange',
   });
 
+  const adjustedByName = user?.name?.trim() ?? '';
+
+  useEffect(() => {
+    if (adjustedByName) {
+      setValue('adjustedBy', adjustedByName, { shouldDirty: false });
+    }
+  }, [adjustedByName, setValue]);
+
+  const reloadData = useCallback(async () => {
+    const [prods, adjs] = await Promise.all([
+      fetchProducts(),
+      fetchRecentAdjustments(),
+    ]);
+    setProducts(prods);
+    setRecentAdjustments(adjs);
+  }, []);
+
   // ── Load data ──────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    Promise.all([fetchProducts(), fetchRecentAdjustments()]).then(
-      ([prods, adjs]) => {
+    reloadData().then(() => {
         if (!cancelled) {
-          setProducts(prods);
-          setRecentAdjustments(adjs);
           setLoading(false);
         }
-      },
-    );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadData]);
 
   // ── Wastage summary ───────────────────────────────────────
   const totalInventoryValue = useMemo(
@@ -129,12 +151,16 @@ const AdjustmentEntryPage = () => {
         const payload = buildPayload(data, product);
         const result = await submitAdjustment(payload);
         if (result.success) {
+          await reloadData();
           setSnackbar({
             open: true,
             message: `Adjustment recorded — ${fmt(payload.totalValue)} deducted`,
             severity: 'success',
           });
           reset({ ...defaultFormValues });
+          if (adjustedByName) {
+            setValue('adjustedBy', adjustedByName, { shouldDirty: false });
+          }
         }
       } catch {
         setSnackbar({
@@ -146,7 +172,7 @@ const AdjustmentEntryPage = () => {
         setIsSubmitting(false);
       }
     },
-    [products, reset],
+    [adjustedByName, products, reloadData, reset, setValue],
   );
 
   // ── Styling ────────────────────────────────────────────────

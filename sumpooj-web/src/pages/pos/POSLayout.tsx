@@ -77,22 +77,28 @@ const POSLayout: React.FC = () => {
 
         const finishedGoodsItems = (Array.isArray(finishedGoodsRes) ? finishedGoodsRes : [])
           .filter((fg: any) => !currentLocationId || fg.locationId === currentLocationId)
-          .map((fg: any) => ({
-            id: `FG-${fg.id}`,
+          .map((fg: any) => {
+            const finishedGoodsId = String(fg.id ?? fg.Id ?? '').trim();
+            if (!finishedGoodsId) return null;
+
+            return ({
+            id: finishedGoodsId,
             name: fg.name || fg.recipeName || 'Ready Bouquet',
             sku: fg.sku || fg.batchCode || fg.id,
-            barcode: fg.barcode,
-            finishedBarcode: fg.barcode,
+            barcode: fg.barcode || fg.Barcode,
+            finishedBarcode: fg.barcode || fg.Barcode,
             category: 'Bouquets',
-            sellingPrice: Number(fg.retailPrice) || Number(fg.sellingPrice) || 0,
-            costPrice: Number(fg.costPrice) || 0,
+            sellingPrice: Number(fg.retailPrice ?? fg.RetailPrice) || Number(fg.sellingPrice) || 0,
+            costPrice: Number(fg.costPrice ?? fg.CostPrice) || 0,
             taxRate: 0,
-            availableStock: Number(fg.stockQuantity) || Number(fg.quantityAvailable) || 0,
+            availableStock: Number(fg.stockQuantity ?? fg.StockQuantity) || Number(fg.quantityAvailable) || 0,
             isPerishable: true,
             trackBatch: false,
             imageUrl: '',
             batches: [],
-          } as Product));
+          } as Product);
+          })
+          .filter((fg: Product | null): fg is Product => fg !== null);
 
         setProducts([...finishedGoodsItems, ...normalized]);
         const custItems = Array.isArray(custRes) ? custRes : custRes?.items ?? [];

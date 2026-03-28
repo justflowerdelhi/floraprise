@@ -1,11 +1,11 @@
 /**
- * MaintenanceModal.tsx — Bouquet Maintenance / Repair Workflow
+ * MaintenanceModal.tsx — Finished Goods Repair Workflow
  *
  * Features:
  * - Replace spoiled/wilted components in active finished batches
  * - Select replacement material and quantity
  * - Choose wastage reason
- * - Logs wastage + maintenance entries
+ * - Logs wastage + repair entries
  * - Does NOT change finished goods quantity
  */
 
@@ -20,7 +20,7 @@ import {
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
-  Build as MaintainIcon,
+  Build as RepairIcon,
   Warning as WarningIcon,
 } from '@mui/icons-material';
 import type {
@@ -56,6 +56,22 @@ const MaintenanceModal = ({ open, batch, onClose, onComplete }: MaintenanceModal
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  const replacementAvailability = useMemo(
+    () =>
+      replacements.map((row) => {
+        const product = inventoryProducts.find((item) => item.id === row.productId);
+        const available = product?.quantityAvailable ?? 0;
+        return {
+          key: row._key,
+          available,
+          insufficient: Boolean(row.productId) && row.quantityReplaced > available,
+        };
+      }),
+    [inventoryProducts, replacements],
+  );
+
+  const hasInsufficientStock = replacementAvailability.some((row) => row.insufficient);
 
   // ── Load inventory for the batch's location ────────────────
   useEffect(() => {
@@ -113,8 +129,8 @@ const MaintenanceModal = ({ open, batch, onClose, onComplete }: MaintenanceModal
   // ── Validation ─────────────────────────────────────────────
   const isValid = useMemo(() => {
     if (replacements.length === 0) return false;
-    return replacements.every((r) => r.productId && r.quantityReplaced > 0 && r.reason);
-  }, [replacements]);
+    return replacements.every((r) => r.productId && r.quantityReplaced > 0 && r.reason) && !hasInsufficientStock;
+  }, [hasInsufficientStock, replacements]);
 
   // ── Cannot maintain if qty = 0 ────────────────────────────
   const canMaintain = batch.quantityAvailable > 0 && batch.status === 'ACTIVE';
@@ -153,8 +169,8 @@ const MaintenanceModal = ({ open, batch, onClose, onComplete }: MaintenanceModal
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <MaintainIcon sx={{ color: '#ff9800' }} />
-        Maintain Bouquet
+        <RepairIcon sx={{ color: '#ff9800' }} />
+        Repair Ready Product
         <Chip
           label={batch.batchCode}
           size="small"
@@ -172,10 +188,10 @@ const MaintenanceModal = ({ open, batch, onClose, onComplete }: MaintenanceModal
 
         {success ? (
           <Box sx={{ py: 4, textAlign: 'center' }}>
-            <MaintainIcon sx={{ fontSize: 48, color: '#4caf50', mb: 1 }} />
-            <Typography variant="h6" fontWeight={700} color="success.main">Maintenance Complete!</Typography>
+            <RepairIcon sx={{ fontSize: 48, color: '#4caf50', mb: 1 }} />
+            <Typography variant="h6" fontWeight={700} color="success.main">Repair Complete!</Typography>
             <Typography color="text.secondary">
-              Replacement components deducted from raw inventory. Spoiled items logged as wastage.
+              Replacement components were deducted from inventory and damaged/spoiled items were logged as wastage.
             </Typography>
           </Box>
         ) : (
@@ -202,7 +218,7 @@ const MaintenanceModal = ({ open, batch, onClose, onComplete }: MaintenanceModal
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
               <Typography variant="subtitle2" fontWeight={700}>
                 <WarningIcon sx={{ fontSize: 16, mr: 0.5, verticalAlign: 'text-bottom', color: '#ff9800' }} />
-                Components to Replace
+                Components to Repair
               </Typography>
               <Button
                 size="small"
@@ -224,7 +240,7 @@ const MaintenanceModal = ({ open, batch, onClose, onComplete }: MaintenanceModal
                 }}
               >
                 <Typography color="text.secondary" variant="body2">
-                  Add components that need replacement (spoiled, wilted, or damaged)
+                  Add damaged or spoiled components that must be replaced from available inventory
                 </Typography>
               </Box>
             ) : (
@@ -264,6 +280,7 @@ const MaintenanceModal = ({ open, batch, onClose, onComplete }: MaintenanceModal
                           onChange={(e) => updateReplacement(rep._key, 'quantityReplaced', Number(e.target.value))}
                           inputProps={{ min: 1 }}
                           sx={{ width: 70 }}
+                          error={replacementAvailability.find((item) => item.key === rep._key)?.insufficient ?? false}
                         />
                       </TableCell>
                       <TableCell>
@@ -295,6 +312,12 @@ const MaintenanceModal = ({ open, batch, onClose, onComplete }: MaintenanceModal
               </Table>
             )}
 
+            {hasInsufficientStock && (
+              <Alert severity="error" sx={{ mb: 2, borderRadius: 1.5 }}>
+                One or more repair rows exceed available inventory. Reduce the quantity or choose another component.
+              </Alert>
+            )}
+
             {/* Notes */}
             <TextField
               label="Notes (optional)"
@@ -307,9 +330,8 @@ const MaintenanceModal = ({ open, batch, onClose, onComplete }: MaintenanceModal
               sx={{ mt: 1 }}
             />
 
-            <Alert severity="info" sx={{ mt: 2, borderRadius: 1.5 }} icon={<MaintainIcon />}>
-              <strong>What happens:</strong> Replacement quantities are deducted from raw inventory (FIFO).
-              Spoiled items are logged in the Wastage Log. Finished goods quantity remains unchanged.
+            <Alert severity="info" sx={{ mt: 2, borderRadius: 1.5 }} icon={<RepairIcon />}>
+              <strong>What happens:</strong> Repair quantities are deducted from raw inventory and a wastage entry is created for the damaged component against this finished batch. Finished goods quantity remains unchanged.
             </Alert>
           </>
         )}
@@ -324,10 +346,10 @@ const MaintenanceModal = ({ open, batch, onClose, onComplete }: MaintenanceModal
             variant="contained"
             onClick={handleSubmit}
             disabled={!isValid || !canMaintain || submitting}
-            startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <MaintainIcon />}
+            startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <RepairIcon />}
             sx={{ bgcolor: '#ff9800', '&:hover': { bgcolor: '#f57c00' } }}
           >
-            {submitting ? 'Processing...' : 'Perform Maintenance'}
+            {submitting ? 'Processing...' : 'Perform Repair'}
           </Button>
         )}
       </DialogActions>

@@ -9,7 +9,8 @@ interface BouquetComponent {
 }
 
 export const generateBouquetName = (components: BouquetComponent[]) => {
-  if (!components.length) return "Custom Bouquet";
+  const stamp = new Date().toISOString().slice(11, 16).replace(':', '');
+  if (!components.length) return `Custom Bouquet ${stamp}`;
 
   // Sort by quantity (largest first)
   const sorted = [...components].sort((a, b) => b.quantity - a.quantity);
@@ -19,14 +20,14 @@ export const generateBouquetName = (components: BouquetComponent[]) => {
 
   // Example: "10 Red Rose Bouquet"
   if (!second) {
-    return `${main.quantity} ${main.productName} Bouquet`;
+    return `${main.quantity} ${main.productName} Bouquet ${stamp}`;
   }
 
   // Example: "Red Rose & Lily Bouquet"
   if (sorted.length === 2) {
-    return `${main.productName} & ${second.productName} Bouquet`;
+    return `${main.quantity} ${main.productName} + ${second.productName} ${stamp}`;
   }
 
   // Example: "Mixed Rose Bouquet"
-  return `Mixed ${main.productName} Bouquet`;
+  return `${main.quantity} ${main.productName} Mixed Bouquet ${stamp}`;
 };

@@ -30,7 +30,10 @@ import { Controller } from 'react-hook-form';
 import type { Control, FieldErrors, UseFormWatch, UseFormSetValue } from 'react-hook-form';
 
 import type { AdjustmentProduct, ProductBatch } from '../data/adjustment.data';
-import { ADJUSTMENT_TYPES, STAFF_MEMBERS, MOCK_BATCHES } from '../data/adjustment.data';
+import {
+  ADJUSTMENT_TYPES,
+  fetchBatchesForProduct,
+} from '../data/adjustment.data';
 import type { AdjustmentSchemaType } from '../schemas/adjustment.schema';
 import {
   fmt,
@@ -86,22 +89,40 @@ const AdjustmentForm = ({
 
   // Load batches when product changes
   useEffect(() => {
-    if (watchProductId) {
-      const filtered = MOCK_BATCHES.filter((b) => b.productId === watchProductId);
-      setBatches(filtered);
-      if (pendingBatchId) {
-        const match = filtered.find((b) => b.id === pendingBatchId);
-        if (match) {
-          setValue('batchId', pendingBatchId);
-          setPendingBatchId(null);
-          return;
-        }
-      }
-      setValue('batchId', '');
-    } else {
+    let cancelled = false;
+
+    if (!watchProductId) {
       setBatches([]);
       setValue('batchId', '');
+      return;
     }
+
+    fetchBatchesForProduct(watchProductId)
+      .then((result) => {
+        if (cancelled) return;
+
+        setBatches(result);
+
+        if (pendingBatchId) {
+          const match = result.find((b) => b.id === pendingBatchId);
+          if (match) {
+            setValue('batchId', pendingBatchId);
+            setPendingBatchId(null);
+            return;
+          }
+        }
+
+        setValue('batchId', '');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setBatches([]);
+        setValue('batchId', '');
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [watchProductId, setValue, pendingBatchId]);
 
   const handleScanSubmit = () => {
@@ -110,16 +131,21 @@ const AdjustmentForm = ({
       setScanError('Enter a batch code to continue.');
       return;
     }
-    const match = MOCK_BATCHES.find((b) => b.batchCode.toLowerCase() === code.toLowerCase());
+    const match = batches.find((b) => b.batchCode.toLowerCase() === code.toLowerCase());
     if (!match) {
-      setScanError('Batch code not found.');
+      setScanError('Batch code not found for selected product.');
       return;
     }
     setScanError('');
     setScanOpen(false);
     setScanValue('');
-    setValue('productId', match.productId);
-    setPendingBatchId(match.id);
+    if (!watchProductId) {
+      setValue('productId', match.productId);
+      setPendingBatchId(match.id);
+      return;
+    }
+
+    setValue('batchId', match.id);
   };
 
   // Smart calculations
@@ -403,23 +429,14 @@ const AdjustmentForm = ({
         render={({ field }) => (
           <TextField
             {...field}
-            select
-            label="Adjusted By *"
+            label="Adjusted By"
             size="small"
             fullWidth
+            disabled
             error={!!errors.adjustedBy}
-            helperText={errors.adjustedBy?.message}
+            helperText={errors.adjustedBy?.message ?? 'Auto-filled from logged-in user'}
             sx={{ mb: 2.5, ...fieldSx }}
-          >
-            <MenuItem value="" disabled>
-              Select staff…
-            </MenuItem>
-            {STAFF_MEMBERS.map((s) => (
-              <MenuItem key={s} value={s}>
-                {s}
-              </MenuItem>
-            ))}
-          </TextField>
+          />
         )}
       />
 

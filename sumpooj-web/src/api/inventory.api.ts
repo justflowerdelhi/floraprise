@@ -101,6 +101,11 @@ export const getInventorySummary = async () => {
   return res.data;
 };
 
+export const getInventoryProducts = async () => {
+  const res = await api.get('/inventory/products');
+  return res.data;
+};
+
 export const searchAdjustments = async (params: AdjustmentSearchParams = {}) => {
   const res = await api.get('/inventory/adjustments', { params });
   return res.data;

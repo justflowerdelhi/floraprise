@@ -4,6 +4,7 @@ using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Production;
 using Sumpooj.Application.UseCases;
+using System.Security.Claims;
 
 namespace Sumpooj.API.Controllers;
 
@@ -104,8 +105,8 @@ public class ProductionController : ControllerBase
     // ─── Custom Bouquet ─────────────────────────────────────
 
     [HttpPost("custom/sell")]
-    public ActionResult CustomSell([FromBody] CustomBouquetRequest _)
-        => Ok(new { success = true });
+    public async Task<ActionResult<SellableFinishedGoodDto>> CustomSell([FromBody] CustomBouquetRequest request)
+        => Ok(await _service.CreateCustomBouquetAndSellAsync(CompanyId, request));
 
     [HttpPost("custom/save-recipe")]
     public async Task<ActionResult<FloralRecipeDto>> SaveCustomRecipe([FromBody] CustomBouquetSaveRequest request)
@@ -123,7 +124,11 @@ public class ProductionController : ControllerBase
     [HttpPost("maintenance")]
     public async Task<ActionResult<MaintenanceLogDto>> CreateMaintenance([FromBody] MaintenanceRequest request)
     {
-        var log = await _service.CreateMaintenanceAsync(CompanyId, request);
+        var log = await _service.CreateMaintenanceAsync(
+            CompanyId,
+            request,
+            GetCurrentUserId(),
+            GetCurrentUserName());
         return Ok(log);
     }
 
@@ -145,4 +150,13 @@ public class ProductionController : ControllerBase
     [HttpGet("inventory-products")]
     public async Task<ActionResult<List<InventoryProductDto>>> GetInventoryProducts([FromQuery] Guid locationId)
         => Ok(await _service.GetInventoryProductsAsync(CompanyId, locationId));
+
+    private Guid GetCurrentUserId()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(userIdClaim, out var userId) ? userId : Guid.Empty;
+    }
+
+    private string? GetCurrentUserName()
+        => User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
 }

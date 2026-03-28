@@ -466,11 +466,30 @@ public class OrderService
     /// </summary>
     private async Task DeductInventoryForOrderAsync(Guid companyId, Order order)
     {
+        var finishedBatches = await _finishedGoodsBatchRepository.GetAllAsync(companyId);
+
         foreach (var item in order.Items)
         {
+            // Always prefer consuming an active finished-goods batch when it matches
+            // this sold item (batch id match or recipe-name + location match).
+            var finishedBatch = ResolveFinishedGoodsBatch(order, item, finishedBatches);
+            if (finishedBatch != null)
+            {
+                if (finishedBatch.QuantityAvailable < item.Quantity)
+                    throw new Exception($"Not enough stock for finished goods batch {finishedBatch.BatchCode}");
+
+                finishedBatch.Deduct(item.Quantity);
+                await _finishedGoodsBatchRepository.UpdateAsync(finishedBatch);
+                continue;
+            }
+
             var product = await _productRepository.GetByIdAsync(item.ProductId);
 
-            if (product == null) continue;
+            // Finished goods are sold from production batches (not Products table rows).
+            if (product == null)
+            {
+                continue;
+            }
 
             // Case 1: Batch-based inventory
             if (product.TrackBatch)
@@ -555,6 +574,8 @@ public class OrderService
                         "POS Sale"
                     )
                 );
+
+                continue;
             }
         }
     }
@@ -633,18 +654,33 @@ public class OrderService
 
             // Post COGS for the sold products: Dr COGS / Cr Inventory.
             decimal totalCogs = 0m;
+            var finishedBatches = await _finishedGoodsBatchRepository.GetAllAsync(companyId);
             foreach (var item in order.Items)
             {
+                // Keep COGS source aligned with inventory deduction rule above.
+                var finishedBatch = ResolveFinishedGoodsBatch(order, item, finishedBatches);
+                if (finishedBatch != null)
+                {
+                    var unitCost = finishedBatch.QuantityProduced > 0
+                        ? finishedBatch.TotalCost / finishedBatch.QuantityProduced
+                        : 0m;
+                    var finishedGoodsCogs = unitCost * item.Quantity;
+                    if (finishedGoodsCogs > 0)
+                        totalCogs += finishedGoodsCogs;
+                    continue;
+                }
+
                 var product = await _productRepository.GetByIdAsync(companyId, item.ProductId);
-                if (product == null)
-                    continue;
-
-                if (!product.TrackInventory)
-                    continue;
-
-                var lineCogs = product.CostPrice * item.Quantity;
-                if (lineCogs > 0)
-                    totalCogs += lineCogs;
+                if (product != null)
+                {
+                    if (product.TrackInventory)
+                    {
+                        var lineCogs = product.CostPrice * item.Quantity;
+                        if (lineCogs > 0)
+                            totalCogs += lineCogs;
+                        continue;
+                    }
+                }
             }
 
             if (totalCogs > 0)
@@ -675,6 +711,41 @@ public class OrderService
             // Log and continue — the order itself is already saved
             System.Diagnostics.Debug.WriteLine($"[OrderService] Journal entry creation failed: {ex.Message}");
         }
+    }
+
+    private static FinishedGoodsBatch? ResolveFinishedGoodsBatch(Order order, OrderItem item, List<FinishedGoodsBatch> finishedBatches)
+    {
+        var activeBatches = finishedBatches
+            .Where(b => b.Status == FinishedBatchStatus.Active && b.QuantityAvailable > 0)
+            .ToList();
+
+        if (activeBatches.Count == 0)
+            return null;
+
+        // Preferred match: exact batch id.
+        var byId = activeBatches.FirstOrDefault(b => b.Id == item.ProductId);
+        if (byId != null)
+            return byId;
+
+        var normalizedName = (item.ProductName ?? string.Empty).Trim();
+        if (normalizedName.Length == 0)
+            return null;
+
+        IEnumerable<FinishedGoodsBatch> candidates = activeBatches.Where(
+            b => string.Equals(b.RecipeName, normalizedName, StringComparison.OrdinalIgnoreCase));
+
+        if (order.LocationId.HasValue)
+        {
+            var scoped = candidates.Where(b => b.LocationId == order.LocationId.Value).ToList();
+            if (scoped.Count > 0)
+                candidates = scoped;
+        }
+
+        // FEFO style: consume the earliest-expiring produced batch first.
+        return candidates
+            .OrderBy(b => b.ExpectedExpiry)
+            .ThenBy(b => b.ProducedAt)
+            .FirstOrDefault();
     }
 
     /// <summary>

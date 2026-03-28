@@ -3,6 +3,14 @@
  * Florist POS + ERP SaaS Platform
  */
 
+import {
+  createAdjustment,
+  getBatchesByProduct,
+  getRecentAdjustments,
+  getInventoryProducts,
+} from '../../../api/inventory.api';
+import { safeArray } from '../../../utils/safeArray';
+
 // ─── Enums / Constants ───────────────────────────────────────
 
 export const ADJUSTMENT_TYPES = [
@@ -383,23 +391,7 @@ export const STAFF_MEMBERS = [
   'Ravi Kumar',
 ] as const;
 
-// ─── Mock API ────────────────────────────────────────────────
-
-export const fetchProducts = (): Promise<AdjustmentProduct[]> =>
-  new Promise((resolve) => setTimeout(() => resolve([...MOCK_PRODUCTS]), 500));
-
-export const fetchBatchesForProduct = (productId: string): Promise<ProductBatch[]> =>
-  new Promise((resolve) =>
-    setTimeout(
-      () => resolve(MOCK_BATCHES.filter((b) => b.productId === productId)),
-      300,
-    ),
-  );
-
-export const fetchRecentAdjustments = (): Promise<AdjustmentRecord[]> =>
-  new Promise((resolve) =>
-    setTimeout(() => resolve([...MOCK_RECENT_ADJUSTMENTS]), 400),
-  );
+// ─── API Payload Contracts ───────────────────────────────────
 
 export interface SubmitAdjustmentPayload {
   productId: string;
@@ -413,10 +405,172 @@ export interface SubmitAdjustmentPayload {
   totalValue: number;
 }
 
-export const submitAdjustment = (payload: SubmitAdjustmentPayload): Promise<{ success: boolean; id: string }> =>
-  new Promise((resolve) =>
-    setTimeout(() => {
-      console.log('📦 Adjustment API Payload:', JSON.stringify(payload, null, 2));
-      resolve({ success: true, id: `adj_${Date.now()}` });
-    }, 600),
+type ApiAdjustment = {
+  id?: string;
+  productId?: string;
+  productName?: string;
+  batchId?: string | null;
+  batchNumber?: string | null;
+  adjustmentType?: string;
+  quantity?: number;
+  reason?: string;
+  adjustedByName?: string | null;
+  adjustmentDate?: string;
+  costPerUnit?: number;
+  totalValue?: number;
+  createdAtUtc?: string;
+};
+
+type ApiInventoryProduct = {
+  id?: string;
+  name?: string;
+  productType?: string;
+  quantityAvailable?: number;
+  unitCost?: number;
+};
+
+type ApiBatch = {
+  id?: string;
+  productId?: string;
+  batchNumber?: string;
+  quantityRemaining?: number;
+  expiryDate?: string | null;
+  storageLocation?: string | null;
+  receivedDate?: string;
+};
+
+const mapAdjustmentTypeToUi = (value: string | undefined): AdjustmentType => {
+  const normalized = String(value ?? '').toLowerCase();
+
+  switch (normalized) {
+    case 'spoiled':
+      return 'spoiled';
+    case 'damaged':
+      return 'damaged';
+    case 'usedforevent':
+    case 'used_for_event':
+      return 'used_for_event';
+    case 'usedforsample':
+    case 'sample':
+    case 'used_for_sample':
+      return 'sample';
+    case 'correction':
+    case 'count_correction':
+      return 'count_correction';
+    default:
+      return 'internal_use';
+  }
+};
+
+const mapApiAdjustment = (a: ApiAdjustment): AdjustmentRecord => ({
+  id: String(a.id ?? ''),
+  productId: String(a.productId ?? ''),
+  productName: String(a.productName ?? 'Unknown Product'),
+  batchId: String(a.batchId ?? ''),
+  batchNumber: String(a.batchNumber ?? ''),
+  adjustmentType: mapAdjustmentTypeToUi(a.adjustmentType),
+  quantity: Number(a.quantity ?? 0),
+  reason: String(a.reason ?? ''),
+  adjustedBy: String(a.adjustedByName ?? ''),
+  adjustmentDate: String(a.adjustmentDate ?? new Date().toISOString()),
+  costPerUnit: Number(a.costPerUnit ?? 0),
+  totalValue: Number(a.totalValue ?? 0),
+  createdAt: String(a.createdAtUtc ?? a.adjustmentDate ?? new Date().toISOString()),
+});
+
+const inferPerishable = (productType: string): boolean => {
+  const normalized = productType.toLowerCase();
+  return (
+    normalized.includes('flower') ||
+    normalized.includes('fresh') ||
+    normalized.includes('floral')
   );
+};
+
+export const fetchProducts = async (): Promise<AdjustmentProduct[]> => {
+  try {
+    const payload = await getInventoryProducts();
+    const data = safeArray<ApiInventoryProduct>(payload, 'items');
+
+    if (data.length === 0) {
+      return [];
+    }
+
+    return data.map((p) => {
+      const productType = String(p.productType ?? 'General');
+      const unitCost = Number(p.unitCost ?? 0);
+      const id = String(p.id ?? '');
+
+      return {
+        id,
+        name: String(p.name ?? 'Unnamed Product'),
+        sku: `SKU-${id.slice(0, 8).toUpperCase()}`,
+        isPerishable: inferPerishable(productType),
+        currentStock: Number(p.quantityAvailable ?? 0),
+        costPerUnit: unitCost,
+        sellingPricePerUnit: unitCost,
+        category: productType,
+      };
+    });
+  } catch {
+    return [];
+  }
+};
+
+export const fetchBatchesForProduct = async (productId: string): Promise<ProductBatch[]> => {
+  if (!productId) return [];
+
+  try {
+    const payload = await getBatchesByProduct(productId);
+    const data = safeArray<ApiBatch>(payload, 'items');
+
+    if (data.length === 0) {
+      return [];
+    }
+
+    return data.map((b) => ({
+      id: String(b.id ?? ''),
+      productId: String(b.productId ?? productId),
+      batchCode: String(b.batchNumber ?? ''),
+      quantityRemaining: Number(b.quantityRemaining ?? 0),
+      expiryDate: b.expiryDate ? String(b.expiryDate).slice(0, 10) : null,
+      storageLocation: String(b.storageLocation ?? 'N/A'),
+      purchaseDate: String(b.receivedDate ?? new Date().toISOString()).slice(0, 10),
+    }));
+  } catch {
+    return [];
+  }
+};
+
+export const fetchRecentAdjustments = async (): Promise<AdjustmentRecord[]> => {
+  try {
+    const payload = await getRecentAdjustments(25);
+    const data = safeArray<ApiAdjustment>(payload, 'items');
+
+    if (data.length === 0) {
+      return [];
+    }
+
+    return data.map(mapApiAdjustment);
+  } catch {
+    return [];
+  }
+};
+
+export const submitAdjustment = async (
+  payload: SubmitAdjustmentPayload,
+): Promise<{ success: boolean; id: string }> => {
+  const response = await createAdjustment({
+    productId: payload.productId,
+    batchId: payload.batchId || null,
+    adjustmentType: payload.adjustmentType,
+    quantity: payload.quantity,
+    costPerUnit: payload.costPerUnit,
+    reason: payload.reason,
+    adjustmentDate: payload.adjustmentDate,
+    notes: payload.adjustedBy ? `Adjusted by: ${payload.adjustedBy}` : null,
+  });
+
+  const id = String((response as { id?: string })?.id ?? '');
+  return { success: true, id };
+};

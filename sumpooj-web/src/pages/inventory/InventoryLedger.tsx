@@ -108,7 +108,7 @@ const InventoryLedger = () => {
         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded text-sm">
           No ledger entries found for{" "}
           {selectedProduct ? `"${selectedProduct.name}"` : "this product"}.
-          Ledger entries are created when a POS sale deducts stock.
+          Ledger entries are created when stock changes through purchases, sales, and adjustments.
         </div>
       )}
 

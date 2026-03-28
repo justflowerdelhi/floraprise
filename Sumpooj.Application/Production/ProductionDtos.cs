@@ -116,10 +116,13 @@ public class CustomBouquetComponent
 
 public class CustomBouquetRequest
 {
+    public string? Name { get; set; }
+    public string? Category { get; set; }
     public List<CustomBouquetComponent> Components { get; set; } = new();
     public decimal SellingPrice { get; set; }
     public decimal? LaborCost { get; set; }
     public string? Image { get; set; }
+    public Guid LocationId { get; set; }
 }
 
 public class CustomBouquetSaveRequest : CustomBouquetRequest

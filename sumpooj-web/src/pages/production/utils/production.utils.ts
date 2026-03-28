@@ -60,9 +60,17 @@ export const expiryLabel = (expiryDate: string): string => {
 
 // ─── Batch Status Helpers ───────────────────────────────────
 
+const normalizeBatchStatus = (status: FinishedGoodsBatch['status'] | string): FinishedGoodsBatch['status'] => {
+  const normalized = String(status).toUpperCase();
+  if (normalized === 'EXPIRED') return 'EXPIRED';
+  if (normalized === 'DISCARDED') return 'DISCARDED';
+  return 'ACTIVE';
+};
+
 export const getBatchDisplayStatus = (batch: FinishedGoodsBatch): { label: string; color: 'success' | 'warning' | 'error' | 'default' } => {
-  if (batch.status === 'DISCARDED') return { label: 'Discarded', color: 'default' };
-  if (batch.status === 'EXPIRED' || isExpired(batch.expectedExpiry)) return { label: 'Expired', color: 'error' };
+  const status = normalizeBatchStatus(batch.status);
+  if (status === 'DISCARDED') return { label: 'Discarded', color: 'default' };
+  if (status === 'EXPIRED' || isExpired(batch.expectedExpiry)) return { label: 'Expired', color: 'error' };
   if (batch.quantityAvailable === 0) return { label: 'Sold Out', color: 'default' };
   const hours = hoursUntilExpiry(batch.expectedExpiry);
   if (hours <= 12) return { label: 'Expiring Soon', color: 'warning' };
@@ -70,10 +78,10 @@ export const getBatchDisplayStatus = (batch: FinishedGoodsBatch): { label: strin
 };
 
 export const isBatchSellable = (batch: FinishedGoodsBatch): boolean =>
-  batch.status === 'ACTIVE' && batch.quantityAvailable > 0 && !isExpired(batch.expectedExpiry);
+  normalizeBatchStatus(batch.status) === 'ACTIVE' && batch.quantityAvailable > 0 && !isExpired(batch.expectedExpiry);
 
 export const isBatchMaintainable = (batch: FinishedGoodsBatch): boolean =>
-  batch.status === 'ACTIVE' && batch.quantityAvailable > 0;
+  normalizeBatchStatus(batch.status) === 'ACTIVE' && batch.quantityAvailable > 0 && !isExpired(batch.expectedExpiry);
 
 // ─── Currency Formatter ─────────────────────────────────────
 

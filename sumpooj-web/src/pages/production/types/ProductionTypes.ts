@@ -108,10 +108,13 @@ export interface CustomBouquetComponent {
 }
 
 export interface CustomBouquetRequest {
+  name?: string;
+  category?: string;
   components: CustomBouquetComponent[];
   sellingPrice: number;
   laborCost?: number;
   image?: string;
+  locationId: string;
 }
 
 // ─── Maintenance / Repair ───────────────────────────────────

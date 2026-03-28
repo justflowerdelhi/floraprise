@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Box, Container, Typography, TextField, Card, CardContent,
+  Alert, Box, Container, Typography, TextField, Card, CardContent,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
   Chip, InputAdornment, Select, MenuItem, FormControl, InputLabel,
   Paper, useTheme, alpha, Skeleton, Grid,
@@ -20,10 +20,57 @@ import {
   DeleteSweep as WastageIcon,
   TrendingDown as TrendIcon,
 } from '@mui/icons-material';
-import type { WastageLog, WastageFilterState, WastageReason } from './types/ProductionTypes';
+import type {
+  WastageLog,
+  WastageFilterState,
+  WastageReason,
+} from './types/ProductionTypes';
 import { WASTAGE_REASONS } from './types/ProductionTypes';
-import { getWastageLogs } from './api/production.api';
+import { getRecentAdjustments } from '../../api/inventory.api';
+import { safeArray } from '../../utils/safeArray';
 import { formatDateTime, aggregateWastage } from './utils/production.utils';
+
+const WASTAGE_ADJUSTMENT_TYPES = new Set([
+  'spoiled',
+  'damaged',
+  'expired',
+  'wilted',
+  'lost',
+  'theft',
+]);
+
+type InventoryAdjustmentLike = {
+  id?: string;
+  productId?: string;
+  productName?: string;
+  batchNumber?: string | null;
+  adjustmentType?: string;
+  quantity?: number;
+  reason?: string;
+  adjustedByName?: string | null;
+  adjustmentDate?: string;
+  createdAtUtc?: string;
+};
+
+const toWastageReason = (adjustmentType: string, reason: string): WastageReason => {
+  const type = adjustmentType.toLowerCase();
+  const reasonText = reason.toLowerCase();
+
+  if (type.includes('damaged')) return 'DAMAGED';
+  if (type.includes('wilted') || reasonText.includes('wilt')) return 'WILTED';
+  return 'SPOILED';
+};
+
+const toWastageLog = (a: InventoryAdjustmentLike): WastageLog => ({
+  id: String(a.id ?? ''),
+  productId: String(a.productId ?? ''),
+  productName: String(a.productName ?? 'Unknown Product'),
+  quantity: Number(a.quantity ?? 0),
+  reason: toWastageReason(String(a.adjustmentType ?? ''), String(a.reason ?? '')),
+  relatedBatchCode: a.batchNumber ? String(a.batchNumber) : undefined,
+  createdAt: String(a.createdAtUtc ?? a.adjustmentDate ?? new Date().toISOString()),
+  createdBy: a.adjustedByName ? String(a.adjustedByName) : undefined,
+});
 
 const WastageLogPage = () => {
   const theme = useTheme();
@@ -32,6 +79,7 @@ const WastageLogPage = () => {
   // ── State ──────────────────────────────────────────────────
   const [logs, setLogs] = useState<WastageLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string>('');
   const [filters, setFilters] = useState<WastageFilterState>({
     search: '',
     reason: 'ALL',
@@ -42,11 +90,25 @@ const WastageLogPage = () => {
   // ── Load ───────────────────────────────────────────────────
   const loadLogs = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
-      const data = await getWastageLogs();
-      setLogs(data);
+      const data = await getRecentAdjustments(1000);
+      const rows = safeArray<InventoryAdjustmentLike>(data, 'Items');
+
+      const wastageAdjustments = rows.filter((row) => {
+        const type = String(row.adjustmentType ?? '').toLowerCase();
+        const reason = String(row.reason ?? '').toLowerCase();
+        return (
+          WASTAGE_ADJUSTMENT_TYPES.has(type) ||
+          reason.includes('wilt') ||
+          reason.includes('spoil') ||
+          reason.includes('damage')
+        );
+      });
+
+      setLogs(wastageAdjustments.map(toWastageLog));
     } catch {
-      // handle error
+      setLoadError('Unable to load wastage from inventory adjustments right now.');
     } finally {
       setLoading(false);
     }
@@ -115,6 +177,16 @@ const WastageLogPage = () => {
             </Typography>
           </Box>
         </Box>
+
+        {loadError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {loadError}
+          </Alert>
+        )}
+
+        <Alert severity="info" sx={{ mb: 3 }}>
+          This page is now read-only and reflects wastage-related inventory adjustments recorded from Inventory Adjustment.
+        </Alert>
 
         {/* ── Summary Cards ─────────────────────────────── */}
         <Grid container spacing={2} sx={{ mb: 3 }}>

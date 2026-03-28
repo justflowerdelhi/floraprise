@@ -107,6 +107,18 @@ public class InventoryService
         {
             product.AdjustStock(request.Quantity);
             await _productRepo.UpdateAsync(product);
+
+            await _ledgerRepo.AddAsync(
+                new InventoryLedger(
+                    _tenant.CompanyId.Value,
+                    request.ProductId,
+                    batchNumber,
+                    "PURCHASE",
+                    request.Quantity,
+                    product.StockQuantity,
+                    "Batch stock-in"
+                )
+            );
         }
 
         await _batchRepo.AddAsync(batch);
@@ -474,14 +486,31 @@ public class InventoryService
 
         // Update product stock quantity
         var product = await _productRepo.GetByIdAsync(request.ProductId);
+        var stockChange = IsNegativeAdjustment(adjustmentType) ? -request.Quantity : request.Quantity;
+
         if (product != null && product.TrackInventory)
         {
-            var stockChange = IsNegativeAdjustment(adjustmentType) ? -request.Quantity : request.Quantity;
             product.AdjustStock(stockChange);
             await _productRepo.UpdateAsync(product);
         }
 
         await _adjustmentRepo.AddAsync(adjustment);
+
+        if (product != null && product.TrackInventory)
+        {
+            await _ledgerRepo.AddAsync(
+                new InventoryLedger(
+                    _tenant.CompanyId.Value,
+                    request.ProductId,
+                    adjustment.Id.ToString(),
+                    "ADJUSTMENT",
+                    stockChange,
+                    product.StockQuantity,
+                    string.IsNullOrWhiteSpace(request.Reason) ? "Inventory adjustment" : request.Reason
+                )
+            );
+        }
+
         return adjustment.Id;
     }
 

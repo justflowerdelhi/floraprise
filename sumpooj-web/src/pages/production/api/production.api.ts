@@ -19,6 +19,21 @@ import type {
   InventoryProduct,
 } from "../types/ProductionTypes";
 
+export interface SellableFinishedGoodLike {
+  id: string;
+  name: string;
+  sku: string;
+  barcode?: string;
+  retailPrice: number;
+  costPrice: number;
+  stockQuantity: number;
+  recipeId: string;
+  recipeName: string;
+  batchCode: string;
+  locationId: string;
+  locationName: string;
+}
+
 type InventoryProductLike = Partial<InventoryProduct> & {
   id?: string;
   productId?: string;
@@ -30,6 +45,22 @@ type InventoryProductLike = Partial<InventoryProduct> & {
   unitCost?: number;
   unitPrice?: number;
   locationId?: string;
+};
+
+type FinishedGoodsBatchLike = Partial<FinishedGoodsBatch> & {
+  id?: string;
+  recipeId?: string;
+  recipeName?: string;
+  batchCode?: string;
+  barcode?: string;
+  quantityProduced?: number;
+  quantityAvailable?: number;
+  expectedExpiry?: string;
+  locationId?: string;
+  locationName?: string;
+  status?: string;
+  producedAt?: string;
+  productId?: string;
 };
 
 const extractArrayPayload = (payload: unknown): unknown[] => {
@@ -57,6 +88,37 @@ const normalizeInventoryProduct = (p: InventoryProductLike): InventoryProduct =>
   quantityAvailable: Number(p.quantityAvailable ?? p.availableUnits ?? 0),
   unitCost: Number(p.unitCost ?? p.unitPrice ?? 0),
   locationId: String(p.locationId ?? ""),
+});
+
+const normalizeFinishedBatchStatus = (status: string | undefined): FinishedGoodsBatch['status'] => {
+  const normalized = String(status ?? '').trim().toUpperCase();
+
+  switch (normalized) {
+    case 'ACTIVE':
+      return 'ACTIVE';
+    case 'EXPIRED':
+      return 'EXPIRED';
+    case 'DISCARDED':
+      return 'DISCARDED';
+    default:
+      return 'ACTIVE';
+  }
+};
+
+const normalizeFinishedGoodsBatch = (batch: FinishedGoodsBatchLike): FinishedGoodsBatch => ({
+  id: String(batch.id ?? ''),
+  recipeId: String(batch.recipeId ?? ''),
+  recipeName: String(batch.recipeName ?? ''),
+  batchCode: String(batch.batchCode ?? ''),
+  barcode: String(batch.barcode ?? ''),
+  quantityProduced: Number(batch.quantityProduced ?? 0),
+  quantityAvailable: Number(batch.quantityAvailable ?? 0),
+  expectedExpiry: String(batch.expectedExpiry ?? ''),
+  locationId: String(batch.locationId ?? ''),
+  locationName: String(batch.locationName ?? ''),
+  status: normalizeFinishedBatchStatus(batch.status),
+  producedAt: String(batch.producedAt ?? ''),
+  productId: batch.productId ? String(batch.productId) : undefined,
 });
 
 // ─── Recipes ────────────────────────────────────────────────
@@ -93,13 +155,14 @@ export const deleteRecipe = async (id: string): Promise<void> => {
 
 export const getFinishedBatches = async (): Promise<FinishedGoodsBatch[]> => {
   const res = await apiClient.get("/production/finished-batches");
-  return safeArray(res.data);
+  return safeArray<FinishedGoodsBatchLike>(res.data).map((batch) => normalizeFinishedGoodsBatch(batch));
 };
 
 export const getFinishedBatchById = async (
   id: string
 ): Promise<FinishedGoodsBatch | undefined> => {
-  return (await apiClient.get(`/production/finished-goods/${id}`)).data;
+  const data = (await apiClient.get(`/production/finished-goods/${id}`)).data as FinishedGoodsBatchLike | undefined;
+  return data ? normalizeFinishedGoodsBatch(data) : undefined;
 };
 
 // ─── Production Runs ────────────────────────────────────────
@@ -125,12 +188,12 @@ export const createOnDemandAssembly = async (
 
 export const createCustomBouquetAndSell = async (
   request: CustomBouquetRequest
-): Promise<{ success: boolean }> => {
+): Promise<SellableFinishedGoodLike> => {
   return (await apiClient.post("/production/custom/sell", request)).data;
 };
 
 export const saveCustomBouquetAsRecipe = async (
-  request: CustomBouquetRequest & { name: string; category?: string }
+  request: Omit<CustomBouquetRequest, 'locationId'> & { name: string; category?: string }
 ): Promise<FloralRecipe> => {
   return (await apiClient.post("/production/custom/save-recipe", request)).data;
 };

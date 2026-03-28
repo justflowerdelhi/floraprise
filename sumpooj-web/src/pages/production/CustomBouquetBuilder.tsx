@@ -36,6 +36,7 @@ import { RECIPE_CATEGORIES } from './types/ProductionTypes';
 import { getInventoryProducts, createCustomBouquetAndSell, saveCustomBouquetAsRecipe } from './api/production.api';
 import { formatCurrency } from './utils/production.utils';
 import { getCurrencySymbol } from '../../core/i18n';
+import { useLocation } from '../../core/location/LocationContext';
 
 interface ComponentRow extends CustomBouquetComponent {
   _key: string;
@@ -46,6 +47,7 @@ const CustomBouquetBuilder = () => {
   const dk = theme.palette.mode === 'dark';
   const navigate = useNavigate();
   const { addProduct } = usePOS();
+  const { currentLocationId } = useLocation();
 
   // ── State ──────────────────────────────────────────────────
   const [inventoryProducts, setInventoryProducts] = useState<InventoryProduct[]>([]);
@@ -134,31 +136,53 @@ const CustomBouquetBuilder = () => {
   const handleSellNow = async () => {
     if (!isValid) return;
 
+    if (!currentLocationId || currentLocationId === 'ALL') {
+      setError('Select a specific location before creating and selling a custom bouquet.');
+      return;
+    }
+
+    setProcessing(true);
+    setError('');
+
     try {
       const bouquetName = generateBouquetName(
         components.map(c => ({ productName: c.productName, quantity: c.quantity })),
       );
-      const product = {
-        id: `custom-bouquet-${Date.now()}`,
+
+      const created = await createCustomBouquetAndSell({
         name: bouquetName,
-        sku: `CUSTOM-${Date.now()}`,
-        barcode: undefined,
-        category: 'Bouquets' as const,
-        sellingPrice: Number(sellingPrice),
-        costPrice: Number(totalCost),
+        category: 'Custom',
+        components: components.map(({ _key, ...rest }) => rest),
+        sellingPrice,
+        laborCost: laborCost || undefined,
+        image: imageUrls[0] || undefined,
+        locationId: currentLocationId,
+      });
+
+      addProduct({
+        id: created.id,
+        name: created.name,
+        sku: created.batchCode,
+        barcode: created.barcode,
+        finishedBarcode: created.barcode,
+        category: 'Bouquets',
+        sellingPrice: Number(created.retailPrice),
+        costPrice: Number(created.costPrice),
         taxRate: 0,
-        availableStock: 999,
-        isPerishable: false,
+        availableStock: Number(created.stockQuantity ?? 1),
+        isPerishable: true,
         trackBatch: false,
         imageUrl: imageUrls?.[0] ?? undefined,
         batches: [],
-      };
-      addProduct(product as any, 1);
+      } as any, 1);
+
       navigate("/pos");
 
     } catch (err) {
       console.error(err);
       setError("Failed to create bouquet.");
+    } finally {
+      setProcessing(false);
     }
   };
 

@@ -633,6 +633,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         permissions: ['settings:edit'],
       },
       {
+        id: 'data-cleanup',
+        label: 'Data Cleanup',
+        icon: 'DeleteSweep',
+        path: '/settings/data-cleanup',
+        permissions: ['settings:edit'],
+      },
+      {
         id: 'subscription',
         label: 'Subscription',
         icon: 'CreditCard',
@@ -770,6 +777,7 @@ export const ROUTE_ACCESS: RouteConfig[] = [
   { path: '/crm/loyalty', permissions: ['crm:loyalty'] },
   { path: '/subscription', permissions: ['settings:billing'] },
   { path: '/settings/tenant', permissions: ['settings:edit'] },
+  { path: '/settings/data-cleanup', permissions: ['settings:edit'] },
   { path: '/settings/discount-rules', permissions: ['settings:edit'] },
   { path: '/day-close', permissions: ['pos:day_close'] },
 ];

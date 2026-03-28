@@ -78,6 +78,7 @@ const POSPaymentDrawerV2: React.FC = () => {
   const [customerSuggestions, setCustomerSuggestions] = useState<CustomerSuggestion[]>([]);
   const [activeSuggestField, setActiveSuggestField] = useState<'name' | 'phone' | null>(null);
   const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
+  const [submitError, setSubmitError] = useState<string>('');
 
   // Initialize billing from customer when drawer opens
   useEffect(() => {
@@ -261,6 +262,8 @@ const POSPaymentDrawerV2: React.FC = () => {
     const canComplete = isFullyPaid || (state.orderIntent === 'PICKUP_LATER' && paidAmount > 0);
     if (!canComplete) return;
 
+    setSubmitError('');
+
     try {
       console.log('FINAL ORDER PAYLOAD', {
         locationId: state.session.locationId,
@@ -270,6 +273,7 @@ const POSPaymentDrawerV2: React.FC = () => {
 
       await createOrder({
         customerId: state.customer?.id ?? null,
+        locationId: state.session.locationId || null,
         deliveryDate: state.deliveryDetails?.deliveryDate ?? null,
         deliveryAddress: state.deliveryDetails?.address ?? null,
         recipientName: state.billingInfo?.name ?? null,
@@ -277,7 +281,7 @@ const POSPaymentDrawerV2: React.FC = () => {
         cardMessage: null,
         deliveryPriority: 'STANDARD',
         timeSlot: state.deliveryDetails?.deliveryTimeSlot ?? state.pickupDetails?.pickupTimeSlot ?? null,
-        orderSource: 'POS',
+        orderSource: 'WALK_IN',
         orderIntent: state.orderIntent ?? 'TAKE_NOW',
         pickupDate: state.pickupDetails?.pickupDate ?? null,
         pickupTimeSlot: state.pickupDetails?.pickupTimeSlot ?? null,
@@ -296,11 +300,12 @@ const POSPaymentDrawerV2: React.FC = () => {
           amount: payment.amount,
         })),
       });
+
+      completeTransaction();
     } catch (err) {
       console.error('Failed to create order:', err);
+      setSubmitError('Order submission failed. Sale was not completed. Please try again.');
     }
-
-    completeTransaction();
   }, [isFullyPaid, paidAmount, state, completeTransaction]);
 
   const handleClose = useCallback(() => {
@@ -628,6 +633,12 @@ const POSPaymentDrawerV2: React.FC = () => {
                   <p className="text-[11px] text-gray-500">Searching customers...</p>
                 )}
               </div>
+            </div>
+          )}
+
+          {submitError && (
+            <div className="px-6 py-3 bg-red-50 border-t border-red-200 text-sm text-red-700">
+              {submitError}
             </div>
           )}
         </div>

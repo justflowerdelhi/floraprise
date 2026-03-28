@@ -6,7 +6,7 @@
  * - Expiry tracking with color-coded status
  * - Filter by status/location
  * - Barcode display
- * - Maintenance action
+ * - Repair action
  * - Sorted by expiry (soonest first)
  */
 
@@ -16,11 +16,12 @@ import {
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
   Chip, IconButton, Tooltip, InputAdornment, Select, MenuItem,
   FormControl, InputLabel, Paper, useTheme, alpha, Skeleton, Grid,
+  Button,
 } from '@mui/material';
 import {
   Search as SearchIcon,
   QrCode as BarcodeIcon,
-  Build as MaintainIcon,
+  Build as RepairIcon,
   Inventory2 as InventoryIcon,
   Warning as WarningIcon,
   CheckCircle as ActiveIcon,
@@ -47,7 +48,7 @@ const FinishedGoodsInventory = () => {
     status: 'ALL',
     locationId: '',
   });
-  const [maintenanceBatch, setMaintenanceBatch] = useState<FinishedGoodsBatch | null>(null);
+  const [repairBatch, setRepairBatch] = useState<FinishedGoodsBatch | null>(null);
 
   // ── Load ───────────────────────────────────────────────────
   const loadBatches = useCallback(async () => {
@@ -221,7 +222,9 @@ const FinishedGoodsInventory = () => {
                   <TableCell>Expiry</TableCell>
                   <TableCell>Location</TableCell>
                   <TableCell align="center">Status</TableCell>
-                  <TableCell align="center">Actions</TableCell>
+                  <TableCell align="center" sx={{ width: 64 }}>
+                    Action
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -284,15 +287,15 @@ const FinishedGoodsInventory = () => {
                         <TableCell align="center">
                           <Chip label={status.label} size="small" color={status.color} variant="filled" />
                         </TableCell>
-                        <TableCell align="center">
+                        <TableCell align="center" sx={{ width: 64 }}>
                           {isBatchMaintainable(batch) && (
-                            <Tooltip title="Maintain / Repair">
+                            <Tooltip title="Repair Ready Product">
                               <IconButton
                                 size="small"
-                                onClick={() => setMaintenanceBatch(batch)}
+                                onClick={() => setRepairBatch(batch)}
                                 sx={{ color: '#ff9800' }}
                               >
-                                <MaintainIcon fontSize="small" />
+                                <RepairIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                           )}
@@ -307,13 +310,13 @@ const FinishedGoodsInventory = () => {
         </Card>
 
         {/* ── Maintenance Modal ─────────────────────────── */}
-        {maintenanceBatch && (
+        {repairBatch && (
           <MaintenanceModal
-            open={Boolean(maintenanceBatch)}
-            batch={maintenanceBatch}
-            onClose={() => setMaintenanceBatch(null)}
+            open={Boolean(repairBatch)}
+            batch={repairBatch}
+            onClose={() => setRepairBatch(null)}
             onComplete={() => {
-              setMaintenanceBatch(null);
+              setRepairBatch(null);
               loadBatches();
             }}
           />

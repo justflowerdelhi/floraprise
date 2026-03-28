@@ -70,6 +70,8 @@ interface LocationProviderProps {
   children: ReactNode;
 }
 
+const LOCATION_STORAGE_KEY = 'app:currentLocationId';
+
 export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) => {
   const { user, role } = useRBAC();
   const [locations, setLocations] = useState<Location[]>(MOCK_LOCATIONS);
@@ -142,7 +144,17 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   }, [accessibleLocations]);
 
   // Current location state
-  const [currentLocationId, setCurrentLocationId] = useState<LocationFilterValue>(defaultLocationId);
+  const [currentLocationId, setCurrentLocationIdState] = useState<LocationFilterValue>(() => {
+    try {
+      const persisted = localStorage.getItem(LOCATION_STORAGE_KEY);
+      if (persisted && persisted !== 'undefined' && persisted !== 'null') {
+        return persisted;
+      }
+    } catch {
+      // Ignore localStorage errors and use fallback
+    }
+    return defaultLocationId;
+  });
 
   // Current location object
   const currentLocation = useMemo((): Location | null => {
@@ -154,6 +166,44 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   const isAllLocations = currentLocationId === LOCATION_CONFIG.ALL_LOCATIONS_ID;
   const canSwitchLocation = accessLevel !== 'SINGLE' || accessibleLocations.length > 1;
   const canViewAllLocations = accessLevel === 'ALL';
+
+  // Keep location in sync with authenticated user context so every module
+  // receives a valid default location right after login.
+  useEffect(() => {
+    if (!user) return;
+
+    const isCurrentAll = currentLocationId === LOCATION_CONFIG.ALL_LOCATIONS_ID;
+    const isCurrentAccessible =
+      currentLocationId !== LOCATION_CONFIG.ALL_LOCATIONS_ID &&
+      accessibleLocations.some((loc) => loc.id === currentLocationId);
+
+    if (isCurrentAccessible || (isCurrentAll && canViewAllLocations)) {
+      return;
+    }
+
+    let nextLocationId: LocationFilterValue = defaultLocationId;
+
+    if (user.primaryLocationId && accessibleLocations.some((loc) => loc.id === user.primaryLocationId)) {
+      nextLocationId = user.primaryLocationId;
+    }
+
+    setCurrentLocationIdState(nextLocationId);
+  }, [
+    user,
+    currentLocationId,
+    canViewAllLocations,
+    accessibleLocations,
+    defaultLocationId,
+  ]);
+
+  // Persist current location so refresh/navigation keeps a consistent scope.
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCATION_STORAGE_KEY, currentLocationId);
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [currentLocationId]);
 
   // Check if a location is accessible
   const isLocationAccessible = useCallback(
@@ -169,13 +219,13 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     (locationId: LocationFilterValue) => {
       // Admin can select "ALL"
       if (locationId === LOCATION_CONFIG.ALL_LOCATIONS_ID && canViewAllLocations) {
-        setCurrentLocationId(locationId);
+        setCurrentLocationIdState(locationId);
         return;
       }
 
       // Validate access to specific location
       if (locationId !== LOCATION_CONFIG.ALL_LOCATIONS_ID && isLocationAccessible(locationId)) {
-        setCurrentLocationId(locationId);
+        setCurrentLocationIdState(locationId);
       }
     },
     [canViewAllLocations, isLocationAccessible]
@@ -184,7 +234,7 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   // Switch to all locations (Admin only)
   const switchToAllLocations = useCallback(() => {
     if (canViewAllLocations) {
-      setCurrentLocationId(LOCATION_CONFIG.ALL_LOCATIONS_ID);
+      setCurrentLocationIdState(LOCATION_CONFIG.ALL_LOCATIONS_ID);
     }
   }, [canViewAllLocations]);
 
