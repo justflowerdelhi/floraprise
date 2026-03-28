@@ -18,6 +18,7 @@ public class OrderService
     private readonly IProductBatchRepository _productBatchRepository;
     private readonly IFinishedGoodsBatchRepository _finishedGoodsBatchRepository;
     private readonly IJournalEntryRepository _journalEntryRepository;
+    private readonly IDeliveryRepository _deliveryRepository;
 
     public OrderService(
         IOrderRepository orderRepository,
@@ -29,7 +30,8 @@ public class OrderService
         IInventoryLedgerRepository inventoryLedgerRepository,
         IProductBatchRepository productBatchRepository,
         IFinishedGoodsBatchRepository finishedGoodsBatchRepository,
-        IJournalEntryRepository journalEntryRepository)
+        IJournalEntryRepository journalEntryRepository,
+        IDeliveryRepository deliveryRepository)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
@@ -41,6 +43,7 @@ public class OrderService
         _productBatchRepository = productBatchRepository;
         _finishedGoodsBatchRepository = finishedGoodsBatchRepository;
         _journalEntryRepository = journalEntryRepository;
+        _deliveryRepository = deliveryRepository;
     }
 
     public async Task<OrderDto?> GetByIdAsync(Guid companyId, Guid id)
@@ -153,6 +156,7 @@ public class OrderService
             customerId,
             deliveryDate,
             request.DeliveryAddress,
+            request.DeliveryPincode,
             request.RecipientName,
             request.RecipientPhone);
 
@@ -191,6 +195,22 @@ public class OrderService
         }
 
         await _orderRepository.AddAsync(order);
+
+        // ── Auto-schedule Delivery for DELIVERY orders ──
+        var isDeliveryOrder = string.Equals(request.OrderIntent, "DELIVERY", StringComparison.OrdinalIgnoreCase);
+        if (isDeliveryOrder
+            && !string.IsNullOrWhiteSpace(request.DeliveryAddress)
+            && !string.IsNullOrWhiteSpace(request.TimeSlot))
+        {
+            var existing = await _deliveryRepository.GetBySalesOrderIdAsync(order.Id);
+            if (existing == null)
+            {
+                var delivery = new Delivery(companyId, order.Id, deliveryDate, request.TimeSlot, request.DeliveryAddress);
+                if (!string.IsNullOrWhiteSpace(request.DeliveryPincode))
+                    delivery.SetPostalCode(request.DeliveryPincode);
+                await _deliveryRepository.AddAsync(delivery);
+            }
+        }
 
         // ── Save payments (if provided from POS checkout) ──
         if (request.Payments.Count > 0)
@@ -401,7 +421,7 @@ public class OrderService
             ? DateTime.UtcNow
             : DateTime.Parse(request.SaleDate).ToUniversalTime();
 
-        var order = new Order(companyId, walkIn.Id, saleDate, null, null, null);
+        var order = new Order(companyId, walkIn.Id, saleDate, null, null, null, null);
         order.LocationId = locationId;
         order.SetOrderSource(OrderSource.WalkIn);
         order.AddInternalNote($"Manual sale — {request.Reason ?? "Offline"}");
@@ -775,6 +795,7 @@ public class OrderService
         OrderSource = order.OrderSource.ToString(),
         IsActive = order.IsActive,
         DeliveryAddress = order.DeliveryAddress,
+        DeliveryPincode = order.DeliveryPincode,
         RecipientName = order.RecipientName,
         RecipientPhone = order.RecipientPhone,
         CardMessage = order.CardMessage,

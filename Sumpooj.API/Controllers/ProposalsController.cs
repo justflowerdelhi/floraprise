@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Common;
 using Sumpooj.Application.Interfaces;
@@ -63,9 +65,20 @@ public class ProposalsController : ControllerBase
     public async Task<ActionResult<ProposalDto>> Create([FromBody] CreateProposalRequest request)
     {
         var companyId = _tenant.CompanyId ?? throw new UnauthorizedAccessException();
-        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var proposal = await _service.CreateAsync(companyId, userId, request);
-        return CreatedAtAction(nameof(GetById), new { id = proposal.Id }, proposal);
+        var userIdRaw = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!Guid.TryParse(userIdRaw, out var userId))
+            return Unauthorized(new { message = "User context is missing or invalid." });
+
+        try
+        {
+            var proposal = await _service.CreateAsync(companyId, userId, request);
+            return CreatedAtAction(nameof(GetById), new { id = proposal.Id }, proposal);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx
+                                           && pgEx.ConstraintName == "Proposals_EventId_fkey")
+        {
+            return BadRequest(new { message = "Selected event is invalid or not accessible. Please create proposal from a valid event." });
+        }
     }
 
     /// <summary>

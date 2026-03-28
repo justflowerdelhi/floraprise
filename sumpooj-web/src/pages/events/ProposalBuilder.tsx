@@ -34,6 +34,9 @@ import {
   Alert,
   Breadcrumbs,
   Link,
+  CircularProgress,
+  useTheme,
+  alpha,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -74,13 +77,31 @@ import {
   sendProposal as sendProposalApi,
   getProposalById,
 } from '../../api/proposal.api';
+import { useToast } from '../../hooks/useToast';
+import { getEventById, searchEvents } from '../../api/event.api';
 
-// ─── Styling Constants ──────────────────────────────────────
+type ProposalColors = {
+  cardBg: string;
+  borderColor: string;
+  accent: string;
+  pageBg: string;
+  inputBg: string;
+  textPrimary: string;
+  textSecondary: string;
+  tableHeadBg: string;
+};
 
-const cardBg = '#1a1a2e';
-const borderColor = '#2d2d44';
-const yellowAccent = '#fdd835';
-const pageBg = '#0f0f0f';
+type EnquiryEventOption = {
+  id: string;
+  eventName: string;
+  clientName: string;
+  eventType?: string;
+  eventDate?: string;
+};
+
+const isGuid = (value?: string | null) =>
+  !!value &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 // ─── Format Currency ────────────────────────────────────────
 
@@ -91,6 +112,7 @@ interface VersionHistoryDialogProps {
   onClose: () => void;
   versions: ProposalVersion[];
   onRestore: (versionId: string) => void;
+  colors: ProposalColors;
 }
 
 const VersionHistoryDialog: React.FC<VersionHistoryDialogProps> = ({
@@ -98,18 +120,19 @@ const VersionHistoryDialog: React.FC<VersionHistoryDialogProps> = ({
   onClose,
   versions,
   onRestore,
+  colors,
 }) => (
   <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-    <DialogTitle sx={{ backgroundColor: cardBg, color: '#fff', borderBottom: `1px solid ${borderColor}` }}>
+    <DialogTitle sx={{ backgroundColor: colors.cardBg, color: colors.textPrimary, borderBottom: `1px solid ${colors.borderColor}` }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <HistoryIcon />
         Version History
       </Box>
     </DialogTitle>
-    <DialogContent sx={{ backgroundColor: cardBg, p: 0 }}>
+    <DialogContent sx={{ backgroundColor: colors.cardBg, p: 0 }}>
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ '& th': { color: '#888', borderColor } }}>
+          <TableRow sx={{ '& th': { color: colors.textSecondary, borderColor: colors.borderColor } }}>
             <TableCell>Version</TableCell>
             <TableCell>Status</TableCell>
             <TableCell align="right">Total</TableCell>
@@ -119,12 +142,12 @@ const VersionHistoryDialog: React.FC<VersionHistoryDialogProps> = ({
         </TableHead>
         <TableBody>
           {versions.map((version) => (
-            <TableRow key={version.id} sx={{ '& td': { color: '#fff', borderColor } }}>
+            <TableRow key={version.id} sx={{ '& td': { color: colors.textPrimary, borderColor: colors.borderColor } }}>
               <TableCell>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
                   {version.versionName}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#888' }}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                   {new Date(version.createdAt).toLocaleDateString()} by {version.changedBy}
                 </Typography>
               </TableCell>
@@ -149,7 +172,7 @@ const VersionHistoryDialog: React.FC<VersionHistoryDialogProps> = ({
               </TableCell>
               <TableCell align="right">
                 <Tooltip title="Restore this version">
-                  <IconButton size="small" onClick={() => onRestore(version.id)} sx={{ color: yellowAccent }}>
+                  <IconButton size="small" onClick={() => onRestore(version.id)} sx={{ color: colors.accent }}>
                     <HistoryIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
@@ -159,8 +182,8 @@ const VersionHistoryDialog: React.FC<VersionHistoryDialogProps> = ({
         </TableBody>
       </Table>
     </DialogContent>
-    <DialogActions sx={{ backgroundColor: cardBg, borderTop: `1px solid ${borderColor}`, p: 2 }}>
-      <Button onClick={onClose} sx={{ color: '#888' }}>
+    <DialogActions sx={{ backgroundColor: colors.cardBg, borderTop: `1px solid ${colors.borderColor}`, p: 2 }}>
+      <Button onClick={onClose} sx={{ color: colors.textSecondary }}>
         Close
       </Button>
     </DialogActions>
@@ -174,9 +197,10 @@ interface LineItemRowProps {
   index: number;
   onUpdate: (index: number, updates: Partial<ProposalItem>) => void;
   onDelete: (index: number) => void;
+  colors: ProposalColors;
 }
 
-const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDelete }) => {
+const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDelete, colors }) => {
   const marginColor = getMarginColor(item.marginPercentage);
   const isLowMargin = item.marginPercentage < 20;
 
@@ -216,7 +240,7 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDele
   return (
     <TableRow
       sx={{
-        '& td': { borderColor, py: 1.5 },
+        '& td': { borderColor: colors.borderColor, py: 1.5 },
         backgroundColor: isLowMargin ? 'rgba(239, 83, 80, 0.05)' : 'transparent',
       }}
     >
@@ -239,10 +263,10 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDele
           }}
           sx={{
             '& .MuiOutlinedInput-root': {
-              backgroundColor: '#0f0f0f',
-              '& fieldset': { borderColor },
+              backgroundColor: colors.inputBg,
+              '& fieldset': { borderColor: colors.borderColor },
             },
-            '& .MuiSelect-select': { color: '#fff', display: 'flex', alignItems: 'center', gap: 1 },
+            '& .MuiSelect-select': { color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: 1 },
           }}
           fullWidth
         >
@@ -280,10 +304,10 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDele
                 placeholder="Select product..."
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#0f0f0f',
-                    '& fieldset': { borderColor },
+                    backgroundColor: colors.inputBg,
+                    '& fieldset': { borderColor: colors.borderColor },
                   },
-                  '& .MuiInputBase-input': { color: '#fff' },
+                  '& .MuiInputBase-input': { color: colors.textPrimary },
                 }}
               />
             )}
@@ -292,7 +316,7 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDele
               return (
                 <Box component="li" {...rest} key={key} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
                   <Typography variant="body2">{option.name}</Typography>
-                  <Typography variant="caption" sx={{ color: '#888' }}>
+                  <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                     {formatCurrency(option.sellingPrice)}
                   </Typography>
                 </Box>
@@ -315,10 +339,10 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDele
                 onChange={(e) => onUpdate(index, { name: e.target.value })}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#0f0f0f',
-                    '& fieldset': { borderColor },
+                    backgroundColor: colors.inputBg,
+                    '& fieldset': { borderColor: colors.borderColor },
                   },
-                  '& .MuiInputBase-input': { color: '#fff' },
+                  '& .MuiInputBase-input': { color: colors.textPrimary },
                 }}
               />
             )}
@@ -339,17 +363,17 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDele
                 onChange={(e) => onUpdate(index, { name: e.target.value })}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#0f0f0f',
-                    '& fieldset': { borderColor },
+                    backgroundColor: colors.inputBg,
+                    '& fieldset': { borderColor: colors.borderColor },
                   },
-                  '& .MuiInputBase-input': { color: '#fff' },
+                  '& .MuiInputBase-input': { color: colors.textPrimary },
                 }}
               />
             )}
           />
         )}
         {item.linkedProductSku && (
-          <Typography variant="caption" sx={{ color: '#666', mt: 0.5, display: 'block' }}>
+          <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5, display: 'block' }}>
             SKU: {item.linkedProductSku}
           </Typography>
         )}
@@ -365,10 +389,10 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDele
           inputProps={{ min: 1, step: 1 }}
           sx={{
             '& .MuiOutlinedInput-root': {
-              backgroundColor: '#0f0f0f',
-              '& fieldset': { borderColor },
+              backgroundColor: colors.inputBg,
+              '& fieldset': { borderColor: colors.borderColor },
             },
-            '& .MuiInputBase-input': { color: '#fff', textAlign: 'center' },
+            '& .MuiInputBase-input': { color: colors.textPrimary, textAlign: 'center' },
           }}
           fullWidth
         />
@@ -384,10 +408,10 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDele
           inputProps={{ min: 0, step: 10 }}
           sx={{
             '& .MuiOutlinedInput-root': {
-              backgroundColor: '#0f0f0f',
-              '& fieldset': { borderColor },
+              backgroundColor: colors.inputBg,
+              '& fieldset': { borderColor: colors.borderColor },
             },
-            '& .MuiInputBase-input': { color: '#fff', textAlign: 'right' },
+            '& .MuiInputBase-input': { color: colors.textPrimary, textAlign: 'right' },
           }}
           fullWidth
         />
@@ -403,10 +427,10 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDele
           inputProps={{ min: 0, step: 10 }}
           sx={{
             '& .MuiOutlinedInput-root': {
-              backgroundColor: '#0f0f0f',
-              '& fieldset': { borderColor },
+              backgroundColor: colors.inputBg,
+              '& fieldset': { borderColor: colors.borderColor },
             },
-            '& .MuiInputBase-input': { color: '#888', textAlign: 'right' },
+            '& .MuiInputBase-input': { color: colors.textSecondary, textAlign: 'right' },
           }}
           fullWidth
         />
@@ -414,7 +438,7 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDele
 
       {/* Total */}
       <TableCell align="right" sx={{ width: 100 }}>
-        <Typography sx={{ color: '#fff', fontFamily: 'monospace', fontWeight: 600 }}>
+        <Typography sx={{ color: colors.textPrimary, fontFamily: 'monospace', fontWeight: 600 }}>
           {formatCurrency(item.totalPrice)}
         </Typography>
       </TableCell>
@@ -450,6 +474,19 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ item, index, onUpdate, onDele
 // ─── Main ProposalBuilder Component ─────────────────────────
 
 const ProposalBuilder: React.FC = () => {
+  const theme = useTheme();
+  const toast = useToast();
+  const dk = theme.palette.mode === 'dark';
+  const colors: ProposalColors = {
+    cardBg: theme.palette.background.paper,
+    borderColor: theme.palette.divider,
+    accent: '#fdd835',
+    pageBg: theme.palette.background.default,
+    inputBg: dk ? alpha(theme.palette.common.white, 0.04) : alpha(theme.palette.common.black, 0.02),
+    textPrimary: theme.palette.text.primary,
+    textSecondary: theme.palette.text.secondary,
+    tableHeadBg: dk ? alpha(theme.palette.primary.main, 0.14) : alpha(theme.palette.primary.main, 0.06),
+  };
   const navigate = useNavigate();
   const { eventId, proposalId } = useParams<{ eventId?: string; proposalId?: string }>();
 
@@ -472,6 +509,81 @@ const ProposalBuilder: React.FC = () => {
   const [versionName, setVersionName] = useState(existingProposal?.versionName || 'Draft v1');
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [eventMeta, setEventMeta] = useState<{ id: string; clientName: string; eventType?: string } | null>(null);
+  const [enquiryEvents, setEnquiryEvents] = useState<EnquiryEventOption[]>([]);
+  const [selectedEnquiryEvent, setSelectedEnquiryEvent] = useState<EnquiryEventOption | null>(null);
+  const [loadingEnquiryEvents, setLoadingEnquiryEvents] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadEventMeta = async () => {
+      if (!eventId || linkedEvent) {
+        setEventMeta(null);
+        return;
+      }
+
+      try {
+        const event = await getEventById(eventId);
+        if (cancelled) return;
+        setEventMeta({
+          id: String(event?.id ?? eventId),
+          clientName: String(event?.clientName ?? ''),
+          eventType: typeof event?.eventTypeName === 'string' ? event.eventTypeName : undefined,
+        });
+      } catch {
+        if (!cancelled) setEventMeta(null);
+      }
+    };
+
+    loadEventMeta();
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId, linkedEvent]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadEnquiryEvents = async () => {
+      if (eventId || proposalId) {
+        setEnquiryEvents([]);
+        return;
+      }
+
+      setLoadingEnquiryEvents(true);
+      try {
+        const response = await searchEvents({
+          Status: 'Inquiry',
+          Page: 1,
+          PageSize: 200,
+        });
+
+        if (cancelled) return;
+        const rawItems = (response?.items ?? response ?? []) as any[];
+        const mapped: EnquiryEventOption[] = rawItems
+          .map((event: any) => ({
+            id: String(event?.id ?? ''),
+            eventName: String(event?.eventName ?? 'Untitled Event'),
+            clientName: String(event?.clientName ?? 'Unknown Client'),
+            eventType: typeof event?.eventType === 'string' ? event.eventType : undefined,
+            eventDate: typeof event?.eventDate === 'string' ? event.eventDate : undefined,
+          }))
+          .filter((event) => isGuid(event.id));
+
+        setEnquiryEvents(mapped);
+      } catch {
+        if (!cancelled) setEnquiryEvents([]);
+      } finally {
+        if (!cancelled) setLoadingEnquiryEvents(false);
+      }
+    };
+
+    loadEnquiryEvents();
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId, proposalId]);
 
   // Version history
   const versionHistory = proposalId ? MOCK_VERSION_HISTORY[proposalId] || [] : [];
@@ -523,17 +635,31 @@ const ProposalBuilder: React.FC = () => {
 
   // Save
   const handleSave = async () => {
+    const resolvedEventId = selectedEnquiryEvent?.id ?? linkedEvent?.id ?? eventMeta?.id ?? eventId ?? '';
+    if (!isGuid(resolvedEventId)) {
+      toast.error('Please select an Enquiry event before saving.');
+      return;
+    }
+    if (items.length === 0) {
+      toast.error('Add at least one line item before saving.');
+      return;
+    }
+    if (items.some((item) => !item.name.trim())) {
+      toast.error('Each line item must have a name.');
+      return;
+    }
+
     const payload = {
-      eventId: linkedEvent?.id ?? eventId ?? '',
+      eventId: resolvedEventId,
       title: versionName,
-      clientName: linkedEvent?.clientName ?? '',
+      clientName: selectedEnquiryEvent?.clientName ?? linkedEvent?.clientName ?? eventMeta?.clientName ?? 'Event Client',
       clientEmail: '',
       items: items.map((item, idx) => ({
         type: item.type,
         name: item.name,
         category: '',
         description: item.description,
-        linkedProductId: item.linkedProductId,
+        linkedProductId: isGuid(item.linkedProductId) ? item.linkedProductId : undefined,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         unitCost: item.unitCost,
@@ -548,12 +674,16 @@ const ProposalBuilder: React.FC = () => {
     try {
       if (proposalId) {
         await updateProposal(proposalId, payload);
+        toast.success('Proposal updated.');
       } else {
-        await createProposal(payload);
+        const created = await createProposal(payload);
+        toast.success('Proposal created.');
+        navigate(`/proposals/${created.id}/edit`, { replace: true });
       }
       setHasChanges(false);
     } catch (err) {
       console.error('Failed to save proposal:', err);
+      toast.error('Failed to save proposal. Please check event and item data.');
     }
   };
 
@@ -561,13 +691,16 @@ const ProposalBuilder: React.FC = () => {
   const handleSend = async () => {
     if (!proposalId) {
       await handleSave();
+      return;
     }
     try {
       if (proposalId) {
         await sendProposalApi(proposalId);
+        toast.success('Proposal sent to client.');
       }
     } catch (err) {
       console.error('Failed to send proposal:', err);
+      toast.error('Failed to send proposal.');
     }
   };
 
@@ -593,16 +726,17 @@ const ProposalBuilder: React.FC = () => {
 
   // Low margin warning check
   const hasLowMarginItems = items.some((item) => item.marginPercentage < 20);
+  const hasEventContext = isGuid(selectedEnquiryEvent?.id ?? linkedEvent?.id ?? eventMeta?.id ?? eventId ?? '');
 
   return (
-    <Box sx={{ p: 3, backgroundColor: pageBg, minHeight: '100vh' }}>
+    <Box sx={{ p: 3, backgroundColor: colors.pageBg, minHeight: '100vh' }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Breadcrumbs sx={{ mb: 1, '& .MuiBreadcrumbs-separator': { color: '#666' } }}>
+        <Breadcrumbs sx={{ mb: 1, '& .MuiBreadcrumbs-separator': { color: colors.textSecondary } }}>
           <Link
             component="button"
             onClick={() => navigate('/events')}
-            sx={{ color: '#888', textDecoration: 'none', '&:hover': { color: yellowAccent } }}
+            sx={{ color: colors.textSecondary, textDecoration: 'none', '&:hover': { color: colors.accent } }}
           >
             Events
           </Link>
@@ -610,28 +744,39 @@ const ProposalBuilder: React.FC = () => {
             <Link
               component="button"
               onClick={() => navigate(`/events/${linkedEvent.id}`)}
-              sx={{ color: '#888', textDecoration: 'none', '&:hover': { color: yellowAccent } }}
+              sx={{ color: colors.textSecondary, textDecoration: 'none', '&:hover': { color: colors.accent } }}
             >
               {linkedEvent.clientName}
             </Link>
           )}
-          <Typography sx={{ color: '#fff' }}>
+          <Typography sx={{ color: colors.textPrimary }}>
             {proposalId ? 'Edit Proposal' : 'New Proposal'}
           </Typography>
         </Breadcrumbs>
 
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <IconButton onClick={() => navigate(-1)} sx={{ color: '#888' }}>
+            <IconButton onClick={() => navigate(-1)} sx={{ color: colors.textSecondary }}>
               <BackIcon />
             </IconButton>
             <Box>
-              <Typography variant="h5" sx={{ color: '#fff', fontWeight: 600 }}>
+              <Typography variant="h5" sx={{ color: colors.textPrimary, fontWeight: 600 }}>
                 {proposalId ? 'Edit Proposal' : 'Create Proposal'}
               </Typography>
               {linkedEvent && (
-                <Typography variant="body2" sx={{ color: '#888' }}>
+                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
                   {linkedEvent.clientName} • {linkedEvent.eventType}
+                </Typography>
+              )}
+              {!linkedEvent && eventMeta && (
+                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                  {eventMeta.clientName}{eventMeta.eventType ? ` • ${eventMeta.eventType}` : ''}
+                </Typography>
+              )}
+              {!linkedEvent && !eventMeta && selectedEnquiryEvent && (
+                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                  {selectedEnquiryEvent.clientName}
+                  {selectedEnquiryEvent.eventType ? ` • ${selectedEnquiryEvent.eventType}` : ''}
                 </Typography>
               )}
             </Box>
@@ -652,7 +797,7 @@ const ProposalBuilder: React.FC = () => {
                 variant="outlined"
                 startIcon={<HistoryIcon />}
                 onClick={() => setShowVersionHistory(true)}
-                sx={{ borderColor, color: '#888', '&:hover': { borderColor: yellowAccent, color: yellowAccent } }}
+                sx={{ borderColor: colors.borderColor, color: colors.textSecondary, '&:hover': { borderColor: colors.accent, color: colors.accent } }}
               >
                 History ({versionHistory.length})
               </Button>
@@ -660,7 +805,7 @@ const ProposalBuilder: React.FC = () => {
             <Button
               variant="outlined"
               startIcon={<DuplicateIcon />}
-              sx={{ borderColor, color: '#888', '&:hover': { borderColor: yellowAccent, color: yellowAccent } }}
+              sx={{ borderColor: colors.borderColor, color: colors.textSecondary, '&:hover': { borderColor: colors.accent, color: colors.accent } }}
             >
               Duplicate
             </Button>
@@ -670,8 +815,8 @@ const ProposalBuilder: React.FC = () => {
               onClick={handleSave}
               disabled={!hasChanges}
               sx={{
-                borderColor: hasChanges ? yellowAccent : borderColor,
-                color: hasChanges ? yellowAccent : '#888',
+                borderColor: hasChanges ? colors.accent : colors.borderColor,
+                color: hasChanges ? colors.accent : colors.textSecondary,
               }}
             >
               Save Draft
@@ -680,9 +825,9 @@ const ProposalBuilder: React.FC = () => {
               variant="contained"
               startIcon={<SendIcon />}
               onClick={handleSend}
-              disabled={items.length === 0}
+              disabled={items.length === 0 || !hasEventContext}
               sx={{
-                backgroundColor: yellowAccent,
+                backgroundColor: colors.accent,
                 color: '#000',
                 '&:hover': { backgroundColor: '#fbc02d' },
                 '&:disabled': { backgroundColor: '#333', color: '#666' },
@@ -694,6 +839,70 @@ const ProposalBuilder: React.FC = () => {
         </Box>
       </Box>
 
+      {/* Context Warning */}
+      {!proposalId && !eventId && !linkedEvent && !eventMeta && (
+        <Paper sx={{ backgroundColor: colors.cardBg, border: `1px solid ${colors.borderColor}`, borderRadius: 2, p: 2, mb: 2 }}>
+          <Typography variant="subtitle2" sx={{ color: colors.textSecondary, mb: 1 }}>
+            Select Enquiry Event
+          </Typography>
+          <Autocomplete
+            size="small"
+            options={enquiryEvents}
+            loading={loadingEnquiryEvents}
+            value={selectedEnquiryEvent}
+            onChange={(_, value) => setSelectedEnquiryEvent(value)}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            getOptionLabel={(option) => `${option.eventName} - ${option.clientName}`}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Search enquiry events..."
+                helperText="Only events in Enquiry status are shown."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: colors.inputBg,
+                    '& fieldset': { borderColor: colors.borderColor },
+                  },
+                  '& .MuiInputBase-input': { color: colors.textPrimary },
+                }}
+                slotProps={{
+                  input: {
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {loadingEnquiryEvents ? <CircularProgress color="inherit" size={16} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  },
+                }}
+              />
+            )}
+            renderOption={(props, option) => {
+              const { key, ...rest } = props as { key: string } & React.HTMLAttributes<HTMLLIElement>;
+              return (
+                <Box component="li" {...rest} key={key} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', py: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {option.eventName}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                    {option.clientName}
+                    {option.eventDate ? ` • ${new Date(option.eventDate).toLocaleDateString('en-IN')}` : ''}
+                  </Typography>
+                </Box>
+              );
+            }}
+            noOptionsText={loadingEnquiryEvents ? 'Loading enquiry events...' : 'No enquiry events found'}
+          />
+        </Paper>
+      )}
+
+      {!hasEventContext && !proposalId && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Select an Enquiry event above, or open any event and click New Proposal.
+        </Alert>
+      )}
+
       {/* Low Margin Warning */}
       {hasLowMarginItems && (
         <Alert
@@ -703,7 +912,7 @@ const ProposalBuilder: React.FC = () => {
             mb: 2,
             backgroundColor: 'rgba(255, 152, 0, 0.1)',
             border: '1px solid #ff9800',
-            '& .MuiAlert-message': { color: '#fff' },
+            '& .MuiAlert-message': { color: colors.textPrimary },
           }}
         >
           Some items have margins below 20%. Review pricing before sending.
@@ -713,22 +922,22 @@ const ProposalBuilder: React.FC = () => {
       <Grid container spacing={3}>
         {/* Left: Line Items */}
         <Grid size={{ xs: 12, lg: 8 }}>
-          <Paper sx={{ backgroundColor: cardBg, border: `1px solid ${borderColor}`, borderRadius: 2, overflow: 'hidden' }}>
+          <Paper sx={{ backgroundColor: colors.cardBg, border: `1px solid ${colors.borderColor}`, borderRadius: 2, overflow: 'hidden' }}>
             {/* Toolbar */}
             <Box
               sx={{
                 p: 2,
-                borderBottom: `1px solid ${borderColor}`,
+                borderBottom: `1px solid ${colors.borderColor}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 600 }}>
+                <Typography variant="subtitle1" sx={{ color: colors.textPrimary, fontWeight: 600 }}>
                   Line Items
                 </Typography>
-                <Chip label={`${items.length} items`} size="small" sx={{ backgroundColor: '#333', color: '#fff' }} />
+                <Chip label={`${items.length} items`} size="small" sx={{ backgroundColor: alpha(theme.palette.text.primary, 0.12), color: colors.textPrimary }} />
               </Box>
               <Stack direction="row" spacing={1}>
                 <Button
@@ -762,7 +971,7 @@ const ProposalBuilder: React.FC = () => {
             <TableContainer sx={{ maxHeight: 500 }}>
               <Table stickyHeader size="small">
                 <TableHead>
-                  <TableRow sx={{ '& th': { backgroundColor: '#252540', color: '#888', borderColor } }}>
+                  <TableRow sx={{ '& th': { backgroundColor: colors.tableHeadBg, color: colors.textSecondary, borderColor: colors.borderColor } }}>
                     <TableCell>Type</TableCell>
                     <TableCell>Item</TableCell>
                     <TableCell align="center">Qty</TableCell>
@@ -776,7 +985,7 @@ const ProposalBuilder: React.FC = () => {
                 <TableBody>
                   {items.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} sx={{ textAlign: 'center', py: 6, color: '#666' }}>
+                      <TableCell colSpan={8} sx={{ textAlign: 'center', py: 6, color: colors.textSecondary }}>
                         <Box>
                           <AddIcon sx={{ fontSize: 48, mb: 1, opacity: 0.3 }} />
                           <Typography>No items yet. Add products, services, or packages.</Typography>
@@ -791,6 +1000,7 @@ const ProposalBuilder: React.FC = () => {
                         index={index}
                         onUpdate={updateItem}
                         onDelete={deleteItem}
+                        colors={colors}
                       />
                     ))
                   )}
@@ -800,8 +1010,8 @@ const ProposalBuilder: React.FC = () => {
           </Paper>
 
           {/* Notes */}
-          <Paper sx={{ backgroundColor: cardBg, border: `1px solid ${borderColor}`, borderRadius: 2, p: 2, mt: 3 }}>
-            <Typography variant="subtitle2" sx={{ color: '#888', mb: 1 }}>
+          <Paper sx={{ backgroundColor: colors.cardBg, border: `1px solid ${colors.borderColor}`, borderRadius: 2, p: 2, mt: 3 }}>
+            <Typography variant="subtitle2" sx={{ color: colors.textSecondary, mb: 1 }}>
               Internal Notes
             </Typography>
             <TextField
@@ -816,10 +1026,10 @@ const ProposalBuilder: React.FC = () => {
               placeholder="Add notes for your team..."
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  backgroundColor: '#0f0f0f',
-                  '& fieldset': { borderColor },
+                  backgroundColor: colors.inputBg,
+                  '& fieldset': { borderColor: colors.borderColor },
                 },
-                '& .MuiInputBase-input': { color: '#fff' },
+                '& .MuiInputBase-input': { color: colors.textPrimary },
               }}
             />
           </Paper>
@@ -844,8 +1054,8 @@ const ProposalBuilder: React.FC = () => {
           />
 
           {/* Version Info */}
-          <Paper sx={{ backgroundColor: cardBg, border: `1px solid ${borderColor}`, borderRadius: 2, p: 2, mt: 2 }}>
-            <Typography variant="subtitle2" sx={{ color: '#888', mb: 1 }}>
+          <Paper sx={{ backgroundColor: colors.cardBg, border: `1px solid ${colors.borderColor}`, borderRadius: 2, p: 2, mt: 2 }}>
+            <Typography variant="subtitle2" sx={{ color: colors.textSecondary, mb: 1 }}>
               Version Name
             </Typography>
             <TextField
@@ -858,10 +1068,10 @@ const ProposalBuilder: React.FC = () => {
               }}
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  backgroundColor: '#0f0f0f',
-                  '& fieldset': { borderColor },
+                  backgroundColor: colors.inputBg,
+                  '& fieldset': { borderColor: colors.borderColor },
                 },
-                '& .MuiInputBase-input': { color: '#fff' },
+                '& .MuiInputBase-input': { color: colors.textPrimary },
               }}
             />
           </Paper>
@@ -874,6 +1084,7 @@ const ProposalBuilder: React.FC = () => {
         onClose={() => setShowVersionHistory(false)}
         versions={versionHistory}
         onRestore={handleRestoreVersion}
+        colors={colors}
       />
     </Box>
   );

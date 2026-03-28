@@ -26,7 +26,9 @@ const UnifiedPhoneOrderPage: React.FC = () => {
       orderType: orderType === 'outstation' ? 'PhoneOutstation' : 'PhoneLocal',
       deliveryDate: deliveryDate || new Date().toISOString(),
       deliveryCity: deliveryCity || 'Unknown',
-      timeSlot: timeSlot || undefined,
+      deliveryAddress: deliveryAddress || undefined,
+      deliveryPincode: zipCode || undefined,
+      timeSlot: timeSlot ? normalizeTimeSlot(timeSlot) : undefined,
       budget: typeof amount === 'number' ? amount : undefined,
       specialInstructions: orderDescription || undefined,
       deliveryCharge: typeof deliveryCharge === 'number' ? deliveryCharge : 0,
@@ -60,10 +62,24 @@ const UnifiedPhoneOrderPage: React.FC = () => {
   const [paid, setPaid] = useState(0);
   const [orderType, setOrderType] = useState<string>("delivery");
   const [timeSlot, setTimeSlot] = useState<string>("");
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [zipCode, setZipCode] = useState("");
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'UPI' | 'Card' | 'BankTransfer'>("Cash");
   const paymentModes: Array<'Cash' | 'UPI' | 'Card' | 'BankTransfer'> = ["Cash", "Card", "UPI", "BankTransfer"];
   const [splitPayments, setSplitPayments] = useState<{mode: 'Cash' | 'UPI' | 'Card' | 'BankTransfer', amount: number}[]>([]);
   const [showSplitPrompt, setShowSplitPrompt] = useState(false);
+
+  const normalizeTimeSlot = (slot: string): string => {
+    switch (slot) {
+      case 'morning': return '9AM-12PM';
+      case 'afternoon': return '12PM-3PM';
+      case 'evening': return '3PM-6PM';
+      case 'night': return '6PM-9PM';
+      default: return slot;
+    }
+  };
 
   const repeatOrder = (order: any) => {
     setOrderDescription(order.description);
@@ -176,20 +192,26 @@ const UnifiedPhoneOrderPage: React.FC = () => {
               <input
                 placeholder="Recipient Name"
                 className="border rounded-lg p-3"
+                value={recipientName}
+                onChange={(e) => setRecipientName(e.target.value)}
               />
               <input
                 placeholder="Recipient Phone"
                 className="border rounded-lg p-3"
+                value={recipientPhone}
+                onChange={(e) => setRecipientPhone(e.target.value)}
               />
             </div>
             <input
               placeholder="Delivery Address"
               className="border rounded-lg p-3 w-full"
+              value={deliveryAddress}
+              onChange={(e) => setDeliveryAddress(e.target.value)}
             />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <input placeholder="City" className="border rounded-lg p-3" value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} />
               <input placeholder="State" className="border rounded-lg p-3" />
-              <input placeholder="ZIP Code" className="border rounded-lg p-3" />
+              <input placeholder="ZIP Code *" className="border rounded-lg p-3" value={zipCode} onChange={(e) => setZipCode(e.target.value)} />
             </div>
             <div className="flex flex-wrap gap-2 mt-2">
               <button onClick={() => setDeliveryCharge(50)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹50</button>

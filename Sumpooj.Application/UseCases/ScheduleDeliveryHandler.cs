@@ -35,6 +35,7 @@ public class ScheduleDeliveryHandler
 
         // 4. Create Delivery entity
         var delivery = new Delivery(
+            companyId: order.CompanyId,
             salesOrderId: command.SalesOrderId,
             deliveryDate: command.DeliveryDate,
             timeSlot: command.TimeSlot,

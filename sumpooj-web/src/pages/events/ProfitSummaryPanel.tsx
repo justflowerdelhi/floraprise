@@ -20,6 +20,8 @@ import {
   Tooltip,
   IconButton,
   Alert,
+  useTheme,
+  alpha,
 } from '@mui/material';
 import {
   TrendingUp as ProfitIcon,
@@ -52,11 +54,15 @@ interface ProfitSummaryPanelProps {
   readonly?: boolean;
 }
 
-// ─── Styling Constants ──────────────────────────────────────
-
-const cardBg = '#1a1a2e';
-const borderColor = '#2d2d44';
-const yellowAccent = '#fdd835';
+type ProfitPanelColors = {
+  cardBg: string;
+  borderColor: string;
+  inputBg: string;
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  accent: string;
+};
 
 // ─── Format Currency ────────────────────────────────────────
 
@@ -65,22 +71,23 @@ const yellowAccent = '#fdd835';
 
 interface MarginBarProps {
   margin: number;
+  colors: ProfitPanelColors;
 }
 
-const MarginBar: React.FC<MarginBarProps> = ({ margin }) => {
+const MarginBar: React.FC<MarginBarProps> = ({ margin, colors }) => {
   const clampedMargin = Math.min(Math.max(margin, 0), 100);
   const color = getMarginColor(margin);
 
   return (
     <Box sx={{ width: '100%', mt: 1 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-        <Typography variant="caption" sx={{ color: '#888' }}>
+        <Typography variant="caption" sx={{ color: colors.textSecondary }}>
           0%
         </Typography>
-        <Typography variant="caption" sx={{ color: '#888' }}>
+        <Typography variant="caption" sx={{ color: colors.textSecondary }}>
           50%
         </Typography>
-        <Typography variant="caption" sx={{ color: '#888' }}>
+        <Typography variant="caption" sx={{ color: colors.textSecondary }}>
           100%
         </Typography>
       </Box>
@@ -91,7 +98,7 @@ const MarginBar: React.FC<MarginBarProps> = ({ margin }) => {
           sx={{
             height: 8,
             borderRadius: 4,
-            backgroundColor: '#2d2d44',
+            backgroundColor: alpha(colors.textPrimary, 0.15),
             '& .MuiLinearProgress-bar': {
               backgroundColor: color,
               borderRadius: 4,
@@ -144,6 +151,7 @@ interface SummaryRowProps {
   negative?: boolean;
   large?: boolean;
   color?: string;
+  colors: ProfitPanelColors;
 }
 
 const SummaryRow: React.FC<SummaryRowProps> = ({
@@ -154,6 +162,7 @@ const SummaryRow: React.FC<SummaryRowProps> = ({
   negative,
   large,
   color,
+  colors,
 }) => (
   <Box
     sx={{
@@ -169,14 +178,14 @@ const SummaryRow: React.FC<SummaryRowProps> = ({
   >
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       {icon && (
-        <Box sx={{ color: color || (negative ? '#ef5350' : '#888'), display: 'flex' }}>
+        <Box sx={{ color: color || (negative ? '#ef5350' : colors.textSecondary), display: 'flex' }}>
           {icon}
         </Box>
       )}
       <Typography
         variant={large ? 'subtitle1' : 'body2'}
         sx={{
-          color: highlight ? '#fff' : '#aaa',
+          color: highlight ? colors.textPrimary : colors.textMuted,
           fontWeight: highlight || large ? 600 : 400,
         }}
       >
@@ -186,7 +195,7 @@ const SummaryRow: React.FC<SummaryRowProps> = ({
     <Typography
       variant={large ? 'h6' : 'body2'}
       sx={{
-        color: color || (negative ? '#ef5350' : highlight ? yellowAccent : '#fff'),
+        color: color || (negative ? '#ef5350' : highlight ? colors.accent : colors.textPrimary),
         fontWeight: highlight || large ? 700 : 500,
         fontFamily: 'monospace',
       }}
@@ -214,6 +223,17 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
   onTaxRateChange,
   readonly = false,
 }) => {
+  const theme = useTheme();
+  const dk = theme.palette.mode === 'dark';
+  const colors: ProfitPanelColors = {
+    cardBg: theme.palette.background.paper,
+    borderColor: theme.palette.divider,
+    inputBg: dk ? alpha(theme.palette.common.white, 0.04) : alpha(theme.palette.common.black, 0.02),
+    textPrimary: theme.palette.text.primary,
+    textSecondary: theme.palette.text.secondary,
+    textMuted: dk ? alpha(theme.palette.text.primary, 0.75) : alpha(theme.palette.text.primary, 0.7),
+    accent: '#fdd835',
+  };
   const marginColor = getMarginColor(marginPercentage);
   const marginStatus = getMarginStatus(marginPercentage);
 
@@ -223,8 +243,8 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
   return (
     <Paper
       sx={{
-        backgroundColor: cardBg,
-        border: `1px solid ${borderColor}`,
+        backgroundColor: colors.cardBg,
+        border: `1px solid ${colors.borderColor}`,
         borderRadius: 2,
         p: 2.5,
         height: '100%',
@@ -232,11 +252,11 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
     >
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6" sx={{ color: '#fff', fontWeight: 600 }}>
+        <Typography variant="h6" sx={{ color: colors.textPrimary, fontWeight: 600 }}>
           Profit Summary
         </Typography>
         <Tooltip title="Real-time margin calculations">
-          <IconButton size="small" sx={{ color: '#666' }}>
+          <IconButton size="small" sx={{ color: colors.textSecondary }}>
             <InfoIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -252,7 +272,7 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
             backgroundColor: showDanger ? 'rgba(239, 83, 80, 0.1)' : 'rgba(255, 152, 0, 0.1)',
             border: `1px solid ${showDanger ? '#ef5350' : '#ff9800'}`,
             '& .MuiAlert-message': {
-              color: '#fff',
+              color: colors.textPrimary,
             },
           }}
         >
@@ -269,11 +289,11 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
           py: 2,
           mb: 2,
           borderRadius: 2,
-          backgroundColor: 'rgba(0,0,0,0.2)',
+          backgroundColor: alpha(colors.textPrimary, dk ? 0.07 : 0.04),
           border: `1px solid ${marginColor}40`,
         }}
       >
-        <Typography variant="caption" sx={{ color: '#888', textTransform: 'uppercase' }}>
+        <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase' }}>
           Gross Margin
         </Typography>
         <Typography
@@ -296,13 +316,13 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
             mt: 1,
           }}
         />
-        <MarginBar margin={marginPercentage} />
+        <MarginBar margin={marginPercentage} colors={colors} />
       </Box>
 
-      <Divider sx={{ borderColor: borderColor, my: 2 }} />
+      <Divider sx={{ borderColor: colors.borderColor, my: 2 }} />
 
       {/* Revenue Section */}
-      <Typography variant="overline" sx={{ color: '#666', fontSize: '0.65rem' }}>
+      <Typography variant="overline" sx={{ color: colors.textMuted, fontSize: '0.65rem' }}>
         Revenue
       </Typography>
 
@@ -310,6 +330,7 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
         label="Subtotal"
         value={formatCurrency(subtotal)}
         icon={<RevenueIcon fontSize="small" />}
+        colors={colors}
       />
 
       {/* Discount Controls */}
@@ -325,10 +346,10 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
               sx={{
                 width: 100,
                 '& .MuiOutlinedInput-root': {
-                  backgroundColor: '#0f0f0f',
-                  '& fieldset': { borderColor },
+                  backgroundColor: colors.inputBg,
+                  '& fieldset': { borderColor: colors.borderColor },
                 },
-                '& .MuiSelect-select': { color: '#fff', py: 0.5 },
+                '& .MuiSelect-select': { color: colors.textPrimary, py: 0.5 },
               }}
             >
               <MenuItem value="PERCENTAGE">%</MenuItem>
@@ -342,10 +363,10 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
               sx={{
                 flex: 1,
                 '& .MuiOutlinedInput-root': {
-                  backgroundColor: '#0f0f0f',
-                  '& fieldset': { borderColor },
+                  backgroundColor: colors.inputBg,
+                  '& fieldset': { borderColor: colors.borderColor },
                 },
-                '& .MuiInputBase-input': { color: '#fff', py: 0.5 },
+                '& .MuiInputBase-input': { color: colors.textPrimary, py: 0.5 },
               }}
               inputProps={{ min: 0, step: discountType === 'PERCENTAGE' ? 1 : 100 }}
             />
@@ -366,6 +387,7 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
             value={formatCurrency(discount)}
             icon={<DiscountIcon fontSize="small" />}
             negative
+            colors={colors}
           />
         )
       )}
@@ -374,8 +396,8 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
       {!readonly ? (
         <Box sx={{ py: 1 }}>
           <Stack direction="row" spacing={1} alignItems="center">
-            <TaxIcon fontSize="small" sx={{ color: '#888' }} />
-            <Typography variant="body2" sx={{ color: '#aaa', flex: 1 }}>
+            <TaxIcon fontSize="small" sx={{ color: colors.textSecondary }} />
+            <Typography variant="body2" sx={{ color: colors.textMuted, flex: 1 }}>
               GST Rate
             </Typography>
             <TextField
@@ -386,14 +408,14 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
               sx={{
                 width: 80,
                 '& .MuiOutlinedInput-root': {
-                  backgroundColor: '#0f0f0f',
-                  '& fieldset': { borderColor },
+                  backgroundColor: colors.inputBg,
+                  '& fieldset': { borderColor: colors.borderColor },
                 },
-                '& .MuiInputBase-input': { color: '#fff', py: 0.5, textAlign: 'right' },
+                '& .MuiInputBase-input': { color: colors.textPrimary, py: 0.5, textAlign: 'right' },
               }}
               inputProps={{ min: 0, max: 28, step: 1 }}
               InputProps={{
-                endAdornment: <Typography sx={{ color: '#666', ml: 0.5 }}>%</Typography>,
+                endAdornment: <Typography sx={{ color: colors.textSecondary, ml: 0.5 }}>%</Typography>,
               }}
             />
           </Stack>
@@ -412,11 +434,12 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
             label={`Tax (${taxRate}%)`}
             value={formatCurrency(tax)}
             icon={<TaxIcon fontSize="small" />}
+            colors={colors}
           />
         )
       )}
 
-      <Divider sx={{ borderColor: borderColor, my: 2 }} />
+      <Divider sx={{ borderColor: colors.borderColor, my: 2 }} />
 
       {/* Grand Total */}
       <SummaryRow
@@ -425,12 +448,13 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
         icon={<RevenueIcon fontSize="small" />}
         highlight
         large
+        colors={colors}
       />
 
-      <Divider sx={{ borderColor: borderColor, my: 2 }} />
+      <Divider sx={{ borderColor: colors.borderColor, my: 2 }} />
 
       {/* Cost & Profit Section */}
-      <Typography variant="overline" sx={{ color: '#666', fontSize: '0.65rem' }}>
+      <Typography variant="overline" sx={{ color: colors.textMuted, fontSize: '0.65rem' }}>
         Profitability
       </Typography>
 
@@ -438,6 +462,7 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
         label="Total Cost"
         value={formatCurrency(totalCost)}
         icon={<CostIcon fontSize="small" />}
+        colors={colors}
       />
 
       <SummaryRow
@@ -446,13 +471,14 @@ const ProfitSummaryPanel: React.FC<ProfitSummaryPanelProps> = ({
         icon={<ProfitIcon fontSize="small" />}
         color={marginColor}
         large
+        colors={colors}
       />
 
-      <Divider sx={{ borderColor: borderColor, my: 2 }} />
+      <Divider sx={{ borderColor: colors.borderColor, my: 2 }} />
 
       {/* Margin Thresholds Legend */}
       <Box sx={{ mt: 2 }}>
-        <Typography variant="overline" sx={{ color: '#666', fontSize: '0.65rem' }}>
+        <Typography variant="overline" sx={{ color: colors.textMuted, fontSize: '0.65rem' }}>
           Margin Thresholds
         </Typography>
         <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 0.5 }}>

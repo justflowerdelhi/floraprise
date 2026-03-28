@@ -16,6 +16,7 @@ public class OrderDto
 
     // Delivery Details
     public string? DeliveryAddress { get; set; }
+    public string? DeliveryPincode { get; set; }
     public string? RecipientName { get; set; }
     public string? RecipientPhone { get; set; }
     public string? CardMessage { get; set; }
@@ -70,6 +71,7 @@ public class OrderListDto
     public decimal TotalAmount { get; set; }
     public int ItemCount { get; set; }
     public string? RecipientName { get; set; }
+    public string? DeliveryPincode { get; set; }
     public string DeliveryPriority { get; set; } = default!;
     public Guid? LocationId { get; set; }
 }
@@ -80,6 +82,7 @@ public class CreateOrderRequest
     public Guid? LocationId { get; set; }
     public DateTime? DeliveryDate { get; set; }
     public string? DeliveryAddress { get; set; }
+    public string? DeliveryPincode { get; set; }
     public string? RecipientName { get; set; }
     public string? RecipientPhone { get; set; }
     public string? CardMessage { get; set; }

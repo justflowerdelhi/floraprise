@@ -56,7 +56,12 @@ const COLUMNS: { key: StatusColumn; label: string; color: string; icon: React.Re
 const shortenAddress = (address: string, maxLen = 40) =>
   address.length > maxLen ? address.slice(0, maxLen) + '…' : address;
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const formatLocalDate = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 // ── Component ────────────────────────────────────────────────────────────
 
@@ -81,7 +86,7 @@ const DeliveryBoardPage: React.FC = () => {
   const fetchDeliveries = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getDeliveries(todayISO());
+      const data = await getDeliveries(formatLocalDate());
       setDeliveries(data);
     } catch (err) {
       console.error('Failed to load deliveries:', err);
@@ -264,12 +269,19 @@ const DeliveryBoardPage: React.FC = () => {
                       </Box>
 
                       {/* Address */}
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: d.postalCode ? 0.5 : 1 }}>
                         <PlaceIcon sx={{ fontSize: 14, color: 'text.secondary', mt: 0.2 }} />
                         <Typography variant="caption" color="text.secondary">
                           {shortenAddress(d.address)}
                         </Typography>
                       </Box>
+
+                      {/* Postal code */}
+                      {d.postalCode && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary', pl: 2.5, display: 'block', mb: 1 }}>
+                          PIN: {d.postalCode}
+                        </Typography>
+                      )}
 
                       {/* Assigned person chip + assign button */}
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5 }}>

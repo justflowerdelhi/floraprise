@@ -136,6 +136,7 @@ export interface POSBillingInfo {
   phone?: string;
   deliveryDate?: string;
   deliveryAddress?: string;
+  deliveryPincode?: string;
   recipientName?: string;
   recipientPhone?: string;
   cardMessage?: string;

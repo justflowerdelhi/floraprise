@@ -10,6 +10,7 @@ public class Order : BaseEntity
         Guid customerId,
         DateTime deliveryDate,
         string? deliveryAddress,
+        string? deliveryPincode,
         string? recipientName,
         string? recipientPhone)
     {
@@ -19,6 +20,7 @@ public class Order : BaseEntity
         OrderDate = DateTime.UtcNow;
         DeliveryDate = EnsureUtc(deliveryDate);
         DeliveryAddress = deliveryAddress;
+        DeliveryPincode = deliveryPincode;
         RecipientName = recipientName;
         RecipientPhone = recipientPhone;
         Status = OrderStatus.Pending;
@@ -46,6 +48,7 @@ public class Order : BaseEntity
 
     // Delivery details
     public string? DeliveryAddress { get; private set; }
+    public string? DeliveryPincode { get; private set; }
     public string? RecipientName { get; private set; }
     public string? RecipientPhone { get; private set; }
     public string? CardMessage { get; private set; }
@@ -101,11 +104,13 @@ public class Order : BaseEntity
     public void UpdateDeliveryDetails(
         DateTime deliveryDate,
         string? deliveryAddress,
+        string? deliveryPincode,
         string? recipientName,
         string? recipientPhone)
     {
         DeliveryDate = deliveryDate;
         DeliveryAddress = deliveryAddress;
+        DeliveryPincode = deliveryPincode;
         RecipientName = recipientName;
         RecipientPhone = recipientPhone;
         MarkUpdated();

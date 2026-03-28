@@ -321,7 +321,7 @@ public static class CompanyDemoDataSeeder
         {
             var cust = customers[i];
             var prod = products[i % products.Count];
-            var order = new Order(cid, cust.Id, today.AddDays(i + 1), addresses[i], cust.Name, null);
+            var order = new Order(cid, cust.Id, today.AddDays(i + 1), addresses[i], null, cust.Name, null);
             order.AddItem(prod.Id, prod.Name, i + 1, prod.RetailPrice);
             order.SetDeliveryFee(99m);
 

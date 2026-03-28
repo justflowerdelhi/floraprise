@@ -276,6 +276,7 @@ const POSPaymentDrawerV2: React.FC = () => {
         locationId: state.session.locationId || null,
         deliveryDate: state.deliveryDetails?.deliveryDate ?? null,
         deliveryAddress: state.deliveryDetails?.address ?? null,
+        deliveryPincode: state.deliveryDetails?.zipCode ?? null,
         recipientName: state.billingInfo?.name ?? null,
         recipientPhone: state.billingInfo?.phone ?? null,
         cardMessage: null,

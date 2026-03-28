@@ -243,7 +243,7 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
   const isDelivery = orderIntent === 'DELIVERY';
   const isPickup = orderIntent === 'PICKUP_LATER';
   const isBillingValid = billingInfo.name.trim() !== '' && (billingInfo.phone ?? '').trim() !== ''
-    && (!isDelivery || ((billingInfo.deliveryAddress ?? '').trim() !== '' && (billingInfo.recipientName ?? '').trim() !== '' && (billingInfo.recipientPhone ?? '').trim() !== ''));
+    && (!isDelivery || ((billingInfo.deliveryAddress ?? '').trim() !== '' && (billingInfo.deliveryPincode ?? '').trim() !== '' && (billingInfo.recipientName ?? '').trim() !== '' && (billingInfo.recipientPhone ?? '').trim() !== ''));
 
   const handleAddPayment = useCallback(() => {
     const amount = parseFloat(inputAmount);
@@ -632,6 +632,17 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
                   placeholder="Recipient Phone *"
                   className={`w-full h-10 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                     !(billingInfo.recipientPhone ?? '').trim() ? 'border-red-300' : 'border-gray-200'
+                  }`}
+                />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={billingInfo.deliveryPincode || ''}
+                  onChange={(e) => setBillingInfo(prev => ({ ...prev, deliveryPincode: e.target.value }))}
+                  placeholder="ZIP / Pincode *"
+                  className={`w-full h-10 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    !(billingInfo.deliveryPincode ?? '').trim() ? 'border-red-300' : 'border-gray-200'
                   }`}
                 />
                 <textarea

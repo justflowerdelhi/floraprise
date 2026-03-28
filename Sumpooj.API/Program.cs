@@ -387,6 +387,49 @@ try
                 END IF;
             END $$;
             """);
+
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'Orders'
+                      AND column_name = 'DeliveryPincode'
+                ) THEN
+                    ALTER TABLE "Orders" ADD COLUMN "DeliveryPincode" text NULL;
+
+                END IF;
+            END $$;
+            """);
+
+        // Self-heal: create DeliveryRoutes table if it doesn't exist yet
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name = 'DeliveryRoutes'
+                ) THEN
+                    CREATE TABLE "DeliveryRoutes" (
+                        "Id"               UUID        NOT NULL DEFAULT uuid_generate_v4(),
+                        "DeliveryPersonId" UUID        NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+                        "RouteDate"        TIMESTAMPTZ NOT NULL,
+                        "Name"             TEXT        NOT NULL DEFAULT '',
+                        "Status"           INTEGER     NOT NULL DEFAULT 0,
+                        "CreatedAtUtc"     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        "UpdatedAtUtc"     TIMESTAMPTZ NULL,
+                        CONSTRAINT "PK_DeliveryRoutes" PRIMARY KEY ("Id")
+                    );
+                    CREATE INDEX "IX_DeliveryRoutes_RouteDate" ON "DeliveryRoutes" ("RouteDate");
+                END IF;
+            END $$;
+            """);
     }
 
     await DataSeeder.SeedAsync(app.Services);

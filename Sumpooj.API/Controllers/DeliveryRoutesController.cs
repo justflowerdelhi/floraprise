@@ -41,6 +41,9 @@ public class DeliveryRoutesController : ControllerBase
         ex.SqlState == PostgresErrorCodes.UndefinedTable
         && ex.MessageText.Contains("DeliveryRoutes", StringComparison.OrdinalIgnoreCase);
 
+    private static bool IsDbUpdateMissingRoutesTable(DbUpdateException ex) =>
+        ex.InnerException is PostgresException pgEx && IsMissingDeliveryRoutesTable(pgEx);
+
     /// <summary>
     /// List delivery routes for a given date.
     /// Frontend: GET /api/delivery-routes?date=2025-01-15
@@ -73,7 +76,9 @@ public class DeliveryRoutesController : ControllerBase
 
             return Ok(routes);
         }
-        catch (PostgresException ex) when (IsMissingDeliveryRoutesTable(ex))
+        catch (Exception ex) when (
+            (ex is PostgresException pgEx1 && IsMissingDeliveryRoutesTable(pgEx1)) ||
+            (ex is DbUpdateException dbEx1 && IsDbUpdateMissingRoutesTable(dbEx1)))
         {
             return Ok(Array.Empty<object>());
         }
@@ -130,7 +135,9 @@ public class DeliveryRoutesController : ControllerBase
                 deliveries,
             });
         }
-        catch (PostgresException ex) when (IsMissingDeliveryRoutesTable(ex))
+        catch (Exception ex) when (
+            (ex is PostgresException pgEx2 && IsMissingDeliveryRoutesTable(pgEx2)) ||
+            (ex is DbUpdateException dbEx2 && IsDbUpdateMissingRoutesTable(dbEx2)))
         {
             return NotFound(new { message = "Delivery routes are not available until the database migration is applied." });
         }
@@ -174,11 +181,13 @@ public class DeliveryRoutesController : ControllerBase
 
             return Ok(new { routeId = route.Id.ToString() });
         }
-        catch (PostgresException ex) when (IsMissingDeliveryRoutesTable(ex))
+        catch (Exception ex) when (
+            (ex is PostgresException pgEx3 && IsMissingDeliveryRoutesTable(pgEx3)) ||
+            (ex is DbUpdateException dbEx3 && IsDbUpdateMissingRoutesTable(dbEx3)))
         {
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new
             {
-                message = "Delivery routes database table is missing. Apply the latest database migration to enable this feature."
+                message = "Delivery routes database table is missing. Run migration 018_add_delivery_routes_table.sql or restart the API (auto-creates on startup)."
             });
         }
     }

@@ -15,6 +15,7 @@ import {
   Alert,
   alpha,
   CircularProgress,
+  useTheme,
 } from '@mui/material';
 import {
   Warning,
@@ -88,6 +89,7 @@ interface PendingAction {
 }
 
 export function SensitiveActionProvider({ children }: SensitiveActionProviderProps) {
+  const theme = useTheme();
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [reason, setReason] = useState('');
   const [password, setPassword] = useState('');
@@ -193,7 +195,7 @@ export function SensitiveActionProvider({ children }: SensitiveActionProviderPro
         fullWidth
         PaperProps={{
           sx: {
-            bgcolor: '#1a1a2e',
+            bgcolor: 'background.paper',
             backgroundImage: 'none',
           },
         }}
@@ -254,7 +256,7 @@ export function SensitiveActionProvider({ children }: SensitiveActionProviderPro
                 <Box
                   sx={{
                     p: 2,
-                    bgcolor: '#0f0f0f',
+                    bgcolor: theme.palette.action.hover,
                     borderRadius: 2,
                     mb: 3,
                   }}

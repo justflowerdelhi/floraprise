@@ -63,6 +63,13 @@ const STATUS_CONFIG: Record<DayCloseStatus, { color: string; icon: React.ReactNo
   REOPENED: { color: '#2196f3', icon: <LockOpen />, label: 'Reopened' },
 };
 
+const formatLocalDate = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 interface DayStatusBadgeProps {
   status?: DayCloseStatus | null;
 }
@@ -177,7 +184,7 @@ export default function DayCloseScreen() {
     const data = await execute(
       () => getDayCloseSummary({
         locationId: currentLocationId !== 'ALL' ? currentLocationId : undefined,
-        date: new Date().toISOString().split('T')[0],
+        date: formatLocalDate(),
       }),
       { errorMessage: 'Failed to load day close summary' }
     );
@@ -198,6 +205,11 @@ export default function DayCloseScreen() {
     if (!countedCash || !summary) {
       return;
     }
+
+    if (!currentLocationId || currentLocationId === 'ALL') {
+      toast.error('Please select a specific location before closing the day.');
+      return;
+    }
     
     const result = await requestConfirmation('DAY_CLOSE', {
       metadata: {
@@ -214,7 +226,7 @@ export default function DayCloseScreen() {
       try {
         const data = await execute(
           () => closeDay({
-            locationId: currentLocationId !== 'ALL' ? currentLocationId : undefined,
+            locationId: currentLocationId,
             businessDate: summary.date,
             actualCash: parseFloat(countedCash),
             notes: notes || null,

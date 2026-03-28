@@ -46,6 +46,7 @@ export interface CreateOrderRequest {
   locationId?: string | null;
   deliveryDate: string | null;
   deliveryAddress?: string | null;
+  deliveryPincode?: string | null;
   recipientName?: string | null;
   recipientPhone?: string | null;
   cardMessage?: string | null;

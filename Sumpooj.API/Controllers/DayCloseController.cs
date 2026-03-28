@@ -24,8 +24,19 @@ public class DayCloseController : ControllerBase
     private Guid CompanyId => _tenantContext.CompanyId 
         ?? throw new UnauthorizedAccessException("Company context required");
 
-    private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) 
-        ?? throw new UnauthorizedAccessException("User not found"));
+    private Guid UserId
+    {
+        get
+        {
+            var rawUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue("sub");
+
+            if (!Guid.TryParse(rawUserId, out var userId))
+                throw new UnauthorizedAccessException("User not found");
+
+            return userId;
+        }
+    }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
@@ -61,7 +72,14 @@ public class DayCloseController : ControllerBase
     [Authorize(Policy = "StaffAccess")]
     public async Task<IActionResult> Close([FromBody] CloseDayRequest request)
     {
-        var id = await _dayCloseService.CloseAsync(CompanyId, request, UserId);
-        return CreatedAtAction(nameof(GetById), new { id }, new { id });
+        try
+        {
+            var id = await _dayCloseService.CloseAsync(CompanyId, request, UserId);
+            return CreatedAtAction(nameof(GetById), new { id }, new { id });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }

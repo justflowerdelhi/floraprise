@@ -111,11 +111,20 @@ public class DayCloseService
 
     public async Task<Guid> CloseAsync(Guid companyId, CloseDayRequest request, Guid userId)
     {
-        var isClosed = await _dayCloseRepository.IsDayClosedAsync(companyId, request.LocationId, request.BusinessDate);
+        if (request.LocationId == Guid.Empty)
+            throw new InvalidOperationException("Please select a specific location before closing the day.");
+
+        var location = await _locationRepository.GetByIdAsync(companyId, request.LocationId);
+        if (location == null)
+            throw new InvalidOperationException("Selected location is invalid or not accessible for this company.");
+
+        var businessDateUtc = DateTime.SpecifyKind(request.BusinessDate.Date, DateTimeKind.Utc);
+
+        var isClosed = await _dayCloseRepository.IsDayClosedAsync(companyId, request.LocationId, businessDateUtc);
         if (isClosed)
             throw new InvalidOperationException("Day is already closed for this location");
 
-        var summary = await GetSummaryAsync(companyId, request.LocationId, request.BusinessDate);
+        var summary = await GetSummaryAsync(companyId, request.LocationId, businessDateUtc);
 
         // Extract values from dynamic summary
         var totalOrders = (int)(summary.GetType().GetProperty("totalOrders")?.GetValue(summary) ?? 0);
@@ -129,7 +138,7 @@ public class DayCloseService
         var dayClose = new Domain.Entities.DayClose(
             companyId,
             request.LocationId,
-            request.BusinessDate,
+            businessDateUtc,
             userId);
 
         dayClose.SetSalesSummary(totalOrders, totalSales, totalRefunds);

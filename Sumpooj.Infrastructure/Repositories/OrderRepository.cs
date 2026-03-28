@@ -100,6 +100,7 @@ public class OrderRepository : IOrderRepository
                 TotalAmount = o.TotalAmount,
                 ItemCount = o.Items.Count,
                 RecipientName = o.RecipientName,
+                DeliveryPincode = o.DeliveryPincode,
                 DeliveryPriority = o.DeliveryPriority.ToString(),
                 LocationId = o.LocationId
             })
@@ -130,6 +131,7 @@ public class OrderRepository : IOrderRepository
                 TotalAmount = o.TotalAmount,
                 ItemCount = o.Items.Count,
                 RecipientName = o.RecipientName,
+                DeliveryPincode = o.DeliveryPincode,
                 DeliveryPriority = o.DeliveryPriority.ToString(),
                 LocationId = o.LocationId
             })
@@ -157,6 +159,7 @@ public class OrderRepository : IOrderRepository
                 TotalAmount = o.TotalAmount,
                 ItemCount = o.Items.Count,
                 RecipientName = o.RecipientName,
+                DeliveryPincode = o.DeliveryPincode,
                 DeliveryPriority = o.DeliveryPriority.ToString(),
                 LocationId = o.LocationId
             })
@@ -182,6 +185,7 @@ public class OrderRepository : IOrderRepository
                 TotalAmount = o.TotalAmount,
                 ItemCount = o.Items.Count,
                 RecipientName = o.RecipientName,
+                DeliveryPincode = o.DeliveryPincode,
                 DeliveryPriority = o.DeliveryPriority.ToString(),
                 LocationId = o.LocationId
             })

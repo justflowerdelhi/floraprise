@@ -5,11 +5,14 @@ public class Delivery : BaseEntity
     private Delivery() { }
 
     public Delivery(
+        Guid companyId,
         Guid salesOrderId,
         DateTime deliveryDate,
         string timeSlot,
         string deliveryAddress)
     {
+        if (companyId == Guid.Empty)
+            throw new ArgumentException("CompanyId is required.", nameof(companyId));
         if (salesOrderId == Guid.Empty)
             throw new ArgumentException("SalesOrderId is required.", nameof(salesOrderId));
         if (string.IsNullOrWhiteSpace(timeSlot))
@@ -17,12 +20,15 @@ public class Delivery : BaseEntity
         if (string.IsNullOrWhiteSpace(deliveryAddress))
             throw new ArgumentException("DeliveryAddress is required.", nameof(deliveryAddress));
 
+        CompanyId = companyId;
         SalesOrderId = salesOrderId;
         DeliveryDate = EnsureUtc(deliveryDate);
         TimeSlot = timeSlot;
         DeliveryAddress = deliveryAddress;
         Status = DeliveryStatus.Scheduled;
     }
+
+    public Guid CompanyId { get; private set; }
 
     public Guid SalesOrderId { get; private set; }
     public DateTime DeliveryDate { get; private set; }
@@ -31,6 +37,12 @@ public class Delivery : BaseEntity
     public string? PostalCode { get; private set; }
     public Guid? DeliveryPersonId { get; private set; }
     public DeliveryStatus Status { get; private set; }
+
+    public void SetPostalCode(string? code)
+    {
+        PostalCode = code;
+        MarkUpdated();
+    }
 
     // Route assignment
     public Guid? DeliveryRouteId { get; private set; }

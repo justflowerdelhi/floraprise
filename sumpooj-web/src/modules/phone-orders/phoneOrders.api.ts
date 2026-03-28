@@ -66,6 +66,8 @@ export async function createPhoneOrder(payload: {
   orderType: 'PhoneLocal' | 'PhoneOutstation';
   deliveryDate: string;
   deliveryCity: string;
+  deliveryAddress?: string;
+  deliveryPincode?: string;
   timeSlot?: string;
   occasion?: string;
   budget?: number;

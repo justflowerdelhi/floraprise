@@ -43,12 +43,10 @@ public class DeliveriesController : ControllerBase
         targetDate = DateTime.SpecifyKind(targetDate, DateTimeKind.Utc);
 
         var query = from d in _db.Deliveries
-                    join o in _db.Orders on d.SalesOrderId equals o.Id
-                    join c in _db.Customers on o.CustomerId equals c.Id
-                    join s in _db.Staff on d.DeliveryPersonId equals s.Id into staffJoin
-                    from s in staffJoin.DefaultIfEmpty()
-                    where d.DeliveryDate.Date == targetDate
-                    select new { d, o, c, DriverName = s != null ? s.Name : null };
+                join o in _db.Orders on d.SalesOrderId equals o.Id
+                join c in _db.Customers on o.CustomerId equals c.Id
+                where d.DeliveryDate.Date == targetDate
+                select new { d, o, c };
 
         // Filter by status (e.g. "Scheduled")
         if (!string.IsNullOrEmpty(status)
@@ -79,7 +77,20 @@ public class DeliveriesController : ControllerBase
                 Address = x.d.DeliveryAddress,
                 PostalCode = x.d.PostalCode,
                 Status = x.d.Status.ToString(),
-                DeliveryPersonName = x.DriverName
+                DeliveryPersonName =
+                    _db.Staff
+                        .Where(s => s.Id == x.d.DeliveryPersonId)
+                        .Select(s => s.Name)
+                        .FirstOrDefault()
+                    ??
+                    (
+                        from r in _db.DeliveryRoutes
+                        join s in _db.Staff on r.DeliveryPersonId equals s.Id
+                        where x.d.DeliveryRouteId != null
+                              && r.Id == x.d.DeliveryRouteId
+                              && r.DeliveryPersonId != Guid.Empty
+                        select s.Name
+                    ).FirstOrDefault()
             })
             .AsNoTracking().ToListAsync();
 

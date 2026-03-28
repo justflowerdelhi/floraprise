@@ -16,6 +16,7 @@ public class PhoneOrdersController : ControllerBase
     private readonly ICustomerRepository _customerRepository;
     private readonly IPaymentRepository _paymentRepository;
     private readonly ScheduleDeliveryHandler _scheduleDeliveryHandler;
+    private readonly IDeliveryRepository _deliveryRepo;
     private readonly ITenantContext _tenantContext;
 
     public PhoneOrdersController(
@@ -23,12 +24,14 @@ public class PhoneOrdersController : ControllerBase
         ICustomerRepository customerRepository,
         IPaymentRepository paymentRepository,
         ScheduleDeliveryHandler scheduleDeliveryHandler,
+        IDeliveryRepository deliveryRepo,
         ITenantContext tenantContext)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
         _paymentRepository = paymentRepository;
         _scheduleDeliveryHandler = scheduleDeliveryHandler;
+        _deliveryRepo = deliveryRepo;
         _tenantContext = tenantContext;
     }
 
@@ -73,6 +76,7 @@ public class PhoneOrdersController : ControllerBase
             deliveryDate,
             request.DeliveryCity,
             null,
+            null,
             null);
 
         // Map order type
@@ -111,6 +115,24 @@ public class PhoneOrdersController : ControllerBase
             order.SetDeliveryFee(request.DeliveryCharge);
 
         await _orderRepository.AddAsync(order);
+
+        // ── Auto-schedule Delivery for PhoneLocal delivery orders ──
+        var deliveryAddress = !string.IsNullOrWhiteSpace(request.DeliveryAddress)
+            ? request.DeliveryAddress
+            : request.DeliveryCity;
+        if (orderType == OrderType.PhoneLocal
+            && !string.IsNullOrWhiteSpace(deliveryAddress)
+            && !string.IsNullOrWhiteSpace(request.TimeSlot))
+        {
+            var existing = await _deliveryRepo.GetBySalesOrderIdAsync(order.Id);
+            if (existing == null)
+            {
+                var delivery = new Delivery(companyId, order.Id, deliveryDate, request.TimeSlot, deliveryAddress);
+                if (!string.IsNullOrWhiteSpace(request.DeliveryPincode))
+                    delivery.SetPostalCode(request.DeliveryPincode);
+                await _deliveryRepo.AddAsync(delivery);
+            }
+        }
 
         return CreatedAtAction(nameof(GetPhoneOrder), new { id = order.Id }, BuildPhoneOrderResponse(order, customerName, request.DeliveryCity, request.TimeSlot, request.Occasion, request.Budget));
     }
@@ -411,6 +433,8 @@ public class CreatePhoneOrderRequest
     public string OrderType { get; set; } = "PhoneLocal";
     public string? DeliveryDate { get; set; }
     public string? DeliveryCity { get; set; }
+    public string? DeliveryAddress { get; set; }
+    public string? DeliveryPincode { get; set; }
     public string? TimeSlot { get; set; }
     public string? Occasion { get; set; }
     public decimal? Budget { get; set; }

@@ -10,6 +10,7 @@ export interface DeliveryListItem {
   deliveryDate: string;
   timeSlot: string;
   address: string;
+  postalCode: string | null;
   status: 'Scheduled' | 'OutForDelivery' | 'Delivered' | 'Failed' | 'Cancelled';
   deliveryPersonName: string | null;
 }
