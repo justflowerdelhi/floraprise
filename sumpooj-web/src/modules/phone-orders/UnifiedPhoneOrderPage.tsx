@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { confirmPhoneLocalOrder, createPhoneOrder } from "./phoneOrders.api";
 import { createPayment } from "./phoneOrders.api";
+import api from '../../api/axios';
 
 const UnifiedPhoneOrderPage: React.FC = () => {
   const [savedOrderId, setSavedOrderId] = useState<string | null>(null);
@@ -88,8 +89,8 @@ const UnifiedPhoneOrderPage: React.FC = () => {
 
   const lookupCustomer = async (phoneNumber: string) => {
     if (phoneNumber.length < 8) return;
-    const res = await fetch(`/api/customers/by-phone?phone=${phoneNumber}`);
-    const data = await res.json();
+    const res = await api.get('/customers/by-phone', { params: { phone: phoneNumber } });
+    const data = res.data;
     if (data) {
       setCustomerName(data.name);
       setLastOrders(data.orders || []);

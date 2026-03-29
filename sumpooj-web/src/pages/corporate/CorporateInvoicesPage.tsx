@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -16,6 +17,8 @@ import {
   TableRow,
   TextField,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { useApiCall } from '../../hooks/useApiCall';
 import {
@@ -40,6 +43,8 @@ const monthEnd = () => {
 
 export default function CorporateInvoicesPage() {
   const { execute, loading } = useApiCall();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [clients, setClients] = useState<CorporateClient[]>([]);
   const [invoices, setInvoices] = useState<CorporateInvoice[]>([]);
   const [status, setStatus] = useState<CorporateInvoiceStatus | ''>('');
@@ -148,8 +153,8 @@ export default function CorporateInvoicesPage() {
   };
 
   return (
-    <Paper sx={{ p: 2 }}>
-      <Typography variant="h5" fontWeight={700} mb={0.5}>Corporate Invoices</Typography>
+    <Paper sx={{ p: { xs: 1.25, sm: 2 } }}>
+      <Typography variant={isMobile ? 'h6' : 'h5'} fontWeight={700} mb={0.5}>Corporate Invoices</Typography>
       <Typography variant="body2" color="text.secondary" mb={2}>
         Generate monthly invoices and post customer payments against receivables.
       </Typography>
@@ -175,7 +180,8 @@ export default function CorporateInvoicesPage() {
             label="Status"
             value={status}
             onChange={(e) => setStatus(e.target.value as CorporateInvoiceStatus | '')}
-            sx={{ minWidth: 180 }}
+            sx={{ minWidth: { md: 180 } }}
+            fullWidth={isMobile}
           >
             <MenuItem value="">All</MenuItem>
             <MenuItem value="Draft">Draft</MenuItem>
@@ -185,7 +191,7 @@ export default function CorporateInvoicesPage() {
             <MenuItem value="Overdue">Overdue</MenuItem>
           </TextField>
 
-          <Button variant="outlined" onClick={loadInvoices} disabled={loading}>Refresh</Button>
+          <Button variant="outlined" onClick={loadInvoices} disabled={loading} fullWidth={isMobile}>Refresh</Button>
         </Stack>
 
         <Paper variant="outlined" sx={{ p: 2 }}>
@@ -205,7 +211,7 @@ export default function CorporateInvoicesPage() {
               onChange={(e) => setToDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
             />
-            <Button variant="contained" onClick={generate} disabled={loading || !clientId}>Generate</Button>
+            <Button variant="contained" onClick={generate} disabled={loading || !clientId} fullWidth={isMobile}>Generate</Button>
           </Stack>
         </Paper>
 
@@ -213,54 +219,104 @@ export default function CorporateInvoicesPage() {
           Total Outstanding in View: {totalOutstanding.toFixed(2)}
         </Typography>
 
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Invoice #</TableCell>
-              <TableCell>Client</TableCell>
-              <TableCell>Period</TableCell>
-              <TableCell>Total</TableCell>
-              <TableCell>Outstanding</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {invoices.map((inv) => (
-              <TableRow key={inv.id} hover>
-                <TableCell>{inv.id.slice(0, 8).toUpperCase()}</TableCell>
-                <TableCell>{clientNameById.get(inv.clientId) ?? inv.clientId.slice(0, 8)}</TableCell>
-                <TableCell>
-                  {new Date(inv.startDateUtc).toLocaleDateString()} - {new Date(inv.endDateUtc).toLocaleDateString()}
-                </TableCell>
-                <TableCell>{Number(inv.totalAmount ?? 0).toFixed(2)}</TableCell>
-                <TableCell>{(String(inv.status) === 'Paid' || String(inv.status) === '4' ? 0 : Number(inv.totalAmount ?? 0)).toFixed(2)}</TableCell>
-                <TableCell>{String(inv.status)}</TableCell>
-                <TableCell align="right">
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={() => openPayDialog(inv)}
-                    disabled={String(inv.status) === 'Paid' || String(inv.status) === '4'}
-                  >
-                    Pay
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+        {isMobile ? (
+          <Stack spacing={1}>
+            {invoices.map((inv) => {
+              const isPaid = String(inv.status) === 'Paid' || String(inv.status) === '4';
+              return (
+                <Paper key={inv.id} variant="outlined" sx={{ p: 1.1 }}>
+                  <Stack spacing={0.8}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                      <Typography variant="subtitle2" fontWeight={700}>{inv.id.slice(0, 8).toUpperCase()}</Typography>
+                      <Chip size="small" label={String(inv.status)} color={isPaid ? 'success' : 'default'} />
+                    </Stack>
+
+                    <Typography variant="body2">
+                      {clientNameById.get(inv.clientId) ?? inv.clientId.slice(0, 8)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(inv.startDateUtc).toLocaleDateString()} - {new Date(inv.endDateUtc).toLocaleDateString()}
+                    </Typography>
+
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="caption" color="text.secondary">Total</Typography>
+                      <Typography variant="body2">{Number(inv.totalAmount ?? 0).toFixed(2)}</Typography>
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="caption" color="text.secondary">Outstanding</Typography>
+                      <Typography variant="body2">{(isPaid ? 0 : Number(inv.totalAmount ?? 0)).toFixed(2)}</Typography>
+                    </Stack>
+
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => openPayDialog(inv)}
+                      disabled={isPaid}
+                      fullWidth
+                    >
+                      Pay
+                    </Button>
+                  </Stack>
+                </Paper>
+              );
+            })}
 
             {invoices.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} align="center">
-                  <Typography variant="body2" color="text.secondary" py={2}>No invoices found.</Typography>
-                </TableCell>
-              </TableRow>
+              <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="body2" color="text.secondary">No invoices found.</Typography>
+              </Paper>
             )}
-          </TableBody>
-        </Table>
+          </Stack>
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Invoice #</TableCell>
+                <TableCell>Client</TableCell>
+                <TableCell>Period</TableCell>
+                <TableCell>Total</TableCell>
+                <TableCell>Outstanding</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {invoices.map((inv) => (
+                <TableRow key={inv.id} hover>
+                  <TableCell>{inv.id.slice(0, 8).toUpperCase()}</TableCell>
+                  <TableCell>{clientNameById.get(inv.clientId) ?? inv.clientId.slice(0, 8)}</TableCell>
+                  <TableCell>
+                    {new Date(inv.startDateUtc).toLocaleDateString()} - {new Date(inv.endDateUtc).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>{Number(inv.totalAmount ?? 0).toFixed(2)}</TableCell>
+                  <TableCell>{(String(inv.status) === 'Paid' || String(inv.status) === '4' ? 0 : Number(inv.totalAmount ?? 0)).toFixed(2)}</TableCell>
+                  <TableCell>{String(inv.status)}</TableCell>
+                  <TableCell align="right">
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => openPayDialog(inv)}
+                      disabled={String(inv.status) === 'Paid' || String(inv.status) === '4'}
+                    >
+                      Pay
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+
+              {invoices.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    <Typography variant="body2" color="text.secondary" py={2}>No invoices found.</Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        )}
       </Stack>
 
-      <Dialog open={Boolean(paying)} onClose={() => setPaying(null)} fullWidth maxWidth="sm">
+      <Dialog open={Boolean(paying)} onClose={() => setPaying(null)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>Record Invoice Payment</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>

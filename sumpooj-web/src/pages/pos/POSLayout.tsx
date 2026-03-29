@@ -23,8 +23,9 @@ import type { POSOrderType, POSCustomer, POSPaymentEntry, POSBillingInfo } from 
 import { POS_SHORTCUTS } from './POSTypes';
 import { searchProducts, normalizeProducts } from '../../api/product.api';
 import { searchCustomers } from '../../api/customer.api';
-import { fetchSellableFinishedGoods } from '../../api/order.api';
+import { createOrder, fetchSellableFinishedGoods } from '../../api/order.api';
 import { formatCurrency } from '../../core/i18n';
+import { openReceiptWindow, printInWindow, printPosReceipt, getPosReceiptPrintMode } from './utils/posReceiptPrint';
 
 const POSLayout: React.FC = () => {
   // Cart context
@@ -174,8 +175,13 @@ const POSLayout: React.FC = () => {
   }, [state.items.length]);
 
   const handlePaymentComplete = useCallback((payments: POSPaymentEntry[], billingInfo: POSBillingInfo, selectedCustomerId?: string | null) => {
+    // Open receipt window NOW — synchronous user-gesture context, before any await.
+    // Popup blockers cannot fire here, so this always succeeds.
+    const printMode = getPosReceiptPrintMode();
+    const receiptWin = openReceiptWindow();
+
     // Create order via API
-    const createOrder = async () => {
+    const doCreate = async () => {
       try {
         const normalizePhone = (value?: string | null) => (value ?? '').replace(/\D/g, '');
         const resolvedCustomerId =
@@ -220,20 +226,55 @@ const POSLayout: React.FC = () => {
             amount: p.amount,
           })),
         };
-        await import('../../api/order.api').then(({ createOrder }) => createOrder(orderPayload));
+        const createdOrder = await createOrder(orderPayload);
+
+        try {
+          const subtotal = orderPayload.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+          const paidTotal = orderPayload.payments.reduce((sum, payment) => sum + payment.amount, 0);
+          const receiptInput = {
+            orderNumber: createdOrder?.orderNumber,
+            orderId: createdOrder?.id,
+            customerName: billingInfo.name,
+            customerPhone: billingInfo.phone,
+            items: orderPayload.items.map((item) => ({
+              name: item.productName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            })),
+            payments: orderPayload.payments,
+            subtotal,
+            discount: orderPayload.discountAmount,
+            deliveryFee: orderPayload.deliveryFee,
+            grandTotal: state.totals.grandTotal,
+            paidTotal,
+            balanceDue: Math.max(0, state.totals.grandTotal - paidTotal),
+          };
+          if (receiptWin && !receiptWin.closed) {
+            printInWindow(receiptWin, receiptInput, printMode);
+          } else {
+            printPosReceipt(receiptInput);
+          }
+        } catch (printError) {
+          console.warn('Receipt print failed:', printError);
+        }
+
         setPaymentDrawerOpen(false);
         clearCart();
         setSelectedCustomer(null);
         showSnackbar(`Order completed - ${formatCurrency(state.totals.grandTotal)}`, 'success');
       } catch (err) {
+        if (receiptWin && !receiptWin.closed) receiptWin.close();
         setPaymentDrawerOpen(false);
         showSnackbar('Order creation failed. Please try again.', 'error');
       }
     };
-    createOrder();
+    doCreate();
   }, [state.items, state.totals, clearCart, showSnackbar, selectedCustomer, orderType, currentLocationId, customers]);
 
   const handlePartialSave = useCallback((payments: POSPaymentEntry[], billingInfo: POSBillingInfo, paidAmount: number, remainingAmount: number, selectedCustomerId?: string | null) => {
+    const printMode = getPosReceiptPrintMode();
+    const receiptWin = openReceiptWindow();
+
     // Create order with balance via API
     const createOrderWithBalance = async () => {
       try {
@@ -280,12 +321,44 @@ const POSLayout: React.FC = () => {
             amount: p.amount,
           })),
         };
-        await import('../../api/order.api').then(({ createOrder }) => createOrder(orderPayload));
+        const createdOrder = await createOrder(orderPayload);
+
+        try {
+          const subtotal = orderPayload.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+          const paidTotal = orderPayload.payments.reduce((sum, payment) => sum + payment.amount, 0);
+          const receiptInput = {
+            orderNumber: createdOrder?.orderNumber,
+            orderId: createdOrder?.id,
+            customerName: billingInfo.name,
+            customerPhone: billingInfo.phone,
+            items: orderPayload.items.map((item) => ({
+              name: item.productName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            })),
+            payments: orderPayload.payments,
+            subtotal,
+            discount: orderPayload.discountAmount,
+            deliveryFee: orderPayload.deliveryFee,
+            grandTotal: state.totals.grandTotal,
+            paidTotal,
+            balanceDue: Math.max(0, state.totals.grandTotal - paidTotal),
+          };
+          if (receiptWin && !receiptWin.closed) {
+            printInWindow(receiptWin, receiptInput, printMode);
+          } else {
+            printPosReceipt(receiptInput);
+          }
+        } catch (printError) {
+          console.warn('Receipt print failed:', printError);
+        }
+
         setPaymentDrawerOpen(false);
         clearCart();
         setSelectedCustomer(null);
         showSnackbar(`Order saved - ${formatCurrency(remainingAmount)} balance due`, 'info');
       } catch (err) {
+        if (receiptWin && !receiptWin.closed) receiptWin.close();
         setPaymentDrawerOpen(false);
         showSnackbar('Order creation failed. Please try again.', 'error');
       }

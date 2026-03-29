@@ -21,6 +21,11 @@ import { searchCustomers } from '../../api/customer.api';
 import { getCrmCustomer360 } from '../../api/crm.api';
 import { useTenant } from '../../core/tenant/TenantContext';
 import { getPosDiscountRules } from '../../core/settings/discountRules';
+import {
+  getPosReceiptPrintMode,
+  setPosReceiptPrintMode,
+  type PosReceiptPrintMode,
+} from './utils/posReceiptPrint';
 
 interface POSPaymentDrawerProps {
   open: boolean;
@@ -74,6 +79,7 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
   const [customerSuggestions, setCustomerSuggestions] = useState<CustomerSuggestion[]>([]);
   const [activeSuggestField, setActiveSuggestField] = useState<'name' | 'phone' | null>(null);
   const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
+  const [receiptPrintMode, setReceiptPrintModeState] = useState<PosReceiptPrintMode>(() => getPosReceiptPrintMode());
   const [matchedCustomer360, setMatchedCustomer360] = useState<{
     totalOrders: number;
     lastOrderDate?: string;
@@ -296,6 +302,11 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
   const getMethodIcon = (method: POSPaymentMethod) => {
     return PAYMENT_METHODS.find(m => m.method === method)?.icon || <CashIcon />;
   };
+
+  const handleReceiptPrintModeChange = useCallback((mode: PosReceiptPrintMode) => {
+    setReceiptPrintModeState(mode);
+    setPosReceiptPrintMode(mode);
+  }, []);
 
   return (
     <Drawer
@@ -716,39 +727,52 @@ const POSPaymentDrawer: React.FC<POSPaymentDrawerProps> = ({
               </div>
             </div>
           )}
-        </div>
 
-        {/* Footer Actions */}
-        <footer className="px-6 py-4 bg-white border-t border-gray-200 space-y-2">
-          {isFullyPaid ? (
-            <button
-              onClick={handleComplete}
-              disabled={!isBillingValid}
-              className="w-full py-3 bg-purple-600 text-white font-semibold rounded-lg
-                         hover:bg-purple-700 transition-colors
-                         disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              Complete Payment
-            </button>
-          ) : hasPartialPayment && onPartialSave ? (
-            <button
-              onClick={handlePartialSave}
-              disabled={!isBillingValid}
-              className="w-full py-3 bg-amber-500 text-white font-semibold rounded-lg
-                         hover:bg-amber-600 transition-colors
-                         disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              Save with Balance ({formatCurrency(remaining)})
-            </button>
-          ) : (
-            <button
-              disabled
-              className="w-full py-3 bg-gray-200 text-gray-500 font-semibold rounded-lg cursor-not-allowed"
-            >
-              Add payment to continue
-            </button>
-          )}
-        </footer>
+          {/* Action buttons — inside scroll so they appear right after the form */}
+          <div className="px-6 py-4 bg-white border-t border-gray-200 space-y-2">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 mb-2">
+              <label className="text-xs font-medium text-gray-700 block mb-1">Receipt Print</label>
+              <select
+                value={receiptPrintMode}
+                onChange={(e) => handleReceiptPrintModeChange(e.target.value as PosReceiptPrintMode)}
+                className="w-full h-9 px-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="AUTO">Auto Print</option>
+                <option value="ASK">Ask Before Print</option>
+                <option value="PDF">PDF Mode</option>
+              </select>
+            </div>
+
+            {isFullyPaid ? (
+              <button
+                onClick={handleComplete}
+                disabled={!isBillingValid}
+                className="w-full py-3 bg-purple-600 text-white font-semibold rounded-lg
+                           hover:bg-purple-700 transition-colors
+                           disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                Complete Payment
+              </button>
+            ) : hasPartialPayment && onPartialSave ? (
+              <button
+                onClick={handlePartialSave}
+                disabled={!isBillingValid}
+                className="w-full py-3 bg-amber-500 text-white font-semibold rounded-lg
+                           hover:bg-amber-600 transition-colors
+                           disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                Save with Balance ({formatCurrency(remaining)})
+              </button>
+            ) : (
+              <button
+                disabled
+                className="w-full py-3 bg-gray-200 text-gray-500 font-semibold rounded-lg cursor-not-allowed"
+              >
+                Add payment to continue
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </Drawer>
   );

@@ -3,28 +3,24 @@ import type { RouteDetail, Driver, Delivery } from '../types/deliveryRouteTypes'
 import { Button, Card, CardContent, Typography, Chip, Select, MenuItem, CircularProgress } from '@mui/material';
 import { useParams } from 'react-router-dom';
 import { useToast } from '../hooks/useToast';
+import { apiClient } from '../core/api/apiClient';
 
 const fetchRouteDetail = async (routeId: string): Promise<RouteDetail> => {
-  // Replace with real API call
-  const res = await fetch(`/api/delivery-routes/${routeId}`);
-  return await res.json() as RouteDetail;
+  const res = await apiClient.get(`/delivery-routes/${routeId}`);
+  return res.data as RouteDetail;
 };
 const fetchAvailableDrivers = async (): Promise<Driver[]> => {
-  const res = await fetch('/api/staff/available-drivers');
-  return await res.json();
+  const res = await apiClient.get('/staff/available-drivers');
+  return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
 };
 const assignDriver = async (routeId: string, driverId: string): Promise<void> => {
-  await fetch(`/api/delivery-routes/${routeId}/assign-driver`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ driverId })
-  });
+  await apiClient.put(`/delivery-routes/${routeId}/assign-driver`, { driverId });
 };
 const startRoute = async (routeId: string): Promise<void> => {
-  await fetch(`/api/delivery-routes/${routeId}/start`, { method: 'PUT' });
+  await apiClient.put(`/delivery-routes/${routeId}/start`);
 };
 const completeRoute = async (routeId: string): Promise<void> => {
-  await fetch(`/api/delivery-routes/${routeId}/complete`, { method: 'PUT' });
+  await apiClient.put(`/delivery-routes/${routeId}/complete`);
 };
 
 export default function DeliveryRouteDetailPage() {

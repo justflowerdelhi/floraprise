@@ -48,6 +48,12 @@ import { PLAN_CONFIGS, ONE_TIME_SETUP_COST, getUsagePercentage } from '../../cor
 import type { FeatureFlag } from '../../core/tenant/FeatureFlags';
 import { FEATURE_METADATA, hasFeature } from '../../core/tenant/FeatureFlags';
 
+const getPlanSetupCost = (planId: TenantPlan): number => {
+  if (planId === 'PRO') return 4999;
+  if (planId === 'ENTERPRISE') return 9999;
+  return ONE_TIME_SETUP_COST;
+};
+
 // -----------------------------------------------------------------------------
 // Main Subscription Page
 // -----------------------------------------------------------------------------
@@ -175,7 +181,7 @@ export default function SubscriptionPage() {
                     Annual: Rs {planConfig.yearlyPrice.toLocaleString()}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                    One-time Setup Cost: Rs {ONE_TIME_SETUP_COST.toLocaleString()}/-
+                    One-time Setup Cost: Rs {getPlanSetupCost(plan).toLocaleString()}/-
                   </Typography>
                 </Box>
               </Box>
@@ -576,7 +582,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
         <Box
           sx={{
             position: 'absolute',
-            top: -12,
+            top: 10,
             left: '50%',
             transform: 'translateX(-50%)',
             px: 2,
@@ -587,6 +593,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
             fontSize: '0.7rem',
             fontWeight: 700,
             textTransform: 'uppercase',
+            zIndex: 1,
           }}
         >
           Most Popular
@@ -597,7 +604,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
         <Box
           sx={{
             position: 'absolute',
-            top: -12,
+            top: 10,
             left: '50%',
             transform: 'translateX(-50%)',
             px: 2,
@@ -608,6 +615,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
             fontSize: '0.7rem',
             fontWeight: 700,
             textTransform: 'uppercase',
+            zIndex: 1,
           }}
         >
           Current Plan
@@ -616,7 +624,17 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
       
       <CardContent sx={{ p: 3, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ textAlign: 'center', mb: 3, pt: isCurrent || isRecommended ? 2 : 0 }}>
-          <Typography variant="h6" fontWeight={700} mb={0.5}>
+          <Typography
+            variant="h6"
+            fontWeight={700}
+            mb={0.5}
+            sx={{
+              fontSize: { xs: '1.05rem', md: '1.15rem' },
+              lineHeight: 1.2,
+              letterSpacing: 0.2,
+              textRendering: 'optimizeLegibility',
+            }}
+          >
             {config.name}
           </Typography>
           <Typography variant="body2" color="text.secondary" mb={2}>
@@ -639,7 +657,7 @@ function PlanCard({ plan, currentPlan, yearlyBilling, onUpgrade }: PlanCardProps
           )}
 
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-            One-time Setup Cost: Rs {ONE_TIME_SETUP_COST.toLocaleString()}/-
+            One-time Setup Cost: Rs {getPlanSetupCost(plan).toLocaleString()}/-
           </Typography>
         </Box>
         

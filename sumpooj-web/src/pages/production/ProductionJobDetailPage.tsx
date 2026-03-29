@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Snackbar, CircularProgress } from '@mui/material';
-import axios from 'axios';
+import { apiClient } from '../../core/api/apiClient';
 
 interface MaterialUsage {
   id: string;
@@ -39,7 +39,7 @@ const ProductionJobDetailPage: React.FC<{ jobId: string }> = ({ jobId }) => {
   const fetchJob = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`/api/production-jobs/${jobId}`);
+      const res = await apiClient.get(`/production-jobs/${jobId}`);
       setJob(res.data);
     } catch (e) {
       setToast({ open: true, message: 'Failed to load job', success: false });
@@ -51,7 +51,7 @@ const ProductionJobDetailPage: React.FC<{ jobId: string }> = ({ jobId }) => {
   const handleStartJob = async () => {
     setApiLoading(true);
     try {
-      await axios.post(`/api/production-jobs/${jobId}/start`);
+      await apiClient.post(`/production-jobs/${jobId}/start`);
       setToast({ open: true, message: 'Job started', success: true });
       fetchJob();
     } catch (e) {
@@ -64,7 +64,7 @@ const ProductionJobDetailPage: React.FC<{ jobId: string }> = ({ jobId }) => {
   const handleCompleteJob = async () => {
     setApiLoading(true);
     try {
-      await axios.post(`/api/production-jobs/${jobId}/complete`);
+      await apiClient.post(`/production-jobs/${jobId}/complete`);
       setToast({ open: true, message: 'Job completed', success: true });
       fetchJob();
     } catch (e) {
@@ -80,7 +80,7 @@ const ProductionJobDetailPage: React.FC<{ jobId: string }> = ({ jobId }) => {
     setSelectedProduct(null);
     setUnitsUsed('');
     try {
-      const res = await axios.get('/api/products');
+      const res = await apiClient.get('/products');
       setProducts(res.data);
     } catch {}
   };
@@ -89,7 +89,7 @@ const ProductionJobDetailPage: React.FC<{ jobId: string }> = ({ jobId }) => {
     if (!selectedProduct || !unitsUsed) return;
     setApiLoading(true);
     try {
-      await axios.post('/api/production-material-usage', {
+      await apiClient.post('/production-material-usage', {
         jobId,
         productId: selectedProduct.id,
         unitsUsed: Number(unitsUsed),

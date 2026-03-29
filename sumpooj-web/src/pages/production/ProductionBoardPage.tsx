@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, Typography, Button, Chip, Snackbar, CircularProgress, Box } from '@mui/material';
 // import { Grid } from '@mui/material';
-import axios from 'axios';
+import { apiClient } from '../../core/api/apiClient';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 dayjs.extend(relativeTime);
@@ -31,7 +31,7 @@ export default function ProductionBoardPage() {
   const fetchJobs = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/production-jobs');
+      const res = await apiClient.get('/production-jobs');
       setJobs(res.data);
     } catch {
       setToast({ open: true, message: 'Failed to load jobs', severity: 'error' });
@@ -47,7 +47,7 @@ export default function ProductionBoardPage() {
   const handleAction = async (job: ProductionJob, action: 'start' | 'complete') => {
     setActionLoading(job.JobId);
     try {
-      await axios.post(`/api/production-jobs/${job.JobId}/${action}`);
+      await apiClient.post(`/production-jobs/${job.JobId}/${action}`);
       setToast({ open: true, message: `Job ${action === 'start' ? 'started' : 'completed'}`, severity: 'success' });
       await fetchJobs();
     } catch {

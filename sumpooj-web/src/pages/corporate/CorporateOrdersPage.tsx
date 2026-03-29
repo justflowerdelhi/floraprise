@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Divider,
   Box,
   Button,
   IconButton,
@@ -14,6 +15,8 @@ import {
   TextField,
   Typography,
   Alert,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -45,6 +48,8 @@ const formatLocalDateTimeInput = () => {
 export default function CorporateOrdersPage() {
   const { execute, loading } = useApiCall();
   const [searchParams] = useSearchParams();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [clients, setClients] = useState<CorporateClient[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
@@ -160,8 +165,8 @@ export default function CorporateOrdersPage() {
   };
 
   return (
-    <Paper sx={{ p: 2 }}>
-      <Typography variant="h5" fontWeight={700} mb={0.5}>Corporate Orders</Typography>
+    <Paper sx={{ p: { xs: 1.25, sm: 2 } }}>
+      <Typography variant={isMobile ? 'h6' : 'h5'} fontWeight={700} mb={0.5}>Corporate Orders</Typography>
       <Typography variant="body2" color="text.secondary" mb={2}>
         Create B2B credit orders (outside POS) with delivery integration.
       </Typography>
@@ -269,23 +274,15 @@ export default function CorporateOrdersPage() {
             <Button startIcon={<AddIcon />} onClick={addItem}>Add Item</Button>
           </Stack>
 
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Product</TableCell>
-                <TableCell align="right">Qty</TableCell>
-                <TableCell align="right">Unit Price</TableCell>
-                <TableCell align="right">Line Total</TableCell>
-                <TableCell align="center"></TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          {isMobile ? (
+            <Stack spacing={1}>
               {form.items.map((item, idx) => (
-                <TableRow key={idx}>
-                  <TableCell>
+                <Paper key={idx} variant="outlined" sx={{ p: 1 }}>
+                  <Stack spacing={1}>
                     <TextField
                       select
                       size="small"
+                      label="Product"
                       value={item.productId}
                       onChange={(e) => {
                         const selected = products.find((p) => p.id === e.target.value);
@@ -301,40 +298,108 @@ export default function CorporateOrdersPage() {
                         <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
                       ))}
                     </TextField>
-                  </TableCell>
-                  <TableCell align="right">
-                    <TextField
-                      size="small"
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(idx, { quantity: Math.max(1, Number(e.target.value || 1)) })}
-                      sx={{ width: 90 }}
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <TextField
-                      size="small"
-                      type="number"
-                      value={item.unitPrice}
-                      onChange={(e) => updateItem(idx, { unitPrice: Math.max(0, Number(e.target.value || 0)) })}
-                      sx={{ width: 120 }}
-                    />
-                  </TableCell>
-                  <TableCell align="right">{(item.quantity * item.unitPrice).toFixed(2)}</TableCell>
-                  <TableCell align="center">
-                    <IconButton color="error" onClick={() => removeItem(idx)} disabled={form.items.length === 1}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
+
+                    <Stack direction="row" spacing={1}>
+                      <TextField
+                        size="small"
+                        type="number"
+                        label="Qty"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(idx, { quantity: Math.max(1, Number(e.target.value || 1)) })}
+                        fullWidth
+                      />
+                      <TextField
+                        size="small"
+                        type="number"
+                        label="Unit Price"
+                        value={item.unitPrice}
+                        onChange={(e) => updateItem(idx, { unitPrice: Math.max(0, Number(e.target.value || 0)) })}
+                        fullWidth
+                      />
+                    </Stack>
+
+                    <Divider />
+
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2" fontWeight={600}>
+                        Line Total: {(item.quantity * item.unitPrice).toFixed(2)}
+                      </Typography>
+                      <IconButton color="error" onClick={() => removeItem(idx)} disabled={form.items.length === 1}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                  </Stack>
+                </Paper>
               ))}
-            </TableBody>
-          </Table>
+            </Stack>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Product</TableCell>
+                  <TableCell align="right">Qty</TableCell>
+                  <TableCell align="right">Unit Price</TableCell>
+                  <TableCell align="right">Line Total</TableCell>
+                  <TableCell align="center"></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {form.items.map((item, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>
+                      <TextField
+                        select
+                        size="small"
+                        value={item.productId}
+                        onChange={(e) => {
+                          const selected = products.find((p) => p.id === e.target.value);
+                          updateItem(idx, {
+                            productId: e.target.value,
+                            productName: selected?.name ?? '',
+                            unitPrice: selected?.retailPrice ?? 0,
+                          });
+                        }}
+                        fullWidth
+                      >
+                        {products.map((p) => (
+                          <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+                        ))}
+                      </TextField>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TextField
+                        size="small"
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(idx, { quantity: Math.max(1, Number(e.target.value || 1)) })}
+                        sx={{ width: 90 }}
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <TextField
+                        size="small"
+                        type="number"
+                        value={item.unitPrice}
+                        onChange={(e) => updateItem(idx, { unitPrice: Math.max(0, Number(e.target.value || 0)) })}
+                        sx={{ width: 120 }}
+                      />
+                    </TableCell>
+                    <TableCell align="right">{(item.quantity * item.unitPrice).toFixed(2)}</TableCell>
+                    <TableCell align="center">
+                      <IconButton color="error" onClick={() => removeItem(idx)} disabled={form.items.length === 1}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </Box>
 
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={1.25}>
           <Typography variant="h6">Total: {total.toFixed(2)}</Typography>
-          <Button variant="contained" onClick={submit} disabled={loading}>Create Corporate Order</Button>
+          <Button variant="contained" onClick={submit} disabled={loading} fullWidth={isMobile}>Create Corporate Order</Button>
         </Stack>
       </Stack>
     </Paper>

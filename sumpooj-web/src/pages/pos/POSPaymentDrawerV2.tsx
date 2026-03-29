@@ -25,6 +25,14 @@ import { formatCurrency } from '../../core/i18n';
 import { createOrder } from '../../api/order.api';
 import { searchCustomers } from '../../api/customer.api';
 import { getCrmCustomer360 } from '../../api/crm.api';
+import {
+  getPosReceiptPrintMode,
+  setPosReceiptPrintMode,
+  openReceiptWindow,
+  printInWindow,
+  printPosReceipt,
+  type PosReceiptPrintMode,
+} from './utils/posReceiptPrint';
 
 interface CustomerSuggestion {
   id: string;
@@ -79,6 +87,7 @@ const POSPaymentDrawerV2: React.FC = () => {
   const [activeSuggestField, setActiveSuggestField] = useState<'name' | 'phone' | null>(null);
   const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
   const [submitError, setSubmitError] = useState<string>('');
+  const [receiptPrintMode, setReceiptPrintModeState] = useState<PosReceiptPrintMode>(() => getPosReceiptPrintMode());
 
   // Initialize billing from customer when drawer opens
   useEffect(() => {
@@ -262,6 +271,13 @@ const POSPaymentDrawerV2: React.FC = () => {
     const canComplete = isFullyPaid || (state.orderIntent === 'PICKUP_LATER' && paidAmount > 0);
     if (!canComplete) return;
 
+    // Open the receipt window NOW, while still in the synchronous user-gesture
+    // call stack (before any `await`). Popup blockers only fire after an await,
+    // so this always succeeds. The window shows "Preparing receipt…" until the
+    // order is confirmed, then we write the actual receipt HTML into it.
+    const printMode = getPosReceiptPrintMode();
+    const receiptWin = openReceiptWindow();
+
     setSubmitError('');
 
     try {
@@ -271,7 +287,7 @@ const POSPaymentDrawerV2: React.FC = () => {
         payments: state.payments,
       });
 
-      await createOrder({
+      const orderPayload = {
         customerId: state.customer?.id ?? null,
         locationId: state.session.locationId || null,
         deliveryDate: state.deliveryDetails?.deliveryDate ?? null,
@@ -300,10 +316,44 @@ const POSPaymentDrawerV2: React.FC = () => {
           method: payment.method,
           amount: payment.amount,
         })),
-      });
+      };
+
+      const createdOrder = await createOrder(orderPayload);
+
+      try {
+        const subtotal = orderPayload.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+        const receiptInput = {
+          orderNumber: createdOrder?.orderNumber,
+          orderId: createdOrder?.id,
+          customerName: state.billingInfo?.name,
+          customerPhone: state.billingInfo?.phone,
+          items: orderPayload.items.map((item) => ({
+            name: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          })),
+          payments: orderPayload.payments,
+          subtotal,
+          discount: orderPayload.discountAmount,
+          deliveryFee: orderPayload.deliveryFee,
+          grandTotal: state.totals.grandTotal,
+          paidTotal: paidAmount,
+          balanceDue: Math.max(0, state.totals.grandTotal - paidAmount),
+        };
+        if (receiptWin && !receiptWin.closed) {
+          printInWindow(receiptWin, receiptInput, printMode);
+        } else {
+          // Popup was blocked — fall back to iframe
+          printPosReceipt(receiptInput);
+        }
+      } catch (printError) {
+        console.warn('Receipt print failed:', printError);
+      }
 
       completeTransaction();
     } catch (err) {
+      // Order failed — close the pre-opened receipt window so it doesn't linger
+      if (receiptWin && !receiptWin.closed) receiptWin.close();
       console.error('Failed to create order:', err);
       setSubmitError('Order submission failed. Sale was not completed. Please try again.');
     }
@@ -317,6 +367,11 @@ const POSPaymentDrawerV2: React.FC = () => {
   const getMethodIcon = (method: POSPaymentMethod) => {
     return PAYMENT_METHODS.find((m) => m.method === method)?.icon || <CashIcon />;
   };
+
+  const handleReceiptPrintModeChange = useCallback((mode: PosReceiptPrintMode) => {
+    setReceiptPrintModeState(mode);
+    setPosReceiptPrintMode(mode);
+  }, []);
 
   // Check if billing is required
   const requiresBilling = state.payments.some((p) => p.method === 'CARD');
@@ -642,33 +697,50 @@ const POSPaymentDrawerV2: React.FC = () => {
               {submitError}
             </div>
           )}
+
+          {/* Action buttons — inside scroll so they appear right after the form */}
+          <div className="px-6 py-4 bg-white border-t border-gray-200 space-y-2">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+              <label className="text-xs font-medium text-gray-700 block mb-1">Receipt Print</label>
+              <select
+                value={receiptPrintMode}
+                onChange={(e) => handleReceiptPrintModeChange(e.target.value as PosReceiptPrintMode)}
+                className="w-full h-9 px-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="AUTO">Auto Print</option>
+                <option value="ASK">Ask Before Print</option>
+                <option value="PDF">PDF Mode</option>
+              </select>
+            </div>
+
+            {canCompletePayment ? (
+              <button
+                onClick={handleComplete}
+                disabled={!isBillingValid}
+                className={`w-full py-3 font-semibold rounded-lg transition-colors
+                           disabled:bg-gray-300 disabled:cursor-not-allowed ${
+                             isFullyPaid
+                               ? 'bg-purple-600 text-white hover:bg-purple-700'
+                               : 'bg-amber-500 text-white hover:bg-amber-600'
+                           }`}
+              >
+                {isFullyPaid
+                  ? 'Complete Payment'
+                  : `Save as Reserved (Deposit ${formatCurrency(paidAmount)})`}
+              </button>
+            ) : (
+              <button
+                disabled
+                className="w-full py-3 bg-gray-200 text-gray-500 font-semibold rounded-lg cursor-not-allowed"
+              >
+                {isPickup ? 'Add deposit to reserve' : 'Add payment to continue'}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Footer Actions */}
-        <footer className="px-6 py-4 bg-white border-t border-gray-200 space-y-2">
-          {canCompletePayment ? (
-            <button
-              onClick={handleComplete}
-              disabled={!isBillingValid}
-              className={`w-full py-3 font-semibold rounded-lg transition-colors
-                         disabled:bg-gray-300 disabled:cursor-not-allowed ${
-                           isFullyPaid
-                             ? 'bg-purple-600 text-white hover:bg-purple-700'
-                             : 'bg-amber-500 text-white hover:bg-amber-600'
-                         }`}
-            >
-              {isFullyPaid
-                ? 'Complete Payment'
-                : `Save as Reserved (Deposit ${formatCurrency(paidAmount)})`}
-            </button>
-          ) : (
-            <button
-              disabled
-              className="w-full py-3 bg-gray-200 text-gray-500 font-semibold rounded-lg cursor-not-allowed"
-            >
-              {isPickup ? 'Add deposit to reserve' : 'Add payment to continue'}
-            </button>
-          )}
+        {/* Footer — Cancel only, always visible */}
+        <footer className="px-6 py-3 bg-white border-t border-gray-200">
           <button
             onClick={handleClose}
             className="w-full py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
