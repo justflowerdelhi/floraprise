@@ -22,6 +22,7 @@ import {
 import Autocomplete from "@mui/material/Autocomplete";
 
 import { postAccountingEvent } from '../../modules/accounting/accountingEvents';
+  import { formatCurrency } from '../../core/i18n';
 import { MOCK_PRODUCTS } from "../../modules/orders/mock/manualSaleMock";
 import { addOfflineSale } from "../../utils/offlineSalesQueue";
 
@@ -200,7 +201,7 @@ const ManualSaleEntry: React.FC = () => {
 
         {/* Total */}
         <Typography variant="h6" sx={{ mt:2 }}>
-          Total: ₹{total}
+          Total: {formatCurrency(total)}
         </Typography>
 
         {/* Save */}

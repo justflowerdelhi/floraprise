@@ -76,6 +76,16 @@ public class ProductBatch : BaseEntity
         MarkUpdated();
     }
 
+    public void ReceiveAdditionalQuantity(int quantity)
+    {
+        if (quantity <= 0)
+            throw new ArgumentException("Additional quantity must be greater than zero");
+
+        QuantityReceived += quantity;
+        QuantityRemaining += quantity;
+        MarkUpdated();
+    }
+
     public void UpdateStorageLocation(string? storageLocation)
     {
         StorageLocation = storageLocation;

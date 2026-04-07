@@ -36,7 +36,7 @@ import {
   Remove as DashIcon,
 } from '@mui/icons-material';
 import { useShift } from './ShiftContext';
-import { formatCurrency } from '../../core/i18n';
+import { formatCurrency, useCurrency } from '../../core/i18n';
 
 // ─── Summary Row ────────────────────────────────────────────
 
@@ -79,6 +79,7 @@ const SummaryRow: React.FC<SummaryRowProps> = ({ icon, label, value, color, bold
 
 const ShiftCloseDrawer: React.FC = () => {
   const { activeShift, isCloseDrawerOpen, setCloseDrawerOpen, closeShift, error } = useShift();
+  const { currencySymbol } = useCurrency();
   const [closingCash, setClosingCash] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -203,7 +204,7 @@ const ShiftCloseDrawer: React.FC = () => {
           }}
           slotProps={{
             input: {
-              startAdornment: <InputAdornment position="start">$</InputAdornment>,
+              startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
             },
           }}
           placeholder="0.00"

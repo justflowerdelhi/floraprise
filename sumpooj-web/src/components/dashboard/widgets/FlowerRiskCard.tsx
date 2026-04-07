@@ -1,4 +1,5 @@
 import { Card, CardContent, Typography } from "@mui/material";
+import { formatCurrency } from "../../../core/i18n";
 
 export default function FlowerRiskCard() {
   return (
@@ -18,7 +19,7 @@ export default function FlowerRiskCard() {
         </Typography>
 
         <Typography fontSize={12} color="#e53935">
-          Estimated loss ₹950
+          Estimated loss {formatCurrency(950)}
         </Typography>
 
         <Typography fontSize={12}>

@@ -3,6 +3,7 @@ using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Inventory;
 using Sumpooj.Application.Purchases;
 using Sumpooj.Domain.Entities;
+using System.Transactions;
 
 namespace Sumpooj.Application.UseCases;
 
@@ -12,6 +13,7 @@ public class PurchaseOrderService
     private readonly ISupplierRepository _supplierRepo;
     private readonly IProductRepository _productRepo;
     private readonly IProductBatchRepository _batchRepo;
+    private readonly InventoryEntryService _inventoryEntryService;
     private readonly ITenantContext _tenant;
 
     public PurchaseOrderService(
@@ -19,12 +21,14 @@ public class PurchaseOrderService
         ISupplierRepository supplierRepo,
         IProductRepository productRepo,
         IProductBatchRepository batchRepo,
+        InventoryEntryService inventoryEntryService,
         ITenantContext tenant)
     {
         _repo = repo;
         _supplierRepo = supplierRepo;
         _productRepo = productRepo;
         _batchRepo = batchRepo;
+        _inventoryEntryService = inventoryEntryService;
         _tenant = tenant;
     }
 
@@ -122,8 +126,29 @@ public class PurchaseOrderService
 
     public async Task ReceiveAsync(Guid id, ReceivePurchaseOrderRequest request)
     {
+        using var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
+
         var po = await _repo.GetByIdWithItemsAsync(id)
             ?? throw new KeyNotFoundException("Purchase order not found");
+
+        if (po.IsInventoryProcessed)
+            return;
+
+        if (po.Status == PurchaseOrderStatus.Received)
+            throw new InvalidOperationException("Purchase order has already been received and cannot be received again");
+
+        // Auto-advance through workflow so a single "Receive Stock" call works
+        // regardless of the PO's current state.
+        if (po.Status == PurchaseOrderStatus.Draft)
+        {
+            po.Submit();
+            po.Approve();
+        }
+        else if (po.Status == PurchaseOrderStatus.Submitted)
+        {
+            po.Approve();
+        }
+        // If already Approved — proceed normally.
 
         // Mark as received
         po.MarkReceived(request.ActualDeliveryDate);
@@ -136,7 +161,7 @@ public class PurchaseOrderService
             await _supplierRepo.UpdateAsync(supplier);
         }
 
-        // Create batches for received items
+        // Create inventory entries for received items
         foreach (var item in po.Items)
         {
             var receiveItem = request.Items.FirstOrDefault(r => r.ProductId == item.ProductId);
@@ -146,45 +171,26 @@ public class PurchaseOrderService
             {
                 item.UpdateReceivedQuantity(receivedQty);
 
-                // Create batch
-                var product = await _productRepo.GetByIdAsync(item.ProductId);
-                if (product != null)
-                {
-                    var batchNumber = receiveItem?.BatchNumber 
-                        ?? await _batchRepo.GenerateBatchNumberAsync(item.ProductId);
-
-                    var expiryDate = receiveItem?.ExpiryDate;
-                    if (!expiryDate.HasValue && item.IsPerishable && item.ShelfLifeDays > 0)
-                    {
-                        expiryDate = DateTime.UtcNow.AddDays(item.ShelfLifeDays);
-                    }
-
-                    var batch = new ProductBatch(
-                        companyId: _tenant.CompanyId!.Value,
-                        productId: item.ProductId,
-                        batchNumber: batchNumber,
-                        quantityReceived: receivedQty,
-                        costPerUnit: item.UnitPrice,
-                        receivedDate: request.ActualDeliveryDate,
-                        expiryDate: expiryDate,
-                        supplierId: po.SupplierId,
-                        locationId: null,
-                        storageLocation: receiveItem?.StorageLocation ?? item.StorageLocation);
-
-                    batch.LinkToPurchaseOrder(po.Id);
-                    await _batchRepo.AddAsync(batch);
-
-                    // Update product stock
-                    if (product.TrackInventory)
-                    {
-                        product.AdjustStock(receivedQty);
-                        await _productRepo.UpdateAsync(product);
-                    }
-                }
+                await _inventoryEntryService.CreateInventoryEntryAsync(new InventoryEntryRequest(
+                    ProductId: item.ProductId,
+                    Quantity: receivedQty,
+                    CostPerUnit: item.UnitPrice,
+                    SellingPricePerUnit: null,
+                    ReceivedDate: request.ActualDeliveryDate,
+                    ExpiryDate: receiveItem?.ExpiryDate,
+                    ShelfLifeDays: item.ShelfLifeDays > 0 ? item.ShelfLifeDays : null,
+                    SupplierId: po.SupplierId,
+                    LocationId: null,
+                    StorageLocation: receiveItem?.StorageLocation ?? item.StorageLocation,
+                    Source: "POReceive",
+                    PurchaseOrderId: po.Id,
+                    MergeWithSameDayBatch: false));
             }
         }
 
+        po.MarkInventoryProcessed();
         await _repo.UpdateAsync(po);
+        scope.Complete();
     }
 
     public async Task CancelAsync(Guid id)

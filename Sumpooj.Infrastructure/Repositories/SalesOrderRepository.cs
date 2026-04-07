@@ -8,20 +8,26 @@ namespace Sumpooj.Infrastructure.Repositories;
 public class SalesOrderRepository : ISalesOrderRepository
 {
     private readonly SumpoojDbContext _db;
+    private readonly ITenantContext _tenantContext;
 
-    public SalesOrderRepository(SumpoojDbContext db)
+    public SalesOrderRepository(SumpoojDbContext db, ITenantContext tenantContext)
     {
         _db = db;
+        _tenantContext = tenantContext;
     }
+
+    private Guid CompanyId => _tenantContext.CompanyId
+        ?? throw new UnauthorizedAccessException("Company context required");
 
     public Task<SalesOrder?> GetByIdAsync(Guid id)
         => _db.SalesOrders
             .Include(o => o.Items)
-            .FirstOrDefaultAsync(o => o.Id == id);
+            .FirstOrDefaultAsync(o => o.Id == id && o.CompanyId == CompanyId);
 
     public async Task<IReadOnlyList<SalesOrder>> GetAllAsync()
         => await _db.SalesOrders
             .Include(o => o.Items)
+            .Where(o => o.CompanyId == CompanyId)
             .AsNoTracking()
             .ToListAsync();
 

@@ -14,17 +14,20 @@ namespace Sumpooj.API.Controllers;
 public class InventoryController : ControllerBase
 {
     private readonly InventoryService _service;
+    private readonly StockReceiveService _receiveService;
     private readonly IProductRepository _productRepository;
     private readonly IInventoryLedgerRepository _repo;
     private readonly ITenantContext _tenant;
 
     public InventoryController(
         InventoryService service,
+        StockReceiveService receiveService,
         IProductRepository productRepository,
         IInventoryLedgerRepository repo,
         ITenantContext tenant)
     {
         _service = service;
+        _receiveService = receiveService;
         _productRepository = productRepository;
         _repo = repo;
         _tenant = tenant;
@@ -189,6 +192,46 @@ public class InventoryController : ControllerBase
             var userId = GetCurrentUserId();
             var result = await _service.ApplyReconciliationFixAsync(request, userId);
             return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // ─── Quick Receive ──────────────────────────────────────────────────
+
+    [HttpPost("quick-receive")]
+    public async Task<IActionResult> QuickReceive([FromBody] QuickReceiveRequest request)
+    {
+        try
+        {
+            var result = await _receiveService.QuickReceiveAsync(request);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // ─── Direct Stock Add ───────────────────────────────────────────────
+
+    [HttpPost("direct-add")]
+    public async Task<IActionResult> DirectAdd([FromBody] DirectAddRequest request)
+    {
+        try
+        {
+            var result = await _receiveService.DirectAddAsync(request);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
         }
         catch (InvalidOperationException ex)
         {

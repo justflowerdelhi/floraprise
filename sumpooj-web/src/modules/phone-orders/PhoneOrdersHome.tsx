@@ -39,6 +39,7 @@ import {
   type DashboardSummaryResponse,
   type PhoneOrderResponse,
 } from './phoneOrders.api';
+import { formatCurrency } from '../../core/i18n';
 
 // ── Card data ────────────────────────────────────────────────────────────
 
@@ -236,7 +237,7 @@ const PhoneOrdersHome: React.FC = () => {
                       variant="h5"
                       sx={{ fontWeight: 700, color: kpi.iconColor }}
                     >
-                      {kpi.isCurrency ? `₹${kpi.value.toLocaleString()}` : kpi.value}
+                      {kpi.isCurrency ? formatCurrency(Number(kpi.value)) : kpi.value}
                     </Typography>
                   </Box>
                   <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>

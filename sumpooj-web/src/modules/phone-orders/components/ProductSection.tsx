@@ -1,5 +1,6 @@
 import React from "react";
 import { Grid, TextField, InputAdornment } from "@mui/material";
+import { getCurrencySymbol } from "../../../core/i18n";
 
 interface Props {
   productDescription: string;
@@ -16,6 +17,8 @@ export default function ProductSection({
   setAmount,
   isLocked,
 }: Props) {
+  const currencySymbol = getCurrencySymbol();
+
   return (
     <Grid container spacing={2}>
       <Grid size={{ xs: 12, md: 8 }}>
@@ -43,7 +46,7 @@ export default function ProductSection({
           size="small"
           InputProps={{
             startAdornment: (
-              <InputAdornment position="start">₹</InputAdornment>
+              <InputAdornment position="start">{currencySymbol}</InputAdornment>
             ),
           }}
         />

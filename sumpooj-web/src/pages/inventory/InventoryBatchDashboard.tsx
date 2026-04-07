@@ -14,6 +14,7 @@ import {
   IconButton,
   Tooltip,
   Alert,
+  Button,
   useTheme,
   alpha,
   Chip,
@@ -22,6 +23,8 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import WarningIcon from '@mui/icons-material/Warning';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import { useNavigate } from 'react-router-dom';
 
 import type { InventoryBatch, FilterState } from './data/inventory.data';
 import { DEFAULT_FILTERS } from './data/inventory.data';
@@ -96,6 +99,7 @@ const extractBatchItems = (payload: unknown): ApiBatchDto[] => {
 
 const InventoryBatchDashboard = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
   const { execute, loading: apiLoading } = useApiCall();
   const toast = useToast();
 
@@ -218,6 +222,22 @@ const InventoryBatchDashboard = () => {
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<AddCircleOutlineIcon />}
+              onClick={() => navigate('/inventory/direct-add')}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                },
+              }}
+            >
+              Add Stock
+            </Button>
             <Chip
               label={`${filtered.length} of ${batches.length} batches`}
               size="small"

@@ -15,6 +15,7 @@ import {
 import { CheckCircle as ConfirmIcon } from '@mui/icons-material';
 import { useApiCall } from '../../hooks/useApiCall';
 import { confirmPhoneOutstationOrder } from './phoneOrders.api';
+import { formatCurrency } from '../../core/i18n';
 
 // ── Mock vendor list (replace with API fetch later) ──────────────────────
 
@@ -145,7 +146,7 @@ const VendorAssignmentModal: React.FC<VendorAssignmentModalProps> = ({
             Total Vendor Payable
           </Typography>
           <Typography variant="body1" sx={{ fontWeight: 700 }}>
-            ${totalPayable.toFixed(2)}
+            {formatCurrency(totalPayable)}
           </Typography>
         </Box>
       </DialogContent>

@@ -26,6 +26,7 @@ import {
   addItemToPhoneOrder,
   type AvailableFlowerResponse,
 } from './phoneOrders.api';
+import { formatCurrency } from '../../core/i18n';
 
 // ── Props ────────────────────────────────────────────────────────────────
 
@@ -147,7 +148,7 @@ const CustomBouquetBuilder: React.FC<CustomBouquetBuilderProps> = ({
                   <TableCell align="right">
                     {f.availableUnits} {f.consumptionUnit}
                   </TableCell>
-                  <TableCell align="right">${f.unitPrice.toFixed(2)}</TableCell>
+                  <TableCell align="right">{formatCurrency(f.unitPrice)}</TableCell>
                   <TableCell align="center">
                     <Button
                       size="small"

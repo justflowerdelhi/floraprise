@@ -26,10 +26,12 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useShift } from './ShiftContext';
 import { useAuth } from '../../auth/AuthContext';
+import { useCurrency } from '../../core/i18n';
 
 const ShiftOpenModal: React.FC = () => {
   const { activeShift, loading, error, openShift, locationId } = useShift();
   const { user } = useAuth();
+  const { currencySymbol } = useCurrency();
   const navigate = useNavigate();
   const [openingCash, setOpeningCash] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -183,7 +185,7 @@ const ShiftOpenModal: React.FC = () => {
           onKeyDown={handleKeyDown}
           slotProps={{
             input: {
-              startAdornment: <InputAdornment position="start">$</InputAdornment>,
+              startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
             },
           }}
           placeholder="0.00"

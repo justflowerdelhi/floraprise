@@ -15,6 +15,7 @@ import {
 } from '@mui/icons-material';
 import type { DeliveryDetails } from './POSTypes';
 import { calcDeliveryFeeFromZip } from './POSTypes';
+import { formatCurrency } from '../../core/i18n';
 
 interface DeliveryDetailsFormProps {
   value: DeliveryDetails;
@@ -90,7 +91,7 @@ const DeliveryDetailsForm: React.FC<DeliveryDetailsFormProps> = ({
         />
         {value.zipCode.length >= 5 && (
           <p className="mt-1 text-[10px] text-blue-600 font-medium">
-            Delivery fee: ${value.deliveryFee.toFixed(2)}{value.deliveryFee === 0 ? ' (local zone — free)' : ''}
+            Delivery fee: {formatCurrency(value.deliveryFee)}{value.deliveryFee === 0 ? ' (local zone — free)' : ''}
           </p>
         )}
       </div>

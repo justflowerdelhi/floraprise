@@ -18,6 +18,7 @@ import {
 import { useParams } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
 import { useApiCall } from '../../hooks/useApiCall';
+import { formatCurrency } from '../../core/i18n';
 import {
   getPhoneOrder,
   confirmPhoneLocalOrder,
@@ -197,7 +198,7 @@ const PhoneOrderPage: React.FC = () => {
           {order.budget != null && (
             <Box>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>Budget</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>${order.budget.toFixed(2)}</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatCurrency(order.budget)}</Typography>
             </Box>
           )}
         </Box>
@@ -285,7 +286,7 @@ const PhoneOrderPage: React.FC = () => {
           <Box component="ul" sx={{ pl: 2, m: 0 }}>
             {order.items.map((item) => (
               <Typography component="li" variant="body2" key={item.id} sx={{ mb: 0.5 }}>
-                {item.productName} — {item.quantity} × ${item.unitPrice.toFixed(2)} = ${item.totalPrice.toFixed(2)}
+                {item.productName} — {item.quantity} x {formatCurrency(item.unitPrice)} = {formatCurrency(item.totalPrice)}
               </Typography>
             ))}
           </Box>

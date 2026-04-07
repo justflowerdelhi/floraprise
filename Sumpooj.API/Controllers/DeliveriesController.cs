@@ -17,16 +17,28 @@ public class DeliveriesController : ControllerBase
     private readonly SumpoojDbContext _db;
     private readonly IDeliveryRepository _deliveryRepo;
     private readonly AssignDeliveryPersonHandler _assignHandler;
+    private readonly IOrderRepository _orderRepository;
+    private readonly OrderService _orderService;
+    private readonly ITenantContext _tenantContext;
 
     public DeliveriesController(
         SumpoojDbContext db,
         IDeliveryRepository deliveryRepo,
-        AssignDeliveryPersonHandler assignHandler)
+        AssignDeliveryPersonHandler assignHandler,
+        IOrderRepository orderRepository,
+        OrderService orderService,
+        ITenantContext tenantContext)
     {
         _db = db;
         _deliveryRepo = deliveryRepo;
         _assignHandler = assignHandler;
+        _orderRepository = orderRepository;
+        _orderService = orderService;
+        _tenantContext = tenantContext;
     }
+
+    private Guid CompanyId => _tenantContext.CompanyId
+        ?? throw new UnauthorizedAccessException("Company context required");
 
     /// <summary>
     /// Get deliveries for a specific date (defaults to today).
@@ -107,8 +119,13 @@ public class DeliveriesController : ControllerBase
         if (delivery == null)
             return NotFound(new { message = "Delivery not found" });
 
+        var order = await _orderRepository.GetByIdAsync(CompanyId, delivery.SalesOrderId);
+        if (order == null)
+            return NotFound(new { message = "Linked order not found" });
+
         delivery.MarkOutForDelivery();
         await _deliveryRepo.UpdateAsync(delivery);
+        await _orderService.UpdateStatusAsync(CompanyId, order.Id, OrderStatus.OutForDelivery.ToString());
 
         return Ok(new { message = "Delivery marked as out for delivery" });
     }
@@ -123,8 +140,13 @@ public class DeliveriesController : ControllerBase
         if (delivery == null)
             return NotFound(new { message = "Delivery not found" });
 
+        var order = await _orderRepository.GetByIdAsync(CompanyId, delivery.SalesOrderId);
+        if (order == null)
+            return NotFound(new { message = "Linked order not found" });
+
         delivery.MarkDelivered();
         await _deliveryRepo.UpdateAsync(delivery);
+        await _orderService.UpdateStatusAsync(CompanyId, order.Id, OrderStatus.Delivered.ToString());
 
         return Ok(new { message = "Delivery marked as delivered" });
     }

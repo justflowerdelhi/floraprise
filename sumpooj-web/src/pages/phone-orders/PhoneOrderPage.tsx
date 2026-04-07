@@ -30,6 +30,7 @@ import {
 import { useParams } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
 import { useApiCall } from '../../hooks/useApiCall';
+import { formatCurrency } from '../../core/i18n';
 import {
   getPhoneOrder,
   confirmPhoneLocalOrder,
@@ -394,8 +395,8 @@ const PhoneOrderPage: React.FC = () => {
                 <TableRow key={item.id}>
                   <TableCell>{item.productName}</TableCell>
                   <TableCell align="right">{item.quantity}</TableCell>
-                  <TableCell align="right">${item.unitPrice.toFixed(2)}</TableCell>
-                  <TableCell align="right">${item.totalPrice.toFixed(2)}</TableCell>
+                  <TableCell align="right">{formatCurrency(item.unitPrice)}</TableCell>
+                  <TableCell align="right">{formatCurrency(item.totalPrice)}</TableCell>
                 </TableRow>
               ))
             )}
@@ -416,7 +417,7 @@ const PhoneOrderPage: React.FC = () => {
         >
           <Divider />
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            Subtotal: ${subtotal.toFixed(2)}
+            Subtotal: {formatCurrency(subtotal)}
           </Typography>
         </Paper>
       )}

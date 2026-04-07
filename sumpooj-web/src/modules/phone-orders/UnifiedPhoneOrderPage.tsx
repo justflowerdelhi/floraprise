@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { confirmPhoneLocalOrder, createPhoneOrder } from "./phoneOrders.api";
 import { createPayment } from "./phoneOrders.api";
 import api from '../../api/axios';
+import { formatCurrency } from '../../core/i18n';
 
 const UnifiedPhoneOrderPage: React.FC = () => {
   const [savedOrderId, setSavedOrderId] = useState<string | null>(null);
@@ -174,7 +175,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
               >
                 <div>
                   <div>{order.description}</div>
-                  <div className="text-gray-500 text-xs">₹{order.amount}</div>
+                  <div className="text-gray-500 text-xs">{formatCurrency(Number(order.amount ?? 0))}</div>
                 </div>
                 <button
                   onClick={() => repeatOrder(order)}
@@ -215,9 +216,9 @@ const UnifiedPhoneOrderPage: React.FC = () => {
               <input placeholder="ZIP Code *" className="border rounded-lg p-3" value={zipCode} onChange={(e) => setZipCode(e.target.value)} />
             </div>
             <div className="flex flex-wrap gap-2 mt-2">
-              <button onClick={() => setDeliveryCharge(50)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹50</button>
-              <button onClick={() => setDeliveryCharge(100)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹100</button>
-              <button onClick={() => setDeliveryCharge(150)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹150</button>
+              <button onClick={() => setDeliveryCharge(50)} className="px-3 py-1 bg-gray-200 rounded text-sm">{formatCurrency(50)}</button>
+              <button onClick={() => setDeliveryCharge(100)} className="px-3 py-1 bg-gray-200 rounded text-sm">{formatCurrency(100)}</button>
+              <button onClick={() => setDeliveryCharge(150)} className="px-3 py-1 bg-gray-200 rounded text-sm">{formatCurrency(150)}</button>
             </div>
           </div>
         )}
@@ -287,9 +288,9 @@ const UnifiedPhoneOrderPage: React.FC = () => {
           </div>
         </div>
         <div className="flex flex-wrap gap-2 mt-2">
-          <button onClick={() => setDeliveryCharge(50)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹50</button>
-          <button onClick={() => setDeliveryCharge(100)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹100</button>
-          <button onClick={() => setDeliveryCharge(150)} className="px-3 py-1 bg-gray-200 rounded text-sm">₹150</button>
+          <button onClick={() => setDeliveryCharge(50)} className="px-3 py-1 bg-gray-200 rounded text-sm">{formatCurrency(50)}</button>
+          <button onClick={() => setDeliveryCharge(100)} className="px-3 py-1 bg-gray-200 rounded text-sm">{formatCurrency(100)}</button>
+          <button onClick={() => setDeliveryCharge(150)} className="px-3 py-1 bg-gray-200 rounded text-sm">{formatCurrency(150)}</button>
         </div>
       </div>
       {/* RIGHT SIDE — Summary & Payment */}
@@ -298,15 +299,15 @@ const UnifiedPhoneOrderPage: React.FC = () => {
         <div className="space-y-4">
           <div className="flex justify-between text-gray-600">
             <span>Order Amount</span>
-            <span className="font-medium">₹{amount}</span>
+            <span className="font-medium">{formatCurrency(Number(amount || 0))}</span>
           </div>
           <div className="flex justify-between text-gray-600">
             <span>Delivery Charge</span>
-            <span className="font-medium">₹{deliveryCharge}</span>
+            <span className="font-medium">{formatCurrency(Number(deliveryCharge || 0))}</span>
           </div>
           <div className="border-t pt-3 flex justify-between text-xl font-bold text-purple-700">
             <span>Total</span>
-            <span>₹{total}</span>
+            <span>{formatCurrency(total)}</span>
           </div>
         </div>
         {/* PAYMENT BUTTONS */}
@@ -501,11 +502,11 @@ const UnifiedPhoneOrderPage: React.FC = () => {
         <div className="mt-6 text-sm space-y-1">
           <div className="flex justify-between">
             <span>Paid</span>
-            <span>₹{paid}</span>
+            <span>{formatCurrency(paid)}</span>
           </div>
           <div className="flex justify-between">
             <span>Balance</span>
-            <span>₹{balance}</span>
+            <span>{formatCurrency(balance)}</span>
           </div>
         </div>
         {/* CHECKOUT */}
@@ -528,7 +529,7 @@ const UnifiedPhoneOrderPage: React.FC = () => {
             }
           }}
         >
-          Complete Order ₹{total}
+          Complete Order {formatCurrency(total)}
         </button>
       </div>
     </div>

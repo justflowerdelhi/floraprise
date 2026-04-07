@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import { Box, Button, TextField, Typography } from "@mui/material";
+import { Box, Button, TextField, Typography, InputAdornment } from "@mui/material";
 import { closeShift } from "../../api/shift.api";
+import { useCurrency } from "../../core/i18n";
 
 const CloseShiftModal = ({ shift }: any) => {
+  const { format, currencySymbol } = useCurrency();
   const [cash, setCash] = useState(0);
 
   const expectedCash =
@@ -22,19 +24,22 @@ const CloseShiftModal = ({ shift }: any) => {
     <Box>
       <Typography variant="h6">Close Shift</Typography>
 
-      <Typography>Opening Cash: ${shift.openingCash}</Typography>
-      <Typography>Cash Sales: ${shift.cashSales}</Typography>
-      <Typography>Expected Cash: ${expectedCash}</Typography>
+      <Typography>Opening Cash: {format(shift.openingCash)}</Typography>
+      <Typography>Cash Sales: {format(shift.cashSales)}</Typography>
+      <Typography>Expected Cash: {format(expectedCash)}</Typography>
 
       <TextField
         label="Counted Cash"
         type="number"
         value={cash}
         onChange={(e) => setCash(Number(e.target.value))}
+        InputProps={{
+          startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
+        }}
       />
 
       <Typography>
-        Difference: ${difference}
+        Difference: {format(difference)}
       </Typography>
 
       <Button

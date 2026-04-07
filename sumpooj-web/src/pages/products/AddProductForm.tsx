@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -25,6 +26,11 @@ import {
   Chip,
   Drawer,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
@@ -36,6 +42,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
 import TuneIcon from '@mui/icons-material/Tune';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 import {
   BasicInfoSection,
@@ -51,6 +58,8 @@ import {
 } from './components/sections';
 
 import QuickAddSupplierModal from './components/QuickAddSupplierModal';
+import QuickAddFlowersModal from './components/QuickAddFlowersModal';
+import type { QuickFlowerProduct } from './components/QuickAddFlowersModal';
 import ProductIntentSelector from './components/ProductIntentSelector';
 
 import { productFormSchema } from './schemas/product.schema';
@@ -59,14 +68,19 @@ import type { ProductFormData, Supplier, CategoryOption } from './types/product.
 import { defaultProductFormValues } from './types/product.types';
 import {
   createProduct,
+  fetchProductById,
   saveDraft,
+  updateProductById,
+  deleteProductById,
   fetchSuppliers,
+  type ProductDetailResponse,
 } from './api/product.api';
 import {
   saveDraftToStorage,
   loadDraftFromStorage,
   clearDraftFromStorage,
 } from './utils/product.utils';
+import { generateSku } from './utils/product.utils';
 import { getCategories } from '../../api/category.api';
 
 // ============================================
@@ -88,6 +102,10 @@ const AddProductForm = ({
 }: AddProductFormProps) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const canDeleteProducts = import.meta.env.VITE_ENABLE_PRODUCT_FORCE_DELETE === 'true';
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const isEditMode = Boolean(id) && !isDuplicate;
 
   // State
   const [darkMode, setDarkMode] = useState(false);
@@ -95,13 +113,17 @@ const AddProductForm = ({
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [loadingProduct, setLoadingProduct] = useState(false);
   const [supplierModalOpen, setSupplierModalOpen] = useState(false);
   const [images, setImages] = useState<File[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   // Submission states
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [submitAction, setSubmitAction] = useState<'save' | 'saveAndNew' | 'draft'>('save');
 
   // Notifications
@@ -117,8 +139,9 @@ const AddProductForm = ({
     handleSubmit,
     watch,
     setValue,
+    setFocus,
     reset,
-    formState: { errors, isValid, isDirty },
+    formState: { errors, isDirty },
   } = useForm<ProductFormSchema>({
     resolver: zodResolver(productFormSchema) as any,
     defaultValues: {
@@ -137,6 +160,109 @@ const AddProductForm = ({
 
   // Advanced Settings Drawer state
   const [advancedDrawerOpen, setAdvancedDrawerOpen] = useState(false);
+
+  const inferProductIntent = (productType?: string): ProductFormData['productIntent'] => {
+    if (productType === 'gift_item') return 'gift_item';
+    if (productType === 'bouquet') return 'bouquet';
+    if (productType === 'fresh_flower') return 'fresh_flower';
+    return 'raw_material';
+  };
+
+  const normalizeEnum = <T extends string>(
+    value: string | undefined | null,
+    allowed: readonly T[],
+    fallback: T,
+  ): T => {
+    if (!value) return fallback;
+    const direct = value as T;
+    if (allowed.includes(direct)) return direct;
+    const lower = value.toLowerCase() as T;
+    if (allowed.includes(lower)) return lower;
+    return fallback;
+  };
+
+  const toFormValues = (product: ProductDetailResponse): ProductFormData => {
+    const productTypes = [
+      'fresh_flower',
+      'dried_flower',
+      'plant',
+      'arrangement',
+      'bouquet',
+      'gift_item',
+      'container',
+      'ribbon',
+      'supply',
+      'service',
+    ] as const;
+
+    const units = ['each', 'stem', 'bunch', 'box', 'case', 'dozen', 'foot', 'yard', 'roll', 'pack'] as const;
+    const taxCategories = ['standard', 'reduced', 'exempt', 'zero'] as const;
+    const incomeAccounts = ['4000', '4010', '4020', '4030', '4040', '4050'] as const;
+    const expenseAccounts = ['5000', '5010', '5020', '5030', '5040'] as const;
+
+    const seasonalityAllowed = new Set([
+      'year_round',
+      'spring',
+      'summer',
+      'fall',
+      'winter',
+      'valentines',
+      'mothers_day',
+      'christmas',
+      'wedding_season',
+    ] as const);
+
+    const seasonalAvailability = product.seasonalAvailability
+      ? product.seasonalAvailability
+          .split(',')
+          .map((s) => s.trim().toLowerCase().replace(/\s+/g, '_'))
+          .filter((s) => seasonalityAllowed.has(s as any))
+      : [];
+
+    const normalizedProductType = normalizeEnum(product.productType, productTypes, defaultProductFormValues.productType);
+
+    return {
+      ...defaultProductFormValues,
+      productIntent: inferProductIntent(normalizedProductType),
+      productName: product.name || product.productName || '',
+      productType: normalizedProductType,
+      categoryId: product.categoryId || '',
+      sku: product.sku || '',
+      barcode: product.barcode || '',
+      brand: product.brand || '',
+      description: product.description || '',
+      unitOfMeasure: normalizeEnum(product.unitOfMeasure, units, defaultProductFormValues.unitOfMeasure),
+      retailPrice: Number(product.retailPrice ?? 0),
+      costPrice: Number(product.costPrice ?? 0),
+      wholesalePrice: product.wholesalePrice ?? undefined,
+      weddingEventPrice: product.weddingEventPrice ?? undefined,
+      taxCategory: normalizeEnum(product.taxCategory, taxCategories, defaultProductFormValues.taxCategory),
+      trackInventory: product.trackInventory ?? defaultProductFormValues.trackInventory,
+      trackBatch: product.trackBatch ?? defaultProductFormValues.trackBatch,
+      openingStock: product.stockQuantity ?? 0,
+      reorderLevel: product.reorderLevel ?? product.minimumStockLevel ?? 0,
+      status: product.isActive === false ? 'inactive' : 'active',
+      isPerishable: product.isPerishable ?? false,
+      shelfLifeDays: product.shelfLifeDays ?? undefined,
+      expiryAlertDays: product.expiryAlertDays ?? undefined,
+      temperatureNotes: product.temperatureNotes ?? undefined,
+      color: product.color ?? undefined,
+      variety: product.variety ?? undefined,
+      grade: (product.flowerGrade as ProductFormData['grade']) ?? undefined,
+      countryOfOrigin: (product.countryOfOrigin as ProductFormData['countryOfOrigin']) ?? undefined,
+      seasonality: seasonalAvailability as ProductFormData['seasonality'],
+      supplierId: product.defaultSupplierId ?? undefined,
+      leadTimeDays: product.leadTimeDays ?? undefined,
+      incomeAccount: normalizeEnum(product.incomeAccount, incomeAccounts, defaultProductFormValues.incomeAccount),
+      expenseAccount: normalizeEnum(product.expenseAccount, expenseAccounts, defaultProductFormValues.expenseAccount),
+      allowAsRawMaterial: product.allowAsRawMaterial ?? defaultProductFormValues.allowAsRawMaterial,
+      availableOnline: product.availableOnline ?? defaultProductFormValues.availableOnline,
+      commissionEligible: product.commissionEligible ?? defaultProductFormValues.commissionEligible,
+      tags: product.tags ?? [],
+      isMultiUnit: product.isMultiUnit ?? defaultProductFormValues.isMultiUnit,
+      avgUnitsPerStem: product.avgUnitsPerStem ?? defaultProductFormValues.avgUnitsPerStem,
+    };
+  };
 
   // Auto-open Advanced Settings drawer for raw_material
   useEffect(() => {
@@ -199,6 +325,39 @@ const AddProductForm = ({
     loadCategories();
   }, []);
 
+  // Load product for edit mode
+  useEffect(() => {
+    if (!isEditMode || !id) return;
+
+    const loadProduct = async () => {
+      setLoadingProduct(true);
+      try {
+        const response = await fetchProductById(id);
+        if (response.success && response.data) {
+          clearDraftFromStorage();
+          reset(toFormValues(response.data));
+          return;
+        }
+
+        setNotification({
+          open: true,
+          message: response.error || 'Failed to load product details',
+          severity: 'error',
+        });
+      } catch (error) {
+        setNotification({
+          open: true,
+          message: 'Failed to load product details',
+          severity: 'error',
+        });
+      } finally {
+        setLoadingProduct(false);
+      }
+    };
+
+    loadProduct();
+  }, [id, isEditMode, reset]);
+
   // Load suppliers on mount
   useEffect(() => {
     const loadSuppliers = async () => {
@@ -229,7 +388,7 @@ const AddProductForm = ({
 
   // Load draft on mount
   useEffect(() => {
-    if (!initialData && !isDuplicate) {
+    if (!initialData && !isDuplicate && !isEditMode) {
       const draft = loadDraftFromStorage<Partial<ProductFormData>>();
       if (draft) {
         setNotification({
@@ -244,13 +403,67 @@ const AddProductForm = ({
         });
       }
     }
-  }, [initialData, isDuplicate, setValue]);
+  }, [initialData, isDuplicate, isEditMode, setValue]);
 
   // Handle image changes
   const handleImagesChange = useCallback((files: File[], urls: string[]) => {
     setImages(files);
     setImageUrls(urls);
   }, []);
+
+  // Bulk-create flowers from Quick Add modal
+  const handleQuickCreate = async (products: QuickFlowerProduct[]) => {
+    const failed: string[] = [];
+    for (const product of products) {
+      const response = await createProduct({
+        ...defaultProductFormValues,
+        productName: product.productName,
+        productType: product.productType,
+        unitOfMeasure: product.unitOfMeasure as any,
+        isPerishable: product.isPerishable,
+        trackInventory: product.trackInventory,
+        trackBatch: product.trackBatch,
+        categoryId: product.categoryId,
+        color: product.color,
+        tags: product.colors.length > 0 ? product.colors : [],
+        retailPrice: product.retailPrice,
+        costPrice: product.costPrice,
+        openingStock: product.openingStock,
+        reorderLevel: product.reorderLevel,
+        shelfLifeDays: product.shelfLifeDays,
+        taxCategory: product.taxCategory,
+        incomeAccount: product.incomeAccount,
+        expenseAccount: product.expenseAccount,
+        status: product.status,
+        // Auto-generate a unique SKU so the backend doesn't reject an empty one
+        sku: generateSku('fresh_flower', product.productName),
+        images: [],
+        imageUrls: [],
+      });
+      if (!response.success) {
+        failed.push(product.productName);
+      }
+    }
+    if (failed.length === 0) {
+      setNotification({
+        open: true,
+        message: `${products.length} flower product${products.length > 1 ? 's' : ''} created successfully`,
+        severity: 'success',
+      });
+    } else if (failed.length === products.length) {
+      setNotification({
+        open: true,
+        message: `Failed to create flowers: ${failed.join(', ')}`,
+        severity: 'error',
+      });
+    } else {
+      setNotification({
+        open: true,
+        message: `${products.length - failed.length} created. Failed: ${failed.join(', ')}`,
+        severity: 'warning',
+      });
+    }
+  };
 
   // Handle supplier created
   const handleSupplierCreated = useCallback((supplier: Supplier) => {
@@ -274,30 +487,37 @@ const AddProductForm = ({
         imageUrls,
       };
 
-      const response = await createProduct(formData);
+      const response = isEditMode && id
+        ? await updateProductById(id, formData)
+        : await createProduct(formData);
 
-      if (response.success && response.data) {
+      if (response.success) {
         clearDraftFromStorage();
         
         setNotification({
           open: true,
-          message: response.message || 'Product created successfully!',
+          message: response.message || (isEditMode ? 'Product updated successfully!' : 'Product created successfully!'),
           severity: 'success',
         });
 
-        if (submitAction === 'saveAndNew') {
+        if (!isEditMode && submitAction === 'saveAndNew') {
           // Reset form for new entry
           reset(defaultProductFormValues);
           setImages([]);
           setImageUrls([]);
         } else {
           // Navigate away or notify parent
-          onProductCreated?.(response.data.id);
+          if (!isEditMode && response.data?.id) {
+            onProductCreated?.(response.data.id);
+          }
+          if (!onBack && !onProductCreated) {
+            navigate('/products');
+          }
         }
       } else {
         setNotification({
           open: true,
-          message: response.error || 'Failed to create product',
+          message: response.error || (isEditMode ? 'Failed to update product' : 'Failed to create product'),
           severity: 'error',
         });
       }
@@ -309,6 +529,53 @@ const AddProductForm = ({
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const onInvalidSubmit = (formErrors: typeof errors) => {
+    const firstInvalidField = Object.keys(formErrors)[0] as keyof ProductFormSchema | undefined;
+    if (!firstInvalidField) return;
+
+    setNotification({
+      open: true,
+      message: 'Please fill the required fields highlighted in red before saving.',
+      severity: 'warning',
+    });
+
+    requestAnimationFrame(() => {
+      setFocus(firstInvalidField as any);
+    });
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!id || !canDeleteProducts) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await deleteProductById(id, true);
+      if (response.success) {
+        setNotification({
+          open: true,
+          message: response.message || 'Product deleted successfully',
+          severity: 'success',
+        });
+        setDeleteDialogOpen(false);
+        navigate('/products');
+      } else {
+        setNotification({
+          open: true,
+          message: response.error || 'Failed to delete product',
+          severity: 'error',
+        });
+      }
+    } catch (error) {
+      setNotification({
+        open: true,
+        message: 'Failed to delete product',
+        severity: 'error',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -343,10 +610,18 @@ const AddProductForm = ({
     if (isDirty) {
       if (window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
         clearDraftFromStorage();
-        onBack?.();
+        if (onBack) {
+          onBack();
+        } else {
+          navigate('/products');
+        }
       }
     } else {
-      onBack?.();
+      if (onBack) {
+        onBack();
+      } else {
+        navigate('/products');
+      }
     }
   };
 
@@ -388,6 +663,11 @@ const AddProductForm = ({
         }}
       >
         <Container maxWidth="lg">
+          {loadingProduct && isEditMode && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <CircularProgress size={22} />
+            </Box>
+          )}
           <Box
             sx={{
               py: 2,
@@ -424,16 +704,29 @@ const AddProductForm = ({
                       color: darkMode ? 'grey.100' : 'grey.900',
                     }}
                   >
-                    {isDuplicate ? 'Duplicate Product' : 'Add New Product'}
+                    {isDuplicate ? 'Duplicate Product' : isEditMode ? 'Edit Product' : 'Add New Product'}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Fill in the details below to create a new product
+                    {isEditMode ? 'Update product details and pricing' : 'Fill in the details below to create a new product'}
                   </Typography>
                 </Box>
               </Box>
             </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {/* Quick Add Flowers */}
+              {!isEditMode && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => setQuickAddOpen(true)}
+                  sx={{ textTransform: 'none', borderRadius: 2 }}
+                >
+                  {isMobile ? 'Quick Add' : 'Quick Add Flowers'}
+                </Button>
+              )}
+
               {/* Duplicate Button */}
               {isDirty && (
                 <Tooltip title="Duplicate this product">
@@ -456,7 +749,7 @@ const AddProductForm = ({
 
       {/* Main Form Content */}
       <Container maxWidth="md" sx={{ py: 3 }}>
-        <form onSubmit={handleSubmit(onSubmit as any)}>
+        <form onSubmit={handleSubmit(onSubmit as any, onInvalidSubmit)}>
           <Stack spacing={3}>
             {/* ─── Product Intent Selector ────────────────────── */}
             <ProductIntentSelector control={control} darkMode={darkMode} />
@@ -476,6 +769,15 @@ const AddProductForm = ({
 
             {/* Core Pricing (retail/cost with margin) */}
             <CorePricingSection
+              control={control}
+              errors={errors}
+              watch={watch}
+              setValue={setValue}
+              darkMode={darkMode}
+            />
+
+            {/* Accounting (required fields should remain visible) */}
+            <AccountingSection
               control={control}
               errors={errors}
               watch={watch}
@@ -572,17 +874,6 @@ const AddProductForm = ({
           <Stack spacing={3}>
             {/* Additional Pricing Fields */}
             <AdditionalPricingSection
-              control={control}
-              errors={errors}
-              watch={watch}
-              setValue={setValue}
-              darkMode={darkMode}
-            />
-
-            <Divider />
-
-            {/* Accounting */}
-            <AccountingSection
               control={control}
               errors={errors}
               watch={watch}
@@ -740,35 +1031,52 @@ const AddProductForm = ({
                 variant="outlined"
                 color="inherit"
                 onClick={handleCancel}
-                disabled={isSubmitting || isSavingDraft}
+                disabled={isSubmitting || isSavingDraft || isDeleting}
                 startIcon={<CloseIcon />}
               >
                 Cancel
               </Button>
 
+              {/* Delete Product (edit mode) */}
+              {isEditMode && canDeleteProducts && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  disabled={isSubmitting || isSavingDraft || isDeleting}
+                  startIcon={isDeleting ? <CircularProgress size={18} /> : <DeleteOutlineIcon />}
+                >
+                  Delete Product
+                </Button>
+              )}
+
               {/* Save as Draft */}
-              <Button
-                variant="outlined"
-                onClick={handleSaveDraft}
-                disabled={isSubmitting || isSavingDraft}
-                startIcon={isSavingDraft ? <CircularProgress size={18} /> : <DraftsIcon />}
-              >
-                {isMobile ? 'Draft' : 'Save Draft'}
-              </Button>
+              {!isEditMode && (
+                <Button
+                  variant="outlined"
+                  onClick={handleSaveDraft}
+                  disabled={isSubmitting || isSavingDraft || isDeleting}
+                  startIcon={isSavingDraft ? <CircularProgress size={18} /> : <DraftsIcon />}
+                >
+                  {isMobile ? 'Draft' : 'Save Draft'}
+                </Button>
+              )}
 
               {/* Save & Add New */}
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={() => {
-                  setSubmitAction('saveAndNew');
-                  handleSubmit(onSubmit as any)();
-                }}
-                disabled={!isValid || isSubmitting || isSavingDraft}
-                startIcon={isSubmitting && submitAction === 'saveAndNew' ? <CircularProgress size={18} /> : <AddIcon />}
-              >
-                {isMobile ? 'Save+New' : 'Save & Add New'}
-              </Button>
+              {!isEditMode && (
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => {
+                    setSubmitAction('saveAndNew');
+                    handleSubmit(onSubmit as any, onInvalidSubmit)();
+                  }}
+                  disabled={isSubmitting || isSavingDraft || isDeleting}
+                  startIcon={isSubmitting && submitAction === 'saveAndNew' ? <CircularProgress size={18} /> : <AddIcon />}
+                >
+                  {isMobile ? 'Save+New' : 'Save & Add New'}
+                </Button>
+              )}
 
               {/* Save */}
               <Button
@@ -776,9 +1084,9 @@ const AddProductForm = ({
                 color="primary"
                 onClick={() => {
                   setSubmitAction('save');
-                  handleSubmit(onSubmit as any)();
+                  handleSubmit(onSubmit as any, onInvalidSubmit)();
                 }}
-                disabled={!isValid || isSubmitting || isSavingDraft}
+                disabled={isSubmitting || isSavingDraft || isDeleting}
                 startIcon={isSubmitting && submitAction === 'save' ? <CircularProgress size={18} /> : <SaveIcon />}
                 sx={{
                   background: 'linear-gradient(135deg, #e91e63 0%, #9c27b0 100%)',
@@ -787,12 +1095,40 @@ const AddProductForm = ({
                   },
                 }}
               >
-                Save Product
+                {isEditMode ? 'Update Product' : 'Save Product'}
               </Button>
             </Box>
           </Box>
         </Container>
       </Paper>
+
+      {canDeleteProducts && (
+        <Dialog open={deleteDialogOpen} onClose={() => !isDeleting && setDeleteDialogOpen(false)}>
+          <DialogTitle>Delete Product</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              This will permanently delete this product. This action cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button color="error" onClick={handleDeleteProduct} disabled={isDeleting} startIcon={isDeleting ? <CircularProgress size={16} /> : <DeleteOutlineIcon />}>
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* Quick Add Flowers Modal */}
+      <QuickAddFlowersModal
+        open={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        onCreate={handleQuickCreate}
+        categories={categories}
+        defaultCategoryId={categoryId || ''}
+      />
 
       {/* Quick Add Supplier Modal */}
       <QuickAddSupplierModal

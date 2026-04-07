@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import type { ReactNode } from 'react';
+import { useCurrency } from '../../../core/i18n';
 
 // ============================================
 // COMMON PROPS
@@ -163,6 +164,8 @@ export const FormCurrencyField = ({
   placeholder,
   darkMode = false,
 }: FormCurrencyFieldProps) => {
+  const { currencySymbol } = useCurrency();
+
   return (
     <Controller
       name={name}
@@ -195,7 +198,7 @@ export const FormCurrencyField = ({
             field.onChange(value);
           }}
           InputProps={{
-            startAdornment: <InputAdornment position="start">$</InputAdornment>,
+            startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
           }}
           inputProps={{
             min: 0,

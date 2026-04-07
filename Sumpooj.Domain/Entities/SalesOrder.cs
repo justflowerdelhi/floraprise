@@ -39,6 +39,7 @@ public class SalesOrder : BaseEntity
     public OrderType OrderType { get; private set; }
     public SalesOrderStatus Status { get; private set; }
     public string? InvoiceNumber { get; private set; }
+    public bool IsInventoryProcessed { get; private set; }
 
     public IReadOnlyCollection<SalesOrderItem> Items => _items.AsReadOnly();
 
@@ -122,6 +123,15 @@ public class SalesOrder : BaseEntity
             throw new InvalidOperationException("Order is already Cancelled.");
 
         Status = SalesOrderStatus.Cancelled;
+        MarkUpdated();
+    }
+
+    public void MarkInventoryProcessed()
+    {
+        if (IsInventoryProcessed)
+            throw new InvalidOperationException("Inventory already processed");
+
+        IsInventoryProcessed = true;
         MarkUpdated();
     }
 

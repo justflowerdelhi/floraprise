@@ -145,6 +145,18 @@ export const activateProduct = async (id: string) => {
   return res.data;
 };
 
+export const deleteProduct = async (
+  id: string,
+  options?: { forceDeleteReferences?: boolean }
+) => {
+  const res = await api.delete(`/products/${id}`, {
+    params: {
+      forceDeleteReferences: options?.forceDeleteReferences ? true : undefined,
+    },
+  });
+  return res.data;
+};
+
 export const getLowStockProducts = async () => {
   const res = await api.get('/products/low-stock');
   return res.data;

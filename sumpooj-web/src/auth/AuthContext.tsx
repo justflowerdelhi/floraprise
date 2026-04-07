@@ -124,21 +124,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch { /* quota */ }
       return true;
     } catch {
-      // /auth/me failed — try to restore from localStorage before giving up
-      try {
-        const storedUser = localStorage.getItem('app:user');
-        const storedTenant = localStorage.getItem('app:tenant');
-        const token = localStorage.getItem('auth_token');
-        if (storedUser && token && token !== 'undefined' && token !== 'null') {
-          const parsedUser = JSON.parse(storedUser);
-          const parsedTenant = storedTenant ? JSON.parse(storedTenant) : PLATFORM_ADMIN_TENANT;
-          setUser(parsedUser);
-          setTenant(parsedTenant);
-          setStatus('authenticated');
-          return true;
-        }
-      } catch { /* invalid JSON */ }
-      // No stored session either — go to login
+      // /auth/me is the source of truth for token validity.
+      // If it fails, clear local state and require re-auth.
       clearAuthToken();
       setUser(null);
       setTenant(null);

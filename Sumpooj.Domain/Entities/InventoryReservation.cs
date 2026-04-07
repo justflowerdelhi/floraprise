@@ -48,6 +48,11 @@ public class InventoryReservation : BaseEntity
         MarkUpdated();
     }
 
+    public void MarkConsumed()
+    {
+        MarkConverted();
+    }
+
     private void GuardActiveStatus(string operation)
     {
         if (Status != ReservationStatus.Active)

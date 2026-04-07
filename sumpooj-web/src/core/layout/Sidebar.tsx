@@ -53,6 +53,7 @@ import {
   Store,
   AltRoute,
   Schedule as ScheduleIcon,
+  AddCircleOutline,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRBAC } from '../rbac/RBACContext';
@@ -94,6 +95,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Store: <Store />,
   AltRoute: <AltRoute />,
   ScheduleIcon: <ScheduleIcon />,
+  AddCircleOutline: <AddCircleOutline />,
 };
 
 // ─── Section Colors ─────────────────────────────────────────

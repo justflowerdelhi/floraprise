@@ -299,6 +299,33 @@ public class ProductService
         await _repo.UpdateAsync(product);
     }
 
+    public async Task DeleteAsync(Guid id, bool forceDeleteReferences = false)
+    {
+        if (_tenant.CompanyId == null)
+            throw new InvalidOperationException("Company context required");
+
+        var companyId = _tenant.CompanyId.Value;
+
+        var product = await _repo.GetByIdAsync(companyId, id)
+            ?? throw new KeyNotFoundException("Product not found");
+
+        try
+        {
+            if (forceDeleteReferences)
+            {
+                await _repo.ForceDeleteWithReferencesAsync(companyId, id);
+                return;
+            }
+
+            await _repo.DeleteAsync(product);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Unable to hard-delete product {ProductId} for company {CompanyId}", id, companyId);
+            throw new InvalidOperationException("Cannot delete this product because it is referenced by existing transactions.");
+        }
+    }
+
     public async Task<List<ProductListDto>> GetLowStockProductsAsync()
     {
         var products = await _repo.GetLowStockProductsAsync();

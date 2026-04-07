@@ -46,6 +46,7 @@ import { getStaffById as getStaffByIdApi, createStaff as createStaffApi, updateS
 import { getLocations } from '../../api/location.api';
 import { useToast } from '../../hooks/useToast';
 import { useApiCall } from '../../hooks/useApiCall';
+import { useCurrency } from '../../core/i18n';
 
 // ─── Form Section ────────────────────────────────────────────
 
@@ -85,6 +86,7 @@ const FormSection: React.FC<FormSectionProps> = ({ title, icon, children }) => {
 const StaffForm: React.FC = () => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  const { currencySymbol } = useCurrency();
   const navigate = useNavigate();
   const { staffId } = useParams<{ staffId: string }>();
   const isEdit = Boolean(staffId);
@@ -531,7 +533,7 @@ const StaffForm: React.FC = () => {
                   label="Monthly Salary"
                   fullWidth
                   type="number"
-                  InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                  InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }}
                   value={formData.monthlySalary}
                   onChange={handleChange('monthlySalary')}
                 />
@@ -541,7 +543,7 @@ const StaffForm: React.FC = () => {
               <TextField
                 label="Overtime Rate"
                 type="number"
-                InputProps={{ endAdornment: <InputAdornment position="end">₹ / hr</InputAdornment> }}
+                InputProps={{ endAdornment: <InputAdornment position="end">{`${currencySymbol} / hr`}</InputAdornment> }}
                 value={formData.overtimeRate}
                 onChange={handleChange('overtimeRate')}
                 fullWidth

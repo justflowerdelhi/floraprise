@@ -254,8 +254,8 @@ export const productFormSchema = z.object({
 )
 .refine(
   (data) => {
-    // Shelf life required for perishable products
-    if (data.isPerishable) {
+    // Shelf life required for active perishable products
+    if (data.status === 'active' && data.isPerishable) {
       return data.shelfLifeDays !== undefined && data.shelfLifeDays > 0;
     }
     return true;
@@ -267,8 +267,8 @@ export const productFormSchema = z.object({
 )
 .refine(
   (data) => {
-    // Opening stock required if track inventory is enabled
-    if (data.trackInventory) {
+    // Opening stock required only for active products when inventory tracking is enabled
+    if (data.status === 'active' && data.trackInventory) {
       return data.openingStock !== undefined;
     }
     return true;
@@ -280,8 +280,8 @@ export const productFormSchema = z.object({
 )
 .refine(
   (data) => {
-    // Reorder level required if track inventory is enabled
-    if (data.trackInventory) {
+    // Reorder level required only for active products when inventory tracking is enabled
+    if (data.status === 'active' && data.trackInventory) {
       return data.reorderLevel !== undefined;
     }
     return true;

@@ -6,6 +6,9 @@
 import type { ProductFormData, ProductApiPayload, Supplier } from '../types/product.types';
 import {
   createProduct as createProductApi,
+  deleteProduct as deleteProductApi,
+  getProductById as getProductByIdApi,
+  updateProduct as updateProductApi,
   validateSku as validateSkuApi,
 } from '../../../api/product.api';
 import { getAllSuppliers, createSupplier as createSupplierApi } from '../../../api/supplier.api';
@@ -111,6 +114,49 @@ interface CreatedProduct {
   createdAt: string;
 }
 
+export interface ProductDetailResponse {
+  id: string;
+  name?: string;
+  productName?: string;
+  sku?: string;
+  barcode?: string | null;
+  brand?: string | null;
+  productType?: string;
+  categoryId?: string | null;
+  description?: string | null;
+  unitOfMeasure?: string;
+  isActive?: boolean;
+  retailPrice?: number;
+  costPrice?: number;
+  wholesalePrice?: number | null;
+  weddingEventPrice?: number | null;
+  taxCategory?: string;
+  trackInventory?: boolean;
+  trackBatch?: boolean;
+  stockQuantity?: number;
+  reorderLevel?: number;
+  minimumStockLevel?: number;
+  isPerishable?: boolean;
+  shelfLifeDays?: number | null;
+  expiryAlertDays?: number | null;
+  temperatureNotes?: string | null;
+  color?: string | null;
+  variety?: string | null;
+  flowerGrade?: string | null;
+  countryOfOrigin?: string | null;
+  seasonalAvailability?: string | null;
+  defaultSupplierId?: string | null;
+  leadTimeDays?: number | null;
+  incomeAccount?: string | null;
+  expenseAccount?: string | null;
+  allowAsRawMaterial?: boolean;
+  availableOnline?: boolean;
+  commissionEligible?: boolean;
+  tags?: string[];
+  isMultiUnit?: boolean;
+  avgUnitsPerStem?: number;
+}
+
 /**
  * Create product via real API
  */
@@ -143,6 +189,93 @@ export const createProduct = async (
       success: false,
       error: errorMsg,
       data: undefined,
+      message: errorMsg,
+    };
+  }
+};
+
+/**
+ * Fetch one product by id
+ */
+export const fetchProductById = async (
+  id: string
+): Promise<ApiResponse<ProductDetailResponse>> => {
+  try {
+    const result = await getProductByIdApi(id);
+    return {
+      success: true,
+      data: result,
+    };
+  } catch (error) {
+    let errorMsg = 'Failed to fetch product details';
+    if (error && typeof error === 'object' && 'message' in error) {
+      errorMsg = (error as any).message;
+    }
+    return {
+      success: false,
+      error: errorMsg,
+      message: errorMsg,
+    };
+  }
+};
+
+/**
+ * Update product via real API
+ */
+export const updateProductById = async (
+  id: string,
+  formData: ProductFormData
+): Promise<ApiResponse<null>> => {
+  const payload = transformToApiPayload(formData);
+  try {
+    await updateProductApi(id, payload as any);
+    return {
+      success: true,
+      data: null,
+      message: 'Product updated successfully',
+    };
+  } catch (error) {
+    let errorMsg = 'An unexpected error occurred';
+    if (error && typeof error === 'object' && 'message' in error) {
+      errorMsg = (error as any).message;
+    }
+    return {
+      success: false,
+      error: errorMsg,
+      data: null,
+      message: errorMsg,
+    };
+  }
+};
+
+/**
+ * Hard-delete product via delete endpoint
+ */
+export const deleteProductById = async (
+  id: string,
+  forceDeleteReferences = false,
+): Promise<ApiResponse<null>> => {
+  try {
+    await deleteProductApi(id, { forceDeleteReferences });
+    return {
+      success: true,
+      data: null,
+      message: 'Product deleted successfully',
+    };
+  } catch (error) {
+    let errorMsg = 'Failed to delete product';
+    const apiMessage = (error as any)?.response?.data?.message
+      || (error as any)?.response?.data?.error
+      || (error as any)?.response?.data?.title;
+    if (apiMessage) {
+      errorMsg = apiMessage;
+    } else if (error && typeof error === 'object' && 'message' in error) {
+      errorMsg = (error as any).message;
+    }
+    return {
+      success: false,
+      error: errorMsg,
+      data: null,
       message: errorMsg,
     };
   }

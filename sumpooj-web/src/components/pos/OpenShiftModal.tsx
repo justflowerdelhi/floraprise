@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { Box, Button, TextField, Typography, Paper } from "@mui/material";
+import { Box, Button, TextField, Typography, Paper, InputAdornment } from "@mui/material";
 import { openShift } from "../../api/shift.api";
 import { useAuth } from "../../auth/AuthContext";
+import { useCurrency } from "../../core/i18n";
 
 const OpenShiftModal = ({ onOpened }: any) => {
   const { user } = useAuth();
+  const { currencySymbol } = useCurrency();
   console.log("POS User:", user);
   const [cash, setCash] = useState(0);
 
@@ -47,6 +49,9 @@ const OpenShiftModal = ({ onOpened }: any) => {
         type="number"
         value={cash}
         onChange={(e) => setCash(Number(e.target.value))}
+        InputProps={{
+          startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
+        }}
       />
 
       <Button

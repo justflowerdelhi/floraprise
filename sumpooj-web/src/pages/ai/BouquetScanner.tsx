@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { AxiosError } from "axios";
 import api from "../../api/axios";
 import { analyzeBouquet } from "../../api/ai";
+import { formatCurrency } from "../../core/i18n";
 
 export default function BouquetScanner() {
   type FlowerItem = {
@@ -378,18 +379,18 @@ export default function BouquetScanner() {
 
           <h3>💰 Bouquet Price Estimate</h3>
 
-          <div>Flower Cost: ${price.flowerCost.toFixed(2)}</div>
-          <div>Labor Cost: ${price.laborCost.toFixed(2)}</div>
+          <div>Flower Cost: {formatCurrency(price.flowerCost)}</div>
+          <div>Labor Cost: {formatCurrency(price.laborCost)}</div>
 
           <hr />
 
-          <b>Total Cost: ${price.totalCost.toFixed(2)}</b>
-          <div>Profit: ${profit.toFixed(2)}</div>
+          <b>Total Cost: {formatCurrency(price.totalCost)}</b>
+          <div>Profit: {formatCurrency(profit)}</div>
 
           <div style={{ marginTop: 5 }}>
             Retail Price:
             <b style={{ color: "#2e7d32" }}>
-              ${price.sellingPrice.toFixed(2)}
+              {formatCurrency(price.sellingPrice)}
             </b>
           </div>
 

@@ -1,4 +1,5 @@
 import { Paper, Typography, Divider, Button } from "@mui/material";
+import { formatCurrency } from "../../../core/i18n";
 
 interface Props {
   amount: number | "";
@@ -19,11 +20,11 @@ export default function OrderSummaryPanel({ amount, onSubmit }: Props) {
       <Divider sx={{ mb: 2 }} />
 
       <Typography>
-        Product Total: ₹{total}
+        Product Total: {formatCurrency(total)}
       </Typography>
 
       <Typography sx={{ fontWeight: 600, mt: 1 }}>
-        Order Total: ₹{total}
+        Order Total: {formatCurrency(total)}
       </Typography>
 
       <Divider sx={{ my: 2 }} />

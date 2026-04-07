@@ -253,3 +253,57 @@ export const applyInventoryReconciliationFix = async (
   const res = await api.post('/inventory/reconciliation/apply', payload);
   return res.data;
 };
+
+// ─── Quick Receive ───────────────────────────────────────────
+
+export interface QuickReceiveItemRequest {
+  productId: string;
+  quantity: number;
+  costPerUnit: number;
+  sellingPricePerUnit?: number | null;
+  unit?: string | null;
+  expiryDate?: string | null;
+  shelfLifeDays?: number | null;
+  storageLocation?: string | null;
+  mergeWithSameDayBatch?: boolean;
+}
+
+export interface QuickReceiveRequest {
+  supplierId?: string | null;
+  locationId: string;
+  items: QuickReceiveItemRequest[];
+}
+
+export interface QuickReceiveResult {
+  purchaseOrderId?: string | null;
+  purchaseOrderNumber?: string | null;
+  batchIds: string[];
+  itemsReceived: number;
+}
+
+export const quickReceive = async (data: QuickReceiveRequest): Promise<QuickReceiveResult> => {
+  const res = await api.post('/inventory/quick-receive', data);
+  return res.data;
+};
+
+// ─── Direct Stock Add ────────────────────────────────────────
+
+export interface DirectAddRequest {
+  productId: string;
+  quantity: number;
+  costPerUnit: number;
+  locationId: string;
+  expiryDate?: string | null;
+  storageLocation?: string | null;
+  mergeWithSameDayBatch?: boolean;
+}
+
+export interface DirectAddResult {
+  batchId: string;
+  batchNumber: string;
+}
+
+export const directAddStock = async (data: DirectAddRequest): Promise<DirectAddResult> => {
+  const res = await api.post('/inventory/direct-add', data);
+  return res.data;
+};

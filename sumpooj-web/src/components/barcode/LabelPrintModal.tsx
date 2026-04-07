@@ -28,6 +28,7 @@ import {
   useTheme,
   alpha,
 } from '@mui/material';
+import { formatCurrency } from '../../core/i18n';
 import CloseIcon from '@mui/icons-material/Close';
 import PrintIcon from '@mui/icons-material/Print';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
@@ -180,7 +181,7 @@ const LabelPrintModal: React.FC<LabelPrintModalProps> = ({
             </Typography>
             {labelData.price !== undefined && (
               <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>
-                ₹{labelData.price.toFixed(2)}
+                {formatCurrency(labelData.price)}
               </Typography>
             )}
           </Box>

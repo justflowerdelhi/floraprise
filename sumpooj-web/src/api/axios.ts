@@ -219,9 +219,8 @@ api.interceptors.response.use(
         }
       }
 
-      // No refresh token — check if it's /auth/me and force logout
-      const isAuthEndpoint = requestUrl.includes('/auth/me');
-      if (_authToken && isAuthEndpoint) {
+      // No refresh token (or non-recoverable 401) — force logout to avoid stale UI auth state.
+      if (_authToken) {
         clearAuthToken();
         window.dispatchEvent(new CustomEvent('auth:logout'));
       }

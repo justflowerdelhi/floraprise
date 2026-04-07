@@ -52,7 +52,6 @@ import type { PurchaseFormSchemaType } from './schemas/purchase.schema';
 import type { Supplier, Product } from './types/purchase.types';
 import {
   PAYMENT_TERMS,
-  LOCATIONS,
   TAX_RATES,
   createEmptyItem,
   defaultPurchaseHeader,
@@ -63,6 +62,7 @@ import { searchProducts } from '../../api/product.api';
 import { calcOrderSummary } from './utils/purchase.utils';
 import { useToast } from '../../hooks/useToast';
 import { useApiCall } from '../../hooks/useApiCall';
+import { useLocation } from '../../core/location/LocationContext';
 
 // ============================================
 // MAIN COMPONENT
@@ -75,6 +75,7 @@ const PurchaseEntryForm = () => {
   // Hooks
   const toast = useToast();
   const { loading: isSubmitting, execute } = useApiCall();
+  const { currentLocationId, accessibleLocations } = useLocation();
 
   // State
   const [darkMode, setDarkMode] = useState(false);
@@ -137,6 +138,13 @@ const PurchaseEntryForm = () => {
     () => calcOrderSummary(watchedItems || [], watchedTaxRate || 0, watchedShipping || 0),
     [watchedItems, watchedTaxRate, watchedShipping]
   );
+
+  // Pre-fill location from the current store location
+  useEffect(() => {
+    if (currentLocationId && currentLocationId !== 'ALL') {
+      setValue('header.location', currentLocationId);
+    }
+  }, [currentLocationId, setValue]);
 
   // Set supplier defaults when selected
   useEffect(() => {
@@ -572,9 +580,9 @@ const PurchaseEntryForm = () => {
                         helperText={errors.header?.location?.message}
                         sx={fieldSx}
                       >
-                        {LOCATIONS.map((loc) => (
-                          <MenuItem key={loc.value} value={loc.value}>
-                            {loc.label}
+                        {accessibleLocations.map((loc) => (
+                          <MenuItem key={loc.id} value={loc.id}>
+                            {loc.name}
                           </MenuItem>
                         ))}
                       </TextField>

@@ -72,6 +72,7 @@ public class Order : BaseEntity
 
     // Invoice
     public string? InvoiceNumber { get; private set; }
+    public bool IsInventoryProcessed { get; private set; }
 
     public IReadOnlyCollection<OrderItem> Items => _items.AsReadOnly();
 
@@ -282,6 +283,15 @@ public class Order : BaseEntity
     public void MarkDeliveredDirect()
     {
         Status = OrderStatus.Delivered;
+        MarkUpdated();
+    }
+
+    public void MarkInventoryProcessed()
+    {
+        if (IsInventoryProcessed)
+            throw new InvalidOperationException("Inventory already processed");
+
+        IsInventoryProcessed = true;
         MarkUpdated();
     }
 

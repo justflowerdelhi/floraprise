@@ -35,13 +35,8 @@ public class FloralRecipeRepository : IFloralRecipeRepository
 
     public async Task UpdateAsync(FloralRecipe recipe)
     {
-        // Remove old components and replace
-        var existing = await _db.RecipeComponents
-            .Where(c => c.RecipeId == recipe.Id)
-            .ToListAsync();
-        _db.RecipeComponents.RemoveRange(existing);
-
-        _db.FloralRecipes.Update(recipe);
+        // The recipe entity is loaded as tracked (with Components) in the same request scope.
+        // Persist in-memory changes directly to avoid duplicate delete/update state conflicts.
         await _db.SaveChangesAsync();
     }
 

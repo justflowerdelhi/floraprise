@@ -27,6 +27,7 @@ public class PurchaseOrder : BaseEntity
     public DateTime? ActualDeliveryDate { get; private set; }
     public PurchaseOrderStatus Status { get; private set; }
     public bool IsActive { get; private set; }
+    public bool IsInventoryProcessed { get; private set; }
 
     public decimal TotalAmount { get; private set; }
     public string? Notes { get; private set; }
@@ -110,6 +111,15 @@ public class PurchaseOrder : BaseEntity
         Status = PurchaseOrderStatus.Received;
         ActualDeliveryDate = actualDeliveryDate.HasValue ? EnsureUtc(actualDeliveryDate.Value) : DateTime.UtcNow;
         MarkUpdated();
+    }
+
+    public void MarkInventoryProcessed()
+    {
+        if (!IsInventoryProcessed)
+        {
+            IsInventoryProcessed = true;
+            MarkUpdated();
+        }
     }
 
     public void Complete()

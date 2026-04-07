@@ -18,14 +18,13 @@ import {
   Search as SearchIcon,
   Add as AddIcon,
   Refresh as RefreshIcon,
-  Visibility as ViewIcon,
   CallReceived as ReceiveIcon,
   Send as SubmitIcon,
-  CheckCircle as ApproveIcon,
   Cancel as CancelIcon,
   LocalShipping as SupplierIcon,
+  FlashOn as FlashOnIcon,
 } from '@mui/icons-material';
-import { searchPurchases, receivePurchaseOrder, submitPurchaseOrder, approvePurchaseOrder, cancelPurchaseOrder, getPurchaseById } from '../../api/purchase.api';
+import { searchPurchases, receivePurchaseOrder, submitPurchaseOrder, cancelPurchaseOrder, getPurchaseById } from '../../api/purchase.api';
 import type { ReceivePurchaseOrderRequest, ReceiveItemRequest } from '../../api/purchase.api';
 import { useToast } from '../../hooks/useToast';
 import { formatCurrency } from '../../core/i18n';
@@ -247,16 +246,6 @@ const PurchaseListPage: React.FC = () => {
     }
   };
 
-  const handleApprove = async (id: string) => {
-    try {
-      await approvePurchaseOrder(id);
-      toast.success('Purchase order approved!');
-      loadPurchases();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to approve.');
-    }
-  };
-
   const handleCancel = async (id: string) => {
     try {
       await cancelPurchaseOrder(id);
@@ -283,8 +272,7 @@ const PurchaseListPage: React.FC = () => {
     STATUS_CONFIG[status] ?? { label: status, color: '#9e9e9e' };
 
   const canSubmit = (status: string) => ['Draft', 'DRAFT'].includes(status);
-  const canApprove = (status: string) => ['Submitted', 'SUBMITTED'].includes(status);
-  const canReceive = (status: string) => ['Approved', 'APPROVED', 'Submitted', 'SUBMITTED', 'PartiallyReceived', 'PARTIALLY_RECEIVED'].includes(status);
+  const canReceive = (status: string) => ['Draft', 'DRAFT', 'Approved', 'APPROVED', 'Submitted', 'SUBMITTED', 'PartiallyReceived', 'PARTIALLY_RECEIVED'].includes(status);
   const canCancel = (status: string) => ['Draft', 'DRAFT', 'Submitted', 'SUBMITTED'].includes(status);
 
   const headerSx = {
@@ -306,13 +294,21 @@ const PurchaseListPage: React.FC = () => {
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="contained"
+            startIcon={<FlashOnIcon />}
+            onClick={() => navigate('/inventory/quick-receive')}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            ⚡ Receive Stock
+          </Button>
           <Tooltip title="Refresh">
             <IconButton onClick={loadPurchases} disabled={loading}>
               <RefreshIcon />
             </IconButton>
           </Tooltip>
           <Button
-            variant="contained"
+            variant="outlined"
             startIcon={<AddIcon />}
             onClick={() => navigate('/purchases/new')}
             sx={{ fontWeight: 700, textTransform: 'none' }}
@@ -489,11 +485,11 @@ const PurchaseListPage: React.FC = () => {
                             size="small"
                             variant="contained"
                             color="success"
-                            startIcon={<ReceiveIcon />}
+                            startIcon={<FlashOnIcon />}
                             onClick={() => handleOpenReceive(p)}
                             sx={{ fontWeight: 700, fontSize: '0.72rem', textTransform: 'none', minHeight: 32 }}
                           >
-                            Receive
+                            ⚡ Receive Stock
                           </Button>
                         )}
                         {canSubmit(status) && (
@@ -506,18 +502,6 @@ const PurchaseListPage: React.FC = () => {
                             sx={{ fontWeight: 700, fontSize: '0.72rem', textTransform: 'none', minHeight: 32 }}
                           >
                             Submit
-                          </Button>
-                        )}
-                        {canApprove(status) && (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="warning"
-                            startIcon={<ApproveIcon />}
-                            onClick={() => handleApprove(p.id)}
-                            sx={{ fontWeight: 700, fontSize: '0.72rem', textTransform: 'none', minHeight: 32 }}
-                          >
-                            Approve
                           </Button>
                         )}
                         {canCancel(status) && (

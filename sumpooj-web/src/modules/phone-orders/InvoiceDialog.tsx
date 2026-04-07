@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import { Print as PrintIcon } from '@mui/icons-material';
 import { getInvoice, type InvoiceResponse } from './phoneOrders.api';
+import { formatCurrency } from '../../core/i18n';
 
 // Print-friendly styles
 const printStyles = `
@@ -244,8 +245,8 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ open, orderId, onClose })
                     <TableRow key={idx}>
                       <TableCell>{item.description}</TableCell>
                       <TableCell align="center">{item.quantity}</TableCell>
-                      <TableCell align="right">₹{item.unitPrice.toLocaleString()}</TableCell>
-                      <TableCell align="right">₹{item.total.toLocaleString()}</TableCell>
+                      <TableCell align="right">{formatCurrency(item.unitPrice)}</TableCell>
+                      <TableCell align="right">{formatCurrency(item.total)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -260,7 +261,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ open, orderId, onClose })
                     <Typography variant="body2" color="text.secondary">
                       Subtotal
                     </Typography>
-                    <Typography variant="body2">₹{invoice.subtotal.toLocaleString()}</Typography>
+                    <Typography variant="body2">{formatCurrency(invoice.subtotal)}</Typography>
                   </Box>
 
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
@@ -269,7 +270,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ open, orderId, onClose })
                     </Typography>
                     <Typography variant="body2">
                       {invoice.deliveryCharge > 0
-                        ? `₹${invoice.deliveryCharge.toLocaleString()}`
+                        ? formatCurrency(invoice.deliveryCharge)
                         : '—'}
                     </Typography>
                   </Box>
@@ -279,7 +280,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ open, orderId, onClose })
                       Discount
                     </Typography>
                     <Typography variant="body2" color="success.main">
-                      {invoice.discount > 0 ? `-₹${invoice.discount.toLocaleString()}` : '—'}
+                      {invoice.discount > 0 ? `-${formatCurrency(invoice.discount)}` : '—'}
                     </Typography>
                   </Box>
 
@@ -290,7 +291,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ open, orderId, onClose })
                       Grand Total
                     </Typography>
                     <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                      ₹{invoice.total.toLocaleString()}
+                      {formatCurrency(invoice.total)}
                     </Typography>
                   </Box>
 
@@ -299,7 +300,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ open, orderId, onClose })
                       Paid
                     </Typography>
                     <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 600 }}>
-                      ₹{invoice.paidAmount.toLocaleString()}
+                      {formatCurrency(invoice.paidAmount)}
                     </Typography>
                   </Box>
 
@@ -324,7 +325,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ open, orderId, onClose })
                         color: invoice.balance > 0 ? 'warning.dark' : 'success.dark',
                       }}
                     >
-                      ₹{invoice.balance.toLocaleString()}
+                      {formatCurrency(invoice.balance)}
                     </Typography>
                   </Box>
                 </Box>

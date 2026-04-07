@@ -306,14 +306,10 @@ public class PhoneOrdersController : ControllerBase
     [HttpPost("{id:guid}/confirm-local")]
     public async Task<IActionResult> ConfirmLocal(Guid id)
     {
-        var order = await _orderRepository.GetByIdAsync(CompanyId, id);
-        if (order == null) return NotFound(new { message = "Order not found" });
-
-        order.Confirm();
-        await _orderRepository.UpdateAsync(order);
-
-        var customer = await _customerRepository.GetByIdAsync(order.CustomerId);
-        return Ok(BuildPhoneOrderResponse(order, customer?.Name, order.DeliveryAddress, order.TimeSlot, null, null));
+        return BadRequest(new
+        {
+            message = "Local confirmation requires reservation flow. This endpoint is disabled to prevent inventory bypass."
+        });
     }
 
     [HttpPost("{id:guid}/confirm-outstation")]

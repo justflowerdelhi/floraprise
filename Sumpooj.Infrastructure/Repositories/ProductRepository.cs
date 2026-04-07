@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using System.Data;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Domain.Entities;
 using Sumpooj.Infrastructure.Persistence;
@@ -37,6 +39,130 @@ public class ProductRepository : IProductRepository
         _db.Products.Update(product);
         await _db.SaveChangesAsync();
     }
+
+    public async Task DeleteAsync(Product product)
+    {
+        _db.Products.Remove(product);
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task ForceDeleteWithReferencesAsync(Guid companyId, Guid productId)
+    {
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        var conn = _db.Database.GetDbConnection();
+        if (conn.State != ConnectionState.Open)
+        {
+            await conn.OpenAsync();
+        }
+
+        var dbTx = _db.Database.CurrentTransaction?.GetDbTransaction();
+
+        var productIdTables = await GetTablesWithColumnsAsync(conn, dbTx, "ProductId");
+        foreach (var (tableName, hasCompanyId) in productIdTables)
+        {
+            if (string.Equals(tableName, "Products", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            await ExecuteDmlAsync(
+                conn,
+                dbTx,
+                $"DELETE FROM {QuoteIdentifier(tableName)} WHERE \"ProductId\" = @productId" + (hasCompanyId ? " AND \"CompanyId\" = @companyId" : string.Empty),
+                companyId,
+                productId,
+                hasCompanyId);
+        }
+
+        var defaultProductTables = await GetTablesWithColumnsAsync(conn, dbTx, "DefaultProductId");
+        foreach (var (tableName, hasCompanyId) in defaultProductTables)
+        {
+            await ExecuteDmlAsync(
+                conn,
+                dbTx,
+                $"UPDATE {QuoteIdentifier(tableName)} SET \"DefaultProductId\" = NULL WHERE \"DefaultProductId\" = @productId" + (hasCompanyId ? " AND \"CompanyId\" = @companyId" : string.Empty),
+                companyId,
+                productId,
+                hasCompanyId);
+        }
+
+        await ExecuteDmlAsync(
+            conn,
+            dbTx,
+            "DELETE FROM \"Products\" WHERE \"Id\" = @productId AND \"CompanyId\" = @companyId",
+            companyId,
+            productId,
+            includeCompanyId: true);
+
+        await tx.CommitAsync();
+    }
+
+    private static async Task<List<(string TableName, bool HasCompanyId)>> GetTablesWithColumnsAsync(
+        System.Data.Common.DbConnection conn,
+        System.Data.Common.DbTransaction? tx,
+        string keyColumn)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = @"
+SELECT c.table_name,
+       MAX(CASE WHEN c.column_name = 'CompanyId' THEN 1 ELSE 0 END) AS has_company
+FROM information_schema.columns c
+WHERE c.table_schema = 'public'
+  AND c.table_name IN (
+      SELECT table_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND column_name = @keyColumn
+  )
+  AND c.column_name IN (@keyColumn, 'CompanyId')
+GROUP BY c.table_name";
+
+        var p = cmd.CreateParameter();
+        p.ParameterName = "@keyColumn";
+        p.Value = keyColumn;
+        cmd.Parameters.Add(p);
+
+        var rows = new List<(string TableName, bool HasCompanyId)>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((
+                reader.GetString(0),
+                reader.GetInt32(1) == 1
+            ));
+        }
+
+        return rows;
+    }
+
+    private static async Task ExecuteDmlAsync(
+        System.Data.Common.DbConnection conn,
+        System.Data.Common.DbTransaction? tx,
+        string sql,
+        Guid companyId,
+        Guid productId,
+        bool includeCompanyId)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = sql;
+
+        var productParam = cmd.CreateParameter();
+        productParam.ParameterName = "@productId";
+        productParam.Value = productId;
+        cmd.Parameters.Add(productParam);
+
+        if (includeCompanyId)
+        {
+            var companyParam = cmd.CreateParameter();
+            companyParam.ParameterName = "@companyId";
+            companyParam.Value = companyId;
+            cmd.Parameters.Add(companyParam);
+        }
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    private static string QuoteIdentifier(string identifier)
+        => $"\"{identifier.Replace("\"", "\"\"")}\"";
 
     public async Task<(List<Product> Items, int TotalCount)> SearchAsync(
         string? query,

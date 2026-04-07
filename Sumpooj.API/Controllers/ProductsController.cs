@@ -67,6 +67,29 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, [FromQuery] bool forceDeleteReferences = false)
+    {
+        try
+        {
+            await _service.DeleteAsync(id, forceDeleteReferences);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            var message = ex.InnerException?.Message ?? ex.Message;
+            return StatusCode(500, new { message });
+        }
+    }
+
     [HttpGet("low-stock")]
     public async Task<IActionResult> GetLowStock()
     {

@@ -13,14 +13,16 @@ import {
   Box, Typography, Button, Chip, Card,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   IconButton, useTheme, alpha, Tooltip, TablePagination, CircularProgress,
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
+  DeleteOutline as DeleteOutlineIcon,
   Warning as WarningIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { searchProducts } from '../../api/product.api';
+import { deleteProduct, searchProducts } from '../../api/product.api';
 import { getBatchSummary, type BatchSummaryItem } from '../../api/inventory.api';
 import { useApiCall } from '../../hooks/useApiCall';
 
@@ -50,6 +52,7 @@ const ProductsListPage: React.FC = () => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const navigate = useNavigate();
+  const canDeleteProducts = import.meta.env.VITE_ENABLE_PRODUCT_FORCE_DELETE === 'true';
 
   const { loading, execute } = useApiCall();
 
@@ -58,6 +61,8 @@ const ProductsListPage: React.FC = () => {
   const [inventoryMap, setInventoryMap] = useState<Map<string, ProductInventory>>(new Map());
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [deleteTarget, setDeleteTarget] = useState<ProductListItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Load products and batch summary from API
   const loadData = useCallback(async () => {
@@ -99,6 +104,24 @@ const ProductsListPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+
+    setIsDeleting(true);
+    try {
+      const deleted = await execute(
+        () => deleteProduct(deleteTarget.id, { forceDeleteReferences: true }),
+        { errorMessage: 'Failed to delete product' }
+      );
+      if (!deleted) return;
+
+      setDeleteTarget(null);
+      await loadData();
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [deleteTarget, execute, loadData]);
 
   // Paginated products
   const paginatedProducts = products.slice(
@@ -246,18 +269,34 @@ const ProductsListPage: React.FC = () => {
                         })()}
                       </TableCell>
                       <TableCell align="center">
-                        <Tooltip title="Edit Product">
-                          <IconButton
-                            size="small"
-                            onClick={() => navigate(`/products/${product.id}`)}
-                            sx={{
-                              color: '#ff9800',
-                              '&:hover': { bgcolor: alpha('#ff9800', 0.1) },
-                            }}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
+                          <Tooltip title="Edit Product">
+                            <IconButton
+                              size="small"
+                              onClick={() => navigate(`/products/${product.id}`)}
+                              sx={{
+                                color: '#ff9800',
+                                '&:hover': { bgcolor: alpha('#ff9800', 0.1) },
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          {canDeleteProducts && (
+                            <Tooltip title="Delete Product">
+                              <IconButton
+                                size="small"
+                                onClick={() => setDeleteTarget(product)}
+                                sx={{
+                                  color: '#f44336',
+                                  '&:hover': { bgcolor: alpha('#f44336', 0.1) },
+                                }}
+                              >
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))
@@ -286,6 +325,32 @@ const ProductsListPage: React.FC = () => {
             }}
           />
         </Card>
+      )}
+
+      {canDeleteProducts && (
+        <Dialog
+          open={Boolean(deleteTarget)}
+          onClose={() => !isDeleting && setDeleteTarget(null)}
+        >
+          <DialogTitle>Delete Product</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              {`This will permanently delete "${deleteTarget?.name ?? ''}". This action cannot be undone.`}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteTarget(null)} disabled={isDeleting}>Cancel</Button>
+            <Button
+              color="error"
+              variant="contained"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              startIcon={isDeleting ? <CircularProgress size={16} /> : <DeleteOutlineIcon />}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
     </Box>
   );

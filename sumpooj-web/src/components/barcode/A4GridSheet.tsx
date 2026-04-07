@@ -7,6 +7,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import JsBarcode from 'jsbarcode';
 import type { LabelData, LabelConfig, A4GridLayout, A4GridConfig } from './BarcodeTypes';
 import { A4_GRID_LAYOUTS } from './BarcodeTypes';
+import { getCurrencySymbol } from '../../core/i18n';
 
 interface A4GridSheetProps {
   data: LabelData;
@@ -25,6 +26,7 @@ const GridCell: React.FC<{
   grid: A4GridConfig;
 }> = ({ data, config, grid }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const currencySymbol = getCurrencySymbol();
 
   useEffect(() => {
     if (!svgRef.current || !data.barcode) return;
@@ -92,7 +94,7 @@ const GridCell: React.FC<{
 
       {config.includePrice && data.price !== undefined && (
         <div style={{ fontSize: '10px', fontWeight: 700, marginTop: '1px' }}>
-          ₹{data.price.toFixed(2)}
+          {currencySymbol}{data.price.toFixed(2)}
         </div>
       )}
 

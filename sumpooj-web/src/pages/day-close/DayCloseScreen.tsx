@@ -24,6 +24,7 @@ import {
   alpha,
   Paper,
   useTheme,
+  InputAdornment,
 } from '@mui/material';
 import {
   Lock,
@@ -46,7 +47,7 @@ import {
 } from '@mui/icons-material';
 import type { DayCloseSummary, DayCloseStatus } from '../../core/audit/AuditTypes';
 import { useSensitiveAction } from '../../core/audit/SensitiveActionModal';
-import { formatCurrency, getCurrencySymbol } from '../../core/i18n';
+import { formatCurrency, useCurrency } from '../../core/i18n';
 import { getDayCloseSummary, closeDay } from '../../api/day-close.api';
 import { useToast } from '../../hooks/useToast';
 import { useApiCall } from '../../hooks/useApiCall';
@@ -175,6 +176,7 @@ export default function DayCloseScreen() {
   const toast = useToast();
   const { execute, loading: apiLoading } = useApiCall();
   const { currentLocationId } = useLocation();
+  const { currencySymbol } = useCurrency();
   const [summary, setSummary] = useState<DayCloseSummary | null>(null);
   const [countedCash, setCountedCash] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -540,7 +542,7 @@ export default function DayCloseScreen() {
                     onChange={(e) => setCountedCash(e.target.value)}
                     placeholder="Enter the amount in drawer"
                     InputProps={{
-                      startAdornment: <Typography sx={{ mr: 1 }}>{getCurrencySymbol()}</Typography>,
+                      startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
                     }}
                     sx={{ mb: 2 }}
                   />

@@ -428,6 +428,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         permissions: ['products:view'],
       },
       {
+        id: 'new-product',
+        label: 'New Product',
+        icon: 'AddCircleOutline',
+        path: '/products/new',
+        permissions: ['products:create'],
+      },
+      {
         id: 'categories',
         label: 'Categories',
         icon: 'Category',

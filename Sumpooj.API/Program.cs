@@ -188,9 +188,12 @@ builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 builder.Services.AddScoped<SupplierService>();
 
 builder.Services.AddScoped<IProductBatchRepository, ProductBatchRepository>();
+builder.Services.AddScoped<IInventoryReservationRepository, InventoryReservationRepository>();
 builder.Services.AddScoped<IInventoryAdjustmentRepository, InventoryAdjustmentRepository>();
 builder.Services.AddScoped<IInventoryLedgerRepository, InventoryLedgerRepository>();
+builder.Services.AddScoped<InventoryEntryService>();
 builder.Services.AddScoped<InventoryService>();
+builder.Services.AddScoped<StockReceiveService>();
 
 builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
 builder.Services.AddScoped<PurchaseOrderService>();

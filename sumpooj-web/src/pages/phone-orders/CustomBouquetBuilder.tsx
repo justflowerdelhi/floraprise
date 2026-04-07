@@ -23,6 +23,7 @@ import {
 } from '@mui/icons-material';
 import { useToast } from '../../hooks/useToast';
 import { useApiCall } from '../../hooks/useApiCall';
+import { formatCurrency } from '../../core/i18n';
 import {
   getAvailableFlowers,
   addItemToPhoneOrder,
@@ -191,7 +192,7 @@ const CustomBouquetBuilder: React.FC<CustomBouquetBuilderProps> = ({ orderId, on
                       }}
                     />
                   </TableCell>
-                  <TableCell align="right">${flower.unitPrice.toFixed(2)}</TableCell>
+                  <TableCell align="right">{formatCurrency(flower.unitPrice)}</TableCell>
                   <TableCell align="center" sx={{ width: 90 }}>
                     <TextField
                       type="number"

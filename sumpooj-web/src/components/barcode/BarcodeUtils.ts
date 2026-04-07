@@ -17,6 +17,7 @@ import type {
   A4GridConfig,
 } from './BarcodeTypes';
 import { A4_GRID_LAYOUTS } from './BarcodeTypes';
+import { getCurrencySymbol } from '../../core/i18n';
 
 // ============================================
 // BARCODE GENERATION UTILITIES
@@ -233,6 +234,7 @@ export function generateLabelHTML(
   data: LabelData,
   config: LabelConfig
 ): string {
+  const currencySymbol = getCurrencySymbol();
   const barcodeSVG = generateBarcodeSVGString(data.barcode, {
     format: config.barcodeFormat,
     width: 1.5,
@@ -241,7 +243,7 @@ export function generateLabelHTML(
   });
 
   const priceSection = config.includePrice && data.price !== undefined
-    ? `<div style="font-size: 14px; font-weight: bold; margin-top: 2px;">₹${data.price.toFixed(2)}</div>`
+    ? `<div style="font-size: 14px; font-weight: bold; margin-top: 2px;">${currencySymbol}${data.price.toFixed(2)}</div>`
     : '';
 
   const expirySection = config.includeExpiry && data.expiryDate
@@ -431,6 +433,7 @@ function generateA4CellHTML(
   config: LabelConfig,
   grid: A4GridConfig
 ): string {
+  const currencySymbol = getCurrencySymbol();
   const barcodeSVG = generateBarcodeSVGString(data.barcode, {
     format: config.barcodeFormat,
     width: 1.2,
@@ -440,7 +443,7 @@ function generateA4CellHTML(
 
   const priceSection =
     config.includePrice && data.price !== undefined
-      ? `<div style="font-size: 10px; font-weight: bold; margin-top: 1px;">₹${data.price.toFixed(2)}</div>`
+      ? `<div style="font-size: 10px; font-weight: bold; margin-top: 1px;">${currencySymbol}${data.price.toFixed(2)}</div>`
       : '';
 
   const expirySection =

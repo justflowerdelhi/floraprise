@@ -18,6 +18,26 @@ public class ProductBatchRepository : IProductBatchRepository
     public Task<ProductBatch?> GetByIdAsync(Guid id)
         => _db.ProductBatches.FirstOrDefaultAsync(b => b.Id == id);
 
+    public Task<ProductBatch?> GetByIdForUpdateAsync(Guid id)
+        => _db.ProductBatches.FirstOrDefaultAsync(b => b.Id == id);
+
+    public Task<ProductBatch?> GetLatestActiveByProductAndDateAsync(Guid productId, DateTime dateUtc)
+    {
+        var dayStart = dateUtc.Date;
+        var dayEnd = dayStart.AddDays(1);
+
+        return _db.ProductBatches
+            .Where(b => b.ProductId == productId
+                        && b.IsActive
+                        && b.ReceivedDate >= dayStart
+                        && b.ReceivedDate < dayEnd)
+            .OrderByDescending(b => b.ReceivedDate)
+            .FirstOrDefaultAsync();
+    }
+
+    public Task<bool> BatchNumberExistsAsync(Guid productId, string batchNumber)
+        => _db.ProductBatches.AnyAsync(b => b.ProductId == productId && b.BatchNumber == batchNumber);
+
     public async Task AddAsync(ProductBatch batch)
     {
         _db.ProductBatches.Add(batch);

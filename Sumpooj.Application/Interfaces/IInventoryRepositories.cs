@@ -6,6 +6,9 @@ namespace Sumpooj.Application.Interfaces;
 public interface IProductBatchRepository
 {
     Task<ProductBatch?> GetByIdAsync(Guid id);
+    Task<ProductBatch?> GetByIdForUpdateAsync(Guid id);
+    Task<ProductBatch?> GetLatestActiveByProductAndDateAsync(Guid productId, DateTime dateUtc);
+    Task<bool> BatchNumberExistsAsync(Guid productId, string batchNumber);
     Task AddAsync(ProductBatch batch);
     Task UpdateAsync(ProductBatch batch);
 

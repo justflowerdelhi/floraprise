@@ -72,6 +72,7 @@ import {
   deactivateSupplier,
   getSupplierById,
 } from '../../api/supplier.api';
+import { formatCurrency } from '../../core/i18n';
 import { useToast } from '../../hooks/useToast';
 
 // ─── Supplier DTO ───────────────────────────────────────────
@@ -160,18 +161,24 @@ const SupplierCard: React.FC<SupplierCardProps> = ({
           {supplier.email && (
             <Stack direction="row" spacing={1} alignItems="center">
               <Email sx={{ fontSize: 16, color: 'text.secondary' }} />
-              <Typography variant="body2" noWrap>{supplier.email}</Typography>
+              <Typography variant="body2" noWrap>
+                {supplier.email}
+              </Typography>
             </Stack>
           )}
           {supplier.address && (
             <Stack direction="row" spacing={1} alignItems="flex-start">
               <LocationOn sx={{ fontSize: 16, color: 'text.secondary', mt: 0.2 }} />
-              <Typography variant="body2" color="text.secondary" sx={{ 
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
+              >
                 {supplier.address}
               </Typography>
             </Stack>
@@ -181,18 +188,28 @@ const SupplierCard: React.FC<SupplierCardProps> = ({
         {/* Stats */}
         <Stack direction="row" spacing={2} mb={2}>
           <Box>
-            <Typography variant="caption" color="text.secondary">Orders</Typography>
-            <Typography variant="h6" fontWeight={600}>{supplier.totalOrdersCount ?? 0}</Typography>
-          </Box>
-          <Box>
-            <Typography variant="caption" color="text.secondary">Total Spent</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Orders
+            </Typography>
             <Typography variant="h6" fontWeight={600}>
-              ${(supplier.totalSpentAmount ?? 0).toLocaleString()}
+              {supplier.totalOrdersCount ?? 0}
             </Typography>
           </Box>
           <Box>
-            <Typography variant="caption" color="text.secondary">Terms</Typography>
-            <Typography variant="h6" fontWeight={600}>{supplier.paymentTermsDays ?? 0}d</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Total Spent
+            </Typography>
+            <Typography variant="h6" fontWeight={600}>
+              {formatCurrency(supplier.totalSpentAmount ?? 0)}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              Terms
+            </Typography>
+            <Typography variant="h6" fontWeight={600}>
+              {supplier.paymentTermsDays ?? 0}d
+            </Typography>
           </Box>
         </Stack>
 

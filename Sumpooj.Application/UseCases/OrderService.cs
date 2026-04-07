@@ -3,6 +3,7 @@ using Sumpooj.Application.Common;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Orders;
 using Sumpooj.Domain.Entities;
+using System.Transactions;
 
 namespace Sumpooj.Application.UseCases;
 
@@ -16,6 +17,7 @@ public class OrderService
     private readonly IPaymentRepository _paymentRepository;
     private readonly IInventoryLedgerRepository _inventoryLedgerRepository;
     private readonly IProductBatchRepository _productBatchRepository;
+    private readonly IInventoryReservationRepository _reservationRepository;
     private readonly IFinishedGoodsBatchRepository _finishedGoodsBatchRepository;
     private readonly IJournalEntryRepository _journalEntryRepository;
     private readonly IDeliveryRepository _deliveryRepository;
@@ -30,6 +32,7 @@ public class OrderService
         IPaymentRepository paymentRepository,
         IInventoryLedgerRepository inventoryLedgerRepository,
         IProductBatchRepository productBatchRepository,
+        IInventoryReservationRepository reservationRepository,
         IFinishedGoodsBatchRepository finishedGoodsBatchRepository,
         IJournalEntryRepository journalEntryRepository,
         IDeliveryRepository deliveryRepository,
@@ -43,6 +46,7 @@ public class OrderService
         _paymentRepository = paymentRepository;
         _inventoryLedgerRepository = inventoryLedgerRepository;
         _productBatchRepository = productBatchRepository;
+        _reservationRepository = reservationRepository;
         _finishedGoodsBatchRepository = finishedGoodsBatchRepository;
         _journalEntryRepository = journalEntryRepository;
         _deliveryRepository = deliveryRepository;
@@ -288,12 +292,14 @@ public class OrderService
             {
                 order.SetFulfillmentStatus(FulfillmentStatus.Completed);
                 order.MarkDeliveredDirect();
-
-                // Deduct inventory for each sold item
-                await DeductInventoryForOrderAsync(companyId, order);
             }
 
             await _orderRepository.UpdateAsync(order);
+
+            if (order.Status == OrderStatus.Delivered)
+            {
+                await ConsumeInventoryForOrderAsync(companyId, order);
+            }
         }
 
         // ── Create accounting journal entries for payments ──
@@ -356,6 +362,11 @@ public class OrderService
                 break;
         }
 
+        if (order.Status == OrderStatus.Delivered && !order.IsInventoryProcessed)
+        {
+            await ConsumeInventoryForOrderAsync(companyId, order);
+        }
+
         await _orderRepository.UpdateAsync(order);
 
         await HandleCorporateFulfillmentPostingAsync(companyId, order);
@@ -376,6 +387,11 @@ public class OrderService
                 && order.Status != OrderStatus.Cancelled)
             {
                 order.MarkDeliveredDirect();
+            }
+
+            if (order.Status == OrderStatus.Delivered && !order.IsInventoryProcessed)
+            {
+                await ConsumeInventoryForOrderAsync(companyId, order);
             }
 
             await _orderRepository.UpdateAsync(order);
@@ -406,6 +422,22 @@ public class OrderService
     {
         var order = await _orderRepository.GetByIdAsync(companyId, id)
             ?? throw new KeyNotFoundException("Order not found");
+
+        var reservations = await _reservationRepository.GetBySalesOrderIdAsync(order.Id);
+        foreach (var reservation in reservations)
+        {
+            if (reservation.Status != ReservationStatus.Active)
+                continue;
+
+            var batch = await _productBatchRepository.GetByIdAsync(reservation.ProductBatchId)
+                ?? throw new InvalidOperationException($"ProductBatch '{reservation.ProductBatchId}' not found for reservation '{reservation.Id}'.");
+
+            batch.ReleaseReservedUnits(reservation.ReservedUnits);
+            reservation.MarkReleased();
+
+            await _productBatchRepository.UpdateAsync(batch);
+            await _reservationRepository.UpdateAsync(reservation);
+        }
 
         order.Cancel(reason);
         await _orderRepository.UpdateAsync(order);
@@ -459,8 +491,7 @@ public class OrderService
         order.MarkDeliveredDirect();
         await _orderRepository.UpdateAsync(order);
 
-        // Deduct inventory for each sold item
-        await DeductInventoryForOrderAsync(companyId, order);
+        await ConsumeInventoryForOrderAsync(companyId, order);
 
         // Create accounting journal entries
         var cashAccountId = await _journalEntryRepository
@@ -486,10 +517,72 @@ public class OrderService
         return order.Id;
     }
 
+    public async Task ConsumeInventoryForOrderAsync(Guid companyId, Order order)
+    {
+        if (order.IsInventoryProcessed)
+            return;
+
+        // Temporary migration safety for orders already processed in old flows.
+        if (order.Status == OrderStatus.Delivered && order.IsInventoryProcessed)
+            return;
+
+        using var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
+
+        var reservations = await _reservationRepository.GetBySalesOrderIdAsync(order.Id);
+        var activeReservations = reservations.Where(r => r.Status == ReservationStatus.Active).ToList();
+
+        if (activeReservations.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Inventory reservation required before delivery. Fallback deduction disabled.");
+        }
+
+        foreach (var reservation in activeReservations)
+        {
+            var batch = await _productBatchRepository.GetByIdAsync(reservation.ProductBatchId)
+                ?? throw new InvalidOperationException($"Batch {reservation.ProductBatchId} not found");
+
+            if (batch.QuantityRemaining < reservation.ReservedUnits)
+                throw new InvalidOperationException("Insufficient batch quantity during consumption");
+
+            batch.DeductQuantity(reservation.ReservedUnits);
+
+            var product = await _productRepository.GetByIdAsync(reservation.ProductId)
+                ?? throw new InvalidOperationException($"Product {reservation.ProductId} not found");
+
+            if (product.TrackInventory)
+            {
+                product.AdjustStock(-reservation.ReservedUnits);
+                await _productRepository.UpdateAsync(product);
+
+                await _inventoryLedgerRepository.AddAsync(
+                    new InventoryLedger(
+                        companyId,
+                        product.Id,
+                        order.OrderNumber,
+                        "SALE",
+                        -reservation.ReservedUnits,
+                        product.StockQuantity,
+                        "Reserved stock consumed on delivery"
+                    )
+                );
+            }
+
+            reservation.MarkConverted();
+
+            await _reservationRepository.UpdateAsync(reservation);
+            await _productBatchRepository.UpdateAsync(batch);
+        }
+
+        order.MarkInventoryProcessed();
+        await _orderRepository.UpdateAsync(order);
+
+        scope.Complete();
+    }
+
     /// <summary>
-    /// Deducts inventory for each item in a completed order.
-    /// Handles both regular products (from Products table) and
-    /// finished goods batches (from production).
+    /// Legacy deduction path kept for reference and compatibility.
+    /// New flows should call ConsumeInventoryForOrderAsync.
     /// </summary>
     private async Task DeductInventoryForOrderAsync(Guid companyId, Order order)
     {
@@ -620,7 +713,7 @@ public class OrderService
         if (!shouldPostInventory || meta.IsInventoryPosted)
             return;
 
-        await DeductInventoryForOrderAsync(companyId, order);
+        await ConsumeInventoryForOrderAsync(companyId, order);
         await CreateCorporateCogsEntriesAsync(companyId, order);
 
         meta.MarkInventoryPosted();

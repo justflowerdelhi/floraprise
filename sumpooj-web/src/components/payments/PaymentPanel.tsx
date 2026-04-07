@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Box, Button, Grid, TextField, Typography, MenuItem } from "@mui/material";
+import { formatCurrency } from "../../core/i18n";
 
 type Payment = {
   mode: "Cash" | "Card" | "UPI";
@@ -42,8 +43,8 @@ export default function PaymentPanel({ total, onCheckout }: Props) {
     <Box sx={{ p: 2 }}>
       <Typography variant="h6">Order Summary</Typography>
       <Box sx={{ mt: 2 }}>
-        <Typography>Subtotal: ₹{total}</Typography>
-        <Typography fontWeight="bold">Total: ₹{total}</Typography>
+        <Typography>Subtotal: {formatCurrency(total)}</Typography>
+        <Typography fontWeight="bold">Total: {formatCurrency(total)}</Typography>
       </Box>
       <Box sx={{ mt: 2 }}>
         <Grid container spacing={1}>
@@ -114,9 +115,9 @@ export default function PaymentPanel({ total, onCheckout }: Props) {
         </Box>
       )}
       <Box sx={{ mt: 2 }}>
-        <Typography>Total Paid: ₹{paid}</Typography>
+        <Typography>Total Paid: {formatCurrency(paid)}</Typography>
         <Typography color={balance > 0 ? "error" : "success.main"}>
-          Balance: ₹{balance}
+          Balance: {formatCurrency(balance)}
         </Typography>
       </Box>
       <Button
@@ -126,7 +127,7 @@ export default function PaymentPanel({ total, onCheckout }: Props) {
         disabled={balance > 0}
         onClick={handleCheckout}
       >
-        Checkout ₹{total}
+        Checkout {formatCurrency(total)}
       </Button>
     </Box>
   );

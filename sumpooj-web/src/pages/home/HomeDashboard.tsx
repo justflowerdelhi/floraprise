@@ -22,11 +22,12 @@ import OperationsPanel from "../../components/dashboard/OperationsPanel";
 import MorningSetupPanel from "../../components/dashboard/MorningSetupPanel";
 
 import { getDailyFinancialSummary } from "../../modules/accounting/accounting.service";
+import { formatCurrency } from "../../core/i18n";
 
 const HomeDashboard = () => {
 
   const topStats = [
-    { title: "Today Sales", value: "$0.00", subtitle: "0 transactions" },
+    { title: "Today Sales", value: formatCurrency(0), subtitle: "0 transactions" },
     { title: "Pending Orders", value: "0", subtitle: "Needs attention" },
     { title: "Low Stock Items", value: "0", subtitle: "Below threshold" },
     { title: "Active Shift", value: "No Shift", subtitle: "Tap POS to open" },
@@ -40,10 +41,10 @@ const HomeDashboard = () => {
   }, []);
 
   const financeStats = [
-    { title: "Revenue Today", value: `₹${financial.salesToday}` },
-    { title: "Expenses Today", value: `₹${financial.expensesToday}` },
-    { title: "Profit Today", value: `₹${financial.profitToday}` },
-    { title: "Cash Balance", value: `₹${financial.cashInDrawer}` }
+    { title: "Revenue Today", value: formatCurrency(financial.salesToday) },
+    { title: "Expenses Today", value: formatCurrency(financial.expensesToday) },
+    { title: "Profit Today", value: formatCurrency(financial.profitToday) },
+    { title: "Cash Balance", value: formatCurrency(financial.cashInDrawer) }
   ];
 
   return (

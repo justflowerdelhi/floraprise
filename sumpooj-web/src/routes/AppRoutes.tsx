@@ -16,6 +16,8 @@ import InventoryBatchDashboard from '../pages/inventory/InventoryBatchDashboard'
 import InventoryLedgerPage from '../pages/inventory/InventoryLedger';
 import DailyInventoryReportPage from '../pages/inventory/daily-report';
 import InventoryReconciliationPage from '../pages/inventory/reconciliation';
+import QuickReceivePage from '../pages/inventory/QuickReceivePage';
+import DirectAddStockPage from '../pages/inventory/DirectAddStockPage';
 import AdjustmentEntryPage from '../pages/adjustments/AdjustmentEntryPage';
 import ExpiryAlertCenter from '../pages/expiry-alerts/ExpiryAlertCenter';
 import StockMovementLedger from '../pages/stock-ledger/StockMovementLedger';
@@ -293,6 +295,8 @@ export default function AppRoutes() {
 
           {/* ─── Inventory ──────────────────────────────── */}
           <Route path="/inventory" element={<InventoryBatchDashboard />} />
+          <Route path="/inventory/quick-receive" element={<QuickReceivePage />} />
+          <Route path="/inventory/direct-add" element={<DirectAddStockPage />} />
           <Route path="/inventory/ledger" element={<InventoryLedgerPage />} />
           <Route path="/inventory/daily-report" element={<DailyInventoryReportPage />} />
           <Route path="/inventory/reconciliation" element={<InventoryReconciliationPage />} />
