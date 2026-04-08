@@ -30,31 +30,33 @@ export interface PurchaseOrderItemRequest {
   sku?: string | null;
   unit?: string | null;
   quantity: number;
-  costPerUnit: number;
+  expectedCostPerUnit: number;
+  // Legacy alias still accepted by backend for backward compatibility
+  costPerUnit?: number;
   isPerishable: boolean;
   shelfLifeDays: number;
-  batchNumber?: string | null;
-  expiryDate?: string | null;
-  storageLocation?: string | null;
   sellingPrice?: number | null;
 }
 
 export interface CreatePurchaseOrderRequest {
   supplierId: string;
-  invoiceNumber?: string | null;
-  purchaseDate: string;
   expectedDeliveryDate: string;
-  paymentTerms?: string | null;
-  location?: string | null;
-  shippingCost: number;
-  taxRate: number;
   notes?: string | null;
   items: PurchaseOrderItemRequest[];
+
+  // Legacy optional fields (ignored by backend create planning flow)
+  invoiceNumber?: string | null;
+  purchaseDate?: string;
+  paymentTerms?: string | null;
+  location?: string | null;
+  shippingCost?: number;
+  taxRate?: number;
 }
 
 export interface ReceiveItemRequest {
   productId: string;
   receivedQuantity: number;
+  actualCostPerUnit?: number | null;
   batchNumber?: string | null;
   expiryDate?: string | null;
   storageLocation?: string | null;
@@ -62,7 +64,13 @@ export interface ReceiveItemRequest {
 
 export interface ReceivePurchaseOrderRequest {
   actualDeliveryDate: string;
+  invoiceNumber?: string | null;
   items: ReceiveItemRequest[];
+}
+
+export interface SubmitPurchaseOrderResponse {
+  success: boolean;
+  pdfUrl?: string | null;
 }
 
 // ─── API Functions ──────────────────────────────────────────
@@ -83,7 +91,7 @@ export const createPurchaseOrder = async (data: CreatePurchaseOrderRequest) => {
 };
 
 export const submitPurchaseOrder = async (id: string) => {
-  const res = await api.post(`/purchases/${id}/submit`);
+  const res = await api.post<SubmitPurchaseOrderResponse>(`/purchases/${id}/submit`);
   return res.data;
 };
 

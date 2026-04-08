@@ -7,7 +7,8 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Box,
@@ -38,8 +39,6 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import { Controller } from 'react-hook-form';
 
@@ -60,8 +59,7 @@ import { createPurchaseOrder } from './api/purchase.api';
 import { getAllSuppliers } from '../../api/supplier.api';
 import { searchProducts } from '../../api/product.api';
 import { calcOrderSummary } from './utils/purchase.utils';
-import { useToast } from '../../hooks/useToast';
-import { useApiCall } from '../../hooks/useApiCall';
+import { showError, showInfo, showSuccess } from '../../utils/toast';
 import { useLocation } from '../../core/location/LocationContext';
 
 // ============================================
@@ -71,10 +69,9 @@ import { useLocation } from '../../core/location/LocationContext';
 const PurchaseEntryForm = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const navigate = useNavigate();
 
   // Hooks
-  const toast = useToast();
-  const { loading: isSubmitting, execute } = useApiCall();
   const { currentLocationId, accessibleLocations } = useLocation();
 
   // State
@@ -82,7 +79,7 @@ const PurchaseEntryForm = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [supplierModalOpen, setSupplierModalOpen] = useState(false);
-  const [invoiceImageName, setInvoiceImageName] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Draft saving state
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -98,7 +95,7 @@ const PurchaseEntryForm = () => {
         setSuppliers(suppliersRes?.items ?? suppliersRes ?? []);
         setProducts(productsRes?.items ?? productsRes ?? []);
       } catch {
-        toast.error('Failed to load suppliers or products.');
+        showError('Failed to load suppliers or products.');
       }
     };
     loadData();
@@ -127,11 +124,11 @@ const PurchaseEntryForm = () => {
     name: 'items',
   });
 
-  // Watch for summary calculations
-  const watchedItems = watch('items');
-  const watchedTaxRate = watch('header.taxRate');
-  const watchedShipping = watch('header.shippingCost');
-  const watchedSupplierId = watch('header.supplierId');
+  // useWatch keeps summary reactive for first-item edits in field-array rows.
+  const watchedItems = useWatch({ control, name: 'items' });
+  const watchedTaxRate = useWatch({ control, name: 'header.taxRate' });
+  const watchedShipping = useWatch({ control, name: 'header.shippingCost' });
+  const watchedSupplierId = useWatch({ control, name: 'header.supplierId' });
 
   // Live order summary
   const summary = useMemo(
@@ -183,41 +180,43 @@ const PurchaseEntryForm = () => {
     append(createEmptyItem());
   }, [append]);
 
+  const normalizeUnitForSubmit = (item: PurchaseFormSchemaType['items'][number]) => {
+    const rawUnit = (item.unit || '').toLowerCase();
+    if (item.isPerishable && rawUnit === 'stem') {
+      return 'each';
+    }
+    return rawUnit || null;
+  };
+
   const onSubmit = async (data: PurchaseFormSchemaType) => {
-    const result = await execute(
-      () =>
-        createPurchaseOrder({
-          supplierId: data.header.supplierId,
-          invoiceNumber: data.header.invoiceNumber || null,
-          purchaseDate: data.header.purchaseDate,
-          expectedDeliveryDate: data.header.expectedDeliveryDate,
-          paymentTerms: data.header.paymentTerms || null,
-          location: data.header.location || null,
-          shippingCost: data.header.shippingCost,
-          taxRate: data.header.taxRate,
-          notes: data.header.notes || null,
-          items: data.items.map((item) => ({
-            productId: item.productId,
-            productName: item.productName,
-            sku: item.sku || null,
-            unit: item.unit || null,
-            quantity: item.quantity,
-            costPerUnit: item.costPerUnit,
-            isPerishable: item.isPerishable,
-            shelfLifeDays: item.shelfLifeDays,
-            batchNumber: item.batchNumber || null,
-            expiryDate: item.expiryDate || null,
-            storageLocation: item.storageLocation || null,
-            sellingPrice: item.sellingPrice || null,
-          })),
-        }),
-      {
-        successMessage: 'Purchase order created successfully!',
-        errorMessage: 'Failed to submit purchase order',
-      },
-    );
-    if (result) {
+    setIsSubmitting(true);
+    try {
+      await createPurchaseOrder({
+        supplierId: data.header.supplierId,
+        expectedDeliveryDate: data.header.expectedDeliveryDate,
+        notes: data.header.notes || null,
+        items: data.items.map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          sku: item.sku || null,
+          unit: normalizeUnitForSubmit(item),
+          quantity: item.quantity,
+          expectedCostPerUnit: item.expectedCostPerUnit,
+          // Keep legacy alias for older backend builds.
+          costPerUnit: item.expectedCostPerUnit,
+          isPerishable: item.isPerishable,
+          shelfLifeDays: item.shelfLifeDays,
+          sellingPrice: item.sellingPrice || null,
+        })),
+      });
+
+      showSuccess('Purchase Order Created Successfully');
       reset();
+      navigate('/purchases');
+    } catch {
+      showError('Failed to create purchase order');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -229,9 +228,9 @@ const PurchaseEntryForm = () => {
         header: values.header,
         items: values.items,
       }));
-      toast.info('Draft saved locally.');
+      showInfo('Draft saved locally.');
     } catch {
-      toast.error('Failed to save draft.');
+      showError('Failed to save draft.');
     } finally {
       setIsSavingDraft(false);
     }
@@ -241,15 +240,7 @@ const PurchaseEntryForm = () => {
     setSuppliers((prev) => [...prev, supplier]);
     setValue('header.supplierId', supplier.id);
     setSupplierModalOpen(false);
-    toast.success(`Supplier "${supplier.name}" added!`);
-  };
-
-  const handleInvoiceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setValue('header.invoiceImage', file as any);
-      setInvoiceImageName(file.name);
-    }
+    showSuccess(`Supplier "${supplier.name}" added!`);
   };
 
   // Dark mode field sx
@@ -321,7 +312,7 @@ const PurchaseEntryForm = () => {
               New Purchase Order
             </Typography>
             <Typography variant="caption" sx={{ color: darkMode ? 'grey.500' : 'grey.500' }}>
-              Goods Receipt Note — {new Date().toLocaleDateString()}
+              Planning-only PO. Stock details are captured at receive time.
             </Typography>
           </Box>
         </Box>
@@ -414,7 +405,7 @@ const PurchaseEntryForm = () => {
                     Purchase Header
                   </Typography>
                   <Typography variant="caption" sx={{ color: darkMode ? 'grey.500' : 'grey.600' }}>
-                    Supplier info, invoice details, and delivery terms
+                    Supplier and expected delivery planning
                   </Typography>
                 </Box>
               </Box>
@@ -477,48 +468,8 @@ const PurchaseEntryForm = () => {
                   </Box>
                 </Grid>
 
-                {/* Invoice Number */}
-                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                  <Controller
-                    name="header.invoiceNumber"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        label="Invoice Number *"
-                        fullWidth
-                        size="small"
-                        error={!!errors.header?.invoiceNumber}
-                        helperText={errors.header?.invoiceNumber?.message}
-                        sx={fieldSx}
-                      />
-                    )}
-                  />
-                </Grid>
-
-                {/* Purchase Date */}
-                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                  <Controller
-                    name="header.purchaseDate"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        label="Purchase Date *"
-                        type="date"
-                        fullWidth
-                        size="small"
-                        error={!!errors.header?.purchaseDate}
-                        helperText={errors.header?.purchaseDate?.message}
-                        slotProps={{ inputLabel: { shrink: true } }}
-                        sx={fieldSx}
-                      />
-                    )}
-                  />
-                </Grid>
-
                 {/* Expected Delivery Date */}
-                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Grid size={{ xs: 12, sm: 6, md: 8 }}>
                   <Controller
                     name="header.expectedDeliveryDate"
                     control={control}
@@ -594,8 +545,8 @@ const PurchaseEntryForm = () => {
                   <Divider sx={{ borderColor: darkMode ? 'grey.800' : 'grey.100' }} />
                 </Grid>
 
-                {/* Tax Rate */}
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                {/* Tax Rate (optional planning metadata) */}
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <Controller
                     name="header.taxRate"
                     control={control}
@@ -620,8 +571,8 @@ const PurchaseEntryForm = () => {
                   />
                 </Grid>
 
-                {/* Shipping Cost */}
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                {/* Shipping Cost (optional planning metadata) */}
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <Controller
                     name="header.shippingCost"
                     control={control}
@@ -643,50 +594,8 @@ const PurchaseEntryForm = () => {
                   />
                 </Grid>
 
-                {/* Invoice Image */}
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                  <Button
-                    variant="outlined"
-                    component="label"
-                    size="small"
-                    startIcon={<UploadFileIcon />}
-                    sx={{
-                      textTransform: 'none',
-                      height: 40,
-                      width: '100%',
-                      justifyContent: 'flex-start',
-                      borderColor: darkMode ? 'grey.700' : 'grey.300',
-                      color: darkMode ? 'grey.300' : 'grey.700',
-                    }}
-                  >
-                    {invoiceImageName || 'Upload Invoice'}
-                    <input
-                      type="file"
-                      hidden
-                      accept="image/*,.pdf"
-                      onChange={handleInvoiceUpload}
-                    />
-                  </Button>
-                  {invoiceImageName && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                      <Typography variant="caption" sx={{ color: darkMode ? 'grey.500' : 'grey.600' }}>
-                        {invoiceImageName}
-                      </Typography>
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          setInvoiceImageName(null);
-                          setValue('header.invoiceImage', null);
-                        }}
-                      >
-                        <DeleteOutlineIcon sx={{ fontSize: 14 }} />
-                      </IconButton>
-                    </Box>
-                  )}
-                </Grid>
-
                 {/* Notes */}
-                <Grid size={{ xs: 12, md: 3 }}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <Controller
                     name="header.notes"
                     control={control}

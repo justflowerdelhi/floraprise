@@ -34,7 +34,7 @@ import { getBatchesByProduct, quickReceive } from '../../api/inventory.api';
 import { searchProducts } from '../../api/product.api';
 import { getAllSuppliers } from '../../api/supplier.api';
 import { getLocations } from '../../api/location.api';
-import { useToast } from '../../hooks/useToast';
+import { showError, showSuccess } from '../../utils/toast';
 import { formatCurrency, useCurrency } from '../../core/i18n';
 
 // ─── Types ───────────────────────────────────────────────────
@@ -124,7 +124,6 @@ const QuickReceivePage: React.FC = () => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const navigate = useNavigate();
-  const toast = useToast();
   const { currencySymbol } = useCurrency();
 
   const [supplierId, setSupplierId] = useState('');
@@ -159,8 +158,8 @@ const QuickReceivePage: React.FC = () => {
       const supplierItems = (Array.isArray(sups) ? sups : (sups as any)?.items ?? []) as any[];
       setSuppliers(supplierItems.map((s: any) => ({ id: s.id, name: s.name })));
       setLocations((Array.isArray(locs) ? locs : locs?.items ?? []).map((l: any) => ({ id: l.id, name: l.name })));
-    }).catch(() => toast.error('Failed to load reference data'));
-  }, [toast]);
+    }).catch(() => showError('Failed to load reference data'));
+  }, []);
 
   const addRow = () => setRows(prev => [...prev, newRow()]);
 
@@ -254,9 +253,9 @@ const QuickReceivePage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!locationId) { toast.error('Please select a location.'); return; }
-    if (rows.some(r => !r.productId)) { toast.error('Each row must have a product selected.'); return; }
-    if (rows.some(r => r.quantity <= 0)) { toast.error('Quantity must be greater than 0.'); return; }
+    if (!locationId) { showError('Please select a location.'); return; }
+    if (rows.some(r => !r.productId)) { showError('Each row must have a product selected.'); return; }
+    if (rows.some(r => r.quantity <= 0)) { showError('Quantity must be greater than 0.'); return; }
 
     setLoading(true);
     try {
@@ -276,12 +275,10 @@ const QuickReceivePage: React.FC = () => {
         })),
       });
 
-      toast.success(
-        `Received ${result.itemsReceived} item(s).${result.purchaseOrderNumber ? ` PO: ${result.purchaseOrderNumber}` : ''}`
-      );
+      showSuccess('Stock Received Successfully');
       navigate('/inventory');
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Quick receive failed.');
+      showError(err?.response?.data?.message ?? 'Quick receive failed.');
     } finally {
       setLoading(false);
     }

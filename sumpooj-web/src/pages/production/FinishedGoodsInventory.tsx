@@ -35,18 +35,20 @@ import {
   formatDateTime, expiryLabel,
 } from './utils/production.utils';
 import MaintenanceModal from './MaintenanceModal';
+import { useLocation } from '../../core/location/LocationContext';
 
 const FinishedGoodsInventory = () => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
+  const { currentLocationId, isAllLocations } = useLocation();
 
   // ── State ──────────────────────────────────────────────────
   const [batches, setBatches] = useState<FinishedGoodsBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FinishedGoodsFilterState>({
     search: '',
-    status: 'ALL',
-    locationId: '',
+    status: 'ACTIVE',
+    locationId: isAllLocations ? '' : currentLocationId,
   });
   const [repairBatch, setRepairBatch] = useState<FinishedGoodsBatch | null>(null);
 
@@ -64,6 +66,16 @@ const FinishedGoodsInventory = () => {
   }, []);
 
   useEffect(() => { loadBatches(); }, [loadBatches]);
+
+  // Keep default scope on the logged-in branch when a specific location is selected in app context.
+  useEffect(() => {
+    if (isAllLocations) return;
+
+    setFilters((prev) => {
+      if (prev.locationId) return prev;
+      return { ...prev, locationId: currentLocationId };
+    });
+  }, [currentLocationId, isAllLocations]);
 
   // ── Filter & sort ──────────────────────────────────────────
   const filtered = useMemo(() => {

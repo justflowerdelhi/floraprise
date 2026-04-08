@@ -26,7 +26,7 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { directAddStock, getBatchesByProduct } from '../../api/inventory.api';
 import { searchProducts } from '../../api/product.api';
 import { getLocations } from '../../api/location.api';
-import { useToast } from '../../hooks/useToast';
+import { showError, showSuccess } from '../../utils/toast';
 import { useCurrency } from '../../core/i18n';
 
 interface ProductOption {
@@ -41,7 +41,6 @@ const DirectAddStockPage: React.FC = () => {
   const theme = useTheme();
   const dk = theme.palette.mode === 'dark';
   const navigate = useNavigate();
-  const toast = useToast();
 
   const [productId, setProductId] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -67,8 +66,8 @@ const DirectAddStockPage: React.FC = () => {
         costPrice: p.costPrice ?? 0,
       })));
       setLocations((Array.isArray(locs) ? locs : locs?.items ?? []).map((l: any) => ({ id: l.id, name: l.name })));
-    }).catch(() => toast.error('Failed to load products/locations'));
-  }, [toast]);
+    }).catch(() => showError('Failed to load products/locations'));
+  }, []);
 
   const selectedProduct = products.find(p => p.id === productId);
 
@@ -110,9 +109,9 @@ const DirectAddStockPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!productId) { toast.error('Select a product'); return; }
-    if (!locationId) { toast.error('Select a location'); return; }
-    if (quantity <= 0) { toast.error('Quantity must be greater than zero'); return; }
+    if (!productId) { showError('Select a product'); return; }
+    if (!locationId) { showError('Select a location'); return; }
+    if (quantity <= 0) { showError('Quantity must be greater than zero'); return; }
 
     setLoading(true);
     try {
@@ -126,10 +125,10 @@ const DirectAddStockPage: React.FC = () => {
         mergeWithSameDayBatch,
       });
 
-      toast.success(`Stock added. Batch: ${res.batchNumber}`);
+      showSuccess('Inventory Added Successfully');
       navigate('/inventory');
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Direct add failed');
+      showError(err?.response?.data?.message ?? 'Direct add failed');
     } finally {
       setLoading(false);
     }

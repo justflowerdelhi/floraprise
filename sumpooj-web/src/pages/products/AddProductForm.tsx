@@ -69,6 +69,7 @@ import { defaultProductFormValues } from './types/product.types';
 import {
   createProduct,
   fetchProductById,
+  fetchSuggestedUnitOfMeasure,
   saveDraft,
   updateProductById,
   deleteProductById,
@@ -138,10 +139,11 @@ const AddProductForm = ({
     control,
     handleSubmit,
     watch,
+    getValues,
     setValue,
     setFocus,
     reset,
-    formState: { errors, isDirty },
+    formState: { errors, isDirty, dirtyFields },
   } = useForm<ProductFormSchema>({
     resolver: zodResolver(productFormSchema) as any,
     defaultValues: {
@@ -293,6 +295,48 @@ const AddProductForm = ({
       }
     }
   }, [selectedCategory, setValue]);
+
+  // Auto-suggest unit of measure from existing products for matching category/type.
+  useEffect(() => {
+    if (isEditMode || !categoryId || dirtyFields.unitOfMeasure) return;
+
+    let active = true;
+
+    const applySuggestedUnit = async () => {
+      const response = await fetchSuggestedUnitOfMeasure({
+        categoryId,
+        categoryName: selectedCategory?.name,
+        productType,
+      });
+
+      if (!active || !response.success) return;
+
+      const suggestedUnit = response.data?.unitOfMeasure;
+      if (!suggestedUnit) return;
+
+      const currentUnit = getValues('unitOfMeasure');
+      const isDefaultUnit = currentUnit === defaultProductFormValues.unitOfMeasure;
+
+      if (dirtyFields.unitOfMeasure) return;
+      if (isDefaultUnit || !currentUnit) {
+        setValue('unitOfMeasure', suggestedUnit, { shouldDirty: false, shouldValidate: true });
+      }
+    };
+
+    applySuggestedUnit();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    categoryId,
+    dirtyFields.unitOfMeasure,
+    getValues,
+    isEditMode,
+    productType,
+    selectedCategory?.name,
+    setValue,
+  ]);
 
   useEffect(() => {
     if (isPerishable) {

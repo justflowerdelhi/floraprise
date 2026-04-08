@@ -14,7 +14,6 @@ import {
   Chip,
   Box,
   Typography,
-  Collapse,
   alpha,
   useTheme,
 } from '@mui/material';
@@ -27,15 +26,12 @@ import type { SxProps, Theme } from '@mui/material';
 import type { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { Controller } from 'react-hook-form';
 import type { Product } from '../types/purchase.types';
-import { UNITS, STORAGE_LOCATIONS } from '../types/purchase.types';
+import { UNITS } from '../types/purchase.types';
 import type { PurchaseFormSchemaType } from '../schemas/purchase.schema';
 import {
   calcRowTotal,
   calcMargin,
-  calcExpiryDate,
-  getExpiryStatus,
   getMarginColor,
-  generateBatchNumber,
   fmt,
 } from '../utils/purchase.utils';
 
@@ -66,12 +62,10 @@ const PurchaseItemRow = ({
   // Watch row fields
   const productId = watch(`items.${index}.productId`);
   const quantity = watch(`items.${index}.quantity`);
-  const costPerUnit = watch(`items.${index}.costPerUnit`);
+  const expectedCostPerUnit = watch(`items.${index}.expectedCostPerUnit`);
   const isPerishable = watch(`items.${index}.isPerishable`);
   const sellingPrice = watch(`items.${index}.sellingPrice`);
   const shelfLifeDays = watch(`items.${index}.shelfLifeDays`);
-  const purchaseDate = watch(`items.${index}.purchaseDate`);
-  const expiryDate = watch(`items.${index}.expiryDate`);
 
   // Error helpers
   const itemErrors = errors?.items?.[index] as Record<string, { message?: string }> | undefined;
@@ -79,29 +73,20 @@ const PurchaseItemRow = ({
 
   // Auto-calculate total
   useEffect(() => {
-    const total = calcRowTotal(quantity || 0, costPerUnit || 0);
+    const total = calcRowTotal(quantity || 0, expectedCostPerUnit || 0);
     setValue(`items.${index}.total`, total);
-  }, [quantity, costPerUnit, index, setValue]);
+  }, [quantity, expectedCostPerUnit, index, setValue]);
 
   // Auto-calculate margin
   useEffect(() => {
-    const { marginAmount, marginPercent } = calcMargin(costPerUnit || 0, sellingPrice || 0);
+    const { marginAmount, marginPercent } = calcMargin(expectedCostPerUnit || 0, sellingPrice || 0);
     setValue(`items.${index}.marginAmount`, marginAmount);
     setValue(`items.${index}.marginPercent`, marginPercent);
-  }, [costPerUnit, sellingPrice, index, setValue]);
-
-  // Auto-calculate expiry from shelf life
-  useEffect(() => {
-    if (isPerishable && purchaseDate && shelfLifeDays > 0) {
-      const expiry = calcExpiryDate(purchaseDate, shelfLifeDays);
-      setValue(`items.${index}.expiryDate`, expiry);
-    }
-  }, [purchaseDate, shelfLifeDays, isPerishable, index, setValue]);
+  }, [expectedCostPerUnit, sellingPrice, index, setValue]);
 
   // Live computed
-  const total = calcRowTotal(quantity || 0, costPerUnit || 0);
-  const margin = calcMargin(costPerUnit || 0, sellingPrice || 0);
-  const expiryStatus = isPerishable && expiryDate ? getExpiryStatus(expiryDate) : null;
+  const total = calcRowTotal(quantity || 0, expectedCostPerUnit || 0);
+  const margin = calcMargin(expectedCostPerUnit || 0, sellingPrice || 0);
 
   const selectedProduct = useMemo(
     () => products.find((p) => p.id === productId) || null,
@@ -134,22 +119,20 @@ const PurchaseItemRow = ({
       setValue(`items.${index}.unit`, 'stem');
       setValue(`items.${index}.sellingPrice`, 0);
       setValue(`items.${index}.shelfLifeDays`, 0);
-      setValue(`items.${index}.batchNumber`, '');
       return;
     }
     setValue(`items.${index}.productId`, product.id);
     setValue(`items.${index}.productName`, product.name);
     setValue(`items.${index}.sku`, product.sku);
     setValue(`items.${index}.isPerishable`, product.isPerishable);
-    setValue(`items.${index}.unit`, product.defaultUnit);
+    const normalizedUnit = (product.defaultUnit || 'stem').toLowerCase();
+    setValue(`items.${index}.unit`, product.isPerishable && normalizedUnit === 'each' ? 'stem' : normalizedUnit);
     setValue(`items.${index}.sellingPrice`, product.sellingPrice || 0);
     if (product.lastCost) {
-      setValue(`items.${index}.costPerUnit`, product.lastCost);
+      setValue(`items.${index}.expectedCostPerUnit`, product.lastCost);
     }
     if (product.isPerishable) {
       setValue(`items.${index}.shelfLifeDays`, product.defaultShelfLifeDays || 7);
-      setValue(`items.${index}.batchNumber`, generateBatchNumber(product.sku));
-      setValue(`items.${index}.purchaseDate`, new Date().toISOString().split('T')[0]);
     }
   };
 
@@ -201,23 +184,10 @@ const PurchaseItemRow = ({
               sx={{ height: 22, '& .MuiChip-label': { px: 0.5, fontSize: '0.7rem' } }}
             />
           )}
-          {expiryStatus && (
-            <Chip
-              label={expiryStatus.label}
-              size="small"
-              sx={{
-                height: 22,
-                backgroundColor: alpha(expiryStatus.color, 0.15),
-                color: expiryStatus.color,
-                fontWeight: 600,
-                '& .MuiChip-label': { px: 0.5, fontSize: '0.7rem' },
-              }}
-            />
-          )}
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {/* Margin badge */}
-          {sellingPrice > 0 && costPerUnit > 0 && (
+          {sellingPrice > 0 && expectedCostPerUnit > 0 && (
             <Tooltip title={`Margin: ${fmt(margin.marginAmount)} (${margin.marginPercent}%)`}>
               <Chip
                 icon={
@@ -358,16 +328,16 @@ const PurchaseItemRow = ({
 
         {/* Cost per Unit */}
         <Controller
-          name={`items.${index}.costPerUnit`}
+          name={`items.${index}.expectedCostPerUnit`}
           control={control}
           render={({ field }) => (
             <TextField
               {...field}
-              label="Cost ($) *"
+              label="Expected Cost ($) *"
               type="number"
               size="small"
-              error={!!err('costPerUnit')}
-              helperText={err('costPerUnit')}
+              error={!!err('expectedCostPerUnit')}
+              helperText={err('expectedCostPerUnit') || 'Final cost will be confirmed when stock is received'}
               value={field.value ?? ''}
               onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
               inputProps={{ min: 0, step: 0.01 }}
@@ -398,7 +368,7 @@ const PurchaseItemRow = ({
       </Box>
 
       {/* Low margin warning */}
-      {sellingPrice > 0 && costPerUnit > 0 && margin.marginPercent < 15 && (
+      {sellingPrice > 0 && expectedCostPerUnit > 0 && margin.marginPercent < 15 && (
         <Box
           sx={{
             mt: 1,
@@ -419,127 +389,26 @@ const PurchaseItemRow = ({
         </Box>
       )}
 
-      {/* Perishable Fields */}
-      <Collapse in={isPerishable} unmountOnExit>
+      {/* Product shelf-life hint for planning only */}
+      {isPerishable && shelfLifeDays > 0 && (
         <Box
           sx={{
-            mt: 1.5,
-            p: 1.5,
-            borderRadius: 1.5,
-            border: `1px dashed ${darkMode ? theme.palette.info.dark : theme.palette.info.light}`,
-            backgroundColor: darkMode
-              ? alpha(theme.palette.info.dark, 0.06)
-              : alpha(theme.palette.info.light, 0.06),
+            mt: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5,
+            px: 1.5,
+            py: 0.5,
+            borderRadius: 1,
+            backgroundColor: alpha(theme.palette.info.main, 0.08),
           }}
         >
-          <Typography
-            variant="caption"
-            fontWeight={600}
-            sx={{ color: theme.palette.info.main, mb: 1, display: 'block' }}
-          >
-            ❄ Perishable Details
+          <AcUnitIcon sx={{ fontSize: 16, color: theme.palette.info.main }} />
+          <Typography variant="caption" sx={{ color: theme.palette.info.main, fontWeight: 500 }}>
+            Perishable product: receiving will capture batch/expiry/storage. Suggested shelf life: {shelfLifeDays} day(s).
           </Typography>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr', md: '1.5fr 1fr 1fr 1fr 1.5fr' },
-              gap: 1.5,
-            }}
-          >
-            {/* Batch Number */}
-            <Controller
-              name={`items.${index}.batchNumber`}
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  label="Batch Code *"
-                  size="small"
-                  error={!!err('batchNumber')}
-                  helperText={err('batchNumber')}
-                  sx={fieldSx}
-                />
-              )}
-            />
-
-            {/* Purchase Date */}
-            <Controller
-              name={`items.${index}.purchaseDate`}
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  label="Purchase Date"
-                  type="date"
-                  size="small"
-                  slotProps={{ inputLabel: { shrink: true } }}
-                  sx={fieldSx}
-                />
-              )}
-            />
-
-            {/* Shelf Life */}
-            <Controller
-              name={`items.${index}.shelfLifeDays`}
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  label="Shelf Life (days)"
-                  type="number"
-                  size="small"
-                  value={field.value ?? ''}
-                  onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
-                  inputProps={{ min: 0 }}
-                  sx={fieldSx}
-                />
-              )}
-            />
-
-            {/* Expiry Date */}
-            <Controller
-              name={`items.${index}.expiryDate`}
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  label="Expiry Date *"
-                  type="date"
-                  size="small"
-                  error={!!err('expiryDate')}
-                  helperText={err('expiryDate')}
-                  slotProps={{ inputLabel: { shrink: true } }}
-                  sx={fieldSx}
-                />
-              )}
-            />
-
-            {/* Storage Location */}
-            <Controller
-              name={`items.${index}.storageLocation`}
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  select
-                  label="Storage *"
-                  size="small"
-                  error={!!err('storageLocation')}
-                  helperText={err('storageLocation')}
-                  sx={fieldSx}
-                >
-                  <MenuItem value="">— Select —</MenuItem>
-                  {STORAGE_LOCATIONS.map((sl) => (
-                    <MenuItem key={sl.value} value={sl.value}>
-                      {sl.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              )}
-            />
-          </Box>
         </Box>
-      </Collapse>
+      )}
     </Box>
   );
 };

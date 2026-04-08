@@ -2,6 +2,7 @@ using Sumpooj.Application.Common;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Inventory;
 using Sumpooj.Application.Purchases;
+using Sumpooj.Application.Services;
 using Sumpooj.Domain.Entities;
 using System.Transactions;
 
@@ -15,6 +16,7 @@ public class PurchaseOrderService
     private readonly IProductBatchRepository _batchRepo;
     private readonly InventoryEntryService _inventoryEntryService;
     private readonly ITenantContext _tenant;
+    private readonly PurchaseOrderPdfService _pdfService;
 
     public PurchaseOrderService(
         IPurchaseOrderRepository repo,
@@ -22,7 +24,8 @@ public class PurchaseOrderService
         IProductRepository productRepo,
         IProductBatchRepository batchRepo,
         InventoryEntryService inventoryEntryService,
-        ITenantContext tenant)
+        ITenantContext tenant,
+        PurchaseOrderPdfService pdfService)
     {
         _repo = repo;
         _supplierRepo = supplierRepo;
@@ -30,6 +33,7 @@ public class PurchaseOrderService
         _batchRepo = batchRepo;
         _inventoryEntryService = inventoryEntryService;
         _tenant = tenant;
+        _pdfService = pdfService;
     }
 
     public async Task<PagedResult<PurchaseOrderListDto>> SearchAsync(PurchaseOrderSearchRequest request)
@@ -86,7 +90,8 @@ public class PurchaseOrderService
         // Add items — derive IsPerishable from product's category (source of truth)
         foreach (var item in request.Items)
         {
-            po.AddItem(item.ProductId, item.ProductName, item.Quantity, item.CostPerUnit);
+            var expectedCost = item.ResolveExpectedCostPerUnit();
+            po.AddItem(item.ProductId, item.ProductName, item.Quantity, expectedCost);
 
             // Get the last added item and set additional details
             var poItem = po.Items.Last();
@@ -94,25 +99,50 @@ public class PurchaseOrderService
             // Look up product to derive IsPerishable from its category
             var product = await _productRepo.GetByIdAsync(item.ProductId);
             var isPerishable = product?.ProductCategoryRef?.IsPerishable ?? false;
-
-            poItem.SetProductDetails(item.Sku, item.Unit, isPerishable, item.ShelfLifeDays);
-            if (!string.IsNullOrEmpty(item.BatchNumber) || item.ExpiryDate.HasValue)
+            var shelfLifeDays = item.ShelfLifeDays;
+            if (product?.ShelfLifeDays is int derivedShelfLife && derivedShelfLife > 0)
             {
-                poItem.SetBatchInfo(item.BatchNumber ?? "", item.ExpiryDate, item.StorageLocation);
+                shelfLifeDays = derivedShelfLife;
             }
+
+            poItem.SetProductDetails(item.Sku, item.Unit, isPerishable, shelfLifeDays);
         }
 
         await _repo.AddAsync(po);
         return po.Id;
     }
 
-    public async Task SubmitAsync(Guid id)
+    public async Task<PurchaseOrderSubmitResult> SubmitAsync(Guid id)
     {
         var po = await _repo.GetByIdWithItemsAsync(id)
             ?? throw new KeyNotFoundException("Purchase order not found");
 
         po.Submit();
+
+        var pdfBytes = _pdfService.GeneratePdf(po);
+        var fileName = $"PO-{po.OrderNumber}.pdf";
+        var filesDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "files");
+        Directory.CreateDirectory(filesDir);
+
+        var filePath = Path.Combine(filesDir, fileName);
+        await File.WriteAllBytesAsync(filePath, pdfBytes);
+
         await _repo.UpdateAsync(po);
+
+        return new PurchaseOrderSubmitResult
+        {
+            Success = true,
+            PdfUrl = "/files/" + fileName,
+        };
+    }
+
+    public async Task<(byte[] Content, string FileName)> GeneratePdfAsync(Guid id)
+    {
+        var po = await _repo.GetByIdWithItemsAsync(id)
+            ?? throw new KeyNotFoundException("Purchase order not found");
+
+        var pdfBytes = _pdfService.GeneratePdf(po);
+        return (pdfBytes, $"{po.OrderNumber}.pdf");
     }
 
     public async Task ApproveAsync(Guid id)
@@ -137,55 +167,76 @@ public class PurchaseOrderService
         if (po.Status == PurchaseOrderStatus.Received)
             throw new InvalidOperationException("Purchase order has already been received and cannot be received again");
 
-        // Auto-advance through workflow so a single "Receive Stock" call works
-        // regardless of the PO's current state.
         if (po.Status == PurchaseOrderStatus.Draft)
-        {
-            po.Submit();
-            po.Approve();
-        }
-        else if (po.Status == PurchaseOrderStatus.Submitted)
-        {
-            po.Approve();
-        }
-        // If already Approved — proceed normally.
+            throw new InvalidOperationException("Please submit the purchase order before receiving stock.");
+
+        if (po.Status != PurchaseOrderStatus.Submitted && po.Status != PurchaseOrderStatus.Approved)
+            throw new InvalidOperationException("Only submitted or approved purchase orders can be received.");
 
         // Mark as received
         po.MarkReceived(request.ActualDeliveryDate);
-
-        // Update supplier stats
-        var supplier = await _supplierRepo.GetByIdAsync(po.SupplierId);
-        if (supplier != null)
+        if (!string.IsNullOrWhiteSpace(request.InvoiceNumber))
         {
-            supplier.RecordOrder(po.TotalAmount);
-            await _supplierRepo.UpdateAsync(supplier);
+            po.SetInvoiceNumber(request.InvoiceNumber);
         }
 
         // Create inventory entries for received items
         foreach (var item in po.Items)
         {
             var receiveItem = request.Items.FirstOrDefault(r => r.ProductId == item.ProductId);
-            var receivedQty = receiveItem?.ReceivedQuantity ?? item.Quantity;
+            if (receiveItem == null)
+                throw new InvalidOperationException($"Receive details are required for product {item.ProductName}.");
+
+            var receivedQty = receiveItem.ReceivedQuantity;
+
+            if (receivedQty <= 0)
+                throw new InvalidOperationException("Received quantity must be greater than 0");
+
+            if (string.IsNullOrWhiteSpace(receiveItem.BatchNumber))
+                throw new InvalidOperationException("Batch number is required");
+
+            if (!receiveItem.ActualCostPerUnit.HasValue || receiveItem.ActualCostPerUnit.Value <= 0)
+                throw new InvalidOperationException("Actual cost must be greater than 0");
+
+            if (item.IsPerishable && !receiveItem.ExpiryDate.HasValue)
+                throw new InvalidOperationException("Expiry date is required for perishable items");
+
+            var expectedPrice = item.ExpectedPrice;
+            var actualPrice = receiveItem.ActualCostPerUnit.Value;
+            item.SetMismatchFlags(
+                receivedQty != item.Quantity,
+                Math.Abs(actualPrice - expectedPrice) > 0.0001m);
 
             if (receivedQty > 0)
             {
-                item.UpdateReceivedQuantity(receivedQty);
+                item.ApplyReceive(receivedQty, actualPrice);
 
                 await _inventoryEntryService.CreateInventoryEntryAsync(new InventoryEntryRequest(
                     ProductId: item.ProductId,
                     Quantity: receivedQty,
-                    CostPerUnit: item.UnitPrice,
+                    CostPerUnit: actualPrice,
                     SellingPricePerUnit: null,
                     ReceivedDate: request.ActualDeliveryDate,
-                    ExpiryDate: receiveItem?.ExpiryDate,
+                    ExpiryDate: receiveItem.ExpiryDate,
                     ShelfLifeDays: item.ShelfLifeDays > 0 ? item.ShelfLifeDays : null,
                     SupplierId: po.SupplierId,
                     LocationId: null,
-                    StorageLocation: receiveItem?.StorageLocation ?? item.StorageLocation,
+                    StorageLocation: receiveItem.StorageLocation,
                     Source: "POReceive",
                     PurchaseOrderId: po.Id,
                     MergeWithSameDayBatch: false));
             }
+        }
+
+        // Recompute PO total based on received qty * actual price lines.
+        po.RecalculateTotalsFromItems();
+
+        // Update supplier stats with actual received total.
+        var supplier = await _supplierRepo.GetByIdAsync(po.SupplierId);
+        if (supplier != null)
+        {
+            supplier.RecordOrder(po.TotalAmount);
+            await _supplierRepo.UpdateAsync(supplier);
         }
 
         po.MarkInventoryProcessed();
@@ -202,20 +253,31 @@ public class PurchaseOrderService
         await _repo.UpdateAsync(po);
     }
 
-    private static PurchaseOrderListDto ToListDto(PurchaseOrder po, string supplierName) => new()
+    private static PurchaseOrderListDto ToListDto(PurchaseOrder po, string supplierName)
     {
-        Id = po.Id,
-        OrderNumber = po.OrderNumber,
-        SupplierName = supplierName,
-        OrderDate = po.OrderDate,
-        ExpectedDeliveryDate = po.ExpectedDeliveryDate,
-        Status = po.Status.ToString(),
-        TotalAmount = po.TotalAmount,
-        ItemCount = po.Items.Count
-    };
+        var computedTotal = po.Items.Count > 0 ? po.Items.Sum(i => i.TotalPrice) : po.TotalAmount;
+
+        return new PurchaseOrderListDto
+        {
+            Id = po.Id,
+            OrderNumber = po.OrderNumber,
+            SupplierName = supplierName,
+            OrderDate = po.OrderDate,
+            ExpectedDeliveryDate = po.ExpectedDeliveryDate,
+            Status = po.Status.ToString(),
+            TotalAmount = computedTotal,
+            ItemCount = po.Items.Count
+        };
+    }
 
     private async Task<PurchaseOrderDto> ToDto(PurchaseOrder po, string supplierName)
     {
+        var invoiceNumber = po.InvoiceNumber;
+        if (string.IsNullOrWhiteSpace(invoiceNumber) && !string.IsNullOrWhiteSpace(po.Notes))
+        {
+            invoiceNumber = ExtractInvoiceNumber(po.Notes);
+        }
+
         var dto = new PurchaseOrderDto
         {
             Id = po.Id,
@@ -229,6 +291,7 @@ public class PurchaseOrderService
             IsActive = po.IsActive,
             TotalAmount = po.TotalAmount,
             Notes = po.Notes,
+            InvoiceNumber = invoiceNumber,
             CreatedAtUtc = po.CreatedAtUtc
         };
 
@@ -242,18 +305,35 @@ public class PurchaseOrderService
                 Sku = item.Sku,
                 Unit = item.Unit,
                 Quantity = item.Quantity,
-                UnitPrice = item.UnitPrice,
+                ExpectedPrice = item.ExpectedPrice,
+                UnitPrice = item.ExpectedPrice,
+                ActualPrice = item.ActualUnitPrice,
                 TotalPrice = item.TotalPrice,
+                ActualTotalPrice = item.TotalPrice,
                 ReceivedQuantity = item.ReceivedQuantity,
                 IsPerishable = item.IsPerishable,
                 ShelfLifeDays = item.ShelfLifeDays,
-                BatchNumber = item.BatchNumber,
-                ExpiryDate = item.ExpiryDate,
-                StorageLocation = item.StorageLocation
+                IsQuantityMismatch = item.IsQuantityMismatch ?? false,
+                IsPriceMismatch = item.IsPriceMismatch ?? false
             });
         }
 
         dto.SubTotal = dto.Items.Sum(i => i.TotalPrice);
+        dto.TotalAmount = dto.SubTotal;
         return dto;
+    }
+
+    private static string? ExtractInvoiceNumber(string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes)) return null;
+
+        const string marker = "[InvoiceNumber]";
+        var line = notes
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Trim())
+            .FirstOrDefault(x => x.StartsWith(marker, StringComparison.OrdinalIgnoreCase));
+
+        if (line == null) return null;
+        return line.Substring(marker.Length).Trim();
     }
 }

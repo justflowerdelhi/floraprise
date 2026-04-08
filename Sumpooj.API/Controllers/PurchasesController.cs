@@ -32,6 +32,13 @@ public class PurchasesController : ControllerBase
         return purchaseOrder == null ? NotFound() : Ok(purchaseOrder);
     }
 
+    [HttpGet("{id:guid}/pdf")]
+    public async Task<IActionResult> DownloadPdf(Guid id)
+    {
+        var (content, fileName) = await _service.GeneratePdfAsync(id);
+        return File(content, "application/pdf", fileName);
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreatePurchaseOrderRequest request)
     {
@@ -40,10 +47,10 @@ public class PurchasesController : ControllerBase
     }
 
     [HttpPost("{id:guid}/submit")]
-    public async Task<IActionResult> Submit(Guid id)
+    public async Task<ActionResult<PurchaseOrderSubmitResult>> Submit(Guid id)
     {
-        await _service.SubmitAsync(id);
-        return NoContent();
+        var result = await _service.SubmitAsync(id);
+        return Ok(result);
     }
 
     [HttpPost("{id:guid}/approve")]

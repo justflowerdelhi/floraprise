@@ -1,5 +1,11 @@
 namespace Sumpooj.Application.Purchases;
 
+public class PurchaseOrderSubmitResult
+{
+    public bool Success { get; set; }
+    public string? PdfUrl { get; set; }
+}
+
 public class PurchaseOrderDto
 {
     public Guid Id { get; set; }
@@ -31,11 +37,16 @@ public class PurchaseOrderItemDto
     public string? Sku { get; set; }
     public string? Unit { get; set; }
     public int Quantity { get; set; }
+    public decimal ExpectedPrice { get; set; }
     public decimal UnitPrice { get; set; }
+    public decimal ActualPrice { get; set; }
     public decimal TotalPrice { get; set; }
+    public decimal ActualTotalPrice { get; set; }
     public int ReceivedQuantity { get; set; }
     public bool IsPerishable { get; set; }
     public int ShelfLifeDays { get; set; }
+    public bool IsQuantityMismatch { get; set; }
+    public bool IsPriceMismatch { get; set; }
     public string? BatchNumber { get; set; }
     public DateTime? ExpiryDate { get; set; }
     public string? StorageLocation { get; set; }

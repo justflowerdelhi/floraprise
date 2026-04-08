@@ -21,6 +21,7 @@ export type {
   CreatePurchaseOrderRequest,
   ReceivePurchaseOrderRequest,
   ReceiveItemRequest,
+  SubmitPurchaseOrderResponse,
 } from '../../../api/purchase.api';
 
 export {

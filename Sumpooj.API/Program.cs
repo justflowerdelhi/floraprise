@@ -21,6 +21,7 @@ using Sumpooj.Infrastructure.Persistence;
 using Sumpooj.Infrastructure.Repositories;
 using Sumpooj.Application.Marketing;
 using Sumpooj.Application.Email;
+using Sumpooj.Application.Services;
 using Sumpooj.Infrastructure.Email;
 using System.Text;
 
@@ -196,6 +197,7 @@ builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<StockReceiveService>();
 
 builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
+builder.Services.AddScoped<PurchaseOrderPdfService>();
 builder.Services.AddScoped<PurchaseOrderService>();
 
 builder.Services.AddScoped<ILocationRepository, LocationRepository>();
@@ -343,6 +345,8 @@ var app = builder.Build();
 // Otherwise preflight OPTIONS requests get redirected/blocked.
 app.UseCors("DefaultCorsPolicy");
 
+app.UseStaticFiles();
+
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
@@ -413,6 +417,33 @@ try
                 ) THEN
                     ALTER TABLE "Orders" ADD COLUMN "DeliveryPincode" text NULL;
 
+                END IF;
+            END $$;
+            """);
+
+        // Self-heal: add purchase mismatch flags if database is missing these newer columns.
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'PurchaseOrderItems'
+                      AND column_name = 'IsQuantityMismatch'
+                ) THEN
+                    ALTER TABLE "PurchaseOrderItems" ADD COLUMN "IsQuantityMismatch" boolean NULL;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'PurchaseOrderItems'
+                      AND column_name = 'IsPriceMismatch'
+                ) THEN
+                    ALTER TABLE "PurchaseOrderItems" ADD COLUMN "IsPriceMismatch" boolean NULL;
                 END IF;
             END $$;
             """);

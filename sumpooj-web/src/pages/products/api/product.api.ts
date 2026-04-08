@@ -3,11 +3,12 @@
  * Real API calls to the backend
  */
 
-import type { ProductFormData, ProductApiPayload, Supplier } from '../types/product.types';
+import type { ProductFormData, ProductApiPayload, Supplier, UnitOfMeasure } from '../types/product.types';
 import {
   createProduct as createProductApi,
   deleteProduct as deleteProductApi,
   getProductById as getProductByIdApi,
+  searchProducts as searchProductsApi,
   updateProduct as updateProductApi,
   validateSku as validateSkuApi,
 } from '../../../api/product.api';
@@ -208,6 +209,122 @@ export const fetchProductById = async (
     };
   } catch (error) {
     let errorMsg = 'Failed to fetch product details';
+    if (error && typeof error === 'object' && 'message' in error) {
+      errorMsg = (error as any).message;
+    }
+    return {
+      success: false,
+      error: errorMsg,
+      message: errorMsg,
+    };
+  }
+};
+
+const ALLOWED_UNITS = new Set<UnitOfMeasure>([
+  'each',
+  'stem',
+  'bunch',
+  'box',
+  'case',
+  'dozen',
+  'foot',
+  'yard',
+  'roll',
+  'pack',
+]);
+
+interface FetchSuggestedUnitParams {
+  categoryId?: string;
+  categoryName?: string;
+  productType?: string;
+}
+
+interface SuggestedUnitResponse {
+  unitOfMeasure?: UnitOfMeasure;
+  sourceCount: number;
+}
+
+/**
+ * Suggest unit of measure by checking existing products and taking the most frequent match.
+ */
+export const fetchSuggestedUnitOfMeasure = async (
+  params: FetchSuggestedUnitParams,
+): Promise<ApiResponse<SuggestedUnitResponse>> => {
+  try {
+    const result = await searchProductsApi({ PageSize: 500, IsActive: true });
+    const items = Array.isArray(result) ? result : (result?.items ?? []);
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return {
+        success: true,
+        data: { sourceCount: 0 },
+      };
+    }
+
+    const categoryId = params.categoryId?.toLowerCase();
+    const categoryName = params.categoryName?.toLowerCase();
+    const productType = params.productType?.toLowerCase();
+
+    const scoreAndFilter = (item: any) => {
+      const unitRaw = item?.unitOfMeasure;
+      if (typeof unitRaw !== 'string') return null;
+      const normalizedUnit = unitRaw.toLowerCase() as UnitOfMeasure;
+      if (!ALLOWED_UNITS.has(normalizedUnit)) return null;
+
+      let score = 0;
+      const itemCategoryId = String(item?.categoryId ?? '').toLowerCase();
+      const itemCategory = String(item?.category ?? '').toLowerCase();
+      const itemProductType = String(item?.productType ?? '').toLowerCase();
+
+      if (categoryId && itemCategoryId && itemCategoryId === categoryId) {
+        score += 2;
+      } else if (categoryName && itemCategory && itemCategory === categoryName) {
+        score += 2;
+      }
+
+      if (productType && itemProductType && itemProductType === productType) {
+        score += 1;
+      }
+
+      return { unit: normalizedUnit, score };
+    };
+
+    const scored = items
+      .map(scoreAndFilter)
+      .filter((x): x is { unit: UnitOfMeasure; score: number } => Boolean(x));
+
+    const matching = scored.filter((x) => x.score > 0);
+    if (matching.length === 0) {
+      return {
+        success: true,
+        data: { sourceCount: 0 },
+      };
+    }
+
+    const counts = new Map<UnitOfMeasure, { count: number; scoreSum: number }>();
+    for (const row of matching) {
+      const current = counts.get(row.unit) ?? { count: 0, scoreSum: 0 };
+      counts.set(row.unit, {
+        count: current.count + 1,
+        scoreSum: current.scoreSum + row.score,
+      });
+    }
+
+    const ranked = Array.from(counts.entries()).sort((a, b) => {
+      if (b[1].scoreSum !== a[1].scoreSum) return b[1].scoreSum - a[1].scoreSum;
+      if (b[1].count !== a[1].count) return b[1].count - a[1].count;
+      return a[0].localeCompare(b[0]);
+    });
+
+    return {
+      success: true,
+      data: {
+        unitOfMeasure: ranked[0]?.[0],
+        sourceCount: matching.length,
+      },
+    };
+  } catch (error) {
+    let errorMsg = 'Failed to auto-suggest unit';
     if (error && typeof error === 'object' && 'message' in error) {
       errorMsg = (error as any).message;
     }

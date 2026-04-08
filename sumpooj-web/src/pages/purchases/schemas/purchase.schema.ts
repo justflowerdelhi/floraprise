@@ -18,44 +18,16 @@ export const purchaseItemSchema = z.object({
   quantity: z
     .number({ message: 'Quantity is required' })
     .positive('Quantity must be greater than 0'),
-  costPerUnit: z
-    .number({ message: 'Cost is required' })
-    .positive('Cost must be greater than 0'),
+  expectedCostPerUnit: z
+    .number({ message: 'Expected cost is required' })
+    .positive('Expected cost must be greater than 0'),
   total: z.number(),
-  // Perishable fields (conditionally required via superRefine)
-  batchNumber: z.string(),
-  purchaseDate: z.string(),
+  // Product attributes for planning
   shelfLifeDays: z.number(),
-  expiryDate: z.string(),
-  storageLocation: z.string(),
   // Margin
   sellingPrice: z.number(),
   marginPercent: z.number(),
   marginAmount: z.number(),
-}).superRefine((item, ctx) => {
-  if (item.isPerishable) {
-    if (!item.batchNumber || item.batchNumber.trim() === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Batch number is required for perishable items',
-        path: ['batchNumber'],
-      });
-    }
-    if (!item.expiryDate) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Expiry date is required for perishable items',
-        path: ['expiryDate'],
-      });
-    }
-    if (!item.storageLocation) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Storage location is required for perishable items',
-        path: ['storageLocation'],
-      });
-    }
-  }
 });
 
 // ============================================
@@ -64,11 +36,6 @@ export const purchaseItemSchema = z.object({
 
 export const purchaseHeaderSchema = z.object({
   supplierId: z.string().min(1, 'Supplier is required'),
-  invoiceNumber: z
-    .string()
-    .min(1, 'Invoice number is required')
-    .max(50, 'Invoice number must be less than 50 characters'),
-  purchaseDate: z.string().min(1, 'Purchase date is required'),
   expectedDeliveryDate: z.string().min(1, 'Expected delivery date is required'),
   paymentTerms: z.string().min(1, 'Payment terms are required'),
   location: z.string().min(1, 'Location is required'),

@@ -86,14 +86,10 @@ export interface PurchaseItem {
   isPerishable: boolean;
   unit: string;
   quantity: number;
-  costPerUnit: number;
+  expectedCostPerUnit: number;
   total: number;
-  // Perishable fields
-  batchNumber: string;
-  purchaseDate: string;
+  // Product attributes for planning
   shelfLifeDays: number;
-  expiryDate: string;
-  storageLocation: string;
   // Margin tracking
   sellingPrice: number;
   marginPercent: number;
@@ -106,8 +102,6 @@ export interface PurchaseItem {
 
 export interface PurchaseHeader {
   supplierId: string;
-  invoiceNumber: string;
-  purchaseDate: string;
   expectedDeliveryDate: string;
   paymentTerms: string;
   location: string;
@@ -155,13 +149,9 @@ export const createEmptyItem = (): PurchaseItem => ({
   isPerishable: false,
   unit: 'stem',
   quantity: 0,
-  costPerUnit: 0,
+  expectedCostPerUnit: 0,
   total: 0,
-  batchNumber: '',
-  purchaseDate: new Date().toISOString().split('T')[0],
   shelfLifeDays: 0,
-  expiryDate: '',
-  storageLocation: '',
   sellingPrice: 0,
   marginPercent: 0,
   marginAmount: 0,
@@ -169,8 +159,6 @@ export const createEmptyItem = (): PurchaseItem => ({
 
 export const defaultPurchaseHeader: PurchaseHeader = {
   supplierId: '',
-  invoiceNumber: '',
-  purchaseDate: new Date().toISOString().split('T')[0],
   expectedDeliveryDate: '',
   paymentTerms: 'net_30',
   location: '',

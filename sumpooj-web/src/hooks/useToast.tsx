@@ -4,7 +4,7 @@
  * Provides a context-based toast that any component can trigger.
  * Wraps MUI Snackbar + Alert for success / error / warning / info messages.
  */
-import { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Snackbar, Alert } from '@mui/material';
 import type { AlertColor } from '@mui/material';
@@ -17,6 +17,14 @@ interface ToastMessage {
   severity: AlertColor;
   duration?: number;
 }
+
+export type GlobalToastPayload = {
+  message: string;
+  severity: AlertColor;
+  duration?: number;
+};
+
+export const GLOBAL_TOAST_EVENT = 'app:toast';
 
 interface ToastContextValue {
   success: (message: string, duration?: number) => void;
@@ -44,6 +52,20 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   const removeToast = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  useEffect(() => {
+    const handleGlobalToast = (event: Event) => {
+      const customEvent = event as CustomEvent<GlobalToastPayload>;
+      const payload = customEvent.detail;
+      if (!payload?.message || !payload?.severity) return;
+      addToast(payload.message, payload.severity, payload.duration);
+    };
+
+    window.addEventListener(GLOBAL_TOAST_EVENT, handleGlobalToast as EventListener);
+    return () => {
+      window.removeEventListener(GLOBAL_TOAST_EVENT, handleGlobalToast as EventListener);
+    };
+  }, [addToast]);
 
   const value = useMemo<ToastContextValue>(
     () => ({

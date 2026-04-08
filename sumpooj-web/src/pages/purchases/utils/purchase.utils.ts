@@ -92,7 +92,7 @@ export const calcOrderSummary = (
   taxRate: number,
   shippingCost: number
 ): OrderSummary => {
-  const validItems = items.filter((i) => i.productId && i.quantity > 0 && i.costPerUnit > 0);
+  const validItems = items.filter((i) => i.productId && i.quantity > 0 && i.expectedCostPerUnit > 0);
 
   const subtotal = validItems.reduce((sum, i) => sum + i.total, 0);
   const taxAmount = Math.round(subtotal * (taxRate / 100) * 100) / 100;
@@ -114,11 +114,6 @@ export const calcOrderSummary = (
 
   const perishableItems = validItems.filter((i) => i.isPerishable).length;
 
-  const expiryDates = validItems
-    .filter((i) => i.isPerishable && i.expiryDate)
-    .map((i) => i.expiryDate)
-    .sort();
-
   return {
     itemCount: validItems.length,
     subtotal: Math.round(subtotal * 100) / 100,
@@ -129,7 +124,7 @@ export const calcOrderSummary = (
     averageMargin,
     lowMarginItems,
     perishableItems,
-    earliestExpiry: expiryDates[0] || null,
+    earliestExpiry: null,
   };
 };
 
