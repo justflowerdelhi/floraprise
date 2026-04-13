@@ -37,6 +37,11 @@ public class StaffService
         return await _staffRepository.GetByRoleAsync(companyId, role);
     }
 
+    public async Task<List<StaffListDto>> GetAvailableDriversAsync(Guid companyId)
+    {
+        return await _staffRepository.GetAvailableDriversAsync(companyId);
+    }
+
     public async Task<CreateStaffResult> CreateAsync(Guid companyId, CreateStaffRequest request)
     {
         var role = Enum.TryParse<StaffRole>(request.Role, true, out var r) ? r : StaffRole.Staff;

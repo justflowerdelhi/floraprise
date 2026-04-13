@@ -79,17 +79,8 @@ public class StaffController : ControllerBase
     [HttpGet("available-drivers")]
     public async Task<IActionResult> GetAvailableDrivers()
     {
-        var staff = await _staffService.GetAllActiveAsync(CompanyId);
-        var drivers = staff
-            .Where(s => (s.Role == "Delivery" || s.Role == "Driver")
-                && s.DriverStatus == "Available")
-            .Select(s => new {
-                id = s.Id,
-                name = s.Name,
-                driverStatus = s.DriverStatus
-            })
-            .ToList();
-        return Ok(drivers);
+        var drivers = await _staffService.GetAvailableDriversAsync(CompanyId);
+        return Ok(drivers.Select(s => new { id = s.Id, name = s.Name, driverStatus = s.DriverStatus }));
     }
 
     [HttpPost]

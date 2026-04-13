@@ -10,6 +10,7 @@ public interface IStaffRepository
     Task<PagedResult<StaffListDto>> SearchAsync(Guid companyId, StaffSearchRequest request);
     Task<List<StaffListDto>> GetAllActiveAsync(Guid companyId);
     Task<List<StaffListDto>> GetByRoleAsync(Guid companyId, string role);
+    Task<List<StaffListDto>> GetAvailableDriversAsync(Guid companyId);
     Task AddAsync(Domain.Entities.Staff staff);
     Task UpdateAsync(Domain.Entities.Staff staff);
 }

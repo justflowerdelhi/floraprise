@@ -361,7 +361,7 @@ var failOnSeedError = builder.Configuration.GetValue("Database:FailOnSeedError",
 
 try
 {
-    // Self-heal for older databases that missed the IdentityUserId staff migration.
+    // Self-heal for older databases that missed staff migrations.
     await using (var scope = app.Services.CreateAsyncScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<SumpoojDbContext>();
@@ -377,6 +377,23 @@ try
                       AND column_name = 'IdentityUserId'
                 ) THEN
                     ALTER TABLE "Staff" ADD COLUMN "IdentityUserId" uuid NULL;
+                END IF;
+            END $$;
+            """);
+
+        // Self-heal: add DriverStatus column if missing (added after initial schema).
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'Staff'
+                      AND column_name = 'DriverStatus'
+                ) THEN
+                    ALTER TABLE "Staff" ADD COLUMN "DriverStatus" integer NOT NULL DEFAULT 0;
                 END IF;
             END $$;
             """);

@@ -30,24 +30,22 @@ export default defineConfig(({ mode }) => ({
 
           if (!id.includes('node_modules')) return
 
+          // Keep all React-ecosystem packages together in one chunk to avoid
+          // cross-chunk TDZ (Temporal Dead Zone) errors caused by circular
+          // initialization order between react, emotion, mui, and recharts.
           if (
             id.includes('node_modules/react/') ||
             id.includes('node_modules/react-dom/') ||
-            id.includes('node_modules/react-router-dom/')
+            id.includes('node_modules/react-router-dom/') ||
+            id.includes('node_modules/react-smooth/') ||
+            id.includes('node_modules/react-transition-group/') ||
+            id.includes('node_modules/recharts/') ||
+            id.includes('node_modules/recharts-scale/') ||
+            id.includes('node_modules/victory-vendor/') ||
+            id.includes('node_modules/@emotion/') ||
+            id.includes('node_modules/@mui/')
           ) {
             return 'vendor-react'
-          }
-
-          if (id.includes('node_modules/@mui/icons-material/')) {
-            return 'vendor-mui-icons'
-          }
-
-          if (id.includes('node_modules/@mui/') || id.includes('node_modules/@emotion/')) {
-            return 'vendor-mui'
-          }
-
-          if (id.includes('node_modules/recharts/')) {
-            return 'vendor-charts'
           }
 
           if (

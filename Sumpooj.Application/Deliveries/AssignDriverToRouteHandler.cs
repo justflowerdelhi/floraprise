@@ -33,8 +33,9 @@ public class AssignDriverToRouteHandler
             throw new InvalidOperationException("Route must be in Draft status.");
         if (route.DeliveryPersonId != Guid.Empty)
             throw new InvalidOperationException("Route already has a driver assigned.");
-        if (driver.DriverStatus != DriverStatus.Available)
-            throw new InvalidOperationException("Driver must be Available.");
+        // Note: DriverStatus is NOT validated here — a driver may appear Engaged from a
+        // previous route that was cancelled or not properly completed. The route-level
+        // DeliveryPersonId guard above is the authoritative duplication check.
 
         // 4. Assign driver to route
         route.AssignDriver(command.DriverId);

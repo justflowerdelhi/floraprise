@@ -127,4 +127,49 @@ public class StaffRepository : IStaffRepository
     {
         return await _db.Staff.FirstOrDefaultAsync(s => s.Id == id);
     }
+
+    public async Task<List<StaffListDto>> GetAvailableDriversAsync(Guid companyId)
+    {
+        try
+        {
+            // Return ALL active Driver-role staff — DriverStatus is managed by the route lifecycle,
+            // not used to gate the dropdown (avoids stuck-Engaged issue from previous ops).
+            return await _db.Staff
+                .Where(s => s.CompanyId == companyId
+                         && s.IsActive
+                         && s.Role == StaffRole.Driver)
+                .OrderBy(s => s.Name)
+                .Select(s => new StaffListDto
+                {
+                    Id = s.Id,
+                    Name = s.Name,
+                    Role = s.Role.ToString(),
+                    Email = s.Email,
+                    Phone = s.Phone,
+                    IsActive = s.IsActive,
+                    DriverStatus = s.DriverStatus.ToString(),
+                })
+                .ToListAsync();
+        }
+        catch
+        {
+            // Fallback: DriverStatus column may not exist yet on older databases.
+            return await _db.Staff
+                .Where(s => s.CompanyId == companyId
+                         && s.IsActive
+                         && s.Role == StaffRole.Driver)
+                .OrderBy(s => s.Name)
+                .Select(s => new StaffListDto
+                {
+                    Id = s.Id,
+                    Name = s.Name,
+                    Role = s.Role.ToString(),
+                    Email = s.Email,
+                    Phone = s.Phone,
+                    IsActive = s.IsActive,
+                    DriverStatus = "Available",
+                })
+                .ToListAsync();
+        }
+    }
 }

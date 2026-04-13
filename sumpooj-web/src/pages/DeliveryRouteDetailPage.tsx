@@ -87,7 +87,12 @@ export default function DeliveryRouteDetailPage() {
 
   useEffect(() => {
     if (route && route.status === 'Draft') {
-      fetchAvailableDrivers().then(setDrivers).catch(() => setDrivers([]));
+      fetchAvailableDrivers()
+        .then(setDrivers)
+        .catch(() => {
+          setDrivers([]);
+          toast.error('Failed to load available drivers. Please refresh.');
+        });
     }
   }, [route]);
 

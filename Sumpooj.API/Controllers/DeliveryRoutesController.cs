@@ -19,19 +19,22 @@ public class DeliveryRoutesController : ControllerBase
     private readonly StartRouteHandler _startRouteHandler;
     private readonly SumpoojDbContext _db;
     private readonly ITenantContext _tenantContext;
+    private readonly ILogger<DeliveryRoutesController> _logger;
 
     public DeliveryRoutesController(
         AssignDriverToRouteHandler assignDriverHandler,
         CompleteRouteHandler completeRouteHandler,
         StartRouteHandler startRouteHandler,
         SumpoojDbContext db,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        ILogger<DeliveryRoutesController> logger)
     {
         _assignDriverHandler = assignDriverHandler;
         _completeRouteHandler = completeRouteHandler;
         _startRouteHandler = startRouteHandler;
         _db = db;
         _tenantContext = tenantContext;
+        _logger = logger;
     }
 
     private Guid CompanyId => _tenantContext.CompanyId
@@ -193,8 +196,11 @@ public class DeliveryRoutesController : ControllerBase
     }
 
     [HttpPut("{id}/assign-driver")]
-    public async Task<IActionResult> AssignDriver(Guid id, [FromBody] AssignRouteDriverRequest request)
+    public async Task<IActionResult> AssignDriver(Guid id, [FromBody] AssignRouteDriverRequest? request)
     {
+        if (request == null)
+            return BadRequest(new { error = "Request body is required." });
+
         try
         {
             var cmd = new AssignDriverToRouteCommand(id, request.DriverId);
@@ -204,6 +210,11 @@ public class DeliveryRoutesController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error assigning driver {DriverId} to route {RouteId}", request.DriverId, id);
+            return StatusCode(500, new { error = "Failed to assign driver. Please try again." });
         }
     }
 
