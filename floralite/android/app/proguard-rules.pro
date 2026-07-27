@@ -1,0 +1,1 @@
+# Add app-specific keep rules here if a release build exposes reflection issues.
