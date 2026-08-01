@@ -28,6 +28,7 @@ import 'my_designs_screen.dart';
 import 'order_workflow_screen.dart';
 import 'orders_screen.dart';
 import 'opening_cash_screen.dart';
+import 'payment_history_screen.dart';
 import 'products_screen.dart';
 import 'bouquet_production_entry_screen.dart';
 import 'printer_settings_screen.dart';
@@ -72,6 +73,25 @@ class _MainShellScreenState extends State<MainShellScreen> {
     '/_inventory-tab',
     '/_money-tab',
   ];
+
+  static const Set<String> _readOnlyBlockedRoutes = {
+    '/walkin-sales',
+    '/inventory/voice-entry',
+    '/production',
+    '/purchase-list',
+    '/attendance/mark',
+    '/opening-cash',
+    '/expenses',
+    '/day-closing',
+  };
+
+  static const Set<String> _lockedAllowedRoutes = {
+    '/dashboard',
+    '/subscription',
+    '/payment-history',
+    '/backup-restore',
+    '/about',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -206,6 +226,19 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
   MaterialPageRoute<dynamic> _businessRoute(RouteSettings settings) {
     final routeName = settings.name;
+    final subscription = context.read<SubscriptionProvider>();
+    if (routeName != null &&
+        subscription.isLocked &&
+        !_lockedAllowedRoutes.contains(routeName)) {
+      return _materialRoute(settings, const SubscriptionScreen());
+    }
+
+    if (routeName != null &&
+        subscription.hasWriteRestrictions &&
+        _readOnlyBlockedRoutes.contains(routeName)) {
+      return _materialRoute(settings, const SubscriptionScreen());
+    }
+
     if (routeName == '/walkin-sales') {
       final args = settings.arguments as Map<String, dynamic>?;
       return _materialRoute(
@@ -232,6 +265,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
       switch (routeName) {
         '/dashboard' => const DashboardScreen(),
         '/subscription' => const SubscriptionScreen(),
+        '/payment-history' => const PaymentHistoryScreen(),
         '/backup-restore' => const BackupRestoreScreen(),
         '/shop-details' => const ShopDetailsScreen(),
         '/about' => const AboutScreen(),
@@ -573,7 +607,8 @@ class _GracePeriodBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.warning_amber_rounded, color: Colors.amber.shade800, size: 20),
+          Icon(Icons.warning_amber_rounded,
+              color: Colors.amber.shade800, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(

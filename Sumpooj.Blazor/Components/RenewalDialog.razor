@@ -1,0 +1,90 @@
+@using MudBlazor
+@using Sumpooj.Blazor.Services
+
+<MudDialog>
+    <DialogContent>
+        <div class="renewal-form">
+            <MudText Typo="Typo.body2">
+                <strong>@Subscriber?.BusinessName</strong>
+            </MudText>
+            <MudText Typo="Typo.caption" Class="mt-2">
+                Current Plan: @Subscriber?.PlanName
+            </MudText>
+            <MudText Typo="Typo.caption">
+                Expires: @Subscriber?.SubscriptionEndUtc?.ToString("dd MMM yyyy")
+            </MudText>
+
+            <MudSelect T="int" Label="Extend By (Days)" @bind-Value="_extendDays" Class="mt-4" Variant="Variant.Outlined">
+                <MudSelectItem Value="30">30 Days</MudSelectItem>
+                <MudSelectItem Value="90">90 Days (Quarterly)</MudSelectItem>
+                <MudSelectItem Value="180">180 Days (Half-Yearly)</MudSelectItem>
+                <MudSelectItem Value="365">365 Days (Annual)</MudSelectItem>
+            </MudSelect>
+
+            <MudText Typo="Typo.body2" Class="mt-4">
+                Estimated Cost: ₹@CalculateRenewalCost()
+            </MudText>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Renew" Loading="@_isProcessing" Disabled="@_isProcessing">Renew</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .renewal-form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 320px;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Inject]
+    SubscriptionApiService SubscriptionService { get; set; } = null!;
+
+    [Inject]
+    ISnackbar Snackbar { get; set; } = null!;
+
+    [Parameter]
+    public SubscriberDto? Subscriber { get; set; }
+
+    private int _extendDays = 90;
+    private bool _isProcessing;
+
+    private string CalculateRenewalCost()
+    {
+        // Placeholder calculation - in real world this would come from the backend
+        var ratePerDay = 10m; // Example rate
+        return (_extendDays * ratePerDay).ToString("F2");
+    }
+
+    private async Task Cancel() => MudDialog.Cancel();
+
+    private async Task Renew()
+    {
+        if (Subscriber == null) return;
+
+        _isProcessing = true;
+        try
+        {
+            // Call the extend license API
+            await SubscriptionService.ExtendLicenseAsync(Subscriber.MobileUserId, Subscriber.CompanyId, _extendDays);
+            Snackbar.Add($"Subscription extended by {_extendDays} days.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+}

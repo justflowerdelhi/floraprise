@@ -4,7 +4,7 @@
  * Florist POS + ERP SaaS Platform
  */
 
-import JsBarcode from 'jsbarcode';
+import 'jsbarcode/dist/JsBarcode.all.js';
 import type {
   BarcodeFormat,
   BarcodeSourceType,
@@ -18,6 +18,10 @@ import type {
 } from './BarcodeTypes';
 import { A4_GRID_LAYOUTS } from './BarcodeTypes';
 import { getCurrencySymbol } from '../../core/i18n';
+
+const JsBarcode = (window as Window & {
+  JsBarcode?: (element: SVGElement, code: string, options?: Record<string, unknown>) => void;
+}).JsBarcode;
 
 // ============================================
 // BARCODE GENERATION UTILITIES
@@ -158,6 +162,8 @@ export function renderBarcodeToSVG(
     textMargin?: number;
   }
 ): void {
+  if (!JsBarcode) return;
+
   const {
     format = 'CODE128',
     width = 2,
@@ -195,6 +201,8 @@ export function generateBarcodeSVGString(
     displayValue?: boolean;
   }
 ): string {
+  if (!JsBarcode) return '';
+
   const {
     format = 'CODE128',
     width = 2,

@@ -4,10 +4,14 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import JsBarcode from 'jsbarcode';
+import 'jsbarcode/dist/JsBarcode.all.js';
 import type { LabelData, LabelConfig, A4GridLayout, A4GridConfig } from './BarcodeTypes';
 import { A4_GRID_LAYOUTS } from './BarcodeTypes';
 import { getCurrencySymbol } from '../../core/i18n';
+
+const JsBarcode = (window as Window & {
+  JsBarcode?: (element: SVGElement, code: string, options?: Record<string, unknown>) => void;
+}).JsBarcode;
 
 interface A4GridSheetProps {
   data: LabelData;
@@ -30,6 +34,7 @@ const GridCell: React.FC<{
 
   useEffect(() => {
     if (!svgRef.current || !data.barcode) return;
+    if (!JsBarcode) return;
     try {
       JsBarcode(svgRef.current, data.barcode, {
         format:

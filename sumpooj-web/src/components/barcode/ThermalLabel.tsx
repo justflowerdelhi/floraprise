@@ -4,9 +4,13 @@
  */
 
 import { useEffect, useRef } from 'react';
-import JsBarcode from 'jsbarcode';
+import 'jsbarcode/dist/JsBarcode.all.js';
 import type { LabelData, LabelConfig } from './BarcodeTypes';
 import { getCurrencySymbol } from '../../core/i18n';
+
+const JsBarcode = (window as Window & {
+  JsBarcode?: (element: SVGElement, code: string, options?: Record<string, unknown>) => void;
+}).JsBarcode;
 
 interface ThermalLabelProps {
   data: LabelData;
@@ -21,6 +25,7 @@ const ThermalLabel: React.FC<ThermalLabelProps> = ({ data, config, scale = 1 }) 
 
   useEffect(() => {
     if (!svgRef.current || !data.barcode) return;
+    if (!JsBarcode) return;
     try {
       JsBarcode(svgRef.current, data.barcode, {
         format:

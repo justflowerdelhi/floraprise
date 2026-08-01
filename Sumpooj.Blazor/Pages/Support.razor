@@ -1,0 +1,89 @@
+@page "/support"
+@layout MainLayout
+@inject SupportApiService SupportService
+@inject NavigationManager Navigation
+
+<div class="page-shell">
+    <div class="section-header">
+        <div>
+            <div class="eyebrow">Operations</div>
+            <h1 class="page-title">Support Tickets</h1>
+            <div class="page-subtitle">Manage customer support requests and issues</div>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="toolbar-button">New ticket</MudButton>
+    </div>
+
+    <div class="support-layout">
+        <MudPaper Elevation="0" Class="table-card left-panel">
+            <MudTable Items="@_activities" Hover="true" Dense="true" Elevation="0" Class="ops-table">
+                <HeaderContent>
+                    <MudTh>Ticket</MudTh>
+                    <MudTh>Company</MudTh>
+                    <MudTh>Category</MudTh>
+                    <MudTh>Priority</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Assigned</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Ticket">#@context.DateTimeUtc.ToString("MMdd")</MudTd>
+                    <MudTd DataLabel="Company">@context.Customer</MudTd>
+                    <MudTd DataLabel="Category">Billing</MudTd>
+                    <MudTd DataLabel="Priority"><span class="status-pill high">High</span></MudTd>
+                    <MudTd DataLabel="Status"><span class="status-pill open">Open</span></MudTd>
+                    <MudTd DataLabel="Assigned">@context.SupportUser</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+
+        <MudPaper Elevation="0" Class="table-card right-panel">
+            <div class="conversation-header">Conversation</div>
+            <div class="conversation-body">
+                <div class="bubble inbound">Customer reported a sync issue during the morning run.</div>
+                <div class="bubble outbound">We are checking the latest device registration and will update shortly.</div>
+            </div>
+            <div class="reply-box">
+                <MudTextField T="string" Label="Reply" Variant="Variant.Outlined" Lines="4" />
+                <div class="reply-actions">
+                    <MudButton Variant="Variant.Text">Close ticket</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary">Reply</MudButton>
+                </div>
+            </div>
+        </MudPaper>
+    </div>
+</div>
+
+<style>
+    .page-shell { display: flex; flex-direction: column; gap: 16px; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; }
+    .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280; }
+    .page-title { margin: 4px 0 0; font-size: 24px; color: #243447; }
+    .page-subtitle { margin: 4px 0 0; font-size: 14px; color: #6b7280; }
+    .toolbar-button { text-transform: none; }
+    .support-layout { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 16px; }
+    .table-card { background: #ffffff; border: 1px solid #e6ebf1; border-radius: 12px; padding: 8px; }
+    .right-panel { padding: 16px; }
+    .conversation-header { font-size: 16px; font-weight: 700; color: #243447; margin-bottom: 12px; }
+    .conversation-body { display: flex; flex-direction: column; gap: 10px; min-height: 220px; }
+    .bubble { max-width: 80%; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+    .bubble.inbound { background: #f3f4f6; color: #374151; }
+    .bubble.outbound { background: #e8f5e9; color: #2e7d32; align-self: flex-end; }
+    .reply-box { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .reply-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .status-pill { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .status-pill.high { background: #ffebee; color: #d32f2f; }
+    .status-pill.open { background: #fff3e0; color: #ef6c00; }
+</style>
+
+@code {
+    private List<SupportActivityDto> _activities = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadActivities();
+    }
+
+    private async Task LoadActivities()
+    {
+        _activities = await SupportService.GetSupportActivityAsync();
+    }
+}

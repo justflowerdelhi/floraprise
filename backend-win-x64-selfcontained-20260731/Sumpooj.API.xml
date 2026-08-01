@@ -1,0 +1,1044 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Sumpooj.API</name>
+    </assembly>
+    <members>
+        <member name="T:Sumpooj.API.Controllers.AdminDemoRequestsController">
+            <summary>
+            Platform Super Admin endpoints for managing demo requests.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AdminDemoRequestsController.GetAll">
+            <summary>
+            List all demo requests. Platform Super Admin only.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AdminDemoRequestsController.GetById(System.Guid)">
+            <summary>
+            Get a single demo request by ID.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AdminDemoRequestsController.UpdateStatus(System.Guid,Sumpooj.API.Controllers.UpdateDemoRequestStatusRequest)">
+            <summary>
+            Update the status of a demo request (e.g. NewLead → Contacted → Qualified → Converted).
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AdminDemoRequestsController.Onboard(System.Guid)">
+            <summary>
+            Onboard a demo request as a new company.
+            Creates the company, a CompanyAdmin user, and marks the demo request as Converted.
+            Returns the login credentials for sharing with the client.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AdminDemoRequestsController.GenerateTempPassword">
+            <summary>Generates a readable temporary password like "Flora@7x3K".</summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AIController.GenerateGiftCardBackground(Sumpooj.Application.AI.GiftCardBackgroundRequest)">
+            <summary>
+            Generate an AI gift card background image (DALL-E 3).
+            Subject to daily per-user and monthly per-company limits.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AIController.GetGiftCardUsage">
+            <summary>
+            Get current AI usage quota for the authenticated user/company.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AIController.AnalyzeBouquet(Microsoft.AspNetCore.Http.IFormFile)">
+            <summary>
+            Analyze a bouquet photo using GPT-4o-mini vision.
+            Returns detected flowers, stem counts, style, shape, and height.
+            Replaces the separate Python AI service.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AIController.SaveBouquetRecipe(Sumpooj.Application.AI.SaveBouquetRecipeRequest)">
+            <summary>
+            Save a bouquet recipe from AI scan results.
+            Persists to the FloralRecipes table (same as production recipes).
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AIController.GetBouquetRecipes">
+            <summary>
+            Get bouquet recipes saved from AI scans.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AnalyticsController.GetProfitDashboard(Sumpooj.Application.Analytics.ProfitDashboardRequest)">
+            <summary>
+            Get profit dashboard data
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AnalyticsController.GetProfitSummary(System.Nullable{System.DateTime},System.Nullable{System.DateTime})">
+            <summary>
+            Get profit summary for a date range
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AnalyticsController.GetProfitByChannel(System.Nullable{System.DateTime},System.Nullable{System.DateTime})">
+            <summary>
+            Get channel-wise profit breakdown
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AnalyticsController.GetProductProfit(System.Nullable{System.DateTime},System.Nullable{System.DateTime})">
+            <summary>
+            Get product profit analysis
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AnalyticsController.GetPlatformCommission(System.Nullable{System.DateTime},System.Nullable{System.DateTime})">
+            <summary>
+            Get platform commission analysis
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AuditLogsController.Search(Sumpooj.Application.Audit.AuditLogSearchRequest)">
+            <summary>
+            Search audit logs with filters
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AuditLogsController.GetRecent(System.Int32)">
+            <summary>
+            Get recent audit logs
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AuditLogsController.GetById(System.Guid)">
+            <summary>
+            Get audit log by ID
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AuditLogsController.GetByEntity(System.String,System.Guid)">
+            <summary>
+            Get audit history for a specific entity
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AuditLogsController.GetByUser(System.Guid,System.Int32)">
+            <summary>
+            Get audit history for a specific user
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AuditLogsController.GetSummary(System.Nullable{System.DateTime})">
+            <summary>
+            Get daily summary of audit logs
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.AuditLogsController.GetUserActivity(System.Nullable{System.DateTime},System.Nullable{System.DateTime})">
+            <summary>
+            Get user activity report
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.BarcodesController.Generate(Sumpooj.Application.Barcodes.GenerateBarcodeRequest)">
+            <summary>
+            POST /api/barcodes/generate
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.BarcodesController.Validate(Sumpooj.Application.Barcodes.ValidateBarcodeRequest)">
+            <summary>
+            POST /api/barcodes/validate
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.BarcodesController.Search(Sumpooj.Application.Barcodes.SearchBarcodeRequest)">
+            <summary>
+            POST /api/barcodes/search
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.CompaniesController.SeedDemoData(System.Guid)">
+            <summary>
+            Populate ~5 demo records per major table for a company.
+            Platform Super Admin only. Skips tables that already have data.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.CompaniesController.PurgeDemoData(System.Guid)">
+            <summary>
+            Remove ALL company data from every major table (for going live).
+            The Company record itself is preserved — only its data is wiped.
+            Platform Super Admin only.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.CompaniesController.GetAdminCredentials(System.Guid)">
+            <summary>
+            Get login credentials for a company's admin user.
+            Resets the password to a new temporary value each time.
+            Platform Super Admin only.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.CustomersController.GetByPhone(System.String)">
+            <summary>
+            Lookup a customer by phone number.
+            Used by phone-order screen for quick customer identification.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DashboardPreferenceController.Get">
+            <summary>
+            GET /api/dashboard-preference
+            Returns the current user's module visibility/order, or defaults if none saved.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DashboardPreferenceController.Save(Sumpooj.Application.Dashboard.SaveDashboardPreferenceRequest)">
+            <summary>
+            POST /api/dashboard-preference
+            Creates or updates the current user's module visibility/order.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveriesController.GetDeliveries(System.Nullable{System.DateTime},System.String,System.String)">
+            <summary>
+            Get deliveries for a specific date (defaults to today).
+            Supports optional status and routeId filters for the delivery-routes page.
+            Pass routeId=null to get unassigned deliveries.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveriesController.MarkOutForDelivery(System.Guid)">
+            <summary>
+            Mark a delivery as out for delivery
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveriesController.MarkDelivered(System.Guid)">
+            <summary>
+            Mark a delivery as delivered
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveriesController.AssignDeliveryPerson(System.Guid,Sumpooj.API.Controllers.AssignDriverRequest)">
+            <summary>
+            Assign a delivery person to a delivery
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryControlCenterController.GetDashboard(System.Nullable{System.DateTime})">
+            <summary>
+            Get delivery control center dashboard data
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryControlCenterController.GetOnlineDrivers(System.Nullable{System.DateTime})">
+            <summary>
+            Get drivers currently online (with recent location updates)
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryControlCenterController.GetWaitingOrders(System.Nullable{System.DateTime})">
+            <summary>
+            Get orders waiting for assignment
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryControlCenterController.GetInProgressDeliveries(System.Nullable{System.DateTime})">
+            <summary>
+            Get deliveries in progress
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryControlCenterController.GetDelayedDeliveries(System.Nullable{System.DateTime})">
+            <summary>
+            Get delayed deliveries
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryControlCenterController.GetDriverLocations">
+            <summary>
+            Get live driver locations
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryControlCenterController.GetCompletedDeliveries(System.Nullable{System.DateTime})">
+            <summary>
+            Get completed deliveries today
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryJourneyController.AcceptDelivery(Sumpooj.Application.DeliveryTracking.DTOs.StartDeliveryRequest)">
+            <summary>
+            Driver accepts delivery assignment
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryJourneyController.StartJourney(Sumpooj.Application.DeliveryTracking.DTOs.StartDeliveryRequest)">
+            <summary>
+            Start delivery journey (GPS tracking begins)
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryJourneyController.MarkEnRoute(Sumpooj.Application.DeliveryTracking.DTOs.StartDeliveryRequest)">
+            <summary>
+            Mark as out for delivery (en route)
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryJourneyController.MarkArrived(Sumpooj.Application.DeliveryTracking.DTOs.StartDeliveryRequest)">
+            <summary>
+            Mark as arrived nearby (within geofence)
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryJourneyController.CompleteDelivery(Sumpooj.Application.DeliveryTracking.DTOs.CompleteDeliveryRequest)">
+            <summary>
+            Complete delivery with proof
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryJourneyController.MarkFailed(Sumpooj.Application.DeliveryTracking.DTOs.StartDeliveryRequest)">
+            <summary>
+            Mark delivery as failed
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryRoutesController.GetRoutes(System.Nullable{System.DateTime},System.String)">
+            <summary>
+            List delivery routes for a given date.
+            Frontend: GET /api/delivery-routes?date=2025-01-15
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryRoutesController.CreateRoute(Sumpooj.API.Controllers.CreateRouteRequest)">
+            <summary>
+            Create a new delivery route and assign selected deliveries to it.
+            Frontend: POST /api/delivery-routes { routeDate, deliveryIds }
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryTrackingController.RecordLocation(Sumpooj.API.Controllers.RecordLocationRequest)">
+            <summary>
+            Record GPS location update for a delivery
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryTrackingController.RecordHeartbeat(Sumpooj.API.Controllers.HeartbeatRequest)">
+            <summary>
+            Record heartbeat for a delivery (used to keep connection alive)
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryTrackingController.UploadProof(Sumpooj.API.Controllers.UploadProofRequest)">
+            <summary>
+            Upload delivery proof (photo, recipient name, note)
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryTrackingController.GetTrackingByOrder(System.Guid)">
+            <summary>
+            Get tracking information for a specific order
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryTrackingController.GetTrackingByDelivery(System.Guid)">
+            <summary>
+            Get tracking information for a specific delivery by delivery ID
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryTrackingController.GetTrackingByDriver(System.Guid)">
+            <summary>
+            Get tracking information for a specific driver
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryTrackingController.GetTrackingHistory(System.Guid)">
+            <summary>
+            Get tracking history for a specific delivery
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryTrackingController.GetActiveDeliveries">
+            <summary>
+            Get active deliveries for the company
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryTrackingController.GetDeliveriesByStatus(System.String)">
+            <summary>
+            Get deliveries by status
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryZonesController.GetAll(System.Boolean)">
+            <summary>
+            Get all delivery zones
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryZonesController.GetById(System.Guid)">
+            <summary>
+            Get delivery zone by ID
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryZonesController.Create(Sumpooj.Application.DeliveryZones.CreateDeliveryZoneRequest)">
+            <summary>
+            Create a new delivery zone
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryZonesController.Update(System.Guid,Sumpooj.Application.DeliveryZones.UpdateDeliveryZoneRequest)">
+            <summary>
+            Update a delivery zone
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryZonesController.Delete(System.Guid)">
+            <summary>
+            Delete a delivery zone
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryZonesController.Activate(System.Guid)">
+            <summary>
+            Activate a delivery zone
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryZonesController.Deactivate(System.Guid)">
+            <summary>
+            Deactivate a delivery zone
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DeliveryZonesController.CalculateFee(Sumpooj.Application.DeliveryZones.CalculateDeliveryFeeRequest)">
+            <summary>
+            Calculate delivery fee for a location
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DriverLocationController.UploadLocation(Sumpooj.Application.DeliveryTracking.DTOs.UploadLocationRequest)">
+            <summary>
+            Upload driver GPS location
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DriverLocationController.UploadLocationsBatch(System.Collections.Generic.List{Sumpooj.Application.DeliveryTracking.DTOs.UploadLocationRequest})">
+            <summary>
+            Upload multiple GPS locations (batch for offline sync)
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DriverLocationController.GetLiveTracking(System.Guid)">
+            <summary>
+            Get latest location for a delivery
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.DriverLocationController.GetDriverLocation(System.Guid)">
+            <summary>
+            Get latest location for a driver
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.InventoryController.GetProducts">
+            <summary>
+            Returns all active products as inventory items for production/custom bouquet builder.
+            Frontend calls GET /api/inventory/products.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileAuthController.Login(Sumpooj.Application.Mobile.MobileApiLoginRequest,System.Threading.CancellationToken)">
+            <summary>
+            Authenticates a mobile user and returns access tokens plus bootstrap payload.
+            </summary>
+            <remarks>
+            Request example:
+            { "companyId": "00000000-0000-0000-0000-000000000001", "identifier": "+919876543210", "password": "StrongPassword@123", "deviceId": "android-emulator-001", "platform": "android", "appVersion": "2.7.0" }
+            Response example:
+            { "accessToken": "jwt", "refreshToken": "token", "expiresAtUtc": "2026-07-28T10:30:00Z" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileAuthController.Refresh(Sumpooj.Application.Mobile.MobileApiRefreshRequest,System.Threading.CancellationToken)">
+            <summary>
+            Refreshes a mobile access token using a valid refresh token.
+            </summary>
+            <remarks>
+            Request example:
+            { "refreshToken": "refresh_token_value" }
+            Response example:
+            { "accessToken": "jwt", "refreshToken": "token", "expiresAtUtc": "2026-07-28T10:30:00Z" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileAuthController.Logout(Sumpooj.Application.Mobile.MobileApiLogoutRequest,System.Threading.CancellationToken)">
+            <summary>
+            Revokes the active mobile session refresh token.
+            </summary>
+            <remarks>
+            Requires JWT Bearer auth with CompanyOnly policy.
+            Request example:
+            { "refreshToken": "refresh_token_value" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileAuthController.RegisterDevice(Sumpooj.Application.Mobile.MobileDeviceRegisterRequest,System.Threading.CancellationToken)">
+            <summary>
+            Registers or updates the authenticated mobile device metadata.
+            </summary>
+            <remarks>
+            Requires JWT Bearer auth with CompanyOnly policy.
+            Request example:
+            { "deviceId": "android-emulator-001", "platform": "android", "appVersion": "2.7.0" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileAuthController.Heartbeat(Sumpooj.Application.Mobile.MobileDeviceHeartbeatRequest,System.Threading.CancellationToken)">
+            <summary>
+            Sends a heartbeat to keep the session active and validate license state.
+            </summary>
+            <remarks>
+            Requires JWT Bearer auth with CompanyOnly policy.
+            Request example:
+            { "deviceId": "android-emulator-001", "appVersion": "2.7.0", "lastSyncUtc": "2026-07-28T09:00:00Z" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileAuthController.RequestOtp(Sumpooj.Application.Mobile.MobileOtpRequest,System.Threading.CancellationToken)">
+            <summary>
+            Requests OTP for mobile login fallback authentication.
+            </summary>
+            <remarks>
+            Request example:
+            { "mobileOrEmail": "+919876543210" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileAuthController.VerifyOtp(Sumpooj.Application.Mobile.MobileOtpVerifyRequest,System.Threading.CancellationToken)">
+            <summary>
+            Verifies OTP and confirms whether login can proceed.
+            </summary>
+            <remarks>
+            Request example:
+            { "mobileOrEmail": "+919876543210", "otp": "123456" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileBootstrapController.Get(System.Threading.CancellationToken)">
+            <summary>
+            Returns bootstrap data required for mobile app startup.
+            </summary>
+            <remarks>
+            Requires JWT Bearer auth with CompanyOnly policy.
+            Response example includes company, user, plan, license, and feature flags.
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileDeviceController.Register(Sumpooj.Application.Mobile.MobileDeviceRegisterRequest,System.Threading.CancellationToken)">
+            <summary>
+            Registers or updates a mobile device for the authenticated user.
+            </summary>
+            <remarks>
+            Request example:
+            { "deviceId": "android-emulator-001", "platform": "android", "appVersion": "2.7.0" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileDeviceController.Current(System.Threading.CancellationToken)">
+            <summary>
+            Gets details of the current authenticated device.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileDeviceController.List(System.Threading.CancellationToken)">
+            <summary>
+            Lists all devices associated with the authenticated user.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileDeviceController.Heartbeat(Sumpooj.Application.Mobile.MobileDeviceHeartbeatRequest,System.Threading.CancellationToken)">
+            <summary>
+            Sends periodic heartbeat for the current device.
+            </summary>
+            <remarks>
+            Request example:
+            { "deviceId": "android-emulator-001", "appVersion": "2.7.0", "lastSyncUtc": "2026-07-28T09:00:00Z" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileDeviceController.LastSync(Sumpooj.Application.Mobile.MobileDeviceLastSyncRequest,System.Threading.CancellationToken)">
+            <summary>
+            Updates the device last synchronization timestamp.
+            </summary>
+            <remarks>
+            Request example:
+            { "lastSyncUtc": "2026-07-28T09:05:00Z", "ipAddress": "10.0.2.15" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileDeviceController.PushToken(Sumpooj.Application.Mobile.MobileDevicePushTokenRequest,System.Threading.CancellationToken)">
+            <summary>
+            Updates the push notification token for the current device.
+            </summary>
+            <remarks>
+            Request example:
+            { "pushToken": "fcm-token-value", "appVersion": "2.7.0" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileLicenseController.Validate(Sumpooj.Application.Mobile.MobileLicenseValidateRequest,System.Threading.CancellationToken)">
+            <summary>
+            Validates device license access for the authenticated user.
+            </summary>
+            <remarks>
+            Request example:
+            { "deviceId": "android-emulator-001", "appVersion": "2.7.0", "lastSyncUtc": "2026-07-28T09:00:00Z" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileLicenseController.Status(System.Threading.CancellationToken)">
+            <summary>
+            Gets current online license status.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileLicenseController.OfflineStatus(System.Threading.CancellationToken)">
+            <summary>
+            Gets offline validation status and remaining offline allowance.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileLicenseController.AuthorizeDevice(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Checks whether the requested device is authorized for current subscription.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobilePaymentController.CreateSubscriptionOrder(Sumpooj.Application.Mobile.CreateSubscriptionOrderRequest,System.Threading.CancellationToken)">
+            <summary>
+            Creates a subscription payment order with the selected gateway.
+            </summary>
+            <remarks>
+            Request example:
+            { "gateway": 1, "subscriptionId": "00000000-0000-0000-0000-000000000011", "amount": 999.00, "currency": "INR", "planCode": "PRO", "billingCycle": "monthly" }
+            </remarks>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobilePaymentController.Callback(Sumpooj.Application.Mobile.PaymentCallbackRequest,System.Threading.CancellationToken)">
+            <summary>
+            Processes payment callback sent by the mobile payment gateway.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobilePaymentController.Verify(Sumpooj.Application.Mobile.PaymentVerificationRequest,System.Threading.CancellationToken)">
+            <summary>
+            Verifies payment integrity and updates transaction status.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobilePaymentController.History(System.Threading.CancellationToken)">
+            <summary>
+            Returns payment history for the authenticated mobile user.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileSubscriptionController.Current(System.Threading.CancellationToken)">
+            <summary>
+            Gets current subscription state for the authenticated mobile user.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileSubscriptionController.Plans(System.Threading.CancellationToken)">
+            <summary>
+            Lists plans available for upgrade or downgrade.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileSubscriptionController.Upgrade(Sumpooj.Application.Mobile.MobilePlanChangeRequest,System.Threading.CancellationToken)">
+            <summary>
+            Upgrades subscription plan and returns updated subscription state.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileSubscriptionController.Downgrade(Sumpooj.Application.Mobile.MobilePlanChangeRequest,System.Threading.CancellationToken)">
+            <summary>
+            Downgrades subscription plan and returns updated subscription state.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileSubscriptionController.Cancel(System.Threading.CancellationToken)">
+            <summary>
+            Cancels auto-renewal and marks subscription for cancellation flow.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileSubscriptionController.Renew(Sumpooj.Application.Mobile.MobileRenewRequest,System.Threading.CancellationToken)">
+            <summary>
+            Renews subscription for the selected billing cycle.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileSubscriptionController.TrialStatus(System.Threading.CancellationToken)">
+            <summary>
+            Returns trial status and remaining trial days.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.Mobile.MobileSubscriptionController.GraceStatus(System.Threading.CancellationToken)">
+            <summary>
+            Returns grace period status and remaining grace days.
+            </summary>
+        </member>
+        <member name="T:Sumpooj.API.Controllers.PaymentGatewayConfigController">
+            <summary>
+            Manage payment gateway configurations for the tenant
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentGatewayConfigController.GetAvailableGateways">
+            <summary>
+            Get all available payment gateway types with their info
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentGatewayConfigController.GetAll">
+            <summary>
+            Get all configured payment gateways for the company
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentGatewayConfigController.GetById(System.Guid)">
+            <summary>
+            Get a specific payment gateway configuration
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentGatewayConfigController.GetDefault">
+            <summary>
+            Get the default payment gateway for the company
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentGatewayConfigController.Create(Sumpooj.Application.Payments.PaymentGatewayConfigCreateDto)">
+            <summary>
+            Create a new payment gateway configuration
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentGatewayConfigController.Update(System.Guid,Sumpooj.Application.Payments.PaymentGatewayConfigUpdateDto)">
+            <summary>
+            Update a payment gateway configuration
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentGatewayConfigController.Delete(System.Guid)">
+            <summary>
+            Delete a payment gateway configuration
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentGatewayConfigController.TestConnection(System.Guid)">
+            <summary>
+            Test payment gateway connection
+            </summary>
+        </member>
+        <member name="T:Sumpooj.API.Controllers.PaymentWebhooksController">
+            <summary>
+            Webhook endpoints for payment gateway callbacks
+            These endpoints are called directly by payment gateways and don't require authentication
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentWebhooksController.RazorpayWebhook(System.Guid)">
+            <summary>
+            Razorpay webhook handler
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentWebhooksController.StripeWebhook(System.Guid)">
+            <summary>
+            Stripe webhook handler
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentWebhooksController.PayPalWebhook(System.Guid)">
+            <summary>
+            PayPal webhook handler
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentWebhooksController.SquareWebhook(System.Guid)">
+            <summary>
+            Square webhook handler
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentWebhooksController.PayUWebhook(System.Guid)">
+            <summary>
+            PayU webhook handler
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentWebhooksController.CashfreeWebhook(System.Guid)">
+            <summary>
+            Cashfree webhook handler
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentWebhooksController.PayTabsWebhook(System.Guid)">
+            <summary>
+            PayTabs webhook handler
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentWebhooksController.HyperPayWebhook(System.Guid)">
+            <summary>
+            HyperPay webhook handler
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentWebhooksController.TapWebhook(System.Guid)">
+            <summary>
+            Tap Payments webhook handler
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PaymentWebhooksController.CheckoutWebhook(System.Guid)">
+            <summary>
+            Checkout.com webhook handler
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProductionJobsController.Get(System.String)">
+            <summary>
+            GET /api/production-jobs?status=Pending
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProductionJobsController.GetById(System.Guid)">
+            <summary>
+            GET /api/production-jobs/{id}
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProductionJobsController.Create(Sumpooj.Application.Production.CreateProductionJobRequest)">
+            <summary>
+            POST /api/production-jobs
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProductionJobsController.Start(System.Guid)">
+            <summary>
+            POST /api/production-jobs/{id}/start
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProductionJobsController.Complete(System.Guid)">
+            <summary>
+            POST /api/production-jobs/{id}/complete
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProductionMaterialUsageController.Add(Sumpooj.Application.Production.AddMaterialUsageRequest)">
+            <summary>
+            POST /api/production-material-usage
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProposalsController.Search(Sumpooj.Application.Proposals.ProposalSearchRequest)">
+            <summary>
+            Search proposals
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProposalsController.GetById(System.Guid)">
+            <summary>
+            Get proposal by ID
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProposalsController.GetByEvent(System.Guid)">
+            <summary>
+            Get proposals for an event
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProposalsController.Create(Sumpooj.Application.Proposals.CreateProposalRequest)">
+            <summary>
+            Create a new proposal
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProposalsController.Update(System.Guid,Sumpooj.Application.Proposals.UpdateProposalRequest)">
+            <summary>
+            Update a proposal
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProposalsController.Send(System.Guid)">
+            <summary>
+            Send proposal to client
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProposalsController.MarkViewed(System.Guid,System.Guid)">
+            <summary>
+            Mark proposal as viewed (called when client opens)
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProposalsController.Accept(System.Guid,Sumpooj.API.Controllers.AcceptProposalRequest)">
+            <summary>
+            Accept proposal (client action)
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProposalsController.Decline(System.Guid,Sumpooj.API.Controllers.DeclineProposalRequest)">
+            <summary>
+            Decline proposal (client action)
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProposalsController.RequestRevision(System.Guid,Sumpooj.API.Controllers.RevisionRequest)">
+            <summary>
+            Request revision (client action)
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ProposalsController.CreateRevision(System.Guid)">
+            <summary>
+            Create a new revision of a proposal
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PublicDeliveryTrackingController.GetPublicTracking(System.String)">
+            <summary>
+            Get public delivery tracking by secure token
+            No authentication required
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.PublicDeliveryTrackingController.GenerateTrackingToken(Sumpooj.API.Controllers.GenerateTokenRequest)">
+            <summary>
+            Generate tracking token for a delivery (internal use)
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ShiftController.GetActive(System.Guid)">
+            <summary>
+            Get the currently-open shift for a location.
+            Returns 204 if no active shift.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ShiftController.GetById(System.Guid)">
+            <summary>
+            Get a specific shift by ID.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ShiftController.GetHistory(System.Guid,System.Int32)">
+            <summary>
+            Get shift history for a location.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ShiftController.Open(Sumpooj.Application.Shifts.OpenShiftRequest)">
+            <summary>
+            Open a new shift at a location.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.ShiftController.Close(System.Guid,Sumpooj.Application.Shifts.CloseShiftRequest)">
+            <summary>
+            Close an active shift (Manager or Admin only).
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.TaxRulesController.Get(System.String,System.Boolean)">
+            <summary>
+            GET /api/taxrules?country=XX
+            Returns tax rules filtered by country code, or all if country is omitted.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.TaxRulesController.GetById(System.Guid)">
+            <summary>
+            GET /api/taxrules/{id}
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.TaxRulesController.Create(Sumpooj.Application.TaxRules.CreateTaxRuleRequest)">
+            <summary>
+            POST /api/taxrules
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.TaxRulesController.Update(System.Guid,Sumpooj.Application.TaxRules.UpdateTaxRuleRequest)">
+            <summary>
+            PUT /api/taxrules/{id}
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.TaxRulesController.Deactivate(System.Guid)">
+            <summary>
+            DELETE /api/taxrules/{id} — Soft-delete (deactivate).
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.TaxRulesController.Activate(System.Guid)">
+            <summary>
+            POST /api/taxrules/{id}/activate — Re-activate a deactivated rule.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.Search(Sumpooj.Application.WireOrders.WireOrderSearchRequest)">
+            <summary>
+            Search wire orders
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.GetById(System.Guid)">
+            <summary>
+            Get wire order by ID
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.GetTodaysOrders">
+            <summary>
+            Get today's wire orders
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.GetPendingOrders">
+            <summary>
+            Get pending wire orders
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.GetSummary(System.Nullable{System.DateTime},System.Nullable{System.DateTime})">
+            <summary>
+            Get wire order summary for date range
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.Create(Sumpooj.Application.WireOrders.CreateWireOrderRequest)">
+            <summary>
+            Create a new wire order
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.Accept(System.Guid)">
+            <summary>
+            Accept a wire order
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.StartProcessing(System.Guid)">
+            <summary>
+            Start processing a wire order
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.Assign(System.Guid,Sumpooj.API.Controllers.AssignRequest)">
+            <summary>
+            Assign a wire order to a user
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.SetFulfillmentCost(System.Guid,Sumpooj.API.Controllers.FulfillmentCostRequest)">
+            <summary>
+            Set fulfillment cost for a wire order
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.SetSubstitutionNotes(System.Guid,Sumpooj.API.Controllers.SubstitutionNotesRequest)">
+            <summary>
+            Set substitution notes for a wire order
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.LinkToOrder(System.Guid,Sumpooj.API.Controllers.LinkOrderRequest)">
+            <summary>
+            Link wire order to an internal order
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.MarkFulfilled(System.Guid,Sumpooj.API.Controllers.FulfillRequest)">
+            <summary>
+            Mark wire order as fulfilled
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.Reject(System.Guid,Sumpooj.API.Controllers.RejectRequest)">
+            <summary>
+            Reject a wire order
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Controllers.WireOrdersController.Cancel(System.Guid,Sumpooj.API.Controllers.CancelRequest)">
+            <summary>
+            Cancel a wire order
+            </summary>
+        </member>
+        <member name="T:Sumpooj.API.Infrastructure.AuditActionFilter">
+            <summary>
+            Automatically logs audit entries for every mutating API action (POST, PUT, PATCH, DELETE).
+            Read-only actions (GET, HEAD, OPTIONS) are skipped.
+            </summary>
+        </member>
+        <member name="M:Sumpooj.API.Infrastructure.AuditActionFilter.DeriveAuditInfo(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext,Microsoft.AspNetCore.Mvc.Filters.ActionExecutedContext,System.String)">
+            <summary>
+            Derives the audit action, entity type, and optional entity ID from the route/result.
+            </summary>
+        </member>
+        <member name="T:Sumpooj.API.Infrastructure.WebsiteApiKeyAttribute">
+            <summary>
+            Validates the "X-Website-Key" header against a configured secret.
+            Use on public endpoints that bypass JWT authentication.
+            </summary>
+        </member>
+        <member name="M:AuthController.Refresh(RefreshRequest)">
+            <summary>
+            Exchange a valid refresh token for a new access token + refresh token pair.
+            The old refresh token is revoked (rotation).
+            </summary>
+        </member>
+        <member name="M:AuthController.Revoke(RefreshRequest)">
+            <summary>
+            Revoke a refresh token (used on logout).
+            </summary>
+        </member>
+        <member name="M:AuthController.GetMe">
+            <summary>
+            Get current user info from token. Used for session refresh/validation.
+            </summary>
+        </member>
+        <member name="M:AuthController.RevokeTokenFamilyAsync(System.Guid)">
+            <summary>
+            Revoke all active refresh tokens for a user (token reuse detection).
+            </summary>
+        </member>
+        <member name="M:AuthController.VerifyPassword(VerifyPasswordRequest)">
+            <summary>
+            Verify the current user's password. Used for sensitive actions (e.g. currency change).
+            </summary>
+        </member>
+        <member name="M:AuthController.ChangePassword(ChangePasswordRequest)">
+            <summary>
+            Change the current user's own password. Requires current password.
+            Available to any authenticated user.
+            </summary>
+        </member>
+        <member name="M:AuthController.AdminResetPassword(AdminResetPasswordRequest)">
+            <summary>
+            Reset another user's password (admin action).
+            - PlatformSuperAdmin / PlatformSupport: can reset any user
+            - CompanyAdmin: can only reset users within their company
+            </summary>
+        </member>
+        <member name="M:AuthController.GetManageableUsers">
+            <summary>
+            List users that the current admin can manage passwords for.
+            - PlatformSuperAdmin / PlatformSupport: all users
+            - CompanyAdmin: users in their company only
+            </summary>
+        </member>
+        <member name="T:Program">
+            <summary>
+            Auto-generated public partial Program class for top-level statement apps.
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Type)">
+            <summary>
+            Generates a documentation comment ID for a type.
+            Example: T:Namespace.Outer+Inner`1 becomes T:Namespace.Outer.Inner`1
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Reflection.PropertyInfo)">
+            <summary>
+            Generates a documentation comment ID for a property.
+            Example: P:Namespace.ContainingType.PropertyName or for an indexer P:Namespace.ContainingType.Item(System.Int32)
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Type,System.String)">
+            <summary>
+            Generates a documentation comment ID for a property given its container type and property name.
+            Example: P:Namespace.ContainingType.PropertyName
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Reflection.MethodInfo)">
+            <summary>
+            Generates a documentation comment ID for a method (or constructor).
+            For example:
+              M:Namespace.ContainingType.MethodName(ParamType1,ParamType2)~ReturnType
+              M:Namespace.ContainingType.#ctor(ParamType)
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.GetTypeDocId(System.Type,System.Boolean,System.Boolean)">
+            <summary>
+            Generates a documentation ID string for a type.
+            This method handles nested types (replacing '+' with '.'),
+            generic types, arrays, pointers, by-ref types, and generic parameters.
+            The <paramref name="includeGenericArguments"/> flag controls whether
+            constructed generic type arguments are emitted, while <paramref name="omitGenericArity"/>
+            controls whether the generic arity marker (e.g. "`1") is appended.
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.NormalizeDocId(System.String)">
+            <summary>
+            Normalizes a documentation comment ID to match the compiler-style format.
+            Strips the return type suffix for ordinary methods but retains it for conversion operators.
+            </summary>
+            <param name="docId">The documentation comment ID to normalize.</param>
+            <returns>The normalized documentation comment ID.</returns>
+        </member>
+    </members>
+</doc>

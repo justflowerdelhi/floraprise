@@ -114,7 +114,7 @@ class SubscriptionPlans {
     id: 'quarterly',
     name: 'Quarterly Plan',
     durationDays: 90,
-    pricePaise: 499900,
+    pricePaise: 299900,
     productId: 'floraprise_quarterly',
     description: '90 Days',
   );
@@ -124,7 +124,7 @@ class SubscriptionPlans {
     id: 'half_yearly',
     name: 'Half Yearly Plan',
     durationDays: 180,
-    pricePaise: 899900,
+    pricePaise: 549900,
     productId: 'floraprise_half_yearly',
     description: '180 Days',
   );
@@ -134,7 +134,7 @@ class SubscriptionPlans {
     id: 'annual',
     name: 'Annual Plan',
     durationDays: 365,
-    pricePaise: 1499900,
+    pricePaise: 999900,
     productId: 'floraprise_annual',
     description: '365 Days',
     badge: '⭐ MOST POPULAR',
@@ -243,7 +243,7 @@ class SubscriptionAccess {
 
   bool get isLocked => state == SubscriptionState.locked;
   bool get isGrace => state == SubscriptionState.gracePeriod;
-  bool get blocksBusinessAccess => isLocked || requiresInternet;
+  bool get blocksBusinessAccess => isLocked;
 
   int daysRemaining(DateTime now) {
     final end = state == SubscriptionState.gracePeriod

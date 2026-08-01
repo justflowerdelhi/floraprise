@@ -5,6 +5,8 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import 'api_base_url.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class MobileAuthServiceException implements Exception {
@@ -24,12 +26,28 @@ class MobileAuthService {
     String? baseUrl,
   })  : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
         _httpClient = httpClient ?? HttpClient(),
-        _baseUrl =
-            (baseUrl ?? _defaultBaseUrl).replaceFirst(RegExp(r'/+$'), '');
+        _baseUrl = _computeBaseUrl(baseUrl);
+
+  static String _computeBaseUrl(String? baseUrl) {
+    final configured = (baseUrl ?? _defaultBaseUrl).replaceFirst(
+      RegExp(r'/+$'),
+      '',
+    );
+    if (configured.isNotEmpty) return configured;
+    return resolveFlorapriseApiBaseUrl(
+      explicitValue: '',
+      isDebug: kDebugMode,
+      platform: defaultTargetPlatform,
+    );
+  }
 
   static const _defaultBaseUrl = String.fromEnvironment(
     'FLORAPRISE_API_URL',
-    defaultValue: 'http://localhost:5148',
+    defaultValue: '',
+  );
+  static const _defaultCompanyId = String.fromEnvironment(
+    'FLORAPRISE_COMPANY_ID',
+    defaultValue: '',
   );
 
   static const _accessTokenKey = 'mobile_auth_access_token';
@@ -46,7 +64,9 @@ class MobileAuthService {
 
   final FlutterSecureStorage _secureStorage;
   final HttpClient _httpClient;
-  final String _baseUrl;
+  late final String _baseUrl;
+
+  String get baseUrl => _baseUrl;
 
   Future<bool> hasRememberedSession() async {
     final remember = await _secureStorage.read(key: _rememberLoginKey);
@@ -69,12 +89,19 @@ class MobileAuthService {
     final response = await _postJson('/api/v1/mobile/auth/register', {
       'companyName': companyName.trim(),
       'ownerName': ownerName.trim(),
+      'mobile': mobile.trim(),
       'address': address.trim(),
       'city': city.trim(),
-      'mobile': mobile.trim(),
       'email': email.trim(),
       'password': password,
-      'device': device,
+      'deviceId': device['deviceId'],
+      'platform': device['platform'],
+      'manufacturer': device['manufacturer'],
+      'model': device['model'],
+      'osVersion': device['osVersion'],
+      'appVersion': device['appVersion'],
+      'pushToken': device['pushToken'],
+      'ipAddress': device['ipAddress'],
     });
 
     return _parseAndPersistAuthPayload(response, rememberLogin: true);
@@ -85,11 +112,20 @@ class MobileAuthService {
     required String password,
     required bool rememberLogin,
   }) async {
+    final companyId = await _resolveCompanyId();
     final device = await _buildDevicePayload();
     final response = await _postJson('/api/v1/mobile/auth/login', {
+      'companyId': companyId,
       'identifier': identifier.trim(),
       'password': password,
-      'device': device,
+      'deviceId': device['deviceId'],
+      'platform': device['platform'],
+      'manufacturer': device['manufacturer'],
+      'model': device['model'],
+      'osVersion': device['osVersion'],
+      'appVersion': device['appVersion'],
+      'pushToken': device['pushToken'],
+      'ipAddress': device['ipAddress'],
     });
 
     return _parseAndPersistAuthPayload(response, rememberLogin: rememberLogin);
@@ -131,13 +167,15 @@ class MobileAuthService {
         jsonDecode(await _secureStorage.read(key: _userKey) ?? '{}')
             as Map<String, dynamic>;
 
+    final normalizedBootstrap = _normalizeBootstrapPayload(bootstrapData);
+
     final payload = MobileAuthPayload(
       accessToken: accessToken,
       refreshToken: newRefreshToken,
       session: jsonDecode(await _secureStorage.read(key: _sessionKey) ?? '{}')
           as Map<String, dynamic>,
       user: userJson,
-      bootstrap: bootstrapData,
+      bootstrap: normalizedBootstrap,
     );
 
     await _persistProfileAndBootstrap(payload);
@@ -175,6 +213,10 @@ class MobileAuthService {
     await _secureStorage.delete(key: _featureFlagsKey);
   }
 
+  /// Returns the stored access token without triggering a network refresh.
+  Future<String?> getStoredAccessToken() =>
+      _secureStorage.read(key: _accessTokenKey);
+
   Future<Map<String, dynamic>?> readBootstrap() async {
     final user = await _secureStorage.read(key: _userKey);
     if (user == null || user.trim().isEmpty) return null;
@@ -192,9 +234,238 @@ class MobileAuthService {
       'appConfig':
           jsonDecode(await _secureStorage.read(key: _appConfigKey) ?? '{}'),
       'featureFlags': jsonDecode(
-        await _secureStorage.read(key: _featureFlagsKey) ?? '{}',
+        await _secureStorage.read(key: _featureFlagsKey) ?? '[]',
       ),
     };
+  }
+
+  Future<List<Map<String, dynamic>>> getSubscriptionPlans() async {
+    final token = await _secureStorage.read(key: _accessTokenKey);
+    final decoded = await _getJson(
+      '/api/v1/mobile/subscription/plans',
+      bearerToken: token,
+    );
+    final rawData = decoded['data'];
+
+    // Plans endpoint may return either data: [] or data: { items: [] }.
+    if (rawData is List) {
+      return _listOfMaps(rawData);
+    }
+
+    if (rawData is Map<String, dynamic>) {
+      final items = rawData['items'];
+      if (items is List) {
+        return _listOfMaps(items);
+      }
+    }
+
+    return [];
+  }
+
+  Future<Map<String, dynamic>> getCurrentSubscription() async {
+    final token = await _secureStorage.read(key: _accessTokenKey);
+    if (token == null || token.trim().isEmpty) {
+      throw const MobileAuthServiceException(
+        'missing_token',
+        'A registered device session is required before loading subscription details.',
+      );
+    }
+
+    final decoded = await _getJson(
+      '/api/v1/mobile/subscription/current',
+      bearerToken: token,
+    );
+    return _extractData(decoded);
+  }
+
+  Future<Map<String, dynamic>> createSubscriptionOrder(
+    String planId, {
+    String billingCycle = 'annual',
+  }) async {
+    final token = await _secureStorage.read(key: _accessTokenKey);
+    if (token == null || token.trim().isEmpty) {
+      throw const MobileAuthServiceException(
+        'missing_token',
+        'A registered device session is required before creating a subscription order.',
+      );
+    }
+
+    final current = await getCurrentSubscription();
+    final subscriptionId = (current['subscriptionId'] ?? '').toString();
+    if (subscriptionId.isEmpty) {
+      throw const MobileAuthServiceException(
+        'subscription_missing',
+        'Current subscription was not found.',
+      );
+    }
+
+    final plans = await getSubscriptionPlans();
+    final plan = plans.firstWhere(
+      (p) => (p['id'] ?? '').toString() == planId,
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (plan.isEmpty) {
+      throw const MobileAuthServiceException(
+        'plan_not_found',
+        'Selected subscription plan was not found.',
+      );
+    }
+
+    final annualPrice = _toDouble(plan['annualPrice']);
+    final monthlyPrice = _toDouble(plan['monthlyPrice']);
+    final amount = annualPrice > 0 ? annualPrice : monthlyPrice;
+    if (amount <= 0) {
+      throw const MobileAuthServiceException(
+        'invalid_plan_amount',
+        'Selected plan has no payable amount.',
+      );
+    }
+
+    final decoded = await _postJson(
+      '/api/v1/mobile/payment/subscription-order',
+      {
+        'gateway': 1,
+        'subscriptionId': subscriptionId,
+        'amount': amount,
+        'currency': ((plan['currency'] ?? 'INR').toString()).toUpperCase(),
+        'planCode': (plan['code'] ?? '').toString(),
+        'billingCycle': billingCycle,
+        'returnUrl': null,
+      },
+      bearerToken: token,
+    );
+    final data = _extractData(decoded);
+    if (!data.containsKey('transactionRef') &&
+        decoded['transactionRef'] != null) {
+      data['transactionRef'] = decoded['transactionRef'];
+    }
+    if (!data.containsKey('gatewayOrderId') &&
+        decoded['gatewayOrderId'] != null) {
+      data['gatewayOrderId'] = decoded['gatewayOrderId'];
+    }
+    if (!data.containsKey('clientPayload') &&
+        decoded['clientPayload'] != null) {
+      data['clientPayload'] = decoded['clientPayload'];
+    }
+    return data;
+  }
+
+  Future<Map<String, dynamic>> verifySubscriptionPayment({
+    required String transactionRef,
+    required String gatewayOrderId,
+    required String paymentId,
+    required String signature,
+    required String planCode,
+    required String billingCycle,
+  }) async {
+    final token = await _secureStorage.read(key: _accessTokenKey);
+    if (token == null || token.trim().isEmpty) {
+      throw const MobileAuthServiceException(
+        'missing_token',
+        'A registered device session is required before verifying payment.',
+      );
+    }
+
+    return _postJson(
+      '/api/v1/mobile/payment/verify',
+      {
+        'gateway': 1,
+        'transactionRef': transactionRef,
+        'gatewayOrderId': gatewayOrderId,
+        'gatewayPaymentId': paymentId,
+        'signature': signature,
+        'planCode': planCode,
+        'billingCycle': billingCycle,
+      },
+      bearerToken: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> renewSubscription({
+    String billingCycle = 'annual',
+    bool autoRenew = true,
+  }) async {
+    final token = await _secureStorage.read(key: _accessTokenKey);
+    if (token == null || token.trim().isEmpty) {
+      throw const MobileAuthServiceException(
+        'missing_token',
+        'A registered device session is required before renewing subscription.',
+      );
+    }
+
+    final decoded = await _postJson(
+      '/api/v1/mobile/subscription/renew',
+      {
+        'billingCycle': billingCycle,
+        'autoRenew': autoRenew,
+      },
+      bearerToken: token,
+    );
+    return _extractData(decoded);
+  }
+
+  Future<Map<String, dynamic>> upgradeSubscription({
+    required String planId,
+    String billingCycle = 'annual',
+  }) async {
+    final token = await _secureStorage.read(key: _accessTokenKey);
+    if (token == null || token.trim().isEmpty) {
+      throw const MobileAuthServiceException(
+        'missing_token',
+        'A registered device session is required before upgrading subscription.',
+      );
+    }
+
+    final decoded = await _postJson(
+      '/api/v1/mobile/subscription/upgrade',
+      {
+        'planId': planId,
+        'billingCycle': billingCycle,
+      },
+      bearerToken: token,
+    );
+    return _extractData(decoded);
+  }
+
+  Future<List<Map<String, dynamic>>> getPaymentHistory() async {
+    final token = await _secureStorage.read(key: _accessTokenKey);
+    final decoded = await _getJson(
+      '/api/v1/mobile/payment/history',
+      bearerToken: token,
+    );
+    final data = _extractData(decoded);
+
+    final paymentsData = data['payments'] ?? data['items'] ?? data['data'];
+
+    if (paymentsData is List) {
+      return _listOfMaps(paymentsData);
+    }
+
+    if (paymentsData is Map<String, dynamic>) {
+      final items = paymentsData['items'];
+      if (items is List) {
+        return _listOfMaps(items);
+      }
+    }
+
+    return [];
+  }
+
+  Future<Map<String, dynamic>> getLicenseStatus() async {
+    final token = await _secureStorage.read(key: _accessTokenKey);
+    if (token == null || token.trim().isEmpty) {
+      throw const MobileAuthServiceException(
+        'missing_token',
+        'A registered device session is required before checking license status.',
+      );
+    }
+
+    final decoded = await _getJson(
+      '/api/v1/mobile/license/status',
+      bearerToken: token,
+    );
+    return _extractData(decoded);
   }
 
   Future<MobileAuthPayload> _parseAndPersistAuthPayload(
@@ -212,12 +483,13 @@ class MobileAuthService {
       );
     }
 
+    final bootstrapData = _readMap(data, 'bootstrap') ?? <String, dynamic>{};
     final payload = MobileAuthPayload(
       accessToken: accessToken,
       refreshToken: refreshToken,
       session: _readMap(data, 'session') ?? <String, dynamic>{},
       user: _readMap(data, 'user') ?? <String, dynamic>{},
-      bootstrap: _readMap(data, 'bootstrap') ?? <String, dynamic>{},
+      bootstrap: _normalizeBootstrapPayload(bootstrapData),
     );
 
     await _secureStorage.write(key: _accessTokenKey, value: accessToken);
@@ -240,8 +512,14 @@ class MobileAuthService {
     final company = _readMap(bootstrap, 'company');
     final subscription = _readMap(bootstrap, 'subscription') ?? {};
     final permissions = bootstrap['permissions'] ?? [];
-    final appConfig = _readMap(bootstrap, 'appConfig') ?? {};
-    final featureFlags = _readMap(bootstrap, 'featureFlags') ?? {};
+    final appConfig = _readMap(bootstrap, 'appConfig') ??
+        {
+          'appVersion': _readString(bootstrap, 'appVersion') ?? '',
+          'minimumSupportedVersion':
+              _readString(bootstrap, 'minimumSupportedVersion') ?? '',
+          'forceUpdate': bootstrap['forceUpdate'] == true,
+        };
+    final featureFlags = bootstrap['featureFlags'] ?? [];
 
     await _secureStorage.write(key: _userKey, value: jsonEncode(payload.user));
     await _secureStorage.write(key: _companyKey, value: jsonEncode(company));
@@ -261,6 +539,62 @@ class MobileAuthService {
     );
   }
 
+  Map<String, dynamic> _normalizeBootstrapPayload(
+      Map<String, dynamic> bootstrap) {
+    final normalized = Map<String, dynamic>.from(bootstrap);
+    final company = _readMap(bootstrap, 'company');
+    if (company != null) {
+      normalized['company'] = company;
+    }
+
+    final subscription = _readMap(bootstrap, 'subscription');
+    if (subscription != null) {
+      normalized['subscription'] = subscription;
+    }
+
+    final trial = _readMap(bootstrap, 'trial');
+    if (trial != null) {
+      normalized['trial'] = trial;
+    }
+
+    final license = _readMap(bootstrap, 'license');
+    if (license != null) {
+      normalized['license'] = license;
+    }
+
+    final appConfig = _readMap(bootstrap, 'appConfig');
+    if (appConfig != null) {
+      normalized['appConfig'] = appConfig;
+    }
+
+    if (!normalized.containsKey('permissions') &&
+        bootstrap.containsKey('permissions')) {
+      normalized['permissions'] = bootstrap['permissions'];
+    }
+    if (!normalized.containsKey('featureFlags') &&
+        bootstrap.containsKey('featureFlags')) {
+      normalized['featureFlags'] = bootstrap['featureFlags'];
+    }
+    if (!normalized.containsKey('language')) {
+      normalized['language'] = _readString(bootstrap, 'language') ?? 'en';
+    }
+    if (!normalized.containsKey('theme')) {
+      normalized['theme'] = _readString(bootstrap, 'theme') ?? 'light';
+    }
+    if (!normalized.containsKey('appVersion')) {
+      normalized['appVersion'] = _readString(bootstrap, 'appVersion') ?? '';
+    }
+    if (!normalized.containsKey('minimumSupportedVersion')) {
+      normalized['minimumSupportedVersion'] =
+          _readString(bootstrap, 'minimumSupportedVersion') ?? '';
+    }
+    if (!normalized.containsKey('forceUpdate')) {
+      normalized['forceUpdate'] = bootstrap['forceUpdate'] == true;
+    }
+
+    return normalized;
+  }
+
   Future<Map<String, dynamic>> _buildDevicePayload() async {
     final packageInfo = await PackageInfo.fromPlatform();
     final existingFingerprint =
@@ -277,12 +611,14 @@ class MobileAuthService {
     }
 
     return {
-      'deviceFingerprint': fingerprint,
-      'deviceName': Platform.localHostname,
+      'deviceId': fingerprint,
       'platform': _platformName(),
-      'appVersion': '${packageInfo.version}+${packageInfo.buildNumber}',
+      'manufacturer': kIsWeb ? 'Web' : Platform.operatingSystem,
+      'model': Platform.localHostname,
       'osVersion': Platform.operatingSystemVersion,
+      'appVersion': '${packageInfo.version}+${packageInfo.buildNumber}',
       'pushToken': null,
+      'ipAddress': null,
     };
   }
 
@@ -341,30 +677,54 @@ class MobileAuthService {
       final response =
           await request.close().timeout(const Duration(seconds: 20));
       final responseBody = await response.transform(utf8.decoder).join();
-      final decoded = responseBody.trim().isEmpty
-          ? <String, dynamic>{}
-          : (jsonDecode(responseBody) as Map<String, dynamic>);
+
+      // Log request/response details for debugging
+      final contentType = response.headers.contentType?.mimeType ?? 'unknown';
+      final bodyPreview = responseBody.length > 500
+          ? '${responseBody.substring(0, 500)}...'
+          : responseBody;
+      debugPrint('[API] $method $uri');
+      debugPrint('[API] Status: ${response.statusCode}');
+      debugPrint('[API] Content-Type: $contentType');
+      debugPrint('[API] Response body preview: $bodyPreview');
+
+      // Check if Content-Type is JSON before attempting to parse
+      if (!contentType.contains('application/json') &&
+          !contentType.contains('text/json') &&
+          responseBody.trim().isNotEmpty) {
+        throw MobileAuthServiceException(
+          'invalid_content_type',
+          'Server returned non-JSON response (Content-Type: $contentType). URL: $uri, Status: ${response.statusCode}. Response: $bodyPreview',
+        );
+      }
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final error = _extractError(decoded);
+        final parsed = _tryParseJsonObject(responseBody);
+        if (parsed != null) {
+          final error = _extractError(parsed);
+          throw MobileAuthServiceException(error.$1, error.$2);
+        }
+
         throw MobileAuthServiceException(
-          error.$1,
-          error.$2,
+          'request_failed',
+          _buildHttpErrorMessage(response.statusCode, responseBody),
+        );
+      }
+
+      if (responseBody.trim().isEmpty) {
+        return <String, dynamic>{};
+      }
+
+      final decoded = _tryParseJsonObject(responseBody);
+      if (decoded == null) {
+        throw const MobileAuthServiceException(
+          'invalid_response',
+          'Server returned a non-JSON response. Please verify API URL and server deployment.',
         );
       }
 
       return decoded;
     } on SocketException {
-      if (!kIsWeb && Platform.isAndroid) {
-        final host = uri.host.toLowerCase();
-        if (host == 'localhost' || host == '127.0.0.1') {
-          throw const MobileAuthServiceException(
-            'network_unavailable',
-            'Cannot reach local API from Android. Start API and run adb reverse tcp:5000 tcp:5000, or set FLORAPRISE_API_URL to your PC LAN IP.',
-          );
-        }
-      }
-
       throw const MobileAuthServiceException(
         'network_unavailable',
         'Network unavailable. Please check your internet connection.',
@@ -377,7 +737,60 @@ class MobileAuthService {
     }
   }
 
+  Map<String, dynamic>? _tryParseJsonObject(String responseBody) {
+    final trimmed = responseBody.trim();
+    if (trimmed.isEmpty) return <String, dynamic>{};
+    if (!trimmed.startsWith('{')) return null;
+
+    try {
+      final decoded = jsonDecode(trimmed);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return decoded.cast<String, dynamic>();
+      return null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  String _buildHttpErrorMessage(int statusCode, String responseBody) {
+    final trimmed = responseBody.trim();
+    if (trimmed.isEmpty) {
+      return 'Server returned HTTP $statusCode.';
+    }
+
+    if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
+      return 'Server returned HTML (HTTP $statusCode) instead of JSON. This usually means wrong API route or outdated deployment.';
+    }
+
+    final compact = trimmed.replaceAll(RegExp(r'\s+'), ' ');
+    final preview =
+        compact.length > 180 ? '${compact.substring(0, 180)}...' : compact;
+    return 'Server returned HTTP $statusCode: $preview';
+  }
+
   (String, String) _extractError(Map<String, dynamic> decoded) {
+    final detail = _readString(decoded, 'detail');
+    final title = _readString(decoded, 'title');
+
+    // Extract error code from detail if it contains a prefix like "DUPLICATE_EMAIL:"
+    String? errorCode;
+    String? errorMessage;
+
+    if (detail != null && detail.trim().isNotEmpty) {
+      final detailTrimmed = detail.trim();
+      final colonIndex = detailTrimmed.indexOf(':');
+      if (colonIndex > 0) {
+        errorCode = detailTrimmed.substring(0, colonIndex).trim();
+        errorMessage = detailTrimmed.substring(colonIndex + 1).trim();
+        return (errorCode, errorMessage);
+      }
+      return ('request_failed', detailTrimmed);
+    }
+
+    if (title != null && title.trim().isNotEmpty) {
+      return ('request_failed', title.trim());
+    }
+
     final errorMap = _readMap(decoded, 'error');
     if (errorMap != null) {
       final code = _readString(errorMap, 'code') ?? 'request_failed';
@@ -420,55 +833,63 @@ class MobileAuthService {
     return '${key[0].toUpperCase()}${key.substring(1)}';
   }
 
-  Uri _uri(String path) => Uri.parse('$_baseUrl$path');
+  Uri _uri(String path) {
+    final fullUrl = '$_baseUrl$path';
+    debugPrint('[API] Full URL: $fullUrl');
+    return Uri.parse(fullUrl);
+  }
 
-  Future<List<Map<String, dynamic>>> getSubscriptionPlans() async {
-    final decoded = await _getJson('/api/v1/mobile/subscription/plans');
-    final data = _extractData(decoded);
-    final plansData = data['plans'];
-
-    if (plansData is List) {
-      return plansData.cast<Map<String, dynamic>>();
+  Future<String> _resolveCompanyId() async {
+    final configured = _defaultCompanyId.trim();
+    if (configured.isNotEmpty) {
+      if (Guid.tryParse(configured) == null) {
+        throw const MobileAuthServiceException(
+          'invalid_company_id',
+          'FLORAPRISE_COMPANY_ID is not a valid GUID.',
+        );
+      }
+      return configured;
     }
 
-    return [];
-  }
+    final companyJson = await _secureStorage.read(key: _companyKey);
+    if (companyJson != null && companyJson.trim().isNotEmpty) {
+      try {
+        final map = jsonDecode(companyJson) as Map<String, dynamic>;
+        final id = (map['id'] ?? map['Id'] ?? '').toString().trim();
+        if (id.isNotEmpty && Guid.tryParse(id) != null) {
+          return id;
+        }
+      } on Object {
+        // Ignore malformed local cache and use explicit message below.
+      }
+    }
 
-  Future<Map<String, dynamic>> createSubscriptionOrder(String planId) async {
-    final decoded = await _postJson(
-      '/api/v1/mobile/subscription/create-order',
-      {'planId': planId},
-    );
-    return _extractData(decoded);
-  }
-
-  Future<Map<String, dynamic>> verifySubscriptionPayment({
-    required String orderId,
-    required String paymentId,
-    required String signature,
-    required String planId,
-  }) async {
-    return _postJson(
-      '/api/v1/mobile/subscription/verify-payment',
-      {
-        'orderId': orderId,
-        'paymentId': paymentId,
-        'signature': signature,
-        'planId': planId,
-      },
+    throw const MobileAuthServiceException(
+      'missing_company_id',
+      'Company ID is required for login. Set FLORAPRISE_COMPANY_ID at build time.',
     );
   }
 
-  Future<List<Map<String, dynamic>>> getPaymentHistory() async {
-    final decoded = await _getJson('/api/v1/mobile/subscription/payment-history');
-    final data = _extractData(decoded);
-    final paymentsData = data['payments'];
+  double _toDouble(Object? value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
 
-    if (paymentsData is List) {
-      return paymentsData.cast<Map<String, dynamic>>();
-    }
+  List<Map<String, dynamic>> _listOfMaps(List<dynamic> rows) {
+    return rows
+        .whereType<Map>()
+        .map((row) => row.cast<String, dynamic>())
+        .toList();
+  }
+}
 
-    return [];
+class Guid {
+  static final RegExp _regex = RegExp(
+      r'^[{(]?[0-9A-Fa-f]{8}[-]?[0-9A-Fa-f]{4}[-]?[0-9A-Fa-f]{4}[-]?[0-9A-Fa-f]{4}[-]?[0-9A-Fa-f]{12}[)}]?$');
+
+  static String? tryParse(String input) {
+    final value = input.trim();
+    return _regex.hasMatch(value) ? value : null;
   }
 }
 
@@ -487,4 +908,3 @@ class MobileAuthPayload {
   final Map<String, dynamic> user;
   final Map<String, dynamic> bootstrap;
 }
-

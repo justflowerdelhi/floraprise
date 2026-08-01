@@ -1,0 +1,13 @@
+bin/
+obj/
+out/
+publish/
+.DS_Store
+*.user
+*.suo
+*.cache
+*.log
+.vs/
+.vscode/
+*.userosscache
+*.sln.docstates

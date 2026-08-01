@@ -1,0 +1,55 @@
+Floraprise Backend Live Deployment (Windows)
+
+Artifact
+- ZIP: D:\Floraprise\deploy\backend-win-x64-selfcontained-20260729.zip
+- Folder: D:\Floraprise\deploy\backend-win-x64-selfcontained-20260729
+
+IMPORTANT
+- Before starting app, edit appsettings.json in deploy folder:
+  - ConnectionStrings:Default
+  - Jwt:Key
+  - OpenAI:ApiKey (if used)
+- Keep appsettings.Production.json as-is (seeding and startup patches disabled in production).
+
+1) Backup current live deployment and DB
+- Backup current API folder on server.
+- Take PostgreSQL backup/snapshot.
+
+2) Upload and extract artifact
+- Upload backend-win-x64-selfcontained-20260729.zip to server.
+- Extract to a new versioned folder, e.g. C:\apps\floraprise-api\releases\20260729
+
+3) Configure production appsettings.json
+- Set real DB host/user/password/database
+- Set strong JWT key (do not use placeholder)
+- Verify allowed CORS origins include your frontend domains
+
+4) Run DB scripts once against production DB
+- Database/021_mobile_subscription_foundation.sql
+- Database/022_mobile_license_data_migration_from_legacy.sql
+
+5) Switch service to new folder
+- If using IIS in-process:
+  - point site/app pool to new release folder
+  - ensure web.config is present (included)
+- If using Windows Service:
+  - update binary path to Sumpooj.API.exe in new folder
+
+6) Restart API service
+- IIS reset app pool/site OR restart Windows Service
+
+7) Smoke test
+- GET /health/ready
+- Login with platform support account
+- Verify pages:
+  - /admin/mobile/customers
+  - /admin/mobile/devices
+  - /admin/mobile/licenses
+
+8) Rollback plan
+- If issues, switch site/service path back to previous release folder.
+- Restore DB only if migration introduced critical data issues.
+
+Notes
+- This build includes mobile schema self-heal in startup for non-production/patch-enabled scenarios.
+- Production appsettings.Production.json has RunStartupSqlPatches=false and EnableSeeding=false, so DB scripts are still required on live.

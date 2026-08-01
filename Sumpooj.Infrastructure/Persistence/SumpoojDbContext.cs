@@ -38,6 +38,9 @@ public class SumpoojDbContext
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<Delivery> Deliveries => Set<Delivery>();
+    public DbSet<DriverLocation> DriverLocations => Set<DriverLocation>();
+    public DbSet<DeliverySettings> DeliverySettings => Set<DeliverySettings>();
+    public DbSet<DriverAnalytics> DriverAnalytics => Set<DriverAnalytics>();
     public DbSet<Staff> Staff => Set<Staff>();
     public DbSet<Event> Events => Set<Event>();
     public DbSet<Payment> Payments => Set<Payment>();
@@ -72,6 +75,11 @@ public class SumpoojDbContext
     // Delivery Routes
     public DbSet<DeliveryRoute> DeliveryRoutes => Set<DeliveryRoute>();
 
+    // Delivery Tracking
+    public DbSet<DeliveryLocation> DeliveryLocations => Set<DeliveryLocation>();
+    public DbSet<DeliveryTimeline> DeliveryTimelines => Set<DeliveryTimeline>();
+    public DbSet<DeliveryProof> DeliveryProofs => Set<DeliveryProof>();
+
     // Production
     public DbSet<FloralRecipe> FloralRecipes => Set<FloralRecipe>();
     public DbSet<RecipeComponent> RecipeComponents => Set<RecipeComponent>();
@@ -105,6 +113,18 @@ public class SumpoojDbContext
     public DbSet<CorporateInvoice> CorporateInvoices => Set<CorporateInvoice>();
     public DbSet<CorporateInvoiceLine> CorporateInvoiceLines => Set<CorporateInvoiceLine>();
 
+    // Mobile license and subscription management
+    public DbSet<MobileCustomer> MobileCustomers => Set<MobileCustomer>();
+    public DbSet<MobileUser> MobileUsers => Set<MobileUser>();
+    public DbSet<MobileDevice> MobileDevices => Set<MobileDevice>();
+    public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
+    public DbSet<MobileSubscription> MobileSubscriptions => Set<MobileSubscription>();
+    public DbSet<MobileLicense> MobileLicenses => Set<MobileLicense>();
+    public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
+    public DbSet<MobilePaymentTransaction> MobilePaymentTransactions => Set<MobilePaymentTransaction>();
+    public DbSet<FeatureEntitlement> FeatureEntitlements => Set<FeatureEntitlement>();
+    public DbSet<TrialHistory> TrialHistories => Set<TrialHistory>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -117,6 +137,51 @@ public class SumpoojDbContext
         {
             entity.Property(d => d.SalesOrderId).HasColumnName("OrderId");
             entity.Property(d => d.DeliveryDate).HasColumnName("ScheduledDateTime");
+
+            entity.HasOne<Staff>()
+                .WithMany()
+                .HasForeignKey(d => d.DeliveryPersonId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.Property(d => d.TrackingToken).HasMaxLength(256);
+            entity.Property(d => d.CustomerPhone).HasMaxLength(50);
+            entity.Property(d => d.CustomerEmail).HasMaxLength(256);
+        });
+
+        // ===============================
+        // DriverLocation configuration
+        // ===============================
+        modelBuilder.Entity<DriverLocation>(entity =>
+        {
+            entity.ToTable("DriverLocations");
+            entity.HasKey(d => d.Id);
+            entity.HasIndex(d => d.DriverId);
+            entity.HasIndex(d => d.DeliveryId);
+            entity.HasIndex(d => d.RecordedAt);
+            entity.HasIndex(d => new { d.DriverId, d.DeliveryId });
+            entity.HasIndex(d => new { d.DriverId, d.RecordedAt });
+        });
+
+        // ===============================
+        // DeliverySettings configuration
+        // ===============================
+        modelBuilder.Entity<DeliverySettings>(entity =>
+        {
+            entity.ToTable("DeliverySettings");
+            entity.HasKey(d => d.Id);
+            entity.HasIndex(d => d.CompanyId).IsUnique();
+        });
+
+        // ===============================
+        // DriverAnalytics configuration
+        // ===============================
+        modelBuilder.Entity<DriverAnalytics>(entity =>
+        {
+            entity.ToTable("DriverAnalytics");
+            entity.HasKey(d => d.Id);
+            entity.HasIndex(d => d.DriverId);
+            entity.HasIndex(d => d.Date);
+            entity.HasIndex(d => new { d.DriverId, d.Date });
         });
 
         // ===============================
@@ -253,6 +318,60 @@ public class SumpoojDbContext
                 !_tenantContext.CompanyId.HasValue ||
                 l.CompanyId == _tenantContext.CompanyId);
 
+        modelBuilder.Entity<MobileCustomer>()
+            .HasQueryFilter(x =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                x.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<MobileUser>()
+            .HasQueryFilter(x =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                x.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<MobileDevice>()
+            .HasQueryFilter(x =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                x.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<MobileSubscription>()
+            .HasQueryFilter(x =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                x.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<MobileLicense>()
+            .HasQueryFilter(x =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                x.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<DeviceSession>()
+            .HasQueryFilter(x =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                x.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<MobilePaymentTransaction>()
+            .HasQueryFilter(x =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                x.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<FeatureEntitlement>()
+            .HasQueryFilter(x =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                x.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<TrialHistory>()
+            .HasQueryFilter(x =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                x.CompanyId == _tenantContext.CompanyId);
+
         modelBuilder.Entity<Shift>()
             .HasQueryFilter(s =>
                 _tenantContext == null ||
@@ -312,6 +431,25 @@ public class SumpoojDbContext
                 _tenantContext == null ||
                 !_tenantContext.CompanyId.HasValue ||
                 l.CompanyId == _tenantContext.CompanyId);
+
+        // Delivery Tracking entities
+        modelBuilder.Entity<DeliveryLocation>()
+            .HasQueryFilter(l =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                !l.DeliveryId.Equals(Guid.Empty));
+
+        modelBuilder.Entity<DeliveryTimeline>()
+            .HasQueryFilter(t =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                !t.DeliveryId.Equals(Guid.Empty));
+
+        modelBuilder.Entity<DeliveryProof>()
+            .HasQueryFilter(p =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                !p.DeliveryId.Equals(Guid.Empty));
 
         // Apply entity type configurations from assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(SumpoojDbContext).Assembly);

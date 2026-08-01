@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:app_links/app_links.dart';
 
 import 'data/repositories/customer_repository.dart';
 import 'data/repositories/category_repository.dart';
@@ -110,9 +113,10 @@ import 'services/business_data_event_bus.dart';
 import 'services/printer/printer_manager.dart';
 import 'services/scheduler_service.dart';
 import 'screens/main_shell_screen.dart';
-import 'screens/mobile_login_screen.dart';
 import 'screens/delivery_workspace_screen.dart';
 import 'screens/live_delivery_tracking_screen.dart';
+import 'screens/driver_delivery_screen.dart';
+import 'screens/payment_history_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -129,9 +133,70 @@ class FlorapriseGoApp extends StatefulWidget {
 }
 
 class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri>? _sub;
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   void initState() {
     super.initState();
+    _initDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initDeepLinks() async {
+    // Handle initial deep link if app was opened from a cold start
+    try {
+      final initialLink = await _appLinks.getInitialLink();
+      if (initialLink != null) {
+        _handleDeepLink(initialLink);
+      }
+    } catch (e) {
+      // Handle error
+    }
+
+    // Handle deep links while app is running
+    _sub = _appLinks.uriLinkStream.listen((Uri? uri) {
+      if (uri != null) {
+        _handleDeepLink(uri);
+      }
+    }, onError: (err) {
+      // Handle error
+    });
+  }
+
+  void _handleDeepLink(Uri uri) {
+    String? token;
+
+    // Handle custom scheme: floraprise://driver/{token}
+    if (uri.scheme == 'floraprise' && uri.host == 'driver') {
+      token = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : '';
+    }
+    // Handle HTTPS: https://api.floraprise.com/api/public/tracking/driver/{token}
+    else if (uri.scheme == 'https' && uri.host == 'api.floraprise.com') {
+      final pathSegments = uri.pathSegments;
+      if (pathSegments.length >= 5 &&
+          pathSegments[0] == 'api' &&
+          pathSegments[1] == 'public' &&
+          pathSegments[2] == 'tracking' &&
+          pathSegments[3] == 'driver') {
+        token = pathSegments[4];
+      }
+    }
+
+    if (token != null &&
+        token.isNotEmpty &&
+        _navigatorKey.currentContext != null) {
+      Navigator.of(_navigatorKey.currentContext!).pushNamed(
+        '/driver-delivery',
+        arguments: {'token': token},
+      );
+    }
   }
 
   @override
@@ -208,7 +273,7 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
           create: (_) => VoiceProvider(),
         ),
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(mobileAuthService),
+          create: (_) => AuthProvider(mobileAuthService)..initialize(),
         ),
         ChangeNotifierProvider(
           create: (_) => LicenseProvider(LicenseService())..initialize(),
@@ -347,8 +412,25 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
               ),
             ),
             home: const SplashScreen(),
+            navigatorKey: _navigatorKey,
             navigatorObservers: [appRouteObserver],
             onGenerateRoute: (settings) {
+              if (settings.name == '/driver-delivery') {
+                final args = settings.arguments as Map<String, dynamic>?;
+                final token = args?['token'] as String?;
+                if (token == null || token.isEmpty) {
+                  return MaterialPageRoute(
+                    builder: (context) => const Scaffold(
+                      body: Center(
+                        child: Text('Invalid delivery link'),
+                      ),
+                    ),
+                  );
+                }
+                return MaterialPageRoute(
+                  builder: (context) => DriverDeliveryScreen(token: token),
+                );
+              }
               if (settings.name == '/walkin-sales') {
                 final args = settings.arguments as Map<String, dynamic>?;
                 return MaterialPageRoute(
@@ -391,12 +473,12 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
                   const _SubscriptionGate(child: MainShellScreen()),
               '/business-registration': (context) =>
                   const BusinessRegistrationScreen(),
-              '/mobile-login': (context) => const MobileLoginScreen(),
               '/mobile-register': (context) =>
                   const BusinessRegistrationScreen(),
               '/license-subscription-required': (context) =>
                   const LicenseSubscriptionRequiredScreen(),
               '/subscription': (context) => const SubscriptionScreen(),
+              '/payment-history': (context) => const PaymentHistoryScreen(),
               '/backup-restore': (context) => const BackupRestoreScreen(),
               '/shop-details': (context) =>
                   const _SubscriptionGate(child: ShopDetailsScreen()),

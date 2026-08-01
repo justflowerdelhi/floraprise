@@ -6,7 +6,6 @@ import '../presentation/splash/floral_background.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/common_widgets.dart';
 import 'onboarding_flow_screen.dart';
-import 'mobile_login_screen.dart';
 
 class BusinessRegistrationScreen extends StatefulWidget {
   const BusinessRegistrationScreen({super.key});
@@ -199,20 +198,6 @@ class _BusinessRegistrationScreenState
                                   )
                                 : const Icon(Icons.verified_user_outlined),
                             label: const Text('Register'),
-                          ),
-                          const SizedBox(height: 12),
-                          TextButton(
-                            onPressed: provider.isLoading
-                                ? null
-                                : () {
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const MobileLoginScreen(),
-                                      ),
-                                    );
-                                  },
-                            child: const Text('Already have an account? Login'),
                           ),
                         ],
                       ),

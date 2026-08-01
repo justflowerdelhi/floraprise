@@ -1,32 +1,249 @@
-﻿@using Sumpooj.Blazor.Services
+﻿@using Sumpooj.Blazor.Auth
+@using Sumpooj.Blazor.Data
 @inherits LayoutComponentBase
 
-@inject ITokenStorage TokenStorage
+@inject OwnerAuthService AuthService
+@inject NavigationManager Navigation
+@inject OwnerState OwnerState
 
-<PageTitle>Sumpooj.Blazor</PageTitle>
-
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <a href="https://docs.microsoft.com/aspnet/" target="_blank">About</a>
+<MudLayout Class="control-shell">
+    <MudAppBar Elevation="0" Class="app-bar">
+        <MudIconButton Icon="@(_isDrawerOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu)" Class="menu-toggle" OnClick="ToggleDrawer" />
+        <div class="brand-block">
+            <div class="brand-mark"></div>
+            <div>
+                <div class="brand-title">Floraprise</div>
+                <div class="brand-subtitle">Owner Control Center</div>
+            </div>
         </div>
+        <MudSpacer />
+        <MudTextField T="string" Placeholder="Global search" Variant="Variant.Outlined" @bind-Value="OwnerState.SearchQuery" Class="search-field" AdornmentIcon="@Icons.Material.Filled.Search" Adornment="Adornment.Start" />
+        <MudIconButton Icon="@Icons.Material.Filled.Notifications" Class="icon-button" />
+        <MudIconButton Icon="@Icons.Material.Filled.AccountCircle" Class="icon-button" />
+        <MudButton Variant="Variant.Text" Class="logout-button" OnClick="Logout">Logout</MudButton>
+    </MudAppBar>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+    <MudDrawer Open="@_isDrawerOpen" Variant="DrawerVariant.Responsive" Class="drawer" Width="260px" ClipMode="DrawerClipMode.Always">
+        <div class="drawer-header">
+            <div class="drawer-title">Operations</div>
+            <div class="drawer-caption">Daily control center</div>
+        </div>
+        <MudNavMenu Class="drawer-nav">
+            <MudNavLink Href="/" Class="nav-link" Match="NavLinkMatch.All">
+                <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="nav-icon" />
+                <span>Dashboard</span>
+            </MudNavLink>
+            <MudNavLink Href="/subscribers" Class="nav-link">
+                <MudIcon Icon="@Icons.Material.Filled.People" Class="nav-icon" />
+                <span>Subscribers</span>
+            </MudNavLink>
+            <MudNavLink Href="/deliveries" Class="nav-link">
+                <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="nav-icon" />
+                <span>Live Deliveries</span>
+            </MudNavLink>
+            <MudNavLink Href="/support" Class="nav-link">
+                <MudIcon Icon="@Icons.Material.Filled.SupportAgent" Class="nav-icon" />
+                <span>Support Tickets</span>
+            </MudNavLink>
+            <MudNavLink Href="/notifications" Class="nav-link">
+                <MudIcon Icon="@Icons.Material.Filled.Notifications" Class="nav-icon" />
+                <span>Notifications</span>
+            </MudNavLink>
+            <MudNavLink Href="/devices" Class="nav-link">
+                <MudIcon Icon="@Icons.Material.Filled.Devices" Class="nav-icon" />
+                <span>Devices</span>
+            </MudNavLink>
+            <MudNavLink Href="/system" Class="nav-link">
+                <MudIcon Icon="@Icons.Material.Filled.Settings" Class="nav-icon" />
+                <span>System</span>
+            </MudNavLink>
+        </MudNavMenu>
+        <div class="drawer-footer">
+            <MudNavLink Class="nav-link logout-link" OnClick="Logout">
+                <MudIcon Icon="@Icons.Material.Filled.Logout" Class="nav-icon" />
+                <span>Logout</span>
+            </MudNavLink>
+        </div>
+    </MudDrawer>
+
+    <MudMainContent Class="main-content">
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+<style>
+    .control-shell {
+        background: #f5f7fa;
+        min-height: 100vh;
+    }
+
+    .app-bar {
+        background: #ffffff;
+        border-bottom: 1px solid #e6ebf1;
+        color: #243447;
+        padding: 0 24px;
+        height: 68px;
+    }
+
+    .menu-toggle {
+        margin-right: 8px;
+        color: #4b5563;
+    }
+
+    .brand-block {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 220px;
+    }
+
+    .brand-mark {
+        width: 12px;
+        height: 32px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #2e7d32, #66bb6a);
+    }
+
+    .brand-title {
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+
+    .brand-subtitle {
+        font-size: 12px;
+        color: #6b7280;
+    }
+
+    .search-field {
+        max-width: 340px;
+        margin-right: 12px;
+    }
+
+    .icon-button {
+        color: #4b5563;
+    }
+
+    .logout-button {
+        color: #243447;
+        text-transform: none;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+
+    .drawer {
+        background: #ffffff;
+        border-right: 1px solid #e6ebf1;
+        box-shadow: none;
+    }
+
+    .drawer-header {
+        padding: 24px 20px 12px;
+        border-bottom: 1px solid #eef2f7;
+    }
+
+    .drawer-title {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #6b7280;
+    }
+
+    .drawer-caption {
+        margin-top: 4px;
+        font-size: 13px;
+        color: #243447;
+    }
+
+    .drawer-nav .nav-link {
+        margin: 6px 10px;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #374151;
+        padding: 10px 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .nav-icon {
+        font-size: 20px;
+        width: 24px;
+        height: 24px;
+    }
+
+    .drawer-nav .nav-link:hover {
+        background: #f3f7ef;
+        color: #2e7d32;
+    }
+
+    .drawer-nav .nav-link.active {
+        background: #2e7d32;
+        color: #ffffff;
+    }
+
+    .drawer-nav .nav-link.active .mud-icon-root {
+        color: #ffffff;
+    }
+
+    .drawer-footer {
+        margin-top: auto;
+        padding: 12px 10px;
+        border-top: 1px solid #eef2f7;
+    }
+
+    .logout-link {
+        color: #d32f2f;
+    }
+
+    .logout-link:hover {
+        background: #ffebee;
+        color: #d32f2f;
+    }
+
+    .main-content {
+        background: #f5f7fa;
+        min-height: calc(100vh - 68px);
+        padding: 24px;
+    }
+
+    @@media (max-width: 960px) {
+        .brand-block {
+            min-width: auto;
+        }
+
+        .search-field {
+            max-width: 200px;
+        }
+    }
+
+    @@media (max-width: 600px) {
+        .app-bar {
+            padding: 0 16px;
+        }
+
+        .brand-subtitle {
+            display: none;
+        }
+
+        .search-field {
+            display: none;
+        }
+    }
+</style>
 
 @code {
-    protected override Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender && TokenStorage is TokenStorage ts)
-            ts.MarkReady();
+    private bool _isDrawerOpen = true;
 
-        return Task.CompletedTask;
+    private void ToggleDrawer()
+    {
+        _isDrawerOpen = !_isDrawerOpen;
+    }
+
+    private void Logout()
+    {
+        AuthService.Logout();
+        Navigation.NavigateTo("/login");
     }
 }

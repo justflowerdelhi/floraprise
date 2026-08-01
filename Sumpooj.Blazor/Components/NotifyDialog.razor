@@ -1,0 +1,86 @@
+@using MudBlazor
+@using Sumpooj.Blazor.Services
+
+<MudDialog>
+    <DialogContent>
+        <div class="notify-form">
+            <MudText Typo="Typo.body2">
+                Notify <strong>@Subscriber?.BusinessName</strong>
+            </MudText>
+
+            <MudSelect T="string" Label="Notification Type" @bind-Value="_notificationType" Class="mt-4" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("subscription_renewal")">Subscription Renewal Reminder</MudSelectItem>
+                <MudSelectItem Value="@("trial_expiry")">Trial Expiry Notice</MudSelectItem>
+                <MudSelectItem Value="@("feature_release")">Feature Release</MudSelectItem>
+                <MudSelectItem Value="@("maintenance")">Maintenance Notice</MudSelectItem>
+                <MudSelectItem Value="@("custom")">Custom Message</MudSelectItem>
+            </MudSelect>
+
+            @if (_notificationType == "custom")
+            {
+                <MudTextField T="string" Label="Custom Message" @bind-Value="_customMessage" MultiLine Rows="4" Class="mt-4" Variant="Variant.Outlined" Counter="500" MaxLength="500" />
+            }
+
+            <MudCheckBox T="bool" @bind-Checked="_sendEmail" Label="Send via Email" Class="mt-4" />
+            <MudCheckBox T="bool" @bind-Checked="_sendPush" Label="Send Push Notification" Class="mt-2" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Send" Loading="@_isProcessing" Disabled="@_isProcessing">Send</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .notify-form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 380px;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Inject]
+    ISnackbar Snackbar { get; set; } = null!;
+
+    [Parameter]
+    public SubscriberDto? Subscriber { get; set; }
+
+    private string _notificationType = "subscription_renewal";
+    private string _customMessage = string.Empty;
+    private bool _sendEmail = true;
+    private bool _sendPush = true;
+    private bool _isProcessing;
+
+    private async Task Cancel() => MudDialog.Cancel();
+
+    private async Task Send()
+    {
+        _isProcessing = true;
+        try
+        {
+            // Placeholder for notification API call
+            // In a real implementation, you would call a notification service endpoint
+            await Task.Delay(500); // Simulate API call
+
+            var channels = new List<string>();
+            if (_sendEmail) channels.Add("Email");
+            if (_sendPush) channels.Add("Push");
+
+            Snackbar.Add($"Notification sent via {string.Join(", ", channels)}.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+}

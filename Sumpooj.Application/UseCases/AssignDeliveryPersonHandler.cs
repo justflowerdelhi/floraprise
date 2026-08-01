@@ -1,21 +1,19 @@
 using Sumpooj.Application.Deliveries;
 using Sumpooj.Application.Interfaces;
+using System.Security.Cryptography;
 
 namespace Sumpooj.Application.UseCases;
 
 public class AssignDeliveryPersonHandler
 {
     private readonly IDeliveryRepository _deliveryRepo;
-    private readonly ISalesOrderRepository _salesOrderRepo;
     private readonly IStaffRepository _staffRepo;
 
     public AssignDeliveryPersonHandler(
         IDeliveryRepository deliveryRepo,
-        ISalesOrderRepository salesOrderRepo,
         IStaffRepository staffRepo)
     {
         _deliveryRepo = deliveryRepo;
-        _salesOrderRepo = salesOrderRepo;
         _staffRepo = staffRepo;
     }
 
@@ -32,17 +30,24 @@ public class AssignDeliveryPersonHandler
         if (delivery.Status == Domain.Entities.DeliveryStatus.Cancelled)
             throw new InvalidOperationException("Cannot assign a delivery person to a cancelled delivery.");
 
-        // 3. Validate Staff exists (need CompanyId from the related SalesOrder)
-        var order = await _salesOrderRepo.GetByIdAsync(delivery.SalesOrderId)
-            ?? throw new InvalidOperationException($"SalesOrder '{delivery.SalesOrderId}' not found.");
-
-        var staff = await _staffRepo.GetByIdAsync(order.CompanyId, command.StaffId)
+        // 3. Validate Staff exists in the same company as the delivery
+        var staff = await _staffRepo.GetByIdAsync(delivery.CompanyId, command.StaffId)
             ?? throw new InvalidOperationException($"Staff '{command.StaffId}' not found.");
 
-        // 4. Assign delivery person via domain method
+        // 4. Generate secure tracking token if not already set
+        if (string.IsNullOrWhiteSpace(delivery.TrackingToken))
+        {
+            var tokenBytes = new byte[16];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(tokenBytes);
+            var token = Convert.ToHexString(tokenBytes).ToLowerInvariant();
+            delivery.SetTrackingToken(token);
+        }
+
+        // 5. Assign delivery person via domain method
         delivery.AssignDeliveryPerson(command.StaffId);
 
-        // 5. Save changes
+        // 6. Save changes
         await _deliveryRepo.UpdateAsync(delivery);
     }
 }

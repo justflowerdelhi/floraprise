@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Floraprise.Mobile.Domain\Floraprise.Mobile.Domain.csproj" />
+    <ProjectReference Include="..\Floraprise.Mobile.Contracts\Floraprise.Mobile.Contracts.csproj" />
+    <ProjectReference Include="..\Floraprise.Mobile.Core\Floraprise.Mobile.Core.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="11.0.2" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.0.2" />
+    <PackageReference Include="MediatR" Version="12.1.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

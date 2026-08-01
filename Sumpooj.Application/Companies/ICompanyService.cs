@@ -3,6 +3,7 @@
 public interface ICompanyService
 {
     Task<Guid> CreateAsync(CreateCompanyRequest request);
+    Task<CompanyDto?> FindByEmailOrPhoneAsync(string email, string phone);
     Task<IReadOnlyList<CompanyDto>> GetAllAsync();
     Task<CompanyDto?> GetByIdAsync(Guid companyId);
     Task SetActiveAsync(Guid companyId, bool isActive);

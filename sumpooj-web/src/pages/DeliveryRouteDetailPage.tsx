@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { RouteDetail, Driver, Delivery } from '../types/deliveryRouteTypes';
-import { Alert, Button, Card, CardContent, Typography, Chip, Select, MenuItem, CircularProgress, IconButton, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Alert, Button, Card, CardContent, Typography, Chip, Select, MenuItem, CircularProgress, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Stack, Box } from '@mui/material';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import RouteIcon from '@mui/icons-material/Route';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { useParams } from 'react-router-dom';
 import { useToast } from '../hooks/useToast';
 import { apiClient } from '../core/api/apiClient';
@@ -62,6 +64,8 @@ export default function DeliveryRouteDetailPage() {
   const [moveStopId, setMoveStopId] = useState<string | null>(null);
   const [targetDraftRouteId, setTargetDraftRouteId] = useState<string>('');
   const [draftRoutes, setDraftRoutes] = useState<DraftRouteOption[]>([]);
+  const [totalDistance, setTotalDistance] = useState<number>(0);
+  const [expectedCompletion, setExpectedCompletion] = useState<string>('');
 
   const loadRoute = useCallback(async () => {
     setLoading(true);
@@ -73,6 +77,33 @@ export default function DeliveryRouteDetailPage() {
     try {
       const data = await fetchRouteDetail(routeId);
       setRoute(data);
+
+      // Calculate total distance and expected completion
+      if (data.deliveries && data.deliveries.length > 0) {
+        let distance = 0;
+        const sortedDeliveries = [...data.deliveries].sort((a, b) => a.stopOrder - b.stopOrder);
+        
+        for (let i = 0; i < sortedDeliveries.length - 1; i++) {
+          const current = sortedDeliveries[i];
+          const next = sortedDeliveries[i + 1];
+          if (current.latitude && current.longitude && next.latitude && next.longitude) {
+            distance += calculateDistance(current.latitude, current.longitude, next.latitude, next.longitude);
+          }
+        }
+        
+        setTotalDistance(distance);
+        
+        // Estimate completion time (assuming 30 km/h average speed in city)
+        const avgSpeedKph = 30;
+        const travelTimeHours = distance / avgSpeedKph;
+        const deliveryTimePerStop = 0.1; // 6 minutes per stop
+        const totalDeliveryTime = sortedDeliveries.length * deliveryTimePerStop;
+        const totalHours = travelTimeHours + totalDeliveryTime;
+        
+        const startTime = new Date();
+        const completionTime = new Date(startTime.getTime() + totalHours * 60 * 60 * 1000);
+        setExpectedCompletion(completionTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      }
     } catch (err: any) {
       setRoute(null);
       setError(err?.response?.data?.message ?? err?.message ?? 'Failed to load route details.');
@@ -80,6 +111,18 @@ export default function DeliveryRouteDetailPage() {
       setLoading(false);
     }
   }, [routeId]);
+
+  // Haversine formula for distance calculation
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
 
   useEffect(() => {
     loadRoute();
@@ -205,6 +248,38 @@ export default function DeliveryRouteDetailPage() {
           <Chip label="Completed" color="success" />
         )}
       </div>
+
+      {/* Route Statistics */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Stack direction="row" spacing={4} alignItems="center">
+            <Stack direction="row" spacing={1} alignItems="center">
+              <RouteIcon color="action" />
+              <Box>
+                <Typography variant="caption" color="text.secondary">Total Distance</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  {totalDistance.toFixed(1)} km
+                </Typography>
+              </Box>
+            </Stack>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <AccessTimeIcon color="action" />
+              <Box>
+                <Typography variant="caption" color="text.secondary">Expected Completion</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  {expectedCompletion || '--:--'}
+                </Typography>
+              </Box>
+            </Stack>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="caption" color="text.secondary">Stops:</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                {route.deliveries.length}
+              </Typography>
+            </Stack>
+          </Stack>
+        </CardContent>
+      </Card>
       {route.status === 'Draft' && (
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 24 }}>
           <Select

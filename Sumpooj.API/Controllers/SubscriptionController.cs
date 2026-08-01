@@ -6,7 +6,7 @@ namespace Sumpooj.API.Controllers;
 
 [ApiController]
 [Route("api/subscription")]
-[Authorize(Policy = "CompanyAdmin")]
+[Authorize(Roles = "CompanyAdmin,PlatformSuperAdmin,PlatformSupport")]
 public class SubscriptionController : ControllerBase
 {
     private readonly ITenantContext _tenantContext;
@@ -16,8 +16,7 @@ public class SubscriptionController : ControllerBase
         _tenantContext = tenantContext;
     }
 
-    private Guid CompanyId => _tenantContext.CompanyId
-        ?? throw new UnauthorizedAccessException("Company context required");
+    private Guid? CompanyId => _tenantContext.CompanyId;
 
     [HttpPost("upgrade")]
     public IActionResult Upgrade([FromBody] UpgradePlanRequest request)

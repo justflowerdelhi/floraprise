@@ -24,6 +24,8 @@ import {
   Assessment as AnalyticsIcon,
   History as AuditIcon,
   Settings as SettingsIcon,
+  PhoneAndroid as MobileAdminIcon,
+  People as MobileCustomersIcon,
 } from '@mui/icons-material';
 
 const PlatformAdminDashboard: React.FC = () => {
@@ -56,6 +58,20 @@ const PlatformAdminDashboard: React.FC = () => {
       description: 'Configure platform-wide settings',
       icon: <SettingsIcon sx={{ fontSize: 48, color: '#9c27b0' }} />,
       action: () => navigate('/admin/settings'),
+      disabled: false,
+    },
+    {
+      title: 'Mobile Dashboard',
+      description: 'Monitor mobile subscriptions, trials, renewals, and devices',
+      icon: <MobileAdminIcon sx={{ fontSize: 48, color: '#00897b' }} />,
+      action: () => navigate('/admin/mobile/dashboard'),
+      disabled: false,
+    },
+    {
+      title: 'Mobile Customers',
+      description: 'Search customers and run upgrade, renew, suspend, and device reset actions',
+      icon: <MobileCustomersIcon sx={{ fontSize: 48, color: '#ef6c00' }} />,
+      action: () => navigate('/admin/mobile/customers'),
       disabled: false,
     },
   ];

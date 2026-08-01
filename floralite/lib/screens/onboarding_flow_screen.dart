@@ -754,7 +754,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   }) async {
     final authProvider = context.read<AuthProvider>();
     final licenseProvider = context.read<LicenseProvider>();
-    final provisioningIssues = <String>[];
+    final provisioningWarnings = <String>[];
 
     final authRegistered = await authProvider.register(
       companyName: businessName,
@@ -766,7 +766,11 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
       password: password,
     );
     if (!authRegistered) {
-      provisioningIssues.add(authProvider.friendlyMessage);
+      provisioningWarnings.add(
+        authProvider.friendlyMessage.trim().isNotEmpty
+            ? authProvider.friendlyMessage.trim()
+            : 'Cloud registration is pending.',
+      );
     }
 
     try {
@@ -779,22 +783,27 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
         ),
       );
       if (!licenseRegistered) {
-        provisioningIssues.add(
-          'License activation pending. Please connect internet to sync.',
+        provisioningWarnings.add(
+          licenseProvider.message?.trim().isNotEmpty == true
+              ? licenseProvider.message!.trim()
+              : 'License activation pending. Please connect internet to sync.',
         );
       }
-    } catch (_) {
-      provisioningIssues.add(
-        'License activation pending. Please connect internet to sync.',
+    } catch (error) {
+      provisioningWarnings.add(
+        error.toString().trim().isNotEmpty
+            ? error.toString()
+            : 'License activation pending. Please connect internet to sync.',
       );
     }
 
-    if (provisioningIssues.isNotEmpty && mounted) {
+    if (provisioningWarnings.isNotEmpty && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Cloud sync pending: ${provisioningIssues.first}',
+            'Cloud sync pending: ${provisioningWarnings.first}',
           ),
+          duration: const Duration(seconds: 5),
         ),
       );
     }

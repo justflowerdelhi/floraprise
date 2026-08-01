@@ -39,6 +39,20 @@ public class AuthController : ControllerBase
     {
         try
         {
+            if (request is null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+            {
+                return BadRequest(new { message = "Email and password are required" });
+            }
+
+            request = request with { Email = request.Email.Trim() };
+
+            using var dbTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            if (!await _db.Database.CanConnectAsync(dbTimeout.Token))
+            {
+                _logger.LogWarning("Login blocked because database connectivity check failed.");
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "Login temporarily unavailable. Please try again shortly." });
+            }
+
             _logger.LogInformation("Login attempt for: {Email}", request.Email);
 
             var user = await _userManager.FindByEmailAsync(request.Email);
@@ -227,7 +241,9 @@ public class AuthController : ControllerBase
     [Microsoft.AspNetCore.Authorization.Authorize]
     public async Task<IActionResult> GetMe()
     {
-        var userId = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        // JWT handlers may map "sub" to NameIdentifier; support both.
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
         if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out _))
         {
             return Unauthorized(new { message = "Invalid token" });

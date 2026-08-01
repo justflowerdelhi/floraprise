@@ -1,0 +1,347 @@
+@page "/notifications"
+@layout MainLayout
+@using Sumpooj.Blazor.Components
+@inject NotificationApiService NotificationService
+@inject SubscriptionApiService SubscriptionService
+@inject DeviceApiService DeviceService
+@inject ISnackbar Snackbar
+
+<div class="page-shell">
+    <div class="section-header">
+        <div>
+            <div class="eyebrow">Operations</div>
+            <h1 class="page-title">Notifications</h1>
+            <div class="page-subtitle">Send and manage system notifications</div>
+        </div>
+    </div>
+
+    <div class="content-grid">
+        <MudPaper Elevation="0" Class="table-card">
+            <div class="panel-title">Send notification</div>
+
+            
+            <MudSelect T="string" Label="Recipient Group" Value="_recipientGroup" Variant="Variant.Outlined" Class="form-field"
+                       AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft"
+                       ValueChanged="OnRecipientGroupChanged">
+                <MudSelectItem Value="@("all")">All Subscribers</MudSelectItem>
+                <MudSelectItem Value="@("active")">Active Subscribers</MudSelectItem>
+                <MudSelectItem Value="@("trial")">Trial Users</MudSelectItem>
+                <MudSelectItem Value="@("trial_expiring")">Trial Expiring (7 Days)</MudSelectItem>
+                <MudSelectItem Value="@("grace")">Grace Period</MudSelectItem>
+                <MudSelectItem Value="@("expired")">Expired</MudSelectItem>
+                <MudSelectItem Value="@("locked")">Locked</MudSelectItem>
+                <MudSelectItem Value="@("custom")">Custom Selection</MudSelectItem>
+            </MudSelect>
+
+            
+            @if (_recipientGroup == "custom")
+            {
+                <MudSelect T="SubscriberDto" Label="Select Subscribers" MultiSelection="true"
+                           SelectedValues="_customSubscribers" SelectedValuesChanged="OnCustomSubscribersChanged"
+                           Variant="Variant.Outlined" Class="form-field"
+                           ToStringFunc="@(s => s?.BusinessName ?? string.Empty)"
+                           AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+                    @foreach (var sub in _allSubscribers)
+                    {
+                        <MudSelectItem T="SubscriberDto" Value="@sub">@sub.BusinessName (@sub.Mobile)</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            
+            <MudSelect T="string" Label="Notification Type" Value="_notificationType" Variant="Variant.Outlined" Class="form-field"
+                       AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft"
+                       ValueChanged="OnNotificationTypeChanged">
+                <MudSelectItem Value="@("payment_reminder")">Payment Reminder</MudSelectItem>
+                <MudSelectItem Value="@("trial_reminder")">Trial Reminder</MudSelectItem>
+                <MudSelectItem Value="@("grace_reminder")">Grace Reminder</MudSelectItem>
+                <MudSelectItem Value="@("subscription_expired")">Subscription Expired</MudSelectItem>
+                <MudSelectItem Value="@("renewal_confirmation")">Renewal Confirmation</MudSelectItem>
+                <MudSelectItem Value="@("version_update")">Version Update</MudSelectItem>
+                <MudSelectItem Value="@("maintenance")">Maintenance</MudSelectItem>
+                <MudSelectItem Value="@("emergency")">Emergency</MudSelectItem>
+                <MudSelectItem Value="@("custom")">Custom</MudSelectItem>
+            </MudSelect>
+
+            
+            <MudSelect T="string" Label="Target" Value="_target" Variant="Variant.Outlined" Class="form-field"
+                       AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft"
+                       ValueChanged="OnTargetChanged">
+                <MudSelectItem Value="@("selected_subscribers")">Selected Subscribers</MudSelectItem>
+                <MudSelectItem Value="@("all_devices")">All Devices</MudSelectItem>
+                <MudSelectItem Value="@("selected_device")">Selected Device</MudSelectItem>
+                <MudSelectItem Value="@("online_devices")">All Online Devices</MudSelectItem>
+            </MudSelect>
+
+            
+            @if (_target == "selected_device")
+            {
+                <MudSelect T="SubscriberDto" Label="Subscriber (for device)" Value="_deviceSubscriber" Variant="Variant.Outlined" Class="form-field"
+                           ToStringFunc="@(s => s?.BusinessName ?? string.Empty)"
+                           AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft"
+                           ValueChanged="OnDeviceSubscriberChanged">
+                    @foreach (var sub in _allSubscribers)
+                    {
+                        <MudSelectItem T="SubscriberDto" Value="@sub">@sub.BusinessName (@sub.Mobile)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                @if (_loadingDevices)
+                {
+                    <div class="loading-devices">
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        <MudText Typo="Typo.caption">Loading devices…</MudText>
+                    </div>
+                }
+                else if (_subscriberDevices.Count > 0)
+                {
+                    <MudSelect T="DeviceDto" Label="Select Device" @bind-Value="_selectedDevice" Variant="Variant.Outlined" Class="form-field"
+                               ToStringFunc="@(d => d == null ? string.Empty : $"{d.Model} ({d.Platform})")"
+                               AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+                        @foreach (var dev in _subscriberDevices)
+                        {
+                            <MudSelectItem T="DeviceDto" Value="@dev">@dev.Model — @dev.Platform @(dev.IsOnline ? "●" : "○")</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
+                else if (_deviceSubscriber != null)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="form-field">No devices registered for this subscriber.</MudText>
+                }
+            }
+
+            
+            <MudTextField T="string" Label="Title" @bind-Value="_title" Variant="Variant.Outlined" Class="form-field" />
+            <MudTextField T="string" Label="Message" @bind-Value="_body" Variant="Variant.Outlined" Lines="4" Class="form-field" />
+
+            <div class="send-row">
+                <div class="recipient-preview">
+                    @if (!string.IsNullOrEmpty(_recipientGroup))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @GetRecipientSummary()
+                        </MudText>
+                    }
+                </div>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SendNotification"
+                           Disabled="@_sending" Loading="@_sending" Class="toolbar-button">
+                    Send
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        <MudPaper Elevation="0" Class="table-card">
+            <div class="panel-title">Recent sent notifications</div>
+            <div class="list-stack">
+                <div class="list-item">
+                    <div>
+                        <div class="list-title">Renewal reminder</div>
+                        <div class="list-meta">Delivered to 32 subscribers</div>
+                    </div>
+                    <span class="status-pill success">Sent</span>
+                </div>
+                <div class="list-item">
+                    <div>
+                        <div class="list-title">Maintenance notice</div>
+                        <div class="list-meta">Delivered to all owners</div>
+                    </div>
+                    <span class="status-pill warning">Queued</span>
+                </div>
+            </div>
+        </MudPaper>
+    </div>
+</div>
+
+<style>
+    .page-shell { display: flex; flex-direction: column; gap: 16px; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; }
+    .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280; }
+    .page-title { margin: 4px 0 0; font-size: 24px; color: #243447; }
+    .page-subtitle { margin: 4px 0 0; font-size: 14px; color: #6b7280; }
+    .content-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; }
+    .table-card { background: #ffffff; border: 1px solid #e6ebf1; border-radius: 12px; padding: 18px; }
+    .panel-title { font-size: 16px; font-weight: 700; color: #243447; margin-bottom: 12px; }
+    .form-field { margin-bottom: 12px; }
+    .toolbar-button { text-transform: none; }
+    .list-stack { display: flex; flex-direction: column; gap: 10px; }
+    .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+    .list-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .list-title { font-size: 14px; color: #243447; font-weight: 600; }
+    .list-meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .status-pill { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .status-pill.success { background: #e8f5e9; color: #2e7d32; }
+    .status-pill.warning { background: #fff3e0; color: #ef6c00; }
+    .send-row { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+    .recipient-preview { flex: 1; padding-right: 12px; }
+    .loading-devices { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+</style>
+
+@code {
+    private List<SubscriberDto> _allSubscribers = new();
+    private IEnumerable<SubscriberDto> _customSubscribers = new List<SubscriberDto>();
+    private List<DeviceDto> _subscriberDevices = new();
+    private DeviceDto? _selectedDevice;
+    private SubscriberDto? _deviceSubscriber;
+
+    private string _recipientGroup = "all";
+    private string _notificationType = string.Empty;
+    private string _target = "selected_subscribers";
+    private string _title = string.Empty;
+    private string _body = string.Empty;
+    private bool _sending;
+    private bool _loadingDevices;
+
+    // Templates keyed by notification type
+    private static readonly Dictionary<string, (string Title, string Message)> _templates = new()
+    {
+        ["payment_reminder"]       = ("Payment Due", "Your subscription payment is due. Please renew to continue using Floraprise."),
+        ["trial_reminder"]         = ("Trial Ending Soon", "Your free trial is ending soon. Upgrade now to keep access to all features."),
+        ["grace_reminder"]         = ("Grace Period Active", "Your subscription has expired. You are currently in a grace period — please renew to avoid interruption."),
+        ["subscription_expired"]   = ("Subscription Expired", "Your Floraprise subscription has expired. Please renew to restore full access."),
+        ["renewal_confirmation"]   = ("Subscription Renewed", "Thank you! Your Floraprise subscription has been successfully renewed."),
+        ["version_update"]         = ("New Version Available", "A new version of the Floraprise app is available. Update now for the latest features and fixes."),
+        ["maintenance"]            = ("Scheduled Maintenance", "Floraprise will undergo scheduled maintenance. Services may be temporarily unavailable."),
+        ["emergency"]              = ("Important Notice", "Please read this important notice regarding your Floraprise account."),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allSubscribers = await SubscriptionService.GetSubscribersAsync();
+    }
+
+    private void OnRecipientGroupChanged(string value)
+    {
+        _recipientGroup = value;
+        if (value != "custom")
+            _customSubscribers = new List<SubscriberDto>();
+    }
+
+    private void OnCustomSubscribersChanged(IEnumerable<SubscriberDto> values)
+    {
+        _customSubscribers = values;
+    }
+
+    private void OnNotificationTypeChanged(string value)
+    {
+        _notificationType = value;
+        if (_templates.TryGetValue(value, out var tpl))
+        {
+            _title = tpl.Title;
+            _body = tpl.Message;
+        }
+        else
+        {
+            // Custom — clear so user can type freely
+            _title = string.Empty;
+            _body = string.Empty;
+        }
+    }
+
+    private void OnTargetChanged(string value)
+    {
+        _target = value;
+        if (value != "selected_device")
+        {
+            _deviceSubscriber = null;
+            _subscriberDevices = new();
+            _selectedDevice = null;
+        }
+    }
+
+    private void OnDeviceSubscriberChanged(SubscriberDto? subscriber)
+    {
+        _deviceSubscriber = subscriber;
+        _subscriberDevices = new();
+        _selectedDevice = null;
+        if (subscriber != null)
+            _ = LoadDevicesAsync(subscriber);
+    }
+
+    private async Task LoadDevicesAsync(SubscriberDto subscriber)
+    {
+        _loadingDevices = true;
+        _subscriberDevices = new();
+        _selectedDevice = null;
+        StateHasChanged();
+        try
+        {
+            var all = await DeviceService.GetDevicesAsync();
+            _subscriberDevices = all
+                .Where(d => d.MobileUserId == subscriber.MobileUserId && d.CompanyId == subscriber.CompanyId)
+                .ToList();
+        }
+        finally
+        {
+            _loadingDevices = false;
+            StateHasChanged();
+        }
+    }
+
+    private List<Guid> GetTargetCompanyIds()
+    {
+        if (_recipientGroup == "custom")
+            return _customSubscribers.Select(s => s.CompanyId).ToList();
+
+        return _recipientGroup switch
+        {
+            "active"         => _allSubscribers.Where(s => s.SubscriptionStatus.Equals("Active", StringComparison.OrdinalIgnoreCase)).Select(s => s.CompanyId).ToList(),
+            "trial"          => _allSubscribers.Where(s => s.SubscriptionStatus.Equals("Trial", StringComparison.OrdinalIgnoreCase)).Select(s => s.CompanyId).ToList(),
+            "trial_expiring" => _allSubscribers.Where(s => s.SubscriptionStatus.Equals("Trial", StringComparison.OrdinalIgnoreCase) && s.RemainingDays <= 7).Select(s => s.CompanyId).ToList(),
+            "grace"          => _allSubscribers.Where(s => s.SubscriptionStatus.Equals("Grace", StringComparison.OrdinalIgnoreCase)).Select(s => s.CompanyId).ToList(),
+            "expired"        => _allSubscribers.Where(s => s.SubscriptionStatus.Equals("Expired", StringComparison.OrdinalIgnoreCase)).Select(s => s.CompanyId).ToList(),
+            "locked"         => _allSubscribers.Where(s => s.UserStatus.Equals("Locked", StringComparison.OrdinalIgnoreCase)).Select(s => s.CompanyId).ToList(),
+            _                => _allSubscribers.Select(s => s.CompanyId).ToList(),
+        };
+    }
+
+    private string GetRecipientSummary()
+    {
+        if (_recipientGroup == "custom")
+        {
+            var count = _customSubscribers.Count();
+            return count == 0 ? "No subscribers selected" : $"{count} subscriber{(count == 1 ? "" : "s")} selected";
+        }
+        var ids = GetTargetCompanyIds();
+        var label = _recipientGroup switch
+        {
+            "all"            => "All Subscribers",
+            "active"         => "Active Subscribers",
+            "trial"          => "Trial Users",
+            "trial_expiring" => "Trial Expiring (7 Days)",
+            "grace"          => "Grace Period",
+            "expired"        => "Expired",
+            "locked"         => "Locked",
+            _                => string.Empty
+        };
+        return $"{label} — {ids.Count} matched";
+    }
+
+    private async Task SendNotification()
+    {
+        if (string.IsNullOrWhiteSpace(_title) || string.IsNullOrWhiteSpace(_body))
+        {
+            Snackbar.Add("Title and Message are required.", Severity.Warning);
+            return;
+        }
+
+        _sending = true;
+        try
+        {
+            var request = new NotificationRequest
+            {
+                Type = _notificationType,
+                RecipientType = _recipientGroup,
+                CompanyIds = GetTargetCompanyIds(),
+                DeviceId = _target == "selected_device" ? _selectedDevice?.MobileDeviceId : null,
+                Title = _title,
+                Message = _body
+            };
+            var ok = await NotificationService.SendNotificationAsync(request);
+            Snackbar.Add(ok ? "Notification sent." : "Send failed — check API.", ok ? Severity.Success : Severity.Error);
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+}

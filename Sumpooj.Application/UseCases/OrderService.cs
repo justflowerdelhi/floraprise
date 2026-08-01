@@ -526,8 +526,6 @@ public class OrderService
         if (order.Status == OrderStatus.Delivered && order.IsInventoryProcessed)
             return;
 
-        using var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
-
         var reservations = await _reservationRepository.GetBySalesOrderIdAsync(order.Id);
         var activeReservations = reservations.Where(r => r.Status == ReservationStatus.Active).ToList();
 
@@ -577,7 +575,6 @@ public class OrderService
         order.MarkInventoryProcessed();
         await _orderRepository.UpdateAsync(order);
 
-        scope.Complete();
     }
 
     /// <summary>

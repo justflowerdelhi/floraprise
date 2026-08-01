@@ -17,7 +17,7 @@ namespace Sumpooj.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -736,9 +736,23 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CustomerEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("CustomerPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<string>("DeliveryAddress")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<double?>("DeliveryAddressLatitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("DeliveryAddressLongitude")
+                        .HasColumnType("double precision");
 
                     b.Property<DateTime>("DeliveryDate")
                         .HasColumnType("timestamp with time zone")
@@ -767,12 +781,113 @@ namespace Sumpooj.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("TrackingToken")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DeliveryPersonId");
+
                     b.ToTable("Deliveries");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.DeliveryLocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeliveryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("DeliveryRouteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("DriverId")
+                        .HasColumnType("uuid");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double>("SpeedKph")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DeliveryLocations");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.DeliveryProof", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<double?>("CompletionLatitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("CompletionLongitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeliveryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OTPCode")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("OTPVerified")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("OTPVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PhotoUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RecipientName")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SignatureData")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UploadedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UploadedByUserName")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DeliveryProofs");
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.DeliveryRoute", b =>
@@ -803,6 +918,131 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("DeliveryRoutes");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.DeliverySettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AllowCustomerTracking")
+                        .HasColumnType("boolean");
+
+                    b.Property<double>("ArrivedNearbyRadiusMeters")
+                        .HasColumnType("double precision");
+
+                    b.Property<bool>("AutoNotifyDelay")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DelayThresholdMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("EnableBatteryOptimization")
+                        .HasColumnType("boolean");
+
+                    b.Property<double>("ImOutsideRadiusMeters")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("LocationRetentionDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LocationUploadIntervalSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LowBatteryThresholdPercent")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("MinDistanceMetersForUpload")
+                        .HasColumnType("double precision");
+
+                    b.Property<bool>("NotifyCustomerOnAccept")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NotifyCustomerOnArrived")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NotifyCustomerOnDelivered")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NotifyCustomerOnEnRoute")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NotifyCustomerOnPickup")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NotifyFloristOnStatusChange")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("OTPLength")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("RequireOTP")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequirePhotoProof")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequireSignature")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ShowDriverPhoneToCustomer")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ShowDriverPhotoToCustomer")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique();
+
+                    b.ToTable("DeliverySettings", (string)null);
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.DeliveryTimeline", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ChangedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ChangedByUserName")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeliveryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DeliveryTimelines");
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.DeliveryZone", b =>
@@ -904,6 +1144,201 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("DemoRequests");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.DeviceSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid>("MobileDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RefreshToken")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MobileDeviceId");
+
+                    b.HasIndex("RefreshToken")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "MobileDeviceId", "Status");
+
+                    b.ToTable("DeviceSessions", (string)null);
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.DriverAnalytics", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<double>("AverageBatteryLevel")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("AverageDeliveryTimeMinutes")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("AverageDistancePerDeliveryKm")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("AverageLocationAccuracyMeters")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("AverageTimeToDeliveryMinutes")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("AverageTimeToPickupMinutes")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("CompletedDeliveries")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DelayedDeliveries")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("DriverId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FailedDeliveries")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LowBatteryAlerts")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalDeliveries")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("TotalDeliveryTimeMinutes")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("TotalDistanceKm")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("TotalLocationUpdates")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TrackingMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date");
+
+                    b.HasIndex("DriverId");
+
+                    b.HasIndex("DriverId", "Date");
+
+                    b.ToTable("DriverAnalytics", (string)null);
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.DriverLocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<double?>("Accuracy")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("Altitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("BatteryLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeliveryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DriverId")
+                        .HasColumnType("uuid");
+
+                    b.Property<double?>("Heading")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("Speed")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeliveryId");
+
+                    b.HasIndex("DriverId");
+
+                    b.HasIndex("RecordedAt");
+
+                    b.HasIndex("DriverId", "DeliveryId");
+
+                    b.HasIndex("DriverId", "RecordedAt");
+
+                    b.ToTable("DriverLocations", (string)null);
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.Event", b =>
@@ -1030,6 +1465,60 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Expenses");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.FeatureEntitlement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<string>("FeatureKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("MobileSubscriptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MobileSubscriptionId");
+
+                    b.HasIndex("CompanyId", "MobileSubscriptionId", "FeatureKey")
+                        .IsUnique();
+
+                    b.ToTable("FeatureEntitlements", (string)null);
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.FinishedGoodsBatch", b =>
@@ -1410,6 +1899,488 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Locations");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileCustomer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BusinessName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Mobile")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("OwnerName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("State")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "IsDeleted");
+
+                    b.HasIndex("CompanyId", "Mobile")
+                        .IsUnique();
+
+                    b.ToTable("MobileCustomers", (string)null);
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AppVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastHeartbeatAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<string>("LastIpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("LastLoginAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<DateTime?>("LastSyncAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<string>("Manufacturer")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("MobileUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("OsVersion")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("PushToken")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MobileUserId");
+
+                    b.HasIndex("CompanyId", "Status");
+
+                    b.HasIndex("CompanyId", "MobileUserId", "DeviceId")
+                        .IsUnique();
+
+                    b.ToTable("MobileDevices", (string)null);
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileLicense", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<DateTime?>("ExpiryUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("IssuedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid>("MobileDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MobileSubscriptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MobileDeviceId")
+                        .IsUnique();
+
+                    b.HasIndex("MobileSubscriptionId");
+
+                    b.HasIndex("CompanyId", "Status");
+
+                    b.ToTable("MobileLicenses", (string)null);
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobilePaymentTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<DateTime?>("FailedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<string>("GatewayOrderId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("GatewayPaymentId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("MobileSubscriptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("PaidAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("PaymentType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<DateTime?>("RefundedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("TransactionRef")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MobileSubscriptionId");
+
+                    b.HasIndex("TransactionRef")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "PaymentStatus");
+
+                    b.ToTable("MobilePaymentTransactions", (string)null);
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AutoRenew")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<DateTime?>("EndUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<DateTime?>("GraceEndUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastValidatedUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid>("MobileUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime?>("StartUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<Guid>("SubscriptionPlanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("TrialEndUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<DateTime>("TrialStartUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MobileUserId")
+                        .IsUnique();
+
+                    b.HasIndex("SubscriptionPlanId");
+
+                    b.HasIndex("CompanyId", "Status");
+
+                    b.ToTable("MobileSubscriptions", (string)null);
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileUser", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Mobile")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("MobileCustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PreferredLanguage")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("PreferredTheme")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MobileCustomerId");
+
+                    b.HasIndex("CompanyId", "Mobile")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "Status");
+
+                    b.ToTable("MobileUsers", (string)null);
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.Order", b =>
@@ -2471,13 +3442,13 @@ namespace Sumpooj.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("BatchNumber")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("ExpiryDate")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<bool>("IsPerishable")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("IsPriceMismatch")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("IsQuantityMismatch")
                         .HasColumnType("boolean");
 
                     b.Property<Guid>("ProductId")
@@ -2500,9 +3471,6 @@ namespace Sumpooj.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("Sku")
-                        .HasColumnType("text");
-
-                    b.Property<string>("StorageLocation")
                         .HasColumnType("text");
 
                     b.Property<decimal>("TotalPrice")
@@ -3032,6 +4000,92 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.ToTable("StockMovements");
                 });
 
+            modelBuilder.Entity("Sumpooj.Domain.Entities.SubscriptionPlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AnnualPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<int>("GraceDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IncludedModulesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("LifetimePrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("MaximumDevices")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MaximumStaff")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MonthlyPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("OfflineDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PlanType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<int>("TrialDays")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive", "IsDeleted");
+
+                    b.ToTable("SubscriptionPlans", (string)null);
+                });
+
             modelBuilder.Entity("Sumpooj.Domain.Entities.Supplier", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3137,6 +4191,63 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.HasIndex("CompanyId", "CountryCode");
 
                     b.ToTable("tax_rules", (string)null);
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.TrialHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ActionAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("MobileSubscriptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MobileSubscriptionId");
+
+                    b.HasIndex("CompanyId", "MobileSubscriptionId", "ActionAtUtc");
+
+                    b.ToTable("TrialHistory", (string)null);
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.UserDashboardPreference", b =>
@@ -3483,6 +4594,174 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Navigation("Order");
                 });
 
+            modelBuilder.Entity("Sumpooj.Domain.Entities.Delivery", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Staff", null)
+                        .WithMany()
+                        .HasForeignKey("DeliveryPersonId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.DeviceSession", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.MobileDevice", "MobileDevice")
+                        .WithMany("Sessions")
+                        .HasForeignKey("MobileDeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("MobileDevice");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.DriverLocation", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Delivery", "Delivery")
+                        .WithMany()
+                        .HasForeignKey("DeliveryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Delivery");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.FeatureEntitlement", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.MobileSubscription", "MobileSubscription")
+                        .WithMany("FeatureEntitlements")
+                        .HasForeignKey("MobileSubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("MobileSubscription");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileDevice", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.MobileUser", "MobileUser")
+                        .WithMany("Devices")
+                        .HasForeignKey("MobileUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("MobileUser");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileLicense", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.MobileDevice", "MobileDevice")
+                        .WithOne("License")
+                        .HasForeignKey("Sumpooj.Domain.Entities.MobileLicense", "MobileDeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.MobileSubscription", "MobileSubscription")
+                        .WithMany()
+                        .HasForeignKey("MobileSubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("MobileDevice");
+
+                    b.Navigation("MobileSubscription");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobilePaymentTransaction", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.MobileSubscription", "MobileSubscription")
+                        .WithMany("PaymentTransactions")
+                        .HasForeignKey("MobileSubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("MobileSubscription");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileSubscription", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.MobileUser", "MobileUser")
+                        .WithOne("Subscription")
+                        .HasForeignKey("Sumpooj.Domain.Entities.MobileSubscription", "MobileUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.SubscriptionPlan", "SubscriptionPlan")
+                        .WithMany("Subscriptions")
+                        .HasForeignKey("SubscriptionPlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("MobileUser");
+
+                    b.Navigation("SubscriptionPlan");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileUser", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.MobileCustomer", "MobileCustomer")
+                        .WithMany("MobileUsers")
+                        .HasForeignKey("MobileCustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("MobileCustomer");
+                });
+
             modelBuilder.Entity("Sumpooj.Domain.Entities.Order", b =>
                 {
                     b.HasOne("Sumpooj.Domain.Entities.Customer", "Customer")
@@ -3620,6 +4899,25 @@ namespace Sumpooj.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Sumpooj.Domain.Entities.TrialHistory", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.MobileSubscription", "MobileSubscription")
+                        .WithMany("TrialHistoryEntries")
+                        .HasForeignKey("MobileSubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("MobileSubscription");
+                });
+
             modelBuilder.Entity("Sumpooj.Domain.Entities.CorporateClient", b =>
                 {
                     b.Navigation("Employees");
@@ -3633,6 +4931,34 @@ namespace Sumpooj.Infrastructure.Migrations
             modelBuilder.Entity("Sumpooj.Domain.Entities.FloralRecipe", b =>
                 {
                     b.Navigation("Components");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileCustomer", b =>
+                {
+                    b.Navigation("MobileUsers");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileDevice", b =>
+                {
+                    b.Navigation("License");
+
+                    b.Navigation("Sessions");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileSubscription", b =>
+                {
+                    b.Navigation("FeatureEntitlements");
+
+                    b.Navigation("PaymentTransactions");
+
+                    b.Navigation("TrialHistoryEntries");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MobileUser", b =>
+                {
+                    b.Navigation("Devices");
+
+                    b.Navigation("Subscription");
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.Order", b =>
@@ -3663,6 +4989,11 @@ namespace Sumpooj.Infrastructure.Migrations
             modelBuilder.Entity("Sumpooj.Domain.Entities.SalesOrder", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.SubscriptionPlan", b =>
+                {
+                    b.Navigation("Subscriptions");
                 });
 #pragma warning restore 612, 618
         }

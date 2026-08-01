@@ -1,0 +1,282 @@
+@page "/deliveries"
+@layout MainLayout
+@inject DeliveryApiService DeliveryService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<div class="page-shell">
+    <div class="section-header">
+        <div>
+            <div class="eyebrow">Operations</div>
+            <h1 class="page-title">Live Deliveries</h1>
+            <div class="page-subtitle">Track real-time delivery status and locations</div>
+        </div>
+        <div class="header-meta">Auto-refreshing • 30s</div>
+    </div>
+
+    <MudPaper Elevation="0" Class="table-card">
+        <MudTable Items="@_deliveries" Hover="true" Dense="true" Elevation="0" Class="ops-table">
+            <HeaderContent>
+                <MudTh>Order</MudTh>
+                <MudTh>Customer</MudTh>
+                <MudTh>Driver</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>ETA</MudTh>
+                <MudTh>Last Update</MudTh>
+                <MudTh>Track</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Order">@context.OrderNumber</MudTd>
+                <MudTd DataLabel="Customer">@context.CustomerName</MudTd>
+                <MudTd DataLabel="Driver">@context.DriverName</MudTd>
+                <MudTd DataLabel="Status">
+                    <span class="status-pill @GetStatusClass(context.Status)">@context.Status</span>
+                </MudTd>
+                <MudTd DataLabel="ETA">@(context.Eta?.ToString("dd MMM HH:mm") ?? "-")</MudTd>
+                <MudTd DataLabel="Last Update">@context.LastUpdate.ToString("dd MMM HH:mm")</MudTd>
+                <MudTd DataLabel="Track">
+                    <MudButton Variant="Variant.Text" Size="Size.Small" Class="action-link"
+                               OnClick="@(() => OpenTrackDrawer(context))">Track</MudButton>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
+</div>
+
+<MudDrawer @bind-Open="_drawerOpen" Anchor="Anchor.Right" Width="480px" Elevation="1">
+    @if (_selected != null)
+    {
+        <MudDrawerHeader>
+            <MudText Typo="Typo.h6">@_selected.OrderNumber</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@(() => _drawerOpen = false)" />
+        </MudDrawerHeader>
+        <MudDivider />
+        <div class="drawer-body">
+
+            
+            @{ var mapSrc = BuildMapUrl(_selected); }
+            @if (mapSrc != null)
+            {
+                <div class="map-container">
+                    <iframe src="@mapSrc" style="width:100%;height:260px;border:none;border-radius:8px;" loading="lazy" title="Delivery map" />
+                </div>
+                @if (_selected.DriverLat.HasValue)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Success" Class="gps-badge">
+                        ● Driver GPS updated @_selected.DriverUpdatedAt?.ToString("HH:mm")
+                    </MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="gps-badge">Waiting for driver to start delivery.</MudText>
+                }
+            }
+            else
+            {
+                <div class="no-map-placeholder">
+                    <MudIcon Icon="@Icons.Material.Filled.Map" Style="font-size:40px;color:#d1d5db;" />
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">Waiting for driver to start delivery.</MudText>
+                </div>
+            }
+
+            <MudDivider Class="my-3" />
+
+            <div class="detail-row">
+                <span class="detail-label">Customer</span>
+                <MudText Typo="Typo.body2">@_selected.CustomerName</MudText>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Driver</span>
+                <MudText Typo="Typo.body2">@_selected.DriverName</MudText>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Phone</span>
+                <MudText Typo="Typo.body2">Customer: @(_selected.CustomerPhone ?? "-")</MudText>
+                <MudText Typo="Typo.body2">Driver: @(_selected.DriverPhone ?? "-")</MudText>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Status</span>
+                <span class="status-pill @GetStatusClass(_selected.Status)">@_selected.Status</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Status Timeline</span>
+                <MudText Typo="Typo.body2">@_selected.Status at @_selected.LastUpdate.ToString("dd MMM yyyy HH:mm")</MudText>
+            </div>
+            @if (!string.IsNullOrEmpty(_selected.DeliveryAddress))
+            {
+                <div class="detail-row">
+                    <span class="detail-label">Address</span>
+                    <MudText Typo="Typo.body2">@_selected.DeliveryAddress</MudText>
+                </div>
+            }
+            <div class="detail-row">
+                <span class="detail-label">ETA</span>
+                <MudText Typo="Typo.body2">@(_selected.Eta?.ToString("dd MMM yyyy HH:mm") ?? "-")</MudText>
+            </div>
+
+            <MudDivider Class="my-3" />
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh"
+                       Size="Size.Small" FullWidth="true" OnClick="RefreshDrawer">
+                Refresh
+            </MudButton>
+            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Phone"
+                       Size="Size.Small" FullWidth="true" Class="mt-1"
+                       Disabled="@string.IsNullOrWhiteSpace(_selected.DriverPhone)"
+                       OnClick="@(() => CallPhone(_selected.DriverPhone))">
+                Call Driver
+            </MudButton>
+            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Phone"
+                       Size="Size.Small" FullWidth="true" Class="mt-1"
+                       Disabled="@string.IsNullOrWhiteSpace(_selected.CustomerPhone)"
+                       OnClick="@(() => CallPhone(_selected.CustomerPhone))">
+                Call Customer
+            </MudButton>
+
+            @if (!string.IsNullOrEmpty(_selected.TrackingToken))
+            {
+                <MudDivider Class="my-3" />
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.OpenInNew"
+                           Size="Size.Small" FullWidth="true"
+                           OnClick="@(() => OpenTrackingPage(_selected.TrackingToken))">
+                    Open Driver Tracking Page
+                </MudButton>
+                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ContentCopy"
+                           Size="Size.Small" FullWidth="true" Class="mt-1"
+                           OnClick="@(() => CopyTrackingLink(_selected.TrackingToken))">
+                    Copy Driver Link
+                </MudButton>
+            }
+        </div>
+    }
+</MudDrawer>
+
+<style>
+    .page-shell { display: flex; flex-direction: column; gap: 16px; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; }
+    .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280; }
+    .page-title { margin: 4px 0 0; font-size: 24px; color: #243447; }
+    .page-subtitle { margin: 4px 0 0; font-size: 14px; color: #6b7280; }
+    .header-meta { color: #6b7280; font-size: 13px; }
+    .table-card { background: #ffffff; border: 1px solid #e6ebf1; border-radius: 12px; padding: 8px; }
+    .status-pill { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .status-pill.assigned { background: #e3f2fd; color: #1565c0; }
+    .status-pill.inprogress { background: #e3f2fd; color: #1565c0; }
+    .status-pill.outfordelivery { background: #fff8e1; color: #f57f17; }
+    .status-pill.delivered { background: #e8f5e9; color: #2e7d32; }
+    .status-pill.cancelled { background: #ffebee; color: #d32f2f; }
+    .status-pill.pending { background: #fff3e0; color: #ef6c00; }
+    .action-link { color: #2563eb; text-transform: none; min-width: auto; }
+    .drawer-body { padding: 16px; overflow-y: auto; }
+    .detail-row { margin-bottom: 14px; }
+    .detail-label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 3px; }
+    .map-container { margin-bottom: 6px; }
+    .gps-badge { display: block; margin-bottom: 10px; font-size: 11px; }
+    .no-map-placeholder { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 24px 0; color: #9ca3af; }
+    .mt-1 { margin-top: 4px; }
+    .my-3 { margin-top: 12px; margin-bottom: 12px; }
+</style>
+
+@code {
+    private List<LiveDeliveryDto> _deliveries = new();
+    private LiveDeliveryDto? _selected;
+    private bool _drawerOpen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDeliveries();
+    }
+
+    private async Task LoadDeliveries()
+    {
+        _deliveries = await DeliveryService.GetLiveDeliveriesAsync();
+    }
+
+    private async Task RefreshDrawer()
+    {
+        await LoadDeliveries();
+        if (_selected != null)
+        {
+            _selected = _deliveries.FirstOrDefault(x => x.DeliveryId == _selected.DeliveryId) ?? _selected;
+        }
+    }
+
+    private void CallPhone(string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone)) return;
+        Navigation.NavigateTo($"tel:{phone}", forceLoad: true);
+    }
+
+    private void OpenTrackDrawer(LiveDeliveryDto delivery)
+    {
+        _selected = delivery;
+        _drawerOpen = true;
+    }
+
+    private string GetStatusClass(string status) =>
+        status.ToLowerInvariant().Replace(" ", "") switch
+        {
+            "assigned"       => "assigned",
+            "accepted"       => "inprogress",
+            "pickedup"       => "inprogress",
+            "outfordelivery" => "outfordelivery",
+            "arrivednearby"  => "outfordelivery",
+            "delivered"      => "delivered",
+            "cancelled"      => "cancelled",
+            _                => "pending"
+        };
+
+    private void OpenTrackingPage(string? token)
+    {
+        if (string.IsNullOrEmpty(token)) return;
+        Navigation.NavigateTo($"http://localhost:5148/api/public/tracking/driver/{token}", forceLoad: true);
+    }
+
+    private async Task CopyTrackingLink(string? token)
+    {
+        if (string.IsNullOrEmpty(token)) return;
+        var link = $"http://localhost:5148/api/public/tracking/driver/{token}";
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", link);
+        Snackbar.Add("Driver link copied to clipboard.", Severity.Success);
+    }
+
+    // Returns an OpenStreetMap embed URL centred on driver GPS (if available) or delivery destination.
+    private string? BuildMapUrl(LiveDeliveryDto d)
+    {
+        double? lat = d.DriverLat ?? d.DestLat;
+        double? lng = d.DriverLng ?? d.DestLng;
+        if (lat is null || lng is null) return null;
+
+        // F() formats a coordinate as an invariant decimal string safe for URLs.
+        static string F(double v) => v.ToString("F6").Replace(',', '.');
+
+        double span = 0.01;
+        double bboxMinLat, bboxMaxLat, bboxMinLng, bboxMaxLng;
+        double markerLat, markerLng;
+
+        if (d.DriverLat.HasValue && d.DestLat.HasValue)
+        {
+            bboxMinLat = Math.Min(d.DriverLat.Value, d.DestLat.Value) - span;
+            bboxMaxLat = Math.Max(d.DriverLat.Value, d.DestLat.Value) + span;
+            bboxMinLng = Math.Min(d.DriverLng!.Value, d.DestLng!.Value) - span;
+            bboxMaxLng = Math.Max(d.DriverLng.Value, d.DestLng.Value) + span;
+            markerLat  = d.DriverLat.Value;
+            markerLng  = d.DriverLng.Value;
+        }
+        else
+        {
+            bboxMinLat = lat.Value - span; bboxMaxLat = lat.Value + span;
+            bboxMinLng = lng.Value - span; bboxMaxLng = lng.Value + span;
+            markerLat  = lat.Value;
+            markerLng  = lng.Value;
+        }
+
+        var bbox   = $"{F(bboxMinLng)},{F(bboxMinLat)},{F(bboxMaxLng)},{F(bboxMaxLat)}";
+        var marker = $"{F(markerLat)},{F(markerLng)}";
+        return $"https://www.openstreetmap.org/export/embed.html?bbox={bbox}&layer=mapnik&marker={marker}";
+    }
+}

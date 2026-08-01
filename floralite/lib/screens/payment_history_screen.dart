@@ -136,12 +136,27 @@ class _PaymentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final createdAt = payment['createdAtUtc'] as String?;
-    final planName = payment['planName'] as String? ?? 'Unknown Plan';
-    final amount = payment['amount'] as num? ?? 0;
-    final status = payment['status'] as String? ?? 'Unknown';
-    final transactionId = payment['transactionId'] as String?;
-    final paidAt = payment['paidAtUtc'] as String?;
+    final createdAt =
+        (payment['createdAtUtc'] ?? payment['CreatedAtUtc'])?.toString();
+    final planName = (payment['planName'] ??
+            payment['planCode'] ??
+            payment['PlanName'] ??
+            payment['PlanCode'] ??
+            'Subscription')
+        .toString();
+    final amount = _toNum(payment['amount'] ?? payment['Amount']) ?? 0;
+    final status = (payment['paymentStatus'] ??
+            payment['status'] ??
+            payment['PaymentStatus'] ??
+            'Unknown')
+        .toString();
+    final transactionId = (payment['transactionRef'] ??
+            payment['transactionId'] ??
+            payment['TransactionRef'])
+        ?.toString();
+    final invoiceNumber =
+        (payment['invoiceNumber'] ?? payment['InvoiceNumber'])?.toString();
+    final paidAt = (payment['paidAtUtc'] ?? payment['PaidAtUtc'])?.toString();
 
     final createdAtDate =
         createdAt != null ? DateTime.tryParse(createdAt) : null;
@@ -231,7 +246,28 @@ class _PaymentCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      'Transaction ID: $transactionId',
+                      'Transaction: $transactionId',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey.shade600,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (invoiceNumber != null && invoiceNumber.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    Icons.description_outlined,
+                    size: 16,
+                    color: Colors.grey.shade500,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Invoice: $invoiceNumber',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Colors.grey.shade600,
                           ),
@@ -265,8 +301,14 @@ class _PaymentCard extends StatelessWidget {
     );
   }
 
+  num? _toNum(Object? value) {
+    if (value is num) return value;
+    return num.tryParse(value?.toString() ?? '');
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
+      case 'paid':
       case 'completed':
         return Colors.green;
       case 'pending':
@@ -282,6 +324,7 @@ class _PaymentCard extends StatelessWidget {
 
   IconData _getStatusIcon(String status) {
     switch (status.toLowerCase()) {
+      case 'paid':
       case 'completed':
         return Icons.check_circle;
       case 'pending':

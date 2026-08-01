@@ -8,10 +8,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Sumpooj.Application\Sumpooj.Application.csproj" />
+    <ProjectReference Include="..\Sumpooj.Infrastructure\Sumpooj.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.15.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.0" />
+    <PackageReference Include="MudBlazor" Version="7.0.0" />
   </ItemGroup>
 
 </Project>

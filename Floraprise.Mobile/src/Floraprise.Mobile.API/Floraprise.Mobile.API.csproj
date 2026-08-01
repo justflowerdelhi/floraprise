@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Floraprise.Mobile.Application\Floraprise.Mobile.Application.csproj" />
+    <ProjectReference Include="..\Floraprise.Mobile.Infrastructure\Floraprise.Mobile.Infrastructure.csproj" />
+    <ProjectReference Include="..\Floraprise.Mobile.Contracts\Floraprise.Mobile.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,75 @@
+@page "/system"
+@layout MainLayout
+@inject SystemApiService SystemService
+
+<div class="page-shell">
+    <div class="section-header">
+        <div>
+            <div class="eyebrow">Operations</div>
+            <h1 class="page-title">System</h1>
+            <div class="page-subtitle">System status and configuration controls</div>
+        </div>
+    </div>
+
+    <div class="system-grid">
+        <MudPaper Elevation="0" Class="table-card">
+            <div class="panel-title">Operational status</div>
+            <div class="status-list">
+                <div class="status-row"><span>API status</span><strong>@_systemStatus.ApiStatus</strong></div>
+                <div class="status-row"><span>Database</span><strong>@_systemStatus.DatabaseStatus</strong></div>
+                <div class="status-row"><span>Firebase</span><strong>Connected</strong></div>
+                <div class="status-row"><span>Razorpay</span><strong>@_systemStatus.RazorpayStatus</strong></div>
+                <div class="status-row"><span>Background jobs</span><strong>Healthy</strong></div>
+                <div class="status-row"><span>Version</span><strong>@_systemStatus.AppVersion</strong></div>
+            </div>
+        </MudPaper>
+
+        <MudPaper Elevation="0" Class="table-card">
+            <div class="panel-title">Controls</div>
+            <MudSwitch T="bool" Label="Maintenance mode" @bind-Value="@_maintenanceMode" Color="Color.Warning" Class="switch-row" />
+            <MudSwitch T="bool" Label="Kill switch" @bind-Value="@_killSwitch" Color="Color.Error" Class="switch-row" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettings" Class="toolbar-button">Save settings</MudButton>
+        </MudPaper>
+    </div>
+</div>
+
+<style>
+    .page-shell { display: flex; flex-direction: column; gap: 16px; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; }
+    .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280; }
+    .page-title { margin: 4px 0 0; font-size: 24px; color: #243447; }
+    .page-subtitle { margin: 4px 0 0; font-size: 14px; color: #6b7280; }
+    .system-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; }
+    .table-card { background: #ffffff; border: 1px solid #e6ebf1; border-radius: 12px; padding: 18px; }
+    .panel-title { font-size: 16px; font-weight: 700; color: #243447; margin-bottom: 12px; }
+    .status-list { display: flex; flex-direction: column; gap: 10px; }
+    .status-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; color: #374151; }
+    .status-row:last-child { border-bottom: none; }
+    .switch-row { display: block; margin-bottom: 8px; }
+    .toolbar-button { text-transform: none; margin-top: 8px; }
+</style>
+
+@code {
+    private SystemStatusDto _systemStatus = new();
+    private bool _maintenanceMode = false;
+    private bool _killSwitch = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSystemStatus();
+    }
+
+    private async Task LoadSystemStatus()
+    {
+        _systemStatus = await SystemService.GetSystemStatusAsync();
+        _maintenanceMode = _systemStatus.MaintenanceMode;
+        _killSwitch = _systemStatus.KillSwitchActive;
+    }
+
+    private async Task SaveSettings()
+    {
+        await SystemService.ToggleMaintenanceModeAsync(_maintenanceMode);
+        await SystemService.ToggleKillSwitchAsync(_killSwitch);
+        await LoadSystemStatus();
+    }
+}

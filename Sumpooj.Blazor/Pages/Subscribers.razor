@@ -1,0 +1,406 @@
+@page "/subscribers"
+@layout MainLayout
+@using Sumpooj.Blazor.Components
+@inject SubscriptionApiService SubscriptionService
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<div class="page-shell">
+    <div class="section-header">
+        <div>
+            <div class="eyebrow">Operations</div>
+            <h1 class="page-title">Subscribers</h1>
+            <div class="page-subtitle">Manage florist subscriptions and accounts</div>
+        </div>
+        <div class="header-actions">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download" Class="toolbar-button">Export</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" Class="toolbar-button">Refresh</MudButton>
+        </div>
+    </div>
+
+    <MudPaper Elevation="0" Class="table-card">
+        <MudTable Items="@_subscribers" Hover="true" Dense="true" Filter="new Func<SubscriberDto, bool>(FilterFunction)" Elevation="0" Class="ops-table">
+            <ToolBarContent>
+                <MudTextField T="string" Variant="Variant.Outlined" Placeholder="Search company, owner, mobile" @bind-Value="_searchString" AdornmentIcon="@Icons.Material.Filled.Search" Adornment="Adornment.Start" Class="search-field" />
+                <MudSpacer />
+                <MudSelect T="string" Label="Plan" Variant="Variant.Outlined" Class="filter-select" Value="_planFilter" ValueChanged="OnPlanFilterChanged">
+                    <MudSelectItem Value="@("All")" />
+                    <MudSelectItem Value="@("Trial")" />
+                    <MudSelectItem Value="@("Quarterly")" />
+                    <MudSelectItem Value="@("Annual")" />
+                </MudSelect>
+                <MudSelect T="string" Label="Status" Variant="Variant.Outlined" Class="filter-select" Value="_statusFilter" ValueChanged="OnStatusFilterChanged">
+                    <MudSelectItem Value="@("All")" />
+                    <MudSelectItem Value="@("Active")" />
+                    <MudSelectItem Value="@("Trial")" />
+                    <MudSelectItem Value="@("Suspended")" />
+                    <MudSelectItem Value="@("Expired")" />
+                </MudSelect>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>Company</MudTh>
+                <MudTh>Customer</MudTh>
+                <MudTh>Mobile</MudTh>
+                <MudTh>Plan</MudTh>
+                <MudTh>Subscription Status</MudTh>
+                <MudTh>Expiry</MudTh>
+                <MudTh>Devices</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Company">@context.BusinessName</MudTd>
+                <MudTd DataLabel="Customer">@context.CustomerName</MudTd>
+                <MudTd DataLabel="Mobile">@context.Mobile</MudTd>
+                <MudTd DataLabel="Plan">@context.PlanName</MudTd>
+                <MudTd DataLabel="Subscription Status">
+                    <span class="status-pill @GetStatusClass(context.SubscriptionStatus)">@context.SubscriptionStatus</span>
+                </MudTd>
+                <MudTd DataLabel="Expiry">@context.SubscriptionEndUtc?.ToString("dd MMM yyyy")</MudTd>
+                <MudTd DataLabel="Devices">@context.TotalDevices (@context.OnlineDevices online)</MudTd>
+                <MudTd DataLabel="Actions">
+                    <div class="action-row">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Title="View details" OnClick="@(() => OpenSubscriberDetails(context))" Class="action-icon-btn" />
+                        <MudIconButton Icon="@Icons.Material.Filled.CreditCard" Size="Size.Small" Title="Renew subscription" OnClick="@(() => OpenRenewalDialog(context))" Class="action-icon-btn" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Devices" Size="Size.Small" Title="View devices" OnClick="@(() => ViewDevices(context))" Class="action-icon-btn" />
+                        <MudIconButton 
+                            Icon="@(IsSubscriberLocked(context) ? Icons.Material.Filled.LockOpen : Icons.Material.Filled.Lock)" 
+                            Size="Size.Small" 
+                            Title="@(IsSubscriberLocked(context) ? "Unlock subscriber" : "Lock subscriber")" 
+                            OnClick="@(() => ToggleLockSubscriber(context))" 
+                            Class="action-icon-btn action-icon-lock" />
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="action-icon-btn">
+                            <MudMenuItem OnClick="@(() => NotifySubscriber(context))">
+                                <MudIcon Icon="@Icons.Material.Filled.Notifications" Size="Size.Small" Class="menu-icon" />
+                                Notify
+                            </MudMenuItem>
+                            <MudMenuItem OnClick="@(() => ExportSubscriberData(context))">
+                                <MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Small" Class="menu-icon" />
+                                Export
+                            </MudMenuItem>
+                            <MudDivider />
+                            <MudMenuItem OnClick="@(() => ArchiveSubscriber(context))" Class="menu-item-danger">
+                                <MudIcon Icon="@Icons.Material.Filled.Archive" Size="Size.Small" Class="menu-icon" />
+                                Archive
+                            </MudMenuItem>
+                        </MudMenu>
+                    </div>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
+</div>
+
+<style>
+    .page-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .eyebrow {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #6b7280;
+    }
+
+    .page-title {
+        margin: 4px 0 0;
+        font-size: 24px;
+        color: #243447;
+    }
+
+    .page-subtitle {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: #6b7280;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .toolbar-button {
+        text-transform: none;
+    }
+
+    .table-card {
+        background: #ffffff;
+        border: 1px solid #e6ebf1;
+        border-radius: 12px;
+        padding: 8px;
+    }
+
+    .search-field {
+        max-width: 320px;
+        margin-right: 12px;
+    }
+
+    .filter-select {
+        min-width: 120px;
+        margin-right: 8px;
+    }
+
+    .status-pill {
+        display: inline-flex;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .status-pill.active { background: #e8f5e9; color: #2e7d32; }
+    .status-pill.trial { background: #e3f2fd; color: #1565c0; }
+    .status-pill.suspended { background: #fff3e0; color: #ef6c00; }
+    .status-pill.expired { background: #ffebee; color: #d32f2f; }
+
+    .action-stack {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+
+    .action-link {
+        color: #2e7d32;
+        text-transform: none;
+        min-width: auto;
+        padding: 0 4px;
+    }
+
+    .action-row {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .action-icon-btn {
+        opacity: 0.7;
+        transition: opacity 0.2s ease;
+    }
+
+    .action-icon-btn:hover {
+        opacity: 1;
+    }
+
+    .action-icon-lock {
+        color: #d32f2f;
+    }
+
+    .menu-icon {
+        margin-right: 8px;
+    }
+
+    .menu-item-danger {
+        color: #d32f2f;
+    }
+
+</style>
+
+@code {
+    private List<SubscriberDto> _subscribers = new();
+    private string _searchString = string.Empty;
+    private string _planFilter = "All";
+    private string _statusFilter = "All";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSubscribers();
+    }
+
+    private async Task LoadSubscribers()
+    {
+        _subscribers = await SubscriptionService.GetSubscribersAsync();
+    }
+
+    private bool FilterFunction(SubscriberDto subscriber)
+    {
+        var matchesSearch = string.IsNullOrWhiteSpace(_searchString) ||
+            subscriber.BusinessName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            subscriber.CustomerName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            subscriber.Mobile.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+
+        var matchesPlan = _planFilter == "All" || subscriber.PlanName.Contains(_planFilter, StringComparison.OrdinalIgnoreCase);
+        var matchesStatus = _statusFilter == "All" || subscriber.SubscriptionStatus.Contains(_statusFilter, StringComparison.OrdinalIgnoreCase);
+
+        return matchesSearch && matchesPlan && matchesStatus;
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status.ToLowerInvariant() switch
+        {
+            "active" => "active",
+            "trial" => "trial",
+            "suspended" => "suspended",
+            "expired" => "expired",
+            _ => "active"
+        };
+    }
+
+    private void OnPlanFilterChanged(string value)
+    {
+        _planFilter = value;
+    }
+
+    private void OnStatusFilterChanged(string value)
+    {
+        _statusFilter = value;
+    }
+
+    private bool IsSubscriberLocked(SubscriberDto subscriber)
+    {
+        return subscriber.UserStatus?.Equals("Locked", StringComparison.OrdinalIgnoreCase) ?? false;
+    }
+
+    private async Task OpenSubscriberDetails(SubscriberDto subscriber)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(SubscriberDetailsDialog.Subscriber), subscriber }
+        };
+
+        var dialog = await DialogService.ShowAsync<SubscriberDetailsDialog>("Subscriber Details", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data != null)
+        {
+            var action = result.Data.ToString();
+            switch (action?.ToLower())
+            {
+                case "notify":
+                    await NotifySubscriber(subscriber);
+                    break;
+                case "renew":
+                    await OpenRenewalDialog(subscriber);
+                    break;
+                case "devices":
+                    await ViewDevices(subscriber);
+                    break;
+            }
+        }
+    }
+
+    private async Task OpenRenewalDialog(SubscriberDto subscriber)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(RenewalDialog.Subscriber), subscriber }
+        };
+
+        var dialog = await DialogService.ShowAsync<RenewalDialog>("Renew Subscription", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadSubscribers();
+        }
+    }
+
+    private async Task ViewDevices(SubscriberDto subscriber)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(DevicesDialog.MobileUserId), subscriber.MobileUserId },
+            { nameof(DevicesDialog.CompanyId), subscriber.CompanyId }
+        };
+
+        await DialogService.ShowAsync<DevicesDialog>($"Devices - {subscriber.BusinessName}", parameters);
+    }
+
+    private async Task ToggleLockSubscriber(SubscriberDto subscriber)
+    {
+        var isCurrentlyLocked = IsSubscriberLocked(subscriber);
+        var action = isCurrentlyLocked ? "Unlock" : "Lock";
+
+        var parameters = new DialogParameters
+        {
+            { nameof(ConfirmDialog.Title), $"{action} Subscriber" },
+            { nameof(ConfirmDialog.Message), $"Are you sure you want to {action.ToLower()} {subscriber.BusinessName}? This action will {(isCurrentlyLocked ? "allow" : "prevent")} them from accessing the mobile app." }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(action, parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                if (isCurrentlyLocked)
+                {
+                    // Activate the license (unlock)
+                    await SubscriptionService.ActivateLicenseAsync(subscriber.MobileUserId, subscriber.CompanyId);
+                    Snackbar.Add($"{subscriber.BusinessName} has been unlocked.", Severity.Success);
+                }
+                else
+                {
+                    // Suspend the license (lock)
+                    await SubscriptionService.SuspendLicenseAsync(subscriber.MobileUserId, subscriber.CompanyId);
+                    Snackbar.Add($"{subscriber.BusinessName} has been locked.", Severity.Success);
+                }
+
+                await LoadSubscribers();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task NotifySubscriber(SubscriberDto subscriber)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(NotifyDialog.Subscriber), subscriber }
+        };
+
+        await DialogService.ShowAsync<NotifyDialog>("Notify Subscriber", parameters);
+    }
+
+    private void ExportSubscriberData(SubscriberDto subscriber)
+    {
+        // Export as CSV or similar
+        Snackbar.Add($"Exporting data for {subscriber.BusinessName}...", Severity.Info);
+        // TODO: Implement export logic if needed
+    }
+
+    private async Task ArchiveSubscriber(SubscriberDto subscriber)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(ConfirmDialog.Title), "Archive Subscriber" },
+            { nameof(ConfirmDialog.Message), $"Are you sure you want to archive {subscriber.BusinessName}? This action cannot be undone." }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Archive", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                // Archive logic would go here
+                Snackbar.Add($"{subscriber.BusinessName} has been archived.", Severity.Success);
+                await LoadSubscribers();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

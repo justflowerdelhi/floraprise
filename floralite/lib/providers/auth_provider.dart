@@ -152,12 +152,15 @@ class AuthProvider extends ChangeNotifier {
     final status = (subscription['status'] ?? '').toString().toUpperCase();
     if (status == 'EXPIRED' ||
         status == 'SUSPENDED' ||
-        status == 'DEACTIVATED') {
+        status == 'DEACTIVATED' ||
+        status == 'CANCELLED') {
       return false;
     }
 
-    final isTrial = subscription['isTrial'] == true;
-    final trialEndsAtRaw = subscription['trialEndsAtUtc']?.toString();
+    final trial = bootstrap['trial'];
+    final isTrial = trial is Map && trial['isTrial'] == true;
+    final trialEndsAtRaw =
+        trial is Map ? trial['trialEndUtc']?.toString() : null;
     if (isTrial && trialEndsAtRaw != null && trialEndsAtRaw.isNotEmpty) {
       final trialEndsAt = DateTime.tryParse(trialEndsAtRaw)?.toUtc();
       if (trialEndsAt != null && DateTime.now().toUtc().isAfter(trialEndsAt)) {
@@ -186,8 +189,14 @@ class AuthProvider extends ChangeNotifier {
       return 'Your subscription is deactivated. Please contact support.';
     }
 
-    final isTrial = subscription['isTrial'] == true;
-    final trialEndsAtRaw = subscription['trialEndsAtUtc']?.toString();
+    if (status == 'CANCELLED') {
+      return 'Your subscription is cancelled. Please renew to continue.';
+    }
+
+    final trial = bootstrap['trial'];
+    final isTrial = trial is Map && trial['isTrial'] == true;
+    final trialEndsAtRaw =
+        trial is Map ? trial['trialEndUtc']?.toString() : null;
     if (isTrial && trialEndsAtRaw != null && trialEndsAtRaw.isNotEmpty) {
       final trialEndsAt = DateTime.tryParse(trialEndsAtRaw)?.toUtc();
       if (trialEndsAt != null && DateTime.now().toUtc().isAfter(trialEndsAt)) {
@@ -212,8 +221,16 @@ class AuthProvider extends ChangeNotifier {
         return 'This email is already registered.';
       case 'mobile_exists':
         return 'This mobile number is already registered.';
+      case 'DUPLICATE_EMAIL':
+        return 'This email is already registered.';
+      case 'DUPLICATE_PHONE':
+        return 'This mobile number is already registered.';
       default:
-        return fallback;
+        // Return the actual server error message instead of generic fallback
+        if (fallback.trim().isNotEmpty && !fallback.contains('Request failed')) {
+          return fallback;
+        }
+        return 'Something went wrong. Please try again.';
     }
   }
 }

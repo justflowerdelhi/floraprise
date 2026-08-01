@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Floraprise.Mobile.API/Floraprise.Mobile.API.csproj" />
+    <Project Path="src/Floraprise.Mobile.Application/Floraprise.Mobile.Application.csproj" />
+    <Project Path="src/Floraprise.Mobile.Contracts/Floraprise.Mobile.Contracts.csproj" />
+    <Project Path="src/Floraprise.Mobile.Core/Floraprise.Mobile.Core.csproj" />
+    <Project Path="src/Floraprise.Mobile.Domain/Floraprise.Mobile.Domain.csproj" />
+    <Project Path="src/Floraprise.Mobile.Infrastructure/Floraprise.Mobile.Infrastructure.csproj" />
+  </Folder>
+  <Project Path="../scripts/delivery-status-tool/delivery-status-tool.csproj" />
+</Solution>

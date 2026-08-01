@@ -1,0 +1,339 @@
+@page "/"
+@inject SubscriptionApiService SubscriptionService
+@inject DeliveryApiService DeliveryService
+@inject SupportApiService SupportService
+@inject OwnerAuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="page-shell">
+    <div class="section-header">
+        <div>
+            <div class="eyebrow">Operations</div>
+            <h1 class="page-title">Dashboard</h1>
+            <div class="page-subtitle">Today's overview and key metrics</div>
+        </div>
+        <div class="header-meta">Updated just now</div>
+    </div>
+
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Subscribers</div>
+            <div class="kpi-value">@_dashboard.ActiveUsers</div>
+            <div class="kpi-foot">Active users</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Trials</div>
+            <div class="kpi-value">@_dashboard.TrialUsers</div>
+            <div class="kpi-foot">Awaiting conversion</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Live Deliveries</div>
+            <div class="kpi-value">@_liveDeliveriesCount</div>
+            <div class="kpi-foot">In progress</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Open Tickets</div>
+            <div class="kpi-value">@_openTicketsCount</div>
+            <div class="kpi-foot">Needs attention</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Revenue Today</div>
+            <div class="kpi-value">₹@_dashboard.Revenue.ToString("N0")</div>
+            <div class="kpi-foot">Placeholder if unavailable</div>
+        </div>
+    </div>
+
+    <div class="content-grid">
+        <div class="panel-card">
+            <div class="panel-header">
+                <h2>Recent activity</h2>
+                <a href="/subscribers">View all</a>
+            </div>
+            <div class="list-stack">
+                @foreach (var item in _recentActivity)
+                {
+                    <div class="list-item">
+                        <div>
+                            <div class="list-title">@item.Title</div>
+                            <div class="list-meta">@item.Meta</div>
+                        </div>
+                        <span class="status-pill @item.StatusClass">@item.StatusLabel</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="panel-card">
+            <div class="panel-header">
+                <h2>Latest renewals</h2>
+                <a href="/subscribers">View all</a>
+            </div>
+            <div class="list-stack">
+                @foreach (var item in _latestRenewals)
+                {
+                    <div class="list-item">
+                        <div>
+                            <div class="list-title">@item.Title</div>
+                            <div class="list-meta">@item.Meta</div>
+                        </div>
+                        <span class="status-pill @item.StatusClass">@item.StatusLabel</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 4px 0;
+    }
+
+    .eyebrow {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #6b7280;
+    }
+
+    .page-title {
+        margin: 4px 0 0;
+        font-size: 24px;
+        color: #243447;
+    }
+
+    .page-subtitle {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: #6b7280;
+    }
+
+    .header-meta {
+        color: #6b7280;
+        font-size: 13px;
+    }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .kpi-card, .panel-card {
+        background: #ffffff;
+        border: 1px solid #e6ebf1;
+        border-radius: 12px;
+        padding: 18px;
+    }
+
+    .kpi-label {
+        font-size: 12px;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .kpi-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: #243447;
+        margin-top: 6px;
+    }
+
+    .kpi-foot {
+        margin-top: 6px;
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .content-grid {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 16px;
+    }
+
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .panel-header h2 {
+        font-size: 16px;
+        margin: 0;
+        color: #243447;
+    }
+
+    .panel-header a {
+        color: #2e7d32;
+        font-size: 13px;
+        text-decoration: none;
+    }
+
+    .list-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .list-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .list-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .list-title {
+        font-size: 14px;
+        color: #243447;
+        font-weight: 600;
+    }
+
+    .list-meta {
+        font-size: 12px;
+        color: #6b7280;
+        margin-top: 2px;
+    }
+
+    .status-pill {
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .status-pill.success {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+
+    .status-pill.warning {
+        background: #fff3e0;
+        color: #ef6c00;
+    }
+
+    .status-pill.error {
+        background: #ffebee;
+        color: #d32f2f;
+    }
+
+    @@media (max-width: 1200px) {
+        .kpi-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .content-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+@code {
+    private DashboardDto _dashboard = new();
+    private int _liveDeliveriesCount;
+    private int _openTicketsCount;
+    private List<DashboardListItem> _recentActivity = new();
+    private List<DashboardListItem> _latestRenewals = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            _dashboard = await SubscriptionService.GetDashboardAsync();
+            var liveDeliveries = await DeliveryService.GetLiveDeliveriesAsync();
+            _liveDeliveriesCount = liveDeliveries.Count;
+
+            var supportActivity = await SupportService.GetSupportActivityAsync();
+            _openTicketsCount = supportActivity.Count;
+            _recentActivity = supportActivity
+                .Take(3)
+                .Select(item => new DashboardListItem(
+                    item.Action,
+                    $"{item.Customer} • {item.DateTimeUtc:MMM d, yyyy HH:mm}",
+                    GetStatusClass(item.Action),
+                    GetStatusLabel(item.Action)))
+                .ToList();
+
+            _latestRenewals = supportActivity
+                .Where(item => item.Action.Contains("LICENSE_EXTENDED", StringComparison.OrdinalIgnoreCase)
+                    || item.Action.Contains("RENEW", StringComparison.OrdinalIgnoreCase)
+                    || item.Action.Contains("TRIAL_CONVERTED_TO_PAID", StringComparison.OrdinalIgnoreCase))
+                .Take(3)
+                .Select(item => new DashboardListItem(
+                    item.Customer,
+                    $"{item.Action} • {item.DateTimeUtc:MMM d, yyyy HH:mm}",
+                    GetStatusClass(item.Action),
+                    GetStatusLabel(item.Action)))
+                .ToList();
+        }
+        catch (HttpRequestException)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+
+    private static string GetStatusClass(string action)
+    {
+        if (action.Contains("LICENSE_EXTENDED", StringComparison.OrdinalIgnoreCase)
+            || action.Contains("RENEW", StringComparison.OrdinalIgnoreCase))
+        {
+            return "success";
+        }
+
+        if (action.Contains("SUSPEND", StringComparison.OrdinalIgnoreCase)
+            || action.Contains("FAILED", StringComparison.OrdinalIgnoreCase))
+        {
+            return "error";
+        }
+
+        return "warning";
+    }
+
+    private static string GetStatusLabel(string action)
+    {
+        if (action.Contains("LICENSE_EXTENDED", StringComparison.OrdinalIgnoreCase)
+            || action.Contains("RENEW", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Renewed";
+        }
+
+        if (action.Contains("SUSPEND", StringComparison.OrdinalIgnoreCase)
+            || action.Contains("FAILED", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Urgent";
+        }
+
+        return "Updated";
+    }
+
+    private sealed record DashboardListItem(string Title, string Meta, string StatusClass, string StatusLabel);
+}

@@ -35,6 +35,17 @@ public class CompanyService : ICompanyService
         return company.Id;
     }
 
+    public async Task<CompanyDto?> FindByEmailOrPhoneAsync(string email, string phone)
+    {
+        var normalizedEmail = email.Trim();
+        var normalizedPhone = phone.Trim();
+
+        return await _db.Companies
+            .Where(c => c.Email == normalizedEmail || c.Phone == normalizedPhone)
+            .Select(c => MapToDto(c))
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<IReadOnlyList<CompanyDto>> GetAllAsync()
     {
         return await _db.Companies

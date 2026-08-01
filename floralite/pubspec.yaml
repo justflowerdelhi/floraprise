@@ -39,6 +39,11 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   timezone: ^0.9.4
   flutter_timezone: ^4.1.1
+  shared_preferences: ^2.3.2
+  geolocator: ^12.0.0
+  connectivity_plus: ^6.0.3
+  http: ^1.2.0
+  app_links: ^6.0.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

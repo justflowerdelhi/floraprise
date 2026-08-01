@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 
 import '../models/subscription.dart';
 import '../providers/subscription_provider.dart';
+import '../services/mobile_auth_service.dart';
 import '../widgets/common_widgets.dart';
+import 'payment_history_screen.dart';
 
 class SubscriptionScreen extends StatelessWidget {
   const SubscriptionScreen({super.key});
@@ -56,6 +58,13 @@ class SubscriptionScreen extends StatelessWidget {
     await context.read<SubscriptionProvider>().startPurchase(plan);
   }
 
+  Future<void> _openPaymentHistory(BuildContext context) async {
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const PaymentHistoryScreen()),
+    );
+  }
+
   void _showSupport(BuildContext context) {
     showDialog<void>(
       context: context,
@@ -102,7 +111,9 @@ class SubscriptionScreen extends StatelessWidget {
                     provider: provider,
                     state: state,
                     onRenew: () => _showRenewOptions(context),
+                    onUpgrade: () => _showRenewOptions(context),
                     onManage: () => _manageSubscription(context),
+                    onPaymentHistory: () => _openPaymentHistory(context),
                     onSupport: () => _showSupport(context),
                   ),
           ),
@@ -126,6 +137,11 @@ class _LockedSubscriptionBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final message = provider.message;
+    final headline = provider.isForceUpdateRequired
+        ? 'Update Required'
+        : provider.access?.requiresInternet == true
+            ? 'Internet connection required.'
+            : 'Your Free Trial Has Expired';
 
     return Center(
       child: SingleChildScrollView(
@@ -148,9 +164,7 @@ class _LockedSubscriptionBody extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      provider.access?.requiresInternet == true
-                          ? 'Internet connection required.'
-                          : 'Your Free Trial Has Expired',
+                      headline,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 22,
@@ -160,7 +174,7 @@ class _LockedSubscriptionBody extends StatelessWidget {
                     const SizedBox(height: 12),
                     Text(
                       message ??
-                          'Please subscribe to continue using Floraprise.\n\nYour business data is safe.',
+                          'Please renew your subscription to continue using Floraprise.\n\nYour business data is safe.',
                       textAlign: TextAlign.center,
                       style:
                           TextStyle(color: Colors.grey.shade700, height: 1.4),
@@ -210,14 +224,18 @@ class _StatusSubscriptionBody extends StatelessWidget {
     required this.provider,
     required this.state,
     required this.onRenew,
+    required this.onUpgrade,
     required this.onManage,
+    required this.onPaymentHistory,
     required this.onSupport,
   });
 
   final SubscriptionProvider provider;
   final SubscriptionState state;
   final VoidCallback onRenew;
+  final VoidCallback onUpgrade;
   final VoidCallback onManage;
+  final VoidCallback onPaymentHistory;
   final VoidCallback onSupport;
 
   @override
@@ -268,12 +286,40 @@ class _StatusSubscriptionBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
+        const _CloudSubscriptionSnapshotCard(),
+        const SizedBox(height: 16),
         const _PlanSummarySection(),
         const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: onRenew,
-          icon: const Icon(Icons.workspace_premium_outlined),
-          label: const Text('Renew'),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: onRenew,
+                icon: const Icon(Icons.autorenew_rounded),
+                label: const Text('Renew'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onUpgrade,
+                icon: const Icon(Icons.upgrade_rounded),
+                label: const Text('Upgrade'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: onPaymentHistory,
+          icon: const Icon(Icons.receipt_long_outlined),
+          label: const Text('Payment History'),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: onPaymentHistory,
+          icon: const Icon(Icons.description_outlined),
+          label: const Text('Invoice History'),
         ),
         const SizedBox(height: 10),
         OutlinedButton.icon(
@@ -282,12 +328,6 @@ class _StatusSubscriptionBody extends StatelessWidget {
               : () => context.read<SubscriptionProvider>().restorePurchase(),
           icon: const Icon(Icons.restore_outlined),
           label: const Text('Restore Purchase'),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
-          onPressed: provider.isLoading ? null : provider.verifyNow,
-          icon: const Icon(Icons.verified_outlined),
-          label: const Text('Verify Now'),
         ),
         const SizedBox(height: 10),
         OutlinedButton.icon(
@@ -538,5 +578,83 @@ class _InfoRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _CloudSubscriptionSnapshotCard extends StatefulWidget {
+  const _CloudSubscriptionSnapshotCard();
+
+  @override
+  State<_CloudSubscriptionSnapshotCard> createState() =>
+      _CloudSubscriptionSnapshotCardState();
+}
+
+class _CloudSubscriptionSnapshotCardState
+    extends State<_CloudSubscriptionSnapshotCard> {
+  final MobileAuthService _mobileAuthService = MobileAuthService();
+  Future<Map<String, dynamic>>? _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _mobileAuthService.getCurrentSubscription();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const AppCard(
+            child: Center(child: LinearProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return const SizedBox.shrink();
+        }
+
+        final data = snapshot.data!;
+        final planName =
+            (data['planName'] ?? data['planCode'] ?? '-').toString();
+        final status = (data['status'] ?? '-').toString();
+        final startUtc = _tryDate(data['startUtc']);
+        final endUtc =
+            _tryDate(data['endUtc']) ?? _tryDate(data['trialEndUtc']);
+        final remainingDays = (data['remainingDays'] ?? '-').toString();
+        final formatter = DateFormat('dd MMM yyyy');
+
+        return AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'License Dashboard',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              _InfoRow(label: 'Current Plan', value: planName),
+              _InfoRow(label: 'Subscription Status', value: status),
+              _InfoRow(
+                label: 'Activation Date',
+                value: startUtc == null ? '-' : formatter.format(startUtc),
+              ),
+              _InfoRow(
+                label: 'Expiry Date',
+                value: endUtc == null ? '-' : formatter.format(endUtc),
+              ),
+              _InfoRow(label: 'Days Remaining', value: remainingDays),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  DateTime? _tryDate(Object? value) {
+    final raw = value?.toString() ?? '';
+    if (raw.trim().isEmpty) return null;
+    return DateTime.tryParse(raw);
   }
 }

@@ -237,7 +237,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get orderSaved => 'Order Saved';
 
   @override
-  String get orderSavedMessage => 'Order has been saved and added to Scheduler!';
+  String get orderSavedMessage =>
+      'Order has been saved and added to Scheduler!';
 
   @override
   String get done => 'Done';
@@ -495,7 +496,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceInputDesc => 'Enable voice dictation for text fields';
 
   @override
-  String get howCustomerReceiveOrder => 'How will the customer receive the order?';
+  String get howCustomerReceiveOrder =>
+      'How will the customer receive the order?';
 
   @override
   String get appSettings => 'App Settings';
@@ -735,7 +737,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get confirmDelete => 'Confirm Delete';
 
   @override
-  String get confirmDeleteMessage => 'Are you sure you want to delete this item?';
+  String get confirmDeleteMessage =>
+      'Are you sure you want to delete this item?';
 
   @override
   String get sortBy => 'Sort By';
@@ -1092,7 +1095,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openSettings => 'Open Settings';
 
   @override
-  String get qrBarcodeScanningReserved => 'QR/Barcode scanning reserved for future implementation';
+  String get qrBarcodeScanningReserved =>
+      'QR/Barcode scanning reserved for future implementation';
 
   @override
   String get navigateToMyDesigns => 'Navigate to My Designs - placeholder';
@@ -1111,57 +1115,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get logout => 'Logout';
-
-  @override
-  String get subscription => 'Subscription';
-
-  @override
-  String get freeTrial => 'Free Trial';
-
-  @override
-  String get quarterlyPlan => 'Quarterly Plan';
-
-  @override
-  String get halfYearlyPlan => 'Half Yearly Plan';
-
-  @override
-  String get annualPlan => 'Annual Plan';
-
-  @override
-  String get mostPopular => '⭐ MOST POPULAR';
-
-  @override
-  String get fullAccess => 'Full Access';
-
-  @override
-  String get daysRemaining => 'Days Remaining';
-
-  @override
-  String get renewNow => 'Renew Now';
-
-  @override
-  String get upgradePlan => 'Upgrade Plan';
-
-  @override
-  String get subscriptionExpired => 'Your subscription has expired. Please renew to continue uninterrupted.';
-
-  @override
-  String get freeBluetoothPrinter => 'FREE Bluetooth Thermal Printer';
-
-  @override
-  String get freePrinterNote => 'Free Bluetooth Thermal Printer available on NEW Annual subscriptions only. Subject to verification, stock availability, shipping policy, and applicable terms.';
-
-  @override
-  String get saveAmount => 'Save ₹1,000 compared to renewing Quarterly twice.';
-
-  @override
-  String get planComparison => 'Plan Comparison';
-
-  @override
-  String get chooseYourPlan => 'Choose Your Plan';
-
-  @override
-  String get everyPaidPlanIncludes => 'Every paid plan includes:';
 
   @override
   String get confirmLogout => 'Confirm Logout';
@@ -1230,7 +1183,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get marketplace => 'Marketplace';
 
   @override
-  String get searchByCustomerIdNamePhone => 'Search by customer ID, name, phone...';
+  String get searchByCustomerIdNamePhone =>
+      'Search by customer ID, name, phone...';
 
   @override
   String get pendingPayment => 'Pending Payment';
@@ -1245,7 +1199,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get recentActivity => 'Recent Activity';
 
   @override
-  String get searchByProductStockCategory => 'Search by product, stock, category...';
+  String get searchByProductStockCategory =>
+      'Search by product, stock, category...';
 
   @override
   String get flowers => 'Flowers';
@@ -1269,7 +1224,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get min => 'Min';
 
   @override
-  String get searchByIdFlowerColorOccasion => 'Search by ID, flower, color, occasion...';
+  String get searchByIdFlowerColorOccasion =>
+      'Search by ID, flower, color, occasion...';
 
   @override
   String get priceRange => 'Price Range';
@@ -1350,7 +1306,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get scanBarcodeComingSoon => 'Scan barcode coming soon';
 
   @override
-  String get generateNewFloristBarcode => 'Generate a new florist barcode for a product';
+  String get generateNewFloristBarcode =>
+      'Generate a new florist barcode for a product';
 
   @override
   String get productIdOptional => 'Product ID (Optional)';
@@ -1404,7 +1361,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get designIdOrDescription => 'Design ID or Description';
 
   @override
-  String get eG20RedRosesCustomArrangement => 'e.g., 20 Red Roses, Custom Arrangement';
+  String get eG20RedRosesCustomArrangement =>
+      'e.g., 20 Red Roses, Custom Arrangement';
 
   @override
   String get eG850 => 'e.g., ₹850';
@@ -1431,10 +1389,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pleaseSelectPaymentMethod => 'Please select a payment method';
 
   @override
-  String get pleaseSelectPickupDateAndTime => 'Please select pickup date and time';
+  String get pleaseSelectPickupDateAndTime =>
+      'Please select pickup date and time';
 
   @override
-  String get orderSavedAndAddedToScheduler => 'Order has been saved and added to Scheduler!';
+  String get orderSavedAndAddedToScheduler =>
+      'Order has been saved and added to Scheduler!';
 
   @override
   String get draftSavedSuccessfully => 'Draft saved successfully';
@@ -1449,7 +1409,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deliveryTime => 'Delivery Time';
 
   @override
-  String get pleaseSelectDeliveryDateAndTime => 'Please select delivery date and time';
+  String get pleaseSelectDeliveryDateAndTime =>
+      'Please select delivery date and time';
 
   @override
   String get billingCustomer => 'Billing Customer';
@@ -1569,7 +1530,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get generateAutoSuggest => 'Generate Auto-Suggest';
 
   @override
-  String get autoSuggestDescription => 'Add items where Current Stock < Minimum Stock';
+  String get autoSuggestDescription =>
+      'Add items where Current Stock < Minimum Stock';
 
   @override
   String get clearPurchased => 'Clear Purchased';
@@ -1641,7 +1603,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingWelcomeTitle => 'Welcome to Floraprise!';
 
   @override
-  String get onboardingWelcomeBody => 'Run your florist business with\nBilling, Inventory, Orders,\nCustomers, Delivery,\nReminders and much more.';
+  String get onboardingWelcomeBody =>
+      'Run your florist business with\nBilling, Inventory, Orders,\nCustomers, Delivery,\nReminders and much more.';
 
   @override
   String get onboardingGetStarted => 'Get Started';
@@ -1677,16 +1640,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingAddressOptional => 'Address (Optional)';
 
   @override
-  String get onboardingRecommendedTitle => 'Would you like Floraprise to prepare your shop with a recommended florist setup?';
+  String get onboardingRecommendedTitle =>
+      'Would you like Floraprise to prepare your shop with a recommended florist setup?';
 
   @override
-  String get onboardingRecommendedBody => 'This is recommended for new florist shops.';
+  String get onboardingRecommendedBody =>
+      'This is recommended for new florist shops.';
 
   @override
   String get onboardingRecommendedDefault => 'Recommended';
 
   @override
-  String get onboardingRecommendedSubtitle => 'Install starter categories, products, staff and defaults.';
+  String get onboardingRecommendedSubtitle =>
+      'Install starter categories, products, staff and defaults.';
 
   @override
   String get onboardingSkip => 'Skip';
@@ -1731,10 +1697,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingShopNameRequiredError => 'Shop name is required.';
 
   @override
-  String get onboardingMobileRequiredError => 'Valid mobile number is required.';
+  String get onboardingMobileRequiredError =>
+      'Valid mobile number is required.';
 
   @override
-  String get onboardingWhatsappRequiredError => 'Valid WhatsApp number is required.';
+  String get onboardingWhatsappRequiredError =>
+      'Valid WhatsApp number is required.';
 
   @override
   String get onboardingGstRequiredError => 'GST number is required.';
@@ -1764,5 +1732,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resetOnboardingSubtitle => 'For demo/testing';
 
   @override
-  String get resetOnboardingDialogMessage => 'This will show first install onboarding again. Continue?';
+  String get resetOnboardingDialogMessage =>
+      'This will show first install onboarding again. Continue?';
 }

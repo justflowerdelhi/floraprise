@@ -1,37 +1,40 @@
-using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
+using MudBlazor.Services;
 using Sumpooj.Blazor.Auth;
 using Sumpooj.Blazor.Data;
 using Sumpooj.Blazor.Services;
+using Sumpooj.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
-builder.Services.AddSingleton<WeatherForecastService>();
+builder.Services.AddMudServices();
 
-// Register TokenStorage as a concrete type and as the interfaces
-builder.Services.AddScoped<TokenStorage>();
-builder.Services.AddScoped<ITokenStorage>(sp => sp.GetRequiredService<TokenStorage>());
-builder.Services.AddScoped<ITokenStorageNotifier>(sp => sp.GetRequiredService<TokenStorage>());
+// Database
+builder.Services.AddDbContext<SumpoojDbContext>();
 
-builder.Services.AddScoped<AuthApiService>();
-builder.Services.AddScoped<JwtAuthHandler>();
-builder.Services.AddScoped<CustomerApiService>();
+// Owner Authentication
+builder.Services.AddScoped<OwnerAuthService>();
 
+// API Services
+builder.Services.AddScoped<SubscriptionApiService>();
+builder.Services.AddScoped<DeliveryApiService>();
+builder.Services.AddScoped<SupportApiService>();
+builder.Services.AddScoped<NotificationApiService>();
+builder.Services.AddScoped<DeviceApiService>();
+builder.Services.AddScoped<SystemApiService>();
+
+// State
+builder.Services.AddScoped<OwnerState>();
+
+// HTTP Client
 builder.Services.AddHttpClient("Api", client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7223/");
-})
-.AddHttpMessageHandler<JwtAuthHandler>();
-
-builder.Services.AddAuthorizationCore();
-
-builder.Services.AddScoped<AuthenticationStateProvider,
-    JwtAuthenticationStateProvider>();
-
+    client.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5148/");
+});
 
 var app = builder.Build();
 
@@ -39,14 +42,16 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// Disable HTTPS redirection for development to avoid redirect loop
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseStaticFiles();
-
 app.UseRouting();
 
 app.MapBlazorHub();

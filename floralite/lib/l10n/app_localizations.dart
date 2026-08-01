@@ -63,7 +63,8 @@ import 'app_localizations_hi.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale)
+      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -71,7 +72,8 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations);
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -83,7 +85,8 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
     delegate,
     GlobalMaterialLocalizations.delegate,
     GlobalCupertinoLocalizations.delegate,
@@ -2305,108 +2308,6 @@ abstract class AppLocalizations {
   /// **'Logout'**
   String get logout;
 
-  /// No description provided for @subscription.
-  ///
-  /// In en, this message translates to:
-  /// **'Subscription'**
-  String get subscription;
-
-  /// No description provided for @freeTrial.
-  ///
-  /// In en, this message translates to:
-  /// **'Free Trial'**
-  String get freeTrial;
-
-  /// No description provided for @quarterlyPlan.
-  ///
-  /// In en, this message translates to:
-  /// **'Quarterly Plan'**
-  String get quarterlyPlan;
-
-  /// No description provided for @halfYearlyPlan.
-  ///
-  /// In en, this message translates to:
-  /// **'Half Yearly Plan'**
-  String get halfYearlyPlan;
-
-  /// No description provided for @annualPlan.
-  ///
-  /// In en, this message translates to:
-  /// **'Annual Plan'**
-  String get annualPlan;
-
-  /// No description provided for @mostPopular.
-  ///
-  /// In en, this message translates to:
-  /// **'⭐ MOST POPULAR'**
-  String get mostPopular;
-
-  /// No description provided for @fullAccess.
-  ///
-  /// In en, this message translates to:
-  /// **'Full Access'**
-  String get fullAccess;
-
-  /// No description provided for @daysRemaining.
-  ///
-  /// In en, this message translates to:
-  /// **'Days Remaining'**
-  String get daysRemaining;
-
-  /// No description provided for @renewNow.
-  ///
-  /// In en, this message translates to:
-  /// **'Renew Now'**
-  String get renewNow;
-
-  /// No description provided for @upgradePlan.
-  ///
-  /// In en, this message translates to:
-  /// **'Upgrade Plan'**
-  String get upgradePlan;
-
-  /// No description provided for @subscriptionExpired.
-  ///
-  /// In en, this message translates to:
-  /// **'Your subscription has expired. Please renew to continue uninterrupted.'**
-  String get subscriptionExpired;
-
-  /// No description provided for @freeBluetoothPrinter.
-  ///
-  /// In en, this message translates to:
-  /// **'FREE Bluetooth Thermal Printer'**
-  String get freeBluetoothPrinter;
-
-  /// No description provided for @freePrinterNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Free Bluetooth Thermal Printer available on NEW Annual subscriptions only. Subject to verification, stock availability, shipping policy, and applicable terms.'**
-  String get freePrinterNote;
-
-  /// No description provided for @saveAmount.
-  ///
-  /// In en, this message translates to:
-  /// **'Save ₹1,000 compared to renewing Quarterly twice.'**
-  String get saveAmount;
-
-  /// No description provided for @planComparison.
-  ///
-  /// In en, this message translates to:
-  /// **'Plan Comparison'**
-  String get planComparison;
-
-  /// No description provided for @chooseYourPlan.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose Your Plan'**
-  String get chooseYourPlan;
-
-  /// No description provided for @everyPaidPlanIncludes.
-  ///
-  /// In en, this message translates to:
-  /// **'Every paid plan includes:'**
-  String get everyPaidPlanIncludes;
-
   /// No description provided for @confirmLogout.
   ///
   /// In en, this message translates to:
@@ -3614,7 +3515,8 @@ abstract class AppLocalizations {
   String get resetOnboardingDialogMessage;
 }
 
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -3623,26 +3525,27 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   }
 
   @override
-  bool isSupported(Locale locale) => <String>['en', 'gu', 'hi'].contains(locale.languageCode);
+  bool isSupported(Locale locale) =>
+      <String>['en', 'gu', 'hi'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
-
-
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'en': return AppLocalizationsEn();
-    case 'gu': return AppLocalizationsGu();
-    case 'hi': return AppLocalizationsHi();
+    case 'en':
+      return AppLocalizationsEn();
+    case 'gu':
+      return AppLocalizationsGu();
+    case 'hi':
+      return AppLocalizationsHi();
   }
 
   throw FlutterError(
-    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-    'an issue with the localizations generation tool. Please file an issue '
-    'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.'
-  );
+      'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+      'an issue with the localizations generation tool. Please file an issue '
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
 }

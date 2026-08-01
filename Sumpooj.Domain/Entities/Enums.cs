@@ -114,10 +114,20 @@ public enum PurchaseOrderStatus
 
 public enum DeliveryStatus
 {
+    Created,
+    Confirmed,
+    InProduction,
+    Ready,
     Scheduled,
+    Assigned,
+    Accepted,
+    PickedUp,
     OutForDelivery,
+    ArrivedNearby,
     Delivered,
     Failed,
+    Returned,
+    SettlementCompleted,
     Cancelled
 }
 

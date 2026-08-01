@@ -105,15 +105,15 @@ public class CrmController : ControllerBase
             .Where(o => o.CompanyId == CompanyId && o.CustomerId == customer.Id && o.IsActive)
             .OrderByDescending(o => o.OrderDate)
             .Select(o => new CrmCustomerOrderDto(
-                o.Id,
-                o.OrderNumber,
-                o.OrderDate,
-                o.OrderSource.ToString().ToUpperInvariant(),
-                o.FulfillmentStatus.ToString().ToUpperInvariant(),
-                o.PaymentStatus.ToString().ToUpperInvariant(),
-                o.TotalAmount,
-                0m,
-                o.Items.Count))
+                OrderId: o.Id,
+                OrderNumber: o.OrderNumber,
+                OrderDate: o.OrderDate,
+                OrderSource: o.OrderSource.ToString().ToUpperInvariant(),
+                FulfillmentStatus: o.FulfillmentStatus.ToString().ToUpperInvariant(),
+                PaymentStatus: o.PaymentStatus.ToString().ToUpperInvariant(),
+                Total: o.TotalAmount,
+                Profit: 0m,
+                Items: o.Items.Count))
             .ToListAsync();
 
         var loyaltyTransactions = BuildLoyaltyTransactions(customer.Id, orders);
@@ -121,13 +121,13 @@ public class CrmController : ControllerBase
         var eventDtos = matchingEvents
             .OrderByDescending(e => e.EventDate)
             .Select(e => new CrmCustomerEventDto(
-                e.Id,
-                e.EventName,
-                e.EventType.ToString().ToUpperInvariant(),
-                e.EventDate,
-                e.Status.ToString().ToUpperInvariant(),
-                e.TotalProposedAmount,
-                e.TotalPaidAmount))
+                EventId: e.Id,
+                EventName: e.EventName,
+                EventType: e.EventType.ToString().ToUpperInvariant(),
+                EventDate: e.EventDate,
+                Status: e.Status.ToString().ToUpperInvariant(),
+                EstimatedValue: e.TotalProposedAmount,
+                TotalPaid: e.TotalPaidAmount))
             .ToList();
 
         return Ok(new CrmCustomer360Response(crmCustomer, orders, eventDtos, loyaltyTransactions));
@@ -311,33 +311,33 @@ public class CrmController : ControllerBase
             : 0m;
 
         return new CrmCustomerDto(
-            customer.Id,
-            customer.CompanyId,
-            null,
-            customer.Name,
-            customer.Phone ?? string.Empty,
-            customer.Email,
-            null,
-            customer.Notes,
-            null,
-            null,
-            customer.CreatedAtUtc,
-            tags,
-            metrics.LifetimeValue,
-            metrics.TotalOrders,
-            averageOrderValue,
-            metrics.LastOrderDate,
-            metrics.FirstOrderDate,
-            loyaltyPoints,
-            GetLoyaltyTier(loyaltyPoints),
-            loyaltyPoints,
-            0,
-            0m,
-            0m,
-            true,
-            null,
-            null,
-            0);
+            Id: customer.Id,
+            TenantId: customer.CompanyId,
+            LocationId: null,
+            Name: customer.Name,
+            Phone: customer.Phone ?? string.Empty,
+            Email: customer.Email,
+            PreferredAddress: null,
+            Notes: customer.Notes,
+            Birthday: null,
+            Anniversary: null,
+            CreatedAt: customer.CreatedAtUtc,
+            Tags: tags,
+            LifetimeValue: metrics.LifetimeValue,
+            TotalOrders: metrics.TotalOrders,
+            AverageOrderValue: averageOrderValue,
+            LastOrderDate: metrics.LastOrderDate,
+            FirstOrderDate: metrics.FirstOrderDate,
+            LoyaltyPoints: loyaltyPoints,
+            LoyaltyTier: GetLoyaltyTier(loyaltyPoints),
+            LoyaltyPointsEarned: loyaltyPoints,
+            LoyaltyPointsRedeemed: 0,
+            TotalProfit: 0m,
+            ProfitMargin: 0m,
+            MarketingConsent: true,
+            PreferredContactMethod: null,
+            ReferredBy: null,
+            ReferralCount: 0);
     }
 
     private static List<CrmLoyaltyTransactionDto> BuildLoyaltyTransactions(Guid customerId, List<CrmCustomerOrderDto> orders)

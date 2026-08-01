@@ -1,0 +1,8 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Floraprise Mobile API",
+    "version": "v1"
+  },
+  "paths": {}
+}

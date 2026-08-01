@@ -338,11 +338,8 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
 
                     if (!mounted) return;
                     if (ok) {
-                      titleController.clear();
-                      notesController.clear();
                       if (!dialogContext.mounted) return;
-                      Navigator.of(dialogContext, rootNavigator: true)
-                          .pop(true);
+                      Navigator.of(dialogContext).pop(true);
                       return;
                     }
 

@@ -1,0 +1,452 @@
+@using Sumpooj.Blazor.Services
+
+<MudDialog Class="subscriber-details-dialog">
+    <DialogContent>
+        @if (Subscriber != null)
+        {
+            <div class="details-container">
+                <!-- Header Section -->
+                <div class="header-section">
+                    <div class="company-header">
+                        <div class="company-avatar">
+                            <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Large" />
+                        </div>
+                        <div class="company-info">
+                            <h2 class="company-name">@Subscriber.BusinessName</h2>
+                            <div class="company-meta">
+                                <span class="meta-item">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                                    @Subscriber.CustomerName
+                                </span>
+                                <span class="meta-item">
+                                    <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" />
+                                    @Subscriber.Mobile
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="status-badge">
+                        <span class="status-pill @GetStatusClass(Subscriber.SubscriptionStatus)">@Subscriber.SubscriptionStatus</span>
+                    </div>
+                </div>
+
+                <MudDivider Class="section-divider" />
+
+                <!-- Company Information Section -->
+                <div class="info-section">
+                    <div class="section-title">
+                        <MudIcon Icon="@Icons.Material.Filled.Business" Class="section-icon" />
+                        <h3>Company Information</h3>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Company ID</label>
+                            <span>@Subscriber.CompanyId</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Customer Name</label>
+                            <span>@Subscriber.CustomerName</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Email</label>
+                            <span>@Subscriber.Email</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Mobile</label>
+                            <span>@Subscriber.Mobile</span>
+                        </div>
+                        <div class="info-item">
+                            <label>User Status</label>
+                            <span>@Subscriber.UserStatus</span>
+                        </div>
+                    </div>
+                </div>
+
+                <MudDivider Class="section-divider" />
+
+                <!-- Subscription Section -->
+                <div class="info-section">
+                    <div class="section-title">
+                        <MudIcon Icon="@Icons.Material.Filled.CreditCard" Class="section-icon" />
+                        <h3>Subscription Details</h3>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Plan</label>
+                            <span>@Subscriber.PlanName (@Subscriber.PlanCode)</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Subscription Status</label>
+                            <span class="status-pill @GetStatusClass(Subscriber.SubscriptionStatus)">@Subscriber.SubscriptionStatus</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Remaining Days</label>
+                            <span>@Subscriber.RemainingDays days</span>
+                        </div>
+                        @if (Subscriber.TrialEndUtc.HasValue)
+                        {
+                            <div class="info-item">
+                                <label>Trial End Date</label>
+                                <span>@Subscriber.TrialEndUtc?.ToString("dd MMM yyyy")</span>
+                            </div>
+                        }
+                        @if (Subscriber.SubscriptionEndUtc.HasValue)
+                        {
+                            <div class="info-item">
+                                <label>Subscription End Date</label>
+                                <span>@Subscriber.SubscriptionEndUtc?.ToString("dd MMM yyyy")</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <MudDivider Class="section-divider" />
+
+                <!-- Devices Section -->
+                <div class="info-section">
+                    <div class="section-title">
+                        <MudIcon Icon="@Icons.Material.Filled.Devices" Class="section-icon" />
+                        <h3>Devices</h3>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Total Devices</label>
+                            <span>@Subscriber.TotalDevices</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Online Devices</label>
+                            <span class="online-count">@Subscriber.OnlineDevices</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Offline Devices</label>
+                            <span>@(Subscriber.TotalDevices - Subscriber.OnlineDevices)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <MudDivider Class="section-divider" />
+
+                <!-- Activity Section -->
+                <div class="info-section">
+                    <div class="section-title">
+                        <MudIcon Icon="@Icons.Material.Filled.History" Class="section-icon" />
+                        <h3>Recent Activity</h3>
+                    </div>
+                    <div class="activity-list">
+                        <div class="activity-item">
+                            <div class="activity-icon activity-login">
+                                <MudIcon Icon="@Icons.Material.Filled.Login" Size="Size.Small" />
+                            </div>
+                            <div class="activity-content">
+                                <div class="activity-title">Logged in</div>
+                                <div class="activity-time">Today, 10:30 AM</div>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon activity-sync">
+                                <MudIcon Icon="@Icons.Material.Filled.Sync" Size="Size.Small" />
+                            </div>
+                            <div class="activity-content">
+                                <div class="activity-title">Data synced</div>
+                                <div class="activity-time">Today, 9:15 AM</div>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon activity-payment">
+                                <MudIcon Icon="@Icons.Material.Filled.Payment" Size="Size.Small" />
+                            </div>
+                            <div class="activity-content">
+                                <div class="activity-title">Payment received</div>
+                                <div class="activity-time">Yesterday, 3:45 PM</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="Cancel">Close</MudButton>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Notifications" OnClick="Notify">Notify</MudButton>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.CreditCard" OnClick="Renew">Renew</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Devices" OnClick="ViewDevices">View Devices</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .subscriber-details-dialog {
+        max-width: 900px;
+        width: 100%;
+    }
+
+    .dialog-content {
+        padding: 0;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+
+    .details-container {
+        padding: 24px;
+    }
+
+    .header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 24px;
+    }
+
+    .company-header {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+    }
+
+    .company-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #2e7d32, #66bb6a);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+
+    .company-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .company-name {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+        color: #243447;
+    }
+
+    .company-meta {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+    }
+
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .status-badge {
+        display: flex;
+        align-items: center;
+    }
+
+    .section-divider {
+        margin: 24px 0;
+    }
+
+    .info-section {
+        margin-bottom: 24px;
+    }
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .section-icon {
+        color: #2e7d32;
+        font-size: 20px;
+    }
+
+    .section-title h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #243447;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .info-item label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .info-item span {
+        font-size: 14px;
+        color: #243447;
+        font-weight: 500;
+    }
+
+    .online-count {
+        color: #2e7d32;
+        font-weight: 600;
+    }
+
+    .activity-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .activity-item {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+    }
+
+    .activity-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+
+    .activity-login {
+        background: #2e7d32;
+    }
+
+    .activity-sync {
+        background: #1565c0;
+    }
+
+    .activity-payment {
+        background: #ef6c00;
+    }
+
+    .activity-content {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .activity-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: #243447;
+    }
+
+    .activity-time {
+        font-size: 12px;
+        color: #6b7280;
+    }
+
+    .dialog-actions {
+        padding: 16px 24px;
+        border-top: 1px solid #e6ebf1;
+    }
+
+    .status-pill {
+        display: inline-flex;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .status-pill.active { background: #e8f5e9; color: #2e7d32; }
+    .status-pill.trial { background: #e3f2fd; color: #1565c0; }
+    .status-pill.suspended { background: #fff3e0; color: #ef6c00; }
+    .status-pill.expired { background: #ffebee; color: #d32f2f; }
+
+    @@media (max-width: 768px) {
+        .subscriber-details-dialog {
+            max-width: 100%;
+            margin: 0;
+            height: 100vh;
+            max-height: 100vh;
+        }
+
+        .dialog-content {
+            max-height: calc(100vh - 80px);
+        }
+
+        .header-section {
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .company-header {
+            width: 100%;
+        }
+
+        .info-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .dialog-actions {
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .dialog-actions .mud-spacer {
+            display: none;
+        }
+    }
+</style>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public SubscriberDto? Subscriber { get; set; }
+
+    private string GetStatusClass(string status)
+    {
+        return status.ToLowerInvariant() switch
+        {
+            "active" => "active",
+            "trial" => "trial",
+            "suspended" => "suspended",
+            "expired" => "expired",
+            _ => "active"
+        };
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void Notify()
+    {
+        MudDialog.Close(DialogResult.Ok("notify"));
+    }
+
+    private void Renew()
+    {
+        MudDialog.Close(DialogResult.Ok("renew"));
+    }
+
+    private void ViewDevices()
+    {
+        MudDialog.Close(DialogResult.Ok("devices"));
+    }
+}

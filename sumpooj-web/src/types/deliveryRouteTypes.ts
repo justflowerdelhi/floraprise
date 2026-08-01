@@ -6,6 +6,9 @@ export interface Delivery {
   timeSlot: string;
   postalCode: string;
   status?: 'Pending' | 'Delivered' | 'Failed';
+  latitude?: number;
+  longitude?: number;
+  address?: string;
 }
 
 export interface Driver {

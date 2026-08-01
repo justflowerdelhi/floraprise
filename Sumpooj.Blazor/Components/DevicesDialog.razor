@@ -1,0 +1,121 @@
+@using MudBlazor
+@using Sumpooj.Blazor.Services
+
+<MudDialog>
+    <DialogContent>
+        <div class="devices-list">
+            @if (_devices == null)
+            {
+                <MudProgressCircular Indeterminate="true" />
+            }
+            else if (_devices.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">No devices registered for this subscriber.</MudAlert>
+            }
+            else
+            {
+                <MudList T="DeviceDto">
+                    @foreach (var device in _devices)
+                    {
+                        <MudListItem T="DeviceDto">
+                            <div class="device-item">
+                                <div class="device-info">
+                                    <MudText Typo="Typo.body2">
+                                        <strong>@device.Model</strong>
+                                    </MudText>
+                                    <MudText Typo="Typo.caption">
+                                        @device.Platform | @device.OsVersion
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                        Last seen: @(device.LastSeenUtc?.ToString("dd MMM yyyy HH:mm") ?? "Never")
+                                    </MudText>
+                                </div>
+                                <div class="device-status">
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@(device.IsOnline ? Color.Success : Color.Default)">
+                                        @(device.IsOnline ? "Online" : "Offline")
+                                    </MudChip>
+                                </div>
+                            </div>
+                        </MudListItem>
+                        <MudDivider />
+                    }
+                </MudList>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .devices-list {
+        min-width: 400px;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    .device-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+    }
+
+    .device-info {
+        flex: 1;
+    }
+
+    .device-status {
+        margin-left: 16px;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Inject]
+    DeviceApiService DeviceService { get; set; } = null!;
+
+    [Parameter]
+    public Guid MobileUserId { get; set; }
+
+    [Parameter]
+    public Guid CompanyId { get; set; }
+
+    private List<DeviceDto>? _devices;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDevices();
+    }
+
+    private async Task LoadDevices()
+    {
+        try
+        {
+            // Call the devices API endpoint and filter by MobileUserId and CompanyId
+            var allDevices = await DeviceService.GetDevicesAsync();
+            _devices = allDevices
+                .Where(d => d.MobileUserId == MobileUserId && d.CompanyId == CompanyId)
+                .ToList();
+        }
+        catch
+        {
+            _devices = new List<DeviceDto>();
+        }
+    }
+
+    private void Close() => MudDialog.Cancel();
+}
+
+public class DeviceDto
+{
+    public Guid MobileDeviceId { get; set; }
+    public string Platform { get; set; } = string.Empty;
+    public string Model { get; set; } = string.Empty;
+    public string OsVersion { get; set; } = string.Empty;
+    public DateTime? LastSeenUtc { get; set; }
+    public bool IsOnline { get; set; }
+}

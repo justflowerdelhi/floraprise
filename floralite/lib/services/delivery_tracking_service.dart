@@ -2,8 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../managers/business_settings_manager.dart';
+import 'api_base_url.dart';
 import 'mobile_auth_service.dart';
 
 class DeliveryTrackingException implements Exception {
@@ -130,6 +134,10 @@ class DeliveryWorkspaceRecord {
     required this.orderNo,
     required this.customerName,
     required this.recipientName,
+    required this.deliveryAddress,
+    required this.deliveryArea,
+    required this.customerPhone,
+    required this.deliveryTime,
     required this.status,
     required this.trackingLink,
     required this.eta,
@@ -138,10 +146,14 @@ class DeliveryWorkspaceRecord {
   });
 
   final String assignmentId;
-  final int orderId;
+  final String orderId;
   final String orderNo;
   final String customerName;
   final String recipientName;
+  final String deliveryAddress;
+  final String deliveryArea;
+  final String? customerPhone;
+  final String deliveryTime;
   final String status;
   final String trackingLink;
   final DateTime? eta;
@@ -153,28 +165,27 @@ class DeliveryTrackingService {
   DeliveryTrackingService({
     MobileAuthService? auth,
     HttpClient? httpClient,
-    String? baseUrl,
     String? trackingHubPath,
   })  : _auth = auth ?? MobileAuthService(),
         _httpClient = httpClient ?? HttpClient(),
-        _baseUrl =
-            (baseUrl ?? _resolveBaseUrl()).replaceFirst(RegExp(r'/+$'), ''),
         _trackingHubPath = trackingHubPath ?? '/hubs/delivery-tracking';
 
   final MobileAuthService _auth;
   final HttpClient _httpClient;
-  final String _baseUrl;
   final String _trackingHubPath;
 
-  static String _resolveBaseUrl() {
+  static const _assignmentLocationQueueKey =
+      'delivery_assignment_location_queue';
+  static const _driverTokenLocationQueueKey = 'delivery_driver_location_queue';
+
+  String get _baseUrl {
     const explicit =
         String.fromEnvironment('FLORAPRISE_API_URL', defaultValue: '');
-    if (explicit.trim().isNotEmpty) {
-      return explicit.trim();
-    }
-    const fallback = String.fromEnvironment('MOBILE_AUTH_BASE_URL',
-        defaultValue: 'http://localhost:5148');
-    return fallback.trim();
+    return resolveFlorapriseApiBaseUrl(
+      explicitValue: explicit,
+      isDebug: kDebugMode,
+      platform: defaultTargetPlatform,
+    );
   }
 
   Future<List<DeliveryWorkspaceRecord>> getWorkspace(String status) async {
@@ -203,11 +214,311 @@ class DeliveryTrackingService {
     return _toSnapshot(payload);
   }
 
+  Future<String> updateAssignmentStatus({
+    required String assignmentId,
+    required String action,
+    String? notes,
+  }) async {
+    final payload = await _postJson(
+      '/api/v1/mobile/delivery/assignments/$assignmentId/status',
+      {
+        'action': action,
+        if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      },
+    );
+    return _readString(payload, 'status') ?? action;
+  }
+
+  Future<void> uploadAssignmentLocation({
+    required String assignmentId,
+    required double latitude,
+    required double longitude,
+    double? accuracy,
+    double? speed,
+    double? heading,
+    DateTime? recordedAt,
+  }) async {
+    await _postJson(
+      '/api/v1/mobile/delivery/assignments/$assignmentId/location',
+      {
+        'latitude': latitude,
+        'longitude': longitude,
+        'accuracy': accuracy,
+        'speed': speed,
+        'heading': heading,
+        'recordedAt': recordedAt?.toIso8601String(),
+      },
+    );
+  }
+
+  Future<void> queueAssignmentLocation({
+    required String assignmentId,
+    required double latitude,
+    required double longitude,
+    double? accuracy,
+    double? speed,
+    double? heading,
+    DateTime? recordedAt,
+  }) async {
+    await _appendQueuedLocation(
+      _assignmentLocationQueueKey,
+      _QueuedDeliveryLocation(
+        reference: assignmentId,
+        latitude: latitude,
+        longitude: longitude,
+        accuracy: accuracy,
+        speed: speed,
+        heading: heading,
+        recordedAt: recordedAt ?? DateTime.now().toUtc(),
+      ),
+    );
+  }
+
+  Future<void> flushAssignmentLocationQueue() async {
+    final pending = await _readQueuedLocations(_assignmentLocationQueueKey);
+    if (pending.isEmpty) return;
+
+    final remaining = <_QueuedDeliveryLocation>[];
+    for (final location in pending) {
+      try {
+        await uploadAssignmentLocation(
+          assignmentId: location.reference,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracy: location.accuracy,
+          speed: location.speed,
+          heading: location.heading,
+          recordedAt: location.recordedAt,
+        );
+      } on Object {
+        remaining.add(location);
+      }
+    }
+    await _writeQueuedLocations(_assignmentLocationQueueKey, remaining);
+  }
+
+  Future<void> queueDriverTokenLocation({
+    required String token,
+    required double latitude,
+    required double longitude,
+    double? accuracy,
+    double? speed,
+    double? heading,
+    DateTime? recordedAt,
+  }) async {
+    await _appendQueuedLocation(
+      _driverTokenLocationQueueKey,
+      _QueuedDeliveryLocation(
+        reference: token,
+        latitude: latitude,
+        longitude: longitude,
+        accuracy: accuracy,
+        speed: speed,
+        heading: heading,
+        recordedAt: recordedAt ?? DateTime.now().toUtc(),
+      ),
+    );
+  }
+
+  Future<void> flushDriverTokenLocationQueue() async {
+    final pending = await _readQueuedLocations(_driverTokenLocationQueueKey);
+    if (pending.isEmpty) return;
+
+    final remaining = <_QueuedDeliveryLocation>[];
+    for (final location in pending) {
+      try {
+        await uploadDriverLocation(
+          token: location.reference,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracy: location.accuracy,
+          speed: location.speed,
+          heading: location.heading,
+          recordedAt: location.recordedAt,
+        );
+      } on Object {
+        remaining.add(location);
+      }
+    }
+    await _writeQueuedLocations(_driverTokenLocationQueueKey, remaining);
+  }
+
   Future<DeliveryTrackingSnapshot> getPublicTrackingByLink(
     String trackingLink,
   ) async {
     final payload = await _getPublicJsonFromLink(trackingLink);
     return _toSnapshot(payload);
+  }
+
+  Future<TrackingLinksResponse> generateTrackingLinks(String deliveryId) async {
+    final token = await _readAccessToken();
+    if (token == null || token.trim().isEmpty) {
+      throw const DeliveryTrackingException(
+        'Cloud delivery session is not available on this device.',
+      );
+    }
+
+    try {
+      final uri = _uri('/api/public/tracking/generate-token');
+      final request = await _httpClient.openUrl('POST', uri).timeout(
+            const Duration(seconds: 12),
+          );
+      request.headers.contentType = ContentType.json;
+      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+
+      final body = jsonEncode({'deliveryId': deliveryId});
+      request.add(utf8.encode(body));
+
+      final response =
+          await request.close().timeout(const Duration(seconds: 20));
+      final responseBody = await response.transform(utf8.decoder).join();
+      final decoded = responseBody.trim().isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(responseBody) as Map<String, dynamic>);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              'Failed to generate tracking links.',
+        );
+      }
+
+      return TrackingLinksResponse(
+        token: _readString(decoded, 'token') ?? '',
+        driverLink: _readString(decoded, 'driverLink') ?? '',
+        customerLink: _readString(decoded, 'customerLink') ?? '',
+      );
+    } on SocketException {
+      throw DeliveryTrackingException(_connectionFailureMessage());
+    }
+  }
+
+  Future<DriverLinkResponse> getDriverLinkByToken(String token) async {
+    try {
+      final uri = _uri('/api/public/tracking/driver/$token');
+      final request = await _httpClient.openUrl('GET', uri).timeout(
+            const Duration(seconds: 12),
+          );
+      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
+
+      final response =
+          await request.close().timeout(const Duration(seconds: 20));
+      final responseBody = await response.transform(utf8.decoder).join();
+      final decoded = responseBody.trim().isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(responseBody) as Map<String, dynamic>);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              'Failed to get driver link.',
+        );
+      }
+
+      return DriverLinkResponse(
+        deliveryId: _readString(decoded, 'deliveryId') ?? '',
+        orderId: _readString(decoded, 'orderId') ?? '',
+        orderNumber: _readString(decoded, 'orderNumber') ?? '',
+        customerName: _readString(decoded, 'customerName') ?? '',
+        deliveryAddress: _readString(decoded, 'deliveryAddress') ?? '',
+        destinationLatitude: _readDouble(decoded, 'destinationLatitude'),
+        destinationLongitude: _readDouble(decoded, 'destinationLongitude'),
+        customerPhone: _readString(decoded, 'customerPhone'),
+        timeSlot: _readString(decoded, 'timeSlot') ?? '',
+        status: _readString(decoded, 'status') ?? '',
+        trackingToken: _readString(decoded, 'trackingToken') ?? '',
+      );
+    } on SocketException {
+      throw DeliveryTrackingException(_connectionFailureMessage());
+    }
+  }
+
+  Future<bool> updateDeliveryStatus(String token, String status) async {
+    try {
+      final uri = _uri('/api/public/tracking/driver/status');
+      final request = await _httpClient.openUrl('POST', uri).timeout(
+            const Duration(seconds: 12),
+          );
+      request.headers.contentType = ContentType.json;
+      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
+
+      final body = jsonEncode({
+        'trackingToken': token,
+        'status': status,
+      });
+      request.add(utf8.encode(body));
+
+      final response =
+          await request.close().timeout(const Duration(seconds: 20));
+      final responseBody = await response.transform(utf8.decoder).join();
+      final decoded = responseBody.trim().isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(responseBody) as Map<String, dynamic>);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              'Failed to update delivery status.',
+        );
+      }
+
+      final success = decoded['success'];
+      return success is bool && success;
+    } on SocketException {
+      throw DeliveryTrackingException(_connectionFailureMessage());
+    }
+  }
+
+  Future<bool> uploadDriverLocation({
+    required String token,
+    required double latitude,
+    required double longitude,
+    double? accuracy,
+    double? speed,
+    double? heading,
+    DateTime? recordedAt,
+    String? driverMobile,
+  }) async {
+    try {
+      final uri = _uri('/api/public/tracking/driver/location');
+      final request = await _httpClient.openUrl('POST', uri).timeout(
+            const Duration(seconds: 12),
+          );
+      request.headers.contentType = ContentType.json;
+      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
+
+      final body = jsonEncode({
+        'trackingToken': token,
+        'latitude': latitude,
+        'longitude': longitude,
+        'accuracy': accuracy,
+        'speed': speed,
+        'heading': heading,
+        'recordedAt': recordedAt?.toIso8601String(),
+        'driverMobile': driverMobile,
+      });
+      request.add(utf8.encode(body));
+
+      final response =
+          await request.close().timeout(const Duration(seconds: 20));
+      final responseBody = await response.transform(utf8.decoder).join();
+      final decoded = responseBody.trim().isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(responseBody) as Map<String, dynamic>);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              'Failed to upload location.',
+        );
+      }
+
+      final success = decoded['success'];
+      return success is bool && success;
+    } on SocketException {
+      throw DeliveryTrackingException(_connectionFailureMessage());
+    }
   }
 
   Stream<DeliveryTrackingSnapshot> watchTracking(
@@ -257,18 +568,22 @@ class DeliveryTrackingService {
                 _readString(decoded, 'name');
             final payload =
                 _asMap(decoded['payload'] ?? decoded['data'] ?? decoded);
+            final envelopePayload =
+                _asMap(payload['payload'] ?? payload['data']);
+            final payloadToUse =
+                envelopePayload.isNotEmpty ? envelopePayload : payload;
 
             final eventName = (event ?? '').toLowerCase();
             if (eventName.contains('status')) {
-              final assignment = _readString(payload, 'assignmentId');
+              final assignment = _readString(payloadToUse, 'assignmentId');
               if (assignment != null && assignment != current.assignmentId) {
                 return;
               }
-              final status = _readString(payload, 'status');
+              final status = _readString(payloadToUse, 'status');
               final timelineEvent = DeliveryTimelineEvent(
                 status: status ?? current.status,
                 recordedAt: _readDate(payload, 'recordedAt') ?? DateTime.now(),
-                note: _readString(payload, 'note'),
+                note: _readString(payloadToUse, 'note'),
               );
               final timeline =
                   List<DeliveryTimelineEvent>.from(current.timeline)
@@ -283,18 +598,18 @@ class DeliveryTrackingService {
               if (assignment != null && assignment != current.assignmentId) {
                 return;
               }
-              final proof = _toProof(payload);
+              final proof = _toProof(payloadToUse);
               if (proof == null) return;
               current = current.copyWith(proof: proof);
               controller.add(current);
               return;
             }
 
-            final assignment = _readString(payload, 'assignmentId');
+            final assignment = _readString(payloadToUse, 'assignmentId');
             if (assignment != null && assignment != current.assignmentId) {
               return;
             }
-            final location = _toLocation(payload);
+            final location = _toLocation(payloadToUse);
             if (location == null) return;
             final route = List<DeliveryLocationPoint>.from(current.route)
               ..add(location);
@@ -384,51 +699,166 @@ class DeliveryTrackingService {
   }
 
   Future<String?> _readAccessToken() async {
-    final bootstrap = await _auth.readBootstrap();
-    if (bootstrap == null) return null;
+    // Use the stored token directly — avoids a network round-trip on every call.
+    final stored = await _auth.getStoredAccessToken();
+    if (stored != null && stored.trim().isNotEmpty) return stored;
 
-    // Token may not exist in bootstrap, fallback to refresh cycle if needed.
+    // No stored token: attempt a refresh once as a fallback.
     try {
       final refreshed = await _auth.refreshAndBootstrap();
       return refreshed.accessToken;
     } on Object {
+      return _provisionDeviceSessionFromLocalShop();
+    }
+  }
+
+  Future<String?> _provisionDeviceSessionFromLocalShop() async {
+    try {
+      final settings = await BusinessSettingsManager().load();
+      final mobile = settings.phone.replaceAll(RegExp(r'[^0-9]'), '');
+      final shopName = settings.shopName.trim();
+      if (shopName.isEmpty ||
+          shopName == 'My Flower Shop' ||
+          mobile.length < 8) {
+        return null;
+      }
+
+      final payload = await _auth.register(
+        companyName: shopName,
+        ownerName: settings.ownerName.trim().isEmpty
+            ? shopName
+            : settings.ownerName.trim(),
+        mobile: mobile,
+        address: settings.address.trim(),
+        city: '',
+        email: _buildProvisioningEmail(mobile),
+        password: _buildProvisioningPassword(mobile),
+      );
+      return payload.accessToken;
+    } on Object catch (error) {
+      debugPrint('[DeliveryService] Silent device provisioning failed: $error');
       return null;
     }
   }
 
+  String _buildProvisioningEmail(String mobile) {
+    final digits = mobile.replaceAll(RegExp(r'[^0-9]'), '');
+    final safeMobile = digits.isEmpty ? 'device' : digits;
+    return 'auto.$safeMobile@floraprise.local';
+  }
+
+  String _buildProvisioningPassword(String mobile) {
+    final digits = mobile.replaceAll(RegExp(r'[^0-9]'), '');
+    final normalized = digits.padLeft(10, '0');
+    final tail = normalized.substring(normalized.length - 6);
+    return 'Fp@$tail#2026';
+  }
+
   Future<Map<String, dynamic>> _getJson(String path) async {
-    final token = await _readAccessToken();
+    return _getJsonWithToken(path, retryOnUnauthorized: true);
+  }
+
+  Future<Map<String, dynamic>> _postJson(
+    String path,
+    Map<String, Object?> body,
+  ) async {
+    return _sendJsonWithToken(
+      'POST',
+      path,
+      body: body,
+      retryOnUnauthorized: true,
+    );
+  }
+
+  Future<Map<String, dynamic>> _getJsonWithToken(
+    String path, {
+    bool retryOnUnauthorized = false,
+    String? bearerToken,
+  }) async {
+    final token = bearerToken ?? await _readAccessToken();
+    final uri = _uri(path);
+
+    if (token == null || token.trim().isEmpty) {
+      throw const DeliveryTrackingException(
+        'Cloud delivery session is not available on this device. Register the shop/device or use account recovery when cloud services are needed.',
+      );
+    }
+
+    final requestHeaders = <String, List<String>>{
+      HttpHeaders.acceptHeader: [ContentType.json.mimeType],
+      HttpHeaders.authorizationHeader: ['Bearer $token'],
+    };
+
+    debugPrint('[DeliveryService] Request URL: $uri');
+    debugPrint('[DeliveryService] Request Method: GET');
+    debugPrint(
+        '[DeliveryService] Request Headers: ${jsonEncode(requestHeaders)}');
+    debugPrint(
+      '[DeliveryService] Authorization header: ${requestHeaders[HttpHeaders.authorizationHeader]?.join(', ') ?? 'NONE'}',
+    );
 
     try {
-      final uri = _uri(path);
       final request = await _httpClient.openUrl('GET', uri).timeout(
             const Duration(seconds: 12),
           );
-      request.headers.contentType = ContentType.json;
-      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
-      if (token != null && token.trim().isNotEmpty) {
-        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      for (final entry in requestHeaders.entries) {
+        request.headers.set(entry.key, entry.value);
       }
 
       final response =
           await request.close().timeout(const Duration(seconds: 20));
       final body = await response.transform(utf8.decoder).join();
+      final responseHeaders = <String, List<String>>{};
+      response.headers.forEach((name, values) {
+        responseHeaders[name] = values;
+      });
+
+      debugPrint('[DeliveryService] Response Status: ${response.statusCode}');
+      debugPrint(
+          '[DeliveryService] Response Headers: ${jsonEncode(responseHeaders)}');
+      debugPrint('[DeliveryService] Raw Response Body: $body');
+
+      // Refresh token and retry once on 401
+      if (response.statusCode == 401 && retryOnUnauthorized) {
+        debugPrint(
+            '[DeliveryService] 401 received; refreshing token and retrying with the new access token');
+        try {
+          final refreshed = await _auth.refreshAndBootstrap();
+          if (refreshed.accessToken.isNotEmpty) {
+            debugPrint(
+                '[DeliveryService] Refresh succeeded. New Authorization header: Bearer ${refreshed.accessToken}');
+            return _getJsonWithToken(
+              path,
+              retryOnUnauthorized: false,
+              bearerToken: refreshed.accessToken,
+            );
+          }
+        } on Object catch (e) {
+          debugPrint('[DeliveryService] Token refresh failed: $e');
+          throw const DeliveryTrackingException(
+              'Cloud delivery session expired and could not be refreshed. Use device recovery when cloud services are needed.');
+        }
+      }
+
       final decoded = body.trim().isEmpty
           ? <String, dynamic>{}
           : (jsonDecode(body) as Map<String, dynamic>);
 
+      debugPrint('[DeliveryService] Decoded JSON: ${jsonEncode(decoded)}');
+
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw DeliveryTrackingException(
-          _readString(_asMap(decoded['error']), 'message') ??
-              'Failed to load delivery tracking.',
-        );
+        final serverMsg = _readString(_asMap(decoded['error']), 'message') ??
+            _readString(decoded, 'title') ??
+            _readString(decoded, 'detail') ??
+            'HTTP ${response.statusCode}';
+        throw DeliveryTrackingException(serverMsg);
       }
 
       final success = decoded['success'];
       if (success is bool && !success) {
         throw DeliveryTrackingException(
           _readString(_asMap(decoded['error']), 'message') ??
-              'Failed to load delivery tracking.',
+              'Failed to load delivery data.',
         );
       }
 
@@ -436,8 +866,80 @@ class DeliveryTrackingService {
       if (data is Map<String, dynamic>) return data;
       if (data is Map) return data.cast<String, dynamic>();
       return decoded;
-    } on SocketException {
+    } on SocketException catch (e) {
+      debugPrint('[DeliveryService] SocketException: $e');
       throw DeliveryTrackingException(_connectionFailureMessage());
+    } on DeliveryTrackingException {
+      rethrow;
+    } on Object catch (e) {
+      debugPrint('[DeliveryService] Unexpected error: $e');
+      throw DeliveryTrackingException('Unexpected error: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> _sendJsonWithToken(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+    bool retryOnUnauthorized = false,
+    String? bearerToken,
+  }) async {
+    final token = bearerToken ?? await _readAccessToken();
+    if (token == null || token.trim().isEmpty) {
+      throw const DeliveryTrackingException(
+        'Cloud delivery session is not available on this device. Register the shop/device or use account recovery when cloud services are needed.',
+      );
+    }
+
+    try {
+      final request = await _httpClient.openUrl(method, _uri(path)).timeout(
+            const Duration(seconds: 12),
+          );
+      request.headers.contentType = ContentType.json;
+      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      if (body != null) {
+        request.add(utf8.encode(jsonEncode(body)));
+      }
+
+      final response =
+          await request.close().timeout(const Duration(seconds: 20));
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode == 401 && retryOnUnauthorized) {
+        final refreshed = await _auth.refreshAndBootstrap();
+        return _sendJsonWithToken(
+          method,
+          path,
+          body: body,
+          retryOnUnauthorized: false,
+          bearerToken: refreshed.accessToken,
+        );
+      }
+
+      final decoded = responseBody.trim().isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(responseBody) as Map<String, dynamic>);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              _readString(decoded, 'title') ??
+              _readString(decoded, 'detail') ??
+              'HTTP ${response.statusCode}',
+        );
+      }
+
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return data.cast<String, dynamic>();
+      return decoded;
+    } on SocketException catch (e) {
+      throw DeliveryTrackingException('Network unavailable: $e');
+    } on DeliveryTrackingException {
+      rethrow;
+    } on Object catch (e) {
+      throw DeliveryTrackingException('Unexpected error: $e');
     }
   }
 
@@ -482,25 +984,20 @@ class DeliveryTrackingService {
   }
 
   String _connectionFailureMessage() {
-    final uri = Uri.tryParse(_baseUrl);
-    final host = uri?.host.toLowerCase() ?? '';
-    final port = uri?.hasPort == true ? uri!.port : null;
-
-    if (host == 'localhost' || host == '127.0.0.1') {
-      final portText = port == null ? '' : ' on port $port';
-      return 'Delivery tracking server is not reachable at localhost$portText. Start the API server or configure FLORAPRISE_API_URL to the correct backend address.';
-    }
-
-    return 'Delivery tracking server is not reachable right now. Check the backend connection and try again.';
+    return 'Unable to connect to the server. Please check your internet connection and try again.';
   }
 
   DeliveryWorkspaceRecord _toWorkspaceRecord(Map<String, dynamic> map) {
     return DeliveryWorkspaceRecord(
       assignmentId: _readString(map, 'assignmentId') ?? '',
-      orderId: _readInt(map, 'orderId') ?? 0,
+      orderId: _readString(map, 'orderId') ?? '',
       orderNo: _readString(map, 'orderNo') ?? '-',
       customerName: _readString(map, 'customerName') ?? '-',
       recipientName: _readString(map, 'recipientName') ?? '-',
+      deliveryAddress: _readString(map, 'deliveryAddress') ?? '-',
+      deliveryArea: _readString(map, 'deliveryArea') ?? '-',
+      customerPhone: _readString(map, 'customerPhone'),
+      deliveryTime: _readString(map, 'deliveryTime') ?? '-',
       status: _readString(map, 'status') ?? 'assigned',
       trackingLink: _readString(map, 'trackingLink') ?? '',
       eta: _readDate(map, 'eta'),
@@ -631,6 +1128,48 @@ class DeliveryTrackingService {
     );
   }
 
+  Future<void> _appendQueuedLocation(
+    String key,
+    _QueuedDeliveryLocation location,
+  ) async {
+    final pending = await _readQueuedLocations(key);
+    pending.add(location);
+    await _writeQueuedLocations(key, pending);
+  }
+
+  Future<List<_QueuedDeliveryLocation>> _readQueuedLocations(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(key);
+    if (raw == null || raw.trim().isEmpty) return <_QueuedDeliveryLocation>[];
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return <_QueuedDeliveryLocation>[];
+      return decoded
+          .map((item) => _QueuedDeliveryLocation.fromJson(_asMap(item)))
+          .whereType<_QueuedDeliveryLocation>()
+          .toList();
+    } on Object {
+      return <_QueuedDeliveryLocation>[];
+    }
+  }
+
+  Future<void> _writeQueuedLocations(
+    String key,
+    List<_QueuedDeliveryLocation> locations,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (locations.isEmpty) {
+      await prefs.remove(key);
+      return;
+    }
+
+    await prefs.setString(
+      key,
+      jsonEncode(locations.map((item) => item.toJson()).toList()),
+    );
+  }
+
   Map<String, dynamic> _decodeSocketMessage(dynamic raw) {
     try {
       if (raw is String) {
@@ -687,4 +1226,94 @@ class DeliveryTrackingService {
     if (key.isEmpty) return key;
     return '${key[0].toUpperCase()}${key.substring(1)}';
   }
+}
+
+class _QueuedDeliveryLocation {
+  const _QueuedDeliveryLocation({
+    required this.reference,
+    required this.latitude,
+    required this.longitude,
+    required this.recordedAt,
+    this.accuracy,
+    this.speed,
+    this.heading,
+  });
+
+  final String reference;
+  final double latitude;
+  final double longitude;
+  final double? accuracy;
+  final double? speed;
+  final double? heading;
+  final DateTime recordedAt;
+
+  Map<String, Object?> toJson() => {
+        'reference': reference,
+        'latitude': latitude,
+        'longitude': longitude,
+        'accuracy': accuracy,
+        'speed': speed,
+        'heading': heading,
+        'recordedAt': recordedAt.toIso8601String(),
+      };
+
+  static _QueuedDeliveryLocation? fromJson(Map<String, dynamic> map) {
+    final reference = map['reference']?.toString() ?? '';
+    final latitude = DeliveryTrackingService._readDouble(map, 'latitude');
+    final longitude = DeliveryTrackingService._readDouble(map, 'longitude');
+    final recordedAt = DeliveryTrackingService._readDate(map, 'recordedAt');
+    if (reference.isEmpty || latitude == null || longitude == null) {
+      return null;
+    }
+
+    return _QueuedDeliveryLocation(
+      reference: reference,
+      latitude: latitude,
+      longitude: longitude,
+      accuracy: DeliveryTrackingService._readDouble(map, 'accuracy'),
+      speed: DeliveryTrackingService._readDouble(map, 'speed'),
+      heading: DeliveryTrackingService._readDouble(map, 'heading'),
+      recordedAt: recordedAt ?? DateTime.now().toUtc(),
+    );
+  }
+}
+
+class TrackingLinksResponse {
+  const TrackingLinksResponse({
+    required this.token,
+    required this.driverLink,
+    required this.customerLink,
+  });
+
+  final String token;
+  final String driverLink;
+  final String customerLink;
+}
+
+class DriverLinkResponse {
+  const DriverLinkResponse({
+    required this.deliveryId,
+    required this.orderId,
+    required this.orderNumber,
+    required this.customerName,
+    required this.deliveryAddress,
+    this.destinationLatitude,
+    this.destinationLongitude,
+    this.customerPhone,
+    required this.timeSlot,
+    required this.status,
+    required this.trackingToken,
+  });
+
+  final String deliveryId;
+  final String orderId;
+  final String orderNumber;
+  final String customerName;
+  final String deliveryAddress;
+  final double? destinationLatitude;
+  final double? destinationLongitude;
+  final String? customerPhone;
+  final String timeSlot;
+  final String status;
+  final String trackingToken;
 }

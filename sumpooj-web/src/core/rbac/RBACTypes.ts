@@ -55,6 +55,9 @@ export type Permission =
   | 'delivery:view'
   | 'delivery:update'
   | 'delivery:schedule'
+  | 'delivery:control_center'
+  | 'delivery:live_map'
+  | 'delivery:workspace'
   | 'events:view'
   | 'events:manage'
   | 'proposals:view'
@@ -107,7 +110,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'inventory:view', 'inventory:adjust', 'inventory:purchase',
     'products:view', 'products:create', 'products:edit',
     'reports:view', 'reports:profit', 'reports:inventory',
-    'delivery:view', 'delivery:update', 'delivery:schedule',
+    'delivery:view', 'delivery:update', 'delivery:schedule', 'delivery:control_center', 'delivery:live_map', 'delivery:workspace',
     'events:view', 'events:manage',
     'proposals:view', 'proposals:create', 'proposals:edit',
     'payments:schedule:view', 'payments:schedule:manage',
@@ -126,7 +129,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'inventory:view', 'inventory:adjust', 'inventory:purchase',
     'products:view', 'products:create', 'products:edit',
     'reports:view', 'reports:profit', 'reports:inventory',
-    'delivery:view', 'delivery:update', 'delivery:schedule',
+    'delivery:view', 'delivery:update', 'delivery:schedule', 'delivery:control_center', 'delivery:live_map', 'delivery:workspace',
     'events:view', 'events:manage',
     'proposals:view', 'proposals:create', 'proposals:edit',
     'payments:schedule:view', 'payments:schedule:manage',
@@ -325,6 +328,47 @@ export const MENU_SECTIONS: MenuSection[] = [
         icon: 'Assignment',
         path: '/corporate/orders/auto-created',
         permissions: ['orders:edit'],
+      },
+    ],
+  },
+  {
+    id: 'delivery-operations',
+    title: 'Delivery Operations',
+    items: [
+      {
+        id: 'delivery-control-center',
+        label: 'Control Center',
+        icon: 'Dashboard',
+        path: '/delivery/control-center',
+        permissions: ['delivery:control_center'],
+      },
+      {
+        id: 'delivery-live-map',
+        label: 'Live Map',
+        icon: 'Map',
+        path: '/delivery/live-map',
+        permissions: ['delivery:live_map'],
+      },
+      {
+        id: 'delivery-workspace',
+        label: 'Delivery Workspace',
+        icon: 'Assignment',
+        path: '/delivery/workspace/:deliveryId',
+        permissions: ['delivery:workspace'],
+      },
+      {
+        id: 'delivery-reports',
+        label: 'Delivery Reports',
+        icon: 'Assessment',
+        path: '/delivery/reports',
+        permissions: ['delivery:view'],
+      },
+      {
+        id: 'delivery-settings',
+        label: 'Delivery Settings',
+        icon: 'Settings',
+        path: '/delivery/settings',
+        permissions: ['delivery:schedule'],
       },
     ],
   },
@@ -758,6 +802,41 @@ export const MENU_SECTIONS: MenuSection[] = [
         permissions: ['platform:admin'],
       },
       {
+        id: 'admin-mobile-dashboard',
+        label: 'Mobile Dashboard',
+        icon: 'PhoneAndroid',
+        path: '/admin/mobile/dashboard',
+        permissions: ['platform:admin'],
+      },
+      {
+        id: 'admin-mobile-customers',
+        label: 'Mobile Customers',
+        icon: 'ManageAccounts',
+        path: '/admin/mobile/customers',
+        permissions: ['platform:admin'],
+      },
+      {
+        id: 'admin-mobile-devices',
+        label: 'Mobile Devices',
+        icon: 'Devices',
+        path: '/admin/mobile/devices',
+        permissions: ['platform:admin'],
+      },
+      {
+        id: 'admin-mobile-licenses',
+        label: 'Mobile Licenses',
+        icon: 'Verified',
+        path: '/admin/mobile/licenses',
+        permissions: ['platform:admin'],
+      },
+      {
+        id: 'admin-mobile-support-activity',
+        label: 'Support Activity',
+        icon: 'SupportAgent',
+        path: '/admin/mobile/support-activity',
+        permissions: ['platform:admin'],
+      },
+      {
         id: 'admin-audit-logs',
         label: 'Audit Logs',
         icon: 'History',
@@ -820,6 +899,11 @@ export const ROUTE_ACCESS: RouteConfig[] = [
   { path: '/settings/tenant', permissions: ['settings:edit'] },
   { path: '/settings/data-cleanup', permissions: ['settings:edit'] },
   { path: '/settings/discount-rules', permissions: ['settings:edit'] },
+  { path: '/admin/mobile/dashboard', permissions: ['platform:admin'] },
+  { path: '/admin/mobile/customers', permissions: ['platform:admin'] },
+  { path: '/admin/mobile/devices', permissions: ['platform:admin'] },
+  { path: '/admin/mobile/licenses', permissions: ['platform:admin'] },
+  { path: '/admin/mobile/support-activity', permissions: ['platform:admin'] },
   { path: '/day-close', permissions: ['pos:day_close'] },
 ];
 

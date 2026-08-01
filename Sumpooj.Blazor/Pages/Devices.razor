@@ -1,0 +1,175 @@
+@page "/devices"
+@layout MainLayout
+@using Sumpooj.Blazor.Components
+@inject DeviceApiService DeviceService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<div class="page-shell">
+    <div class="section-header">
+        <div>
+            <div class="eyebrow">Operations</div>
+            <h1 class="page-title">Devices</h1>
+            <div class="page-subtitle">Monitor and manage registered devices</div>
+        </div>
+    </div>
+
+    <MudPaper Elevation="0" Class="table-card">
+        <MudTable Items="@_devices" Hover="true" Dense="true" Elevation="0" Class="ops-table">
+            <HeaderContent>
+                <MudTh>Company</MudTh>
+                <MudTh>Device</MudTh>
+                <MudTh>Android</MudTh>
+                <MudTh>App</MudTh>
+                <MudTh>Battery</MudTh>
+                <MudTh>Last Sync</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Company">@context.BusinessName</MudTd>
+                <MudTd DataLabel="Device">@context.DeviceName</MudTd>
+                <MudTd DataLabel="Android">@context.OsVersion</MudTd>
+                <MudTd DataLabel="App">@context.AppVersion</MudTd>
+                <MudTd DataLabel="Battery">88%</MudTd>
+                <MudTd DataLabel="Last Sync">@context.LastSeenAtUtc?.ToString("dd MMM HH:mm")</MudTd>
+                <MudTd DataLabel="Status">
+                    <span class="status-pill @GetStatusClass(context.DeviceStatus)">@context.DeviceStatus</span>
+                </MudTd>
+                <MudTd DataLabel="Actions">
+                    <div class="action-stack">
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Class="action-link" OnClick="@(() => OpenDetailDrawer(context))">View</MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Class="action-link action-link-danger" OnClick="@(() => ConfirmReset(context))">Reset</MudButton>
+                    </div>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
+</div>
+
+<MudDrawer @bind-Open="_drawerOpen" Anchor="Anchor.Right" Width="380px" Elevation="1">
+    @if (_selectedDevice != null)
+    {
+        <MudDrawerHeader>
+            <MudText Typo="Typo.h6">@(_selectedDevice.DeviceName.Length > 0 ? _selectedDevice.DeviceName : _selectedDevice.Model)</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@(() => _drawerOpen = false)" />
+        </MudDrawerHeader>
+        <MudDivider />
+        <div class="drawer-body">
+            <div class="detail-section">
+                <span class="detail-label">Company</span>
+                <MudText Typo="Typo.body2">@_selectedDevice.BusinessName</MudText>
+            </div>
+            <div class="detail-section">
+                <span class="detail-label">Platform / Model</span>
+                <MudText Typo="Typo.body2">@_selectedDevice.Platform — @_selectedDevice.Model</MudText>
+            </div>
+            <div class="detail-section">
+                <span class="detail-label">OS Version</span>
+                <MudText Typo="Typo.body2">@_selectedDevice.OsVersion</MudText>
+            </div>
+            <div class="detail-section">
+                <span class="detail-label">App Version</span>
+                <MudText Typo="Typo.body2">@_selectedDevice.AppVersion</MudText>
+            </div>
+            <div class="detail-section">
+                <span class="detail-label">Last Seen</span>
+                <MudText Typo="Typo.body2">@(_selectedDevice.LastSeenAtUtc?.ToString("dd MMM yyyy HH:mm") ?? _selectedDevice.LastSeenUtc?.ToString("dd MMM yyyy HH:mm") ?? "Never")</MudText>
+            </div>
+            <div class="detail-section">
+                <span class="detail-label">Status</span>
+                <span class="status-pill @GetStatusClass(_selectedDevice.DeviceStatus)">@_selectedDevice.DeviceStatus</span>
+            </div>
+            <div class="detail-section">
+                <span class="detail-label">Online</span>
+                <MudText Typo="Typo.body2">
+                    <span class="@(_selectedDevice.IsOnline ? "online-dot" : "offline-dot")">●</span>
+                    @(_selectedDevice.IsOnline ? "Online" : "Offline")
+                </MudText>
+            </div>
+            <MudDivider Class="my-4" />
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" FullWidth="true"
+                       OnClick="@(() => { _drawerOpen = false; _ = ConfirmReset(_selectedDevice); })">
+                Force Logout
+            </MudButton>
+        </div>
+    }
+</MudDrawer>
+
+<style>
+    .page-shell { display: flex; flex-direction: column; gap: 16px; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; }
+    .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280; }
+    .page-title { margin: 4px 0 0; font-size: 24px; color: #243447; }
+    .page-subtitle { margin: 4px 0 0; font-size: 14px; color: #6b7280; }
+    .table-card { background: #ffffff; border: 1px solid #e6ebf1; border-radius: 12px; padding: 8px; }
+    .status-pill { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .status-pill.online { background: #e8f5e9; color: #2e7d32; }
+    .status-pill.offline { background: #ffebee; color: #d32f2f; }
+    .status-pill.suspended { background: #fff3e0; color: #ef6c00; }
+    .action-stack { display: flex; gap: 4px; flex-wrap: wrap; }
+    .action-link { color: #2563eb; text-transform: none; min-width: auto; }
+    .action-link-danger { color: #d32f2f; }
+    .status-pill.active { background: #e8f5e9; color: #2e7d32; }
+    .detail-section { margin-bottom: 14px; }
+    .detail-label { display: block; margin-bottom: 3px; color: #6b7280; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .drawer-body { padding: 16px; }
+    .online-dot { color: #2e7d32; }
+    .offline-dot { color: #9ca3af; }
+</style>
+
+@code {
+    private List<DeviceDto> _devices = new();
+    private DeviceDto? _selectedDevice;
+    private bool _drawerOpen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDevices();
+    }
+
+    private async Task LoadDevices()
+    {
+        _devices = await DeviceService.GetDevicesAsync();
+    }
+
+    private void OpenDetailDrawer(DeviceDto device)
+    {
+        _selectedDevice = device;
+        _drawerOpen = true;
+    }
+
+    private async Task ConfirmReset(DeviceDto device)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(ConfirmDialog.Title), "Reset Device" },
+            { nameof(ConfirmDialog.Message), $"Force logout '{device.DeviceName}' for {device.BusinessName}? The device will be signed out immediately." }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Reset", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            var ok = await DeviceService.ForceLogoutAsync(device.MobileDeviceId, device.CompanyId);
+            Snackbar.Add(ok ? "Device reset." : "Reset failed.", ok ? Severity.Success : Severity.Error);
+            if (ok) await LoadDevices();
+        }
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status.ToLowerInvariant() switch
+        {
+            "active" => "active",
+            "online" => "active",
+            "offline" => "offline",
+            "suspended" => "suspended",
+            _ => "active"
+        };
+    }
+}

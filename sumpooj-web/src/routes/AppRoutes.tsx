@@ -43,6 +43,12 @@ const UnifiedPhoneOrderPage = lazy(() => import('../modules/phone-orders/Unified
 const PhoneOrdersListPage = lazy(() => import('../modules/phone-orders/PhoneOrdersListPage'));
 const ProductionDashboard = lazy(() => import('../modules/phone-orders/ProductionDashboard'));
 const DeliveryBoardPage = lazy(() => import('../modules/deliveries/DeliveryBoardPage'));
+const DeliveryControlCenter = lazy(() => import('../pages/delivery/DeliveryControlCenter'));
+const DeliveryLiveMap = lazy(() => import('../pages/delivery/DeliveryLiveMap'));
+const DeliveryWorkspace = lazy(() => import('../pages/delivery/DeliveryWorkspace'));
+const PublicTrackingPage = lazy(() => import('../pages/delivery/PublicTrackingPage'));
+const DeliveryReportsPage = lazy(() => import('../pages/delivery/DeliveryReportsPage'));
+const DeliverySettingsPage = lazy(() => import('../pages/delivery/DeliverySettingsPage'));
 import OrderList from '../pages/orders/OrderList';
 const WireVendorsPage = lazy(() => import('../pages/orders/WireVendorsPage'));
 const WireSettlementsPage = lazy(() => import('../pages/orders/WireSettlementsPage'));
@@ -91,6 +97,12 @@ const PlatformAnalyticsPage = lazy(() => import('../pages/admin/PlatformAnalytic
 const PlatformSettingsPage = lazy(() => import('../pages/admin/PlatformSettingsPage'));
 const AdminDemoRequestsPage = lazy(() => import('../pages/admin/AdminDemoRequestsPage'));
 const DataCleanupPage = lazy(() => import('../pages/admin/DataCleanupPage'));
+const MobileAdminDashboardPage = lazy(() => import('../pages/admin/MobileAdminDashboardPage'));
+const MobileAdminCustomersPage = lazy(() => import('../pages/admin/MobileAdminCustomersPage'));
+const MobileAdminCustomerWorkspacePage = lazy(() => import('../pages/admin/MobileAdminCustomerWorkspacePage'));
+const MobileAdminDevicesPage = lazy(() => import('../pages/admin/MobileAdminDevicesPage'));
+const MobileAdminLicensesPage = lazy(() => import('../pages/admin/MobileAdminLicensesPage'));
+const MobileAdminSupportActivityPage = lazy(() => import('../pages/admin/MobileAdminSupportActivityPage'));
 
 // Categories
 const CategoryManagementPage = lazy(() =>
@@ -219,6 +231,7 @@ export default function AppRoutes() {
         {/* Public Routes */}
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="/auth/login" element={<Login />} />
+        <Route path="/tracking/:token" element={<PublicTrackingPage />} />
 
         {/* Onboarding (authenticated but before main layout) */}
         <Route
@@ -276,6 +289,13 @@ export default function AppRoutes() {
           <Route path="/phone-order/*" element={<Navigate to="/phone-orders" replace />} />
           <Route path="/deliveries" element={<DeliveryBoardPage />} />
           <Route path="/delivery-scheduler" element={<Navigate to="/deliveries" replace />} />
+
+          {/* ─── Delivery Operations ───────────────────────────── */}
+          <Route path="/delivery/control-center" element={<DeliveryControlCenter />} />
+          <Route path="/delivery/live-map" element={<DeliveryLiveMap />} />
+          <Route path="/delivery/workspace/:deliveryId" element={<DeliveryWorkspace />} />
+          <Route path="/delivery/reports" element={<DeliveryReportsPage />} />
+          <Route path="/delivery/settings" element={<DeliverySettingsPage />} />
           <Route
             path="/wire-vendors"
             element={
@@ -368,6 +388,12 @@ export default function AppRoutes() {
           <Route path="/admin/analytics" element={<PlatformAnalyticsPage />} />
           <Route path="/admin/settings" element={<PlatformSettingsPage />} />
           <Route path="/admin/demo-requests" element={<AdminDemoRequestsPage />} />
+          <Route path="/admin/mobile/dashboard" element={<MobileAdminDashboardPage />} />
+          <Route path="/admin/mobile/customers" element={<MobileAdminCustomersPage />} />
+          <Route path="/admin/mobile/customers/:companyId/:mobileUserId" element={<MobileAdminCustomerWorkspacePage />} />
+          <Route path="/admin/mobile/devices" element={<MobileAdminDevicesPage />} />
+          <Route path="/admin/mobile/licenses" element={<MobileAdminLicensesPage />} />
+          <Route path="/admin/mobile/support-activity" element={<MobileAdminSupportActivityPage />} />
 
           {/* ─── CRM & Customer Intelligence ────────────── */}
           <Route path="/crm/customers" element={<CustomerListPage />} />
@@ -427,3 +453,5 @@ export default function AppRoutes() {
     </RBACProvider>
   );
 }
+
+

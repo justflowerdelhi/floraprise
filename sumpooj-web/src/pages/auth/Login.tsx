@@ -55,17 +55,23 @@ export default function Login() {
       // Show the actual backend message if available, otherwise a generic one
       const backendMsg = err?.response?.data?.message;
       const statusCode = err?.response?.status;
+      const errorCode = err?.code;
+      const errorText = String(err?.message ?? '');
+      let friendlyMessage = 'Invalid email or password';
+
       if (backendMsg) {
-        setError(backendMsg);
+        friendlyMessage = backendMsg;
       } else if (statusCode) {
-        setError(`Login failed (HTTP ${statusCode}). Please try again.`);
+        friendlyMessage = `Login failed (HTTP ${statusCode}). Please try again.`;
+      } else if (errorCode === 'ECONNABORTED' || /timeout/i.test(errorText)) {
+        friendlyMessage = 'Login request timed out. Backend cannot reach database right now.';
       } else if (err?.code === 'ERR_NETWORK') {
-        setError("Cannot reach the server. Please check your internet connection.");
-      } else {
-        setError("Invalid email or password");
+        friendlyMessage = 'Cannot reach the server. Please check your internet connection.';
       }
+
+      setError(friendlyMessage);
       console.error('Login error:', err);
-      toast.error("Login failed. Please check your credentials.");
+      toast.error(friendlyMessage);
     } finally {
       setLoading(false);
     }

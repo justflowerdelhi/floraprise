@@ -1092,10 +1092,12 @@ class AppLocalizationsHi extends AppLocalizations {
   String get openSettings => 'सेटिंग्स खोलें';
 
   @override
-  String get qrBarcodeScanningReserved => 'QR/बारकोड स्कैनिंग भविष्य के कार्यान्वयन के लिए आरक्षित';
+  String get qrBarcodeScanningReserved =>
+      'QR/बारकोड स्कैनिंग भविष्य के कार्यान्वयन के लिए आरक्षित';
 
   @override
-  String get navigateToMyDesigns => 'मेरे डिज़ाइन पर नेविगेट करें - प्लेसहोल्डर';
+  String get navigateToMyDesigns =>
+      'मेरे डिज़ाइन पर नेविगेट करें - प्लेसहोल्डर';
 
   @override
   String get version => 'संस्करण';
@@ -1111,57 +1113,6 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get logout => 'लॉग आउट';
-
-  @override
-  String get subscription => 'सदस्यता';
-
-  @override
-  String get freeTrial => 'मुफ्त परीक्षण';
-
-  @override
-  String get quarterlyPlan => 'त्रैमासिक योजना';
-
-  @override
-  String get halfYearlyPlan => 'अर्ध-वार्षिक योजना';
-
-  @override
-  String get annualPlan => 'वार्षिक योजना';
-
-  @override
-  String get mostPopular => '⭐ सबसे लोकप्रिय';
-
-  @override
-  String get fullAccess => 'पूर्ण पहुंच';
-
-  @override
-  String get daysRemaining => 'शेष दिन';
-
-  @override
-  String get renewNow => 'अभी नवीनीकरण करें';
-
-  @override
-  String get upgradePlan => 'योजना अपग्रेड करें';
-
-  @override
-  String get subscriptionExpired => 'आपकी सदस्यता समाप्त हो गई है। बिना रुकावट जारी रखने के लिए कृपया नवीनीकरण करें।';
-
-  @override
-  String get freeBluetoothPrinter => 'मुफ्त ब्लूटूथ थर्मल प्रिंटर';
-
-  @override
-  String get freePrinterNote => 'मुफ्त ब्लूटूथ थर्मल प्रिंटर केवल नई वार्षिक सदस्यताओं पर उपलब्ध है। सत्यापन, स्टॉक उपलब्धता, शिपिंग नीति और लागू शर्तों के अधीन।';
-
-  @override
-  String get saveAmount => 'त्रैमासिक दो बार नवीनीकरण की तुलना में ₹1,000 की बचत।';
-
-  @override
-  String get planComparison => 'योजना तुलना';
-
-  @override
-  String get chooseYourPlan => 'अपनी योजना चुनें';
-
-  @override
-  String get everyPaidPlanIncludes => 'हर भुगतान की गई योजना में शामिल है:';
 
   @override
   String get confirmLogout => 'लॉग आउट की पुष्टि करें';
@@ -1230,7 +1181,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get marketplace => 'मार्केटप्लेस';
 
   @override
-  String get searchByCustomerIdNamePhone => 'ग्राहक आईडी, नाम, फोन द्वारा खोजें...';
+  String get searchByCustomerIdNamePhone =>
+      'ग्राहक आईडी, नाम, फोन द्वारा खोजें...';
 
   @override
   String get pendingPayment => 'लंबित भुगतान';
@@ -1245,7 +1197,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get recentActivity => 'हाल की गतिविधि';
 
   @override
-  String get searchByProductStockCategory => 'उत्पाद, स्टॉक, श्रेणी द्वारा खोजें...';
+  String get searchByProductStockCategory =>
+      'उत्पाद, स्टॉक, श्रेणी द्वारा खोजें...';
 
   @override
   String get flowers => 'फूल';
@@ -1269,7 +1222,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get min => 'न्यूनतम';
 
   @override
-  String get searchByIdFlowerColorOccasion => 'आईडी, फूल, रंग, अवसर द्वारा खोजें...';
+  String get searchByIdFlowerColorOccasion =>
+      'आईडी, फूल, रंग, अवसर द्वारा खोजें...';
 
   @override
   String get priceRange => 'मूल्य सीमा';
@@ -1350,7 +1304,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get scanBarcodeComingSoon => 'बारकोड स्कैन जल्द आ रहा है';
 
   @override
-  String get generateNewFloristBarcode => 'किसी उत्पाद के लिए नया फ्लोरिस्ट बारकोड जेनरेट करें';
+  String get generateNewFloristBarcode =>
+      'किसी उत्पाद के लिए नया फ्लोरिस्ट बारकोड जेनरेट करें';
 
   @override
   String get productIdOptional => 'उत्पाद आईडी (वैकल्पिक)';
@@ -1404,7 +1359,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get designIdOrDescription => 'डिज़ाइन आईडी या विवरण';
 
   @override
-  String get eG20RedRosesCustomArrangement => 'उदा., 20 लाल गुलाब, कस्टम व्यवस्था';
+  String get eG20RedRosesCustomArrangement =>
+      'उदा., 20 लाल गुलाब, कस्टम व्यवस्था';
 
   @override
   String get eG850 => 'उदा., ₹850';
@@ -1434,7 +1390,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get pleaseSelectPickupDateAndTime => 'कृपया पिकअप दिनांक और समय चुनें';
 
   @override
-  String get orderSavedAndAddedToScheduler => 'ऑर्डर सहेज लिया गया है और शेड्यूलर में जोड़ दिया गया है!';
+  String get orderSavedAndAddedToScheduler =>
+      'ऑर्डर सहेज लिया गया है और शेड्यूलर में जोड़ दिया गया है!';
 
   @override
   String get draftSavedSuccessfully => 'ड्राफ्ट सफलतापूर्वक सहेजा गया';
@@ -1449,7 +1406,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get deliveryTime => 'डिलीवरी समय';
 
   @override
-  String get pleaseSelectDeliveryDateAndTime => 'कृपया डिलीवरी दिनांक और समय चुनें';
+  String get pleaseSelectDeliveryDateAndTime =>
+      'कृपया डिलीवरी दिनांक और समय चुनें';
 
   @override
   String get billingCustomer => 'बिलिंग ग्राहक';
@@ -1569,7 +1527,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get generateAutoSuggest => 'स्वत: सुझाव उत्पन्न करें';
 
   @override
-  String get autoSuggestDescription => 'आइटम जोड़ें जहां वर्तमान स्टॉक < न्यूनतम स्टॉक';
+  String get autoSuggestDescription =>
+      'आइटम जोड़ें जहां वर्तमान स्टॉक < न्यूनतम स्टॉक';
 
   @override
   String get clearPurchased => 'खरीदे गए साफ़ करें';
@@ -1635,13 +1594,15 @@ class AppLocalizationsHi extends AppLocalizations {
   String get onboardingChooseLanguage => 'अपनी भाषा चुनें';
 
   @override
-  String get onboardingPoweringModernFlorists => 'आधुनिक फूल व्यवसायियों के लिए';
+  String get onboardingPoweringModernFlorists =>
+      'आधुनिक फूल व्यवसायियों के लिए';
 
   @override
   String get onboardingWelcomeTitle => 'Floraprise में आपका स्वागत है!';
 
   @override
-  String get onboardingWelcomeBody => 'Billing, Inventory, Orders,\nCustomers, Delivery,\nReminders और बहुत कुछ के साथ\nअपना florist business चलाएं।';
+  String get onboardingWelcomeBody =>
+      'Billing, Inventory, Orders,\nCustomers, Delivery,\nReminders और बहुत कुछ के साथ\nअपना florist business चलाएं।';
 
   @override
   String get onboardingGetStarted => 'शुरू करें';
@@ -1656,7 +1617,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get onboardingMobileNumberRequired => 'मोबाइल नंबर *';
 
   @override
-  String get onboardingUseSameWhatsapp => 'व्हाट्सऐप के लिए यही नंबर उपयोग करें';
+  String get onboardingUseSameWhatsapp =>
+      'व्हाट्सऐप के लिए यही नंबर उपयोग करें';
 
   @override
   String get onboardingWhatsappNumber => 'व्हाट्सऐप नंबर';
@@ -1677,16 +1639,19 @@ class AppLocalizationsHi extends AppLocalizations {
   String get onboardingAddressOptional => 'पता (वैकल्पिक)';
 
   @override
-  String get onboardingRecommendedTitle => 'क्या आप चाहते हैं कि Floraprise आपके shop के लिए recommended florist setup तैयार करे?';
+  String get onboardingRecommendedTitle =>
+      'क्या आप चाहते हैं कि Floraprise आपके shop के लिए recommended florist setup तैयार करे?';
 
   @override
-  String get onboardingRecommendedBody => 'नए florist shops के लिए यह recommended है।';
+  String get onboardingRecommendedBody =>
+      'नए florist shops के लिए यह recommended है।';
 
   @override
   String get onboardingRecommendedDefault => 'Recommended';
 
   @override
-  String get onboardingRecommendedSubtitle => 'Starter categories, products, staff और defaults install करें।';
+  String get onboardingRecommendedSubtitle =>
+      'Starter categories, products, staff और defaults install करें।';
 
   @override
   String get onboardingSkip => 'स्किप';
@@ -1707,7 +1672,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get onboardingContinue => 'जारी रखें';
 
   @override
-  String get onboardingPreparingTitle => 'आपकी फ्लोरिस्ट शॉप तैयार की जा रही है...';
+  String get onboardingPreparingTitle =>
+      'आपकी फ्लोरिस्ट शॉप तैयार की जा रही है...';
 
   @override
   String get onboardingCreatingCategories => 'कैटेगरी बन रही हैं';
@@ -1725,7 +1691,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get onboardingReady => 'तैयार';
 
   @override
-  String get onboardingSetupFailed => 'सेटअप असफल रहा। कृपया फिर से प्रयास करें।';
+  String get onboardingSetupFailed =>
+      'सेटअप असफल रहा। कृपया फिर से प्रयास करें।';
 
   @override
   String get onboardingShopNameRequiredError => 'दुकान का नाम आवश्यक है।';
@@ -1734,7 +1701,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get onboardingMobileRequiredError => 'मान्य मोबाइल नंबर आवश्यक है।';
 
   @override
-  String get onboardingWhatsappRequiredError => 'मान्य व्हाट्सऐप नंबर आवश्यक है।';
+  String get onboardingWhatsappRequiredError =>
+      'मान्य व्हाट्सऐप नंबर आवश्यक है।';
 
   @override
   String get onboardingGstRequiredError => 'GST नंबर आवश्यक है।';
@@ -1764,5 +1732,6 @@ class AppLocalizationsHi extends AppLocalizations {
   String get resetOnboardingSubtitle => 'डेमो/टेस्टिंग के लिए';
 
   @override
-  String get resetOnboardingDialogMessage => 'इससे पहली बार वाला ऑनबोर्डिंग फिर दिखेगा। जारी रखें?';
+  String get resetOnboardingDialogMessage =>
+      'इससे पहली बार वाला ऑनबोर्डिंग फिर दिखेगा। जारी रखें?';
 }

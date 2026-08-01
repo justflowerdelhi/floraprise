@@ -9,6 +9,9 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../data/repositories/scheduler_repository.dart';
 import '../models/scheduler_task.dart';
+import '../models/smart_alert.dart';
+import 'smart_alert_engine.dart';
+import 'smart_alert_notification_service.dart';
 
 const _schedulerActionComplete = 'complete';
 const _schedulerActionSnooze5 = 'snooze_5';
@@ -30,6 +33,7 @@ class SchedulerService {
 
   final SchedulerRepository _repository;
   final FlutterLocalNotificationsPlugin _notifications;
+  final SmartAlertEngine _smartAlertEngine = SmartAlertEngine.instance;
 
   bool _initialized = false;
 
@@ -63,39 +67,8 @@ class SchedulerService {
     await android?.requestExactAlarmsPermission();
     await android?.requestFullScreenIntentPermission();
 
-    await android?.createNotificationChannel(
-      const AndroidNotificationChannel(
-        'scheduler_low',
-        'Scheduler Low',
-        description: 'Silent reminders for low priority tasks',
-        importance: Importance.low,
-        playSound: false,
-      ),
-    );
-    await android?.createNotificationChannel(
-      const AndroidNotificationChannel(
-        'scheduler_normal',
-        'Scheduler Normal',
-        description: 'Standard reminders for scheduled tasks',
-        importance: Importance.defaultImportance,
-      ),
-    );
-    await android?.createNotificationChannel(
-      const AndroidNotificationChannel(
-        'scheduler_high',
-        'Scheduler High',
-        description: 'High priority reminders with vibration',
-        importance: Importance.high,
-      ),
-    );
-    await android?.createNotificationChannel(
-      const AndroidNotificationChannel(
-        'scheduler_critical',
-        'Scheduler Critical',
-        description: 'Critical alarm-style reminders',
-        importance: Importance.max,
-      ),
-    );
+    // Initialize SmartAlertEngine which will create its own channels
+    await _smartAlertEngine.initialize();
 
     _initialized = true;
   }
@@ -212,6 +185,12 @@ class SchedulerService {
     final taskId = decoded['taskId'] as int?;
     if (taskId == null) return;
 
+    // Check if this is a smart alert response
+    if (decoded.containsKey('alertLevel')) {
+      await _smartAlertEngine.handleNotificationResponse(response);
+      return;
+    }
+
     switch (response.actionId) {
       case _schedulerActionComplete:
         await markCompleted(taskId);
@@ -224,6 +203,11 @@ class SchedulerService {
         break;
       default:
         debugPrint('Scheduler: notification fired for task $taskId');
+        // Trigger smart alert for high/urgent priority tasks
+        final task = await _repository.getTask(taskId);
+        if (task != null && (task.priority == TaskPriority.high || task.priority == TaskPriority.urgent)) {
+          await _smartAlertEngine.triggerAlert(task);
+        }
         break;
     }
   }
@@ -246,90 +230,12 @@ class SchedulerService {
   }
 
   NotificationDetails _detailsForTask(SchedulerTask task) {
-    final isCritical =
-        task.priority == TaskPriority.urgent && task.requiresAlarm;
-
-    AndroidNotificationDetails android;
-    if (isCritical) {
-      android = const AndroidNotificationDetails(
-        'scheduler_critical',
-        'Scheduler Critical',
-        channelDescription: 'Critical alarm-style reminders',
-        importance: Importance.max,
-        priority: Priority.max,
-        fullScreenIntent: true,
-        category: AndroidNotificationCategory.alarm,
-        enableVibration: true,
-        playSound: true,
-        visibility: NotificationVisibility.public,
-        actions: <AndroidNotificationAction>[
-          AndroidNotificationAction(
-            _schedulerActionComplete,
-            'Complete',
-            showsUserInterface: true,
-            cancelNotification: true,
-          ),
-          AndroidNotificationAction(
-            _schedulerActionSnooze5,
-            'Snooze 5 min',
-            showsUserInterface: true,
-            cancelNotification: true,
-          ),
-          AndroidNotificationAction(
-            _schedulerActionSnooze10,
-            'Snooze 10 min',
-            showsUserInterface: true,
-            cancelNotification: true,
-          ),
-        ],
-      );
-    } else {
-      switch (task.priority) {
-        case TaskPriority.low:
-          android = const AndroidNotificationDetails(
-            'scheduler_low',
-            'Scheduler Low',
-            channelDescription: 'Silent reminders for low priority tasks',
-            importance: Importance.low,
-            priority: Priority.low,
-            playSound: false,
-            enableVibration: false,
-          );
-          break;
-        case TaskPriority.high:
-          android = const AndroidNotificationDetails(
-            'scheduler_high',
-            'Scheduler High',
-            channelDescription: 'High priority reminders with vibration',
-            importance: Importance.high,
-            priority: Priority.high,
-            playSound: true,
-            enableVibration: true,
-          );
-          break;
-        case TaskPriority.normal:
-        case TaskPriority.urgent:
-          android = const AndroidNotificationDetails(
-            'scheduler_normal',
-            'Scheduler Normal',
-            channelDescription: 'Standard reminders for scheduled tasks',
-            importance: Importance.defaultImportance,
-            priority: Priority.defaultPriority,
-            playSound: true,
-          );
-          break;
-      }
-    }
-
-    final darwin = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: task.priority != TaskPriority.low,
-      interruptionLevel:
-          isCritical ? InterruptionLevel.critical : InterruptionLevel.active,
-    );
-
-    return NotificationDetails(android: android, iOS: darwin, macOS: darwin);
+    // Use SmartAlertNotificationService for all notifications
+    final alertConfig = AlertConfig.fromPriority(task.priority);
+    final alertSettings = SmartAlertEngine.instance.customizationSettings;
+    final notificationService = SmartAlertNotificationService.instance;
+    
+    return notificationService.getNotificationDetails(alertConfig.level, alertSettings);
   }
 
   String _bodyForTask(SchedulerTask task) {

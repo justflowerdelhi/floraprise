@@ -1,15 +1,25 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Sumpooj.API.Authorization;
+using Sumpooj.API.Hubs;
+using Sumpooj.API.Services.Mobile;
 using Sumpooj.API.Infrastructure;
+using Sumpooj.API.Infrastructure.Health;
+using Sumpooj.API.Infrastructure.OpenApi;
+using Sumpooj.API.Middleware;
 using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Companies;
 using Sumpooj.Application.AI;
 using Sumpooj.Application.Deliveries;
+using Sumpooj.Application.DeliveryTracking;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Payments;
 using Sumpooj.Application.UseCases;
@@ -18,14 +28,27 @@ using Sumpooj.Infrastructure.Companies;
 using Sumpooj.Infrastructure.ExternalServices;
 using Sumpooj.Infrastructure.Identity;
 using Sumpooj.Infrastructure.Persistence;
+using Sumpooj.Infrastructure.Persistence.Repositories;
 using Sumpooj.Infrastructure.Repositories;
 using Sumpooj.Application.Marketing;
 using Sumpooj.Application.Email;
+using Sumpooj.Application.Mobile;
 using Sumpooj.Application.Services;
 using Sumpooj.Infrastructure.Email;
+using System.Diagnostics;
+using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
+
+var configuredConnectionString = builder.Configuration.GetConnectionString("Default");
+Console.WriteLine($"[startup] Using database connection string: {configuredConnectionString?.Replace("Password=", "Password=***", StringComparison.OrdinalIgnoreCase)}");
 
 #region CORS
 
@@ -59,7 +82,14 @@ builder.Services.AddCors(options =>
 #region Database
 
 builder.Services.AddDbContext<SumpoojDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Default"))
+    options.UseNpgsql(
+               builder.Configuration.GetConnectionString("Default"),
+               npgsqlOptions =>
+               {
+                   // Production-safe retries for transient database failures.
+                   npgsqlOptions.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(8), errorCodesToAdd: null);
+                   npgsqlOptions.CommandTimeout(5);
+               })
            .ConfigureWarnings(w => w.Ignore(
                Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 
@@ -84,9 +114,15 @@ builder.Services
 #region JWT Authentication
 
 var jwtKey = builder.Configuration["Jwt:Key"]
-             ?? throw new InvalidOperationException("JWT Key missing");
+             ?? builder.Configuration["Jwt__Key"]
+             ?? Environment.GetEnvironmentVariable("JWT_KEY")
+             ?? Environment.GetEnvironmentVariable("Jwt__Key")
+             ?? throw new InvalidOperationException("JWT Key missing. Provide Jwt:Key, Jwt__Key, or JWT_KEY.");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"]
-                ?? throw new InvalidOperationException("JWT Issuer missing");
+                ?? builder.Configuration["Jwt__Issuer"]
+                ?? Environment.GetEnvironmentVariable("JWT_ISSUER")
+                ?? Environment.GetEnvironmentVariable("Jwt__Issuer")
+                ?? throw new InvalidOperationException("JWT Issuer missing. Provide Jwt:Issuer, Jwt__Issuer, or JWT_ISSUER.");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -110,6 +146,9 @@ builder.Services.AddAuthentication(options =>
         ClockSkew = TimeSpan.Zero
     };
 });
+
+// SignalR
+builder.Services.AddSignalR();
 
 #endregion
 
@@ -156,6 +195,7 @@ builder.Services.AddScoped<IAuthorizationHandler, CompanyUserHandler>();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
+builder.Services.AddProblemDetails();
 
 #endregion
 
@@ -165,6 +205,22 @@ builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<CustomerService>();
 
 builder.Services.AddScoped<ICompanyService, CompanyService>();
+
+// Mobile license and subscription foundation
+builder.Services.AddScoped<IMobileCustomerRepository, MobileCustomerRepository>();
+builder.Services.AddScoped<IMobileUserRepository, MobileUserRepository>();
+builder.Services.AddScoped<IMobileDeviceRepository, MobileDeviceRepository>();
+builder.Services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+builder.Services.AddScoped<IMobileSubscriptionRepository, MobileSubscriptionRepository>();
+builder.Services.AddScoped<IMobileLicenseRepository, MobileLicenseRepository>();
+builder.Services.AddScoped<IDeviceSessionRepository, DeviceSessionRepository>();
+builder.Services.AddScoped<IMobilePaymentTransactionRepository, MobilePaymentTransactionRepository>();
+builder.Services.AddScoped<IMobileUnitOfWork, MobileUnitOfWork>();
+builder.Services.AddScoped<IMobileSubscriptionService, MobileSubscriptionService>();
+builder.Services.AddScoped<IMobileClientService, MobileClientService>();
+builder.Services.AddScoped<ISubscriptionPaymentGateway, RazorpaySubscriptionPaymentGateway>();
+builder.Services.AddScoped<ISubscriptionPaymentGateway, StripeSubscriptionPaymentGateway>();
+builder.Services.AddScoped<ISubscriptionPaymentGatewayFactory, SubscriptionPaymentGatewayFactory>();
 
 // AI Services
 var openAISettings = builder.Configuration.GetSection("OpenAI").Get<OpenAISettings>() ?? new OpenAISettings();
@@ -196,6 +252,14 @@ builder.Services.AddScoped<InventoryEntryService>();
 builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<StockReceiveService>();
 
+// Delivery Tracking Services
+builder.Services.AddScoped<IDriverLocationRepository, DriverLocationRepository>();
+builder.Services.AddScoped<DriverJourneyService>();
+builder.Services.AddScoped<SmartETACalculator>();
+builder.Services.AddScoped<ETAUpdateService>();
+builder.Services.AddScoped<DeliveryNotificationService>();
+builder.Services.AddScoped<GeofenceService>();
+
 builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
 builder.Services.AddScoped<PurchaseOrderPdfService>();
 builder.Services.AddScoped<PurchaseOrderService>();
@@ -219,6 +283,9 @@ builder.Services.AddScoped<TaskService>();
 
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<OrderService>();
+
+builder.Services.AddScoped<IDeliveryRepository, DeliveryRepository>();
+builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<PaymentService>();
@@ -279,6 +346,16 @@ builder.Services.AddScoped<AssignDriverToRouteHandler>();
 builder.Services.AddScoped<CompleteRouteHandler>();
 builder.Services.AddScoped<StartRouteHandler>();
 
+// Delivery Tracking
+builder.Services.AddScoped<IDeliveryLocationRepository, DeliveryLocationRepository>();
+builder.Services.AddScoped<IDeliveryTimelineRepository, DeliveryTimelineRepository>();
+builder.Services.AddScoped<IDeliveryProofRepository, DeliveryProofRepository>();
+builder.Services.AddScoped<IDeliveryLocationService, DeliveryLocationService>();
+builder.Services.AddScoped<IDeliveryTimelineService, DeliveryTimelineService>();
+builder.Services.AddScoped<IDeliveryProofService, DeliveryProofService>();
+builder.Services.AddScoped<IDeliveryTrackingService, DeliveryTrackingService>();
+builder.Services.AddScoped<ISignalRBroadcastService, Sumpooj.API.Services.SignalRBroadcastService>();
+
 // Payment Gateway Services
 builder.Services.AddHttpClient(); // For gateway HTTP calls
 builder.Services.AddScoped<IPaymentGatewayConfigRepository, PaymentGatewayConfigRepository>();
@@ -327,7 +404,21 @@ builder.Services.AddControllers(options =>
 });
 
 // Built-in OpenAPI (no Swagger UI headaches)
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<JwtSecuritySchemeDocumentTransformer>();
+    options.AddOperationTransformer<MobileOpenApiOperationTransformer>();
+});
+
+// Production readiness health checks
+builder.Services.AddHealthChecks()
+    .AddCheck("live", () => HealthCheckResult.Healthy("Service is alive."), tags: new[] { "live" })
+    .AddCheck<DatabaseConnectivityHealthCheck>("database", tags: new[] { "ready" })
+    .AddCheck<DatabaseMigrationsHealthCheck>("migrations", tags: new[] { "ready" })
+    .AddCheck<JwtConfigurationHealthCheck>("jwt", tags: new[] { "ready" })
+    .AddCheck<MobileServicesHealthCheck>("mobile_services", tags: new[] { "ready" })
+    .AddCheck<SubscriptionServicesHealthCheck>("subscription_services", tags: new[] { "ready" })
+    .AddCheck<DeviceServicesHealthCheck>("device_services", tags: new[] { "ready" });
 
 #endregion
 
@@ -341,6 +432,31 @@ var app = builder.Build();
     app.MapScalarApiReference(); // optional API explorer
 //}
 
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        var exceptionFeature = context.Features.Get<IExceptionHandlerFeature>();
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+
+        if (exceptionFeature?.Error is not null)
+        {
+            logger.LogError(exceptionFeature.Error, "Unhandled exception at {Path}", context.Request.Path);
+        }
+
+        var factory = context.RequestServices.GetRequiredService<ProblemDetailsFactory>();
+        var problem = factory.CreateProblemDetails(
+            context,
+            statusCode: StatusCodes.Status500InternalServerError,
+            title: "Server Error",
+            detail: "An unexpected error occurred.");
+
+        problem.Extensions["traceId"] = context.TraceIdentifier;
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        await context.Response.WriteAsJsonAsync(problem);
+    });
+});
+
 // CORS must run FIRST — before HTTPS redirect, auth, etc.
 // Otherwise preflight OPTIONS requests get redirected/blocked.
 app.UseCors("DefaultCorsPolicy");
@@ -350,22 +466,134 @@ app.UseStaticFiles();
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
+
+// Mobile API request telemetry without sensitive payload logging.
+app.Use(async (context, next) =>
+{
+    if (!context.Request.Path.StartsWithSegments("/api/v1/mobile", StringComparison.OrdinalIgnoreCase))
+    {
+        await next();
+        return;
+    }
+
+    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+    var sw = Stopwatch.StartNew();
+    var endpoint = $"{context.Request.Method} {context.Request.Path}";
+
+    string? GetClaim(string claimType) => context.User.FindFirstValue(claimType);
+
+    var requestId = context.TraceIdentifier;
+    var companyId = GetClaim("company_id");
+    var userId = GetClaim("mobile_user_id") ?? GetClaim(ClaimTypes.NameIdentifier) ?? GetClaim("sub");
+    var deviceId = GetClaim("device_id");
+    var subscriptionId = GetClaim("subscription_id");
+
+    context.Response.Headers["X-Correlation-ID"] = requestId;
+    using var scope = logger.BeginScope(new Dictionary<string, object?>
+    {
+        ["CorrelationId"] = requestId,
+        ["CompanyId"] = companyId,
+        ["UserId"] = userId,
+        ["DeviceId"] = deviceId,
+        ["SubscriptionId"] = subscriptionId,
+        ["Endpoint"] = endpoint
+    });
+
+    try
+    {
+        await next();
+        sw.Stop();
+
+        logger.LogInformation(
+            "Mobile request completed. CorrelationId={CorrelationId} CompanyId={CompanyId} UserId={UserId} DeviceId={DeviceId} SubscriptionId={SubscriptionId} Endpoint={Endpoint} DurationMs={DurationMs} StatusCode={StatusCode}",
+            requestId,
+            companyId,
+            userId,
+            deviceId,
+            subscriptionId,
+            endpoint,
+            sw.ElapsedMilliseconds,
+            context.Response.StatusCode);
+    }
+    catch (Exception ex)
+    {
+        sw.Stop();
+
+        logger.LogError(
+            ex,
+            "Mobile request failed. CorrelationId={CorrelationId} CompanyId={CompanyId} UserId={UserId} DeviceId={DeviceId} SubscriptionId={SubscriptionId} Endpoint={Endpoint} DurationMs={DurationMs} StatusCode={StatusCode}",
+            requestId,
+            companyId,
+            userId,
+            deviceId,
+            subscriptionId,
+            endpoint,
+            sw.ElapsedMilliseconds,
+            context.Response.StatusCode);
+
+        throw;
+    }
+});
+
+app.UseMiddleware<DeliveryRateLimitMiddleware>();
 app.UseAuthorization();
 
+app.MapHealthChecks("/health", BuildHealthOptions(check => true));
+app.MapHealthChecks("/health/ready", BuildHealthOptions(check => check.Tags.Contains("ready")));
+app.MapHealthChecks("/health/live", BuildHealthOptions(check => check.Tags.Contains("live")));
+
 app.MapControllers();
+
+// SignalR Hubs
+app.MapHub<DeliveryTrackingHub>("/hubs/delivery-tracking");
 
 #endregion
 
 #region Data Seed
 var failOnSeedError = builder.Configuration.GetValue("Database:FailOnSeedError", !app.Environment.IsDevelopment());
+var runStartupSqlPatches = builder.Configuration.GetValue("Database:RunStartupSqlPatches", !app.Environment.IsProduction());
+var enableSeeding = builder.Configuration.GetValue("Database:EnableSeeding", !app.Environment.IsProduction());
+var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
 
 try
 {
-    // Self-heal for older databases that missed staff migrations.
-    await using (var scope = app.Services.CreateAsyncScope())
+    await using var scope = app.Services.CreateAsyncScope();
+    var db = scope.ServiceProvider.GetRequiredService<SumpoojDbContext>();
+
+    var startupDbAvailable = await CanConnectWithBackoffAsync(db, startupLogger, app.Environment.IsProduction());
+
+    if (!startupDbAvailable)
     {
-        var db = scope.ServiceProvider.GetRequiredService<SumpoojDbContext>();
-        await db.Database.ExecuteSqlRawAsync(
+        startupLogger.LogWarning(
+            "Database is not reachable at startup. Skipping startup SQL patches and seeders. " +
+            "Application startup will continue; readiness checks will report database state.");
+    }
+    else
+    {
+        if (runStartupSqlPatches)
+        {
+            await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS public."__EFMigrationsHistory" (
+                "MigrationId" character varying(150) NOT NULL,
+                "ProductVersion" character varying(32) NOT NULL,
+                CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY ("MigrationId")
+            );
+            """);
+
+            await db.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO public."__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+            VALUES
+                ('20260317130126_UnifyPhoneOrdersIntoOrders', '8.0.11'),
+                ('20260326211015_AddInventoryLedger', '8.0.11'),
+                ('20260407165445_AddIsInventoryProcessed', '8.0.11'),
+                ('20260727192413_MobileSubscriptionFoundation', '8.0.11')
+            ON CONFLICT ("MigrationId") DO NOTHING;
+            """);
+
+            // Self-heal for older databases that missed staff migrations.
+            await db.Database.ExecuteSqlRawAsync(
             """
             DO $$
             BEGIN
@@ -381,8 +609,8 @@ try
             END $$;
             """);
 
-        // Self-heal: add DriverStatus column if missing (added after initial schema).
-        await db.Database.ExecuteSqlRawAsync(
+            // Self-heal: add DriverStatus column if missing (added after initial schema).
+            await db.Database.ExecuteSqlRawAsync(
             """
             DO $$
             BEGIN
@@ -398,12 +626,12 @@ try
             END $$;
             """);
 
-        await db.Database.ExecuteSqlRawAsync(
+            await db.Database.ExecuteSqlRawAsync(
             """
             CREATE INDEX IF NOT EXISTS "IX_Staff_IdentityUserId" ON "Staff" ("IdentityUserId");
             """);
 
-        await db.Database.ExecuteSqlRawAsync(
+            await db.Database.ExecuteSqlRawAsync(
             """
             DO $$
             BEGIN
@@ -421,7 +649,7 @@ try
             END $$;
             """);
 
-        await db.Database.ExecuteSqlRawAsync(
+            await db.Database.ExecuteSqlRawAsync(
             """
             DO $$
             BEGIN
@@ -438,8 +666,8 @@ try
             END $$;
             """);
 
-        // Self-heal: add purchase mismatch flags if database is missing these newer columns.
-        await db.Database.ExecuteSqlRawAsync(
+            // Self-heal: add purchase mismatch flags if database is missing these newer columns.
+            await db.Database.ExecuteSqlRawAsync(
             """
             DO $$
             BEGIN
@@ -465,8 +693,8 @@ try
             END $$;
             """);
 
-        // Self-heal: create DeliveryRoutes table if it doesn't exist yet
-        await db.Database.ExecuteSqlRawAsync(
+            // Self-heal: create DeliveryRoutes table if it doesn't exist yet
+            await db.Database.ExecuteSqlRawAsync(
             """
             DO $$
             BEGIN
@@ -490,25 +718,401 @@ try
                 END IF;
             END $$;
             """);
+
+            // Self-heal: align legacy mobile schema with current mobile admin module.
+            // This is intentionally additive/non-destructive so existing data is preserved.
+            await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+            CREATE TABLE IF NOT EXISTS "MobileCustomers" (
+                "Id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "CompanyId" uuid NOT NULL,
+                "BusinessName" character varying(160) NOT NULL DEFAULT '',
+                "OwnerName" character varying(120) NOT NULL DEFAULT '',
+                "Mobile" character varying(32) NOT NULL DEFAULT '',
+                "Email" character varying(160),
+                "City" character varying(100),
+                "State" character varying(100),
+                "Country" character varying(100),
+                "IsDeleted" boolean NOT NULL DEFAULT false,
+                "DeletedAtUtc" timestamptz,
+                "CreatedBy" uuid,
+                "UpdatedBy" uuid,
+                "CreatedAtUtc" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "UpdatedAtUtc" timestamptz,
+                "RowVersion" bytea NOT NULL DEFAULT E'\\x',
+                CONSTRAINT "PK_MobileCustomers" PRIMARY KEY ("Id")
+            );
+
+            CREATE TABLE IF NOT EXISTS "SubscriptionPlans" (
+                "Id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "Code" character varying(40) NOT NULL,
+                "Name" character varying(100) NOT NULL,
+                "PlanType" character varying(24) NOT NULL,
+                "MonthlyPrice" numeric(18,2) NOT NULL DEFAULT 0,
+                "AnnualPrice" numeric(18,2) NOT NULL DEFAULT 0,
+                "LifetimePrice" numeric(18,2) NOT NULL DEFAULT 0,
+                "TrialDays" integer NOT NULL DEFAULT 30,
+                "OfflineDays" integer NOT NULL DEFAULT 3,
+                "GraceDays" integer NOT NULL DEFAULT 5,
+                "MaximumDevices" integer NOT NULL DEFAULT 1,
+                "MaximumStaff" integer NOT NULL DEFAULT 1,
+                "IncludedModulesJson" text NOT NULL DEFAULT '[]',
+                "IsActive" boolean NOT NULL DEFAULT true,
+                "IsDeleted" boolean NOT NULL DEFAULT false,
+                "DeletedAtUtc" timestamptz,
+                "CreatedBy" uuid,
+                "UpdatedBy" uuid,
+                "CreatedAtUtc" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "UpdatedAtUtc" timestamptz,
+                "RowVersion" bytea NOT NULL DEFAULT E'\\x',
+                CONSTRAINT "PK_SubscriptionPlans" PRIMARY KEY ("Id")
+            );
+
+            CREATE TABLE IF NOT EXISTS "MobileUsers" (
+                "Id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "CompanyId" uuid NOT NULL,
+                "MobileCustomerId" uuid,
+                "FullName" character varying(120) NOT NULL DEFAULT '',
+                "Mobile" character varying(32) NOT NULL DEFAULT '',
+                "Email" character varying(160),
+                "Status" character varying(24) NOT NULL DEFAULT 'Active',
+                "PreferredLanguage" character varying(16) NOT NULL DEFAULT 'en-IN',
+                "PreferredTheme" character varying(32) NOT NULL DEFAULT 'system',
+                "IsDeleted" boolean NOT NULL DEFAULT false,
+                "DeletedAtUtc" timestamptz,
+                "CreatedBy" uuid,
+                "UpdatedBy" uuid,
+                "CreatedAtUtc" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "UpdatedAtUtc" timestamptz,
+                "RowVersion" bytea NOT NULL DEFAULT E'\\x',
+                CONSTRAINT "PK_MobileUsers" PRIMARY KEY ("Id")
+            );
+
+            CREATE TABLE IF NOT EXISTS "MobileSubscriptions" (
+                "Id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "CompanyId" uuid NOT NULL,
+                "MobileUserId" uuid NOT NULL,
+                "SubscriptionPlanId" uuid,
+                "Status" character varying(24) NOT NULL DEFAULT 'Trial',
+                "TrialStartUtc" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "TrialEndUtc" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP + INTERVAL '30 days',
+                "StartUtc" timestamptz,
+                "EndUtc" timestamptz,
+                "GraceEndUtc" timestamptz,
+                "LastValidatedUtc" timestamptz,
+                "AutoRenew" boolean NOT NULL DEFAULT false,
+                "IsDeleted" boolean NOT NULL DEFAULT false,
+                "DeletedAtUtc" timestamptz,
+                "CreatedBy" uuid,
+                "UpdatedBy" uuid,
+                "CreatedAtUtc" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "UpdatedAtUtc" timestamptz,
+                "RowVersion" bytea NOT NULL DEFAULT E'\\x',
+                CONSTRAINT "PK_MobileSubscriptions" PRIMARY KEY ("Id")
+            );
+
+            CREATE TABLE IF NOT EXISTS "MobileDevices" (
+                "Id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "CompanyId" uuid NOT NULL,
+                "MobileUserId" uuid,
+                "DeviceId" character varying(120),
+                "Manufacturer" character varying(80),
+                "Model" character varying(120),
+                "Platform" character varying(24) NOT NULL DEFAULT 'android',
+                "OsVersion" character varying(80),
+                "AppVersion" character varying(40) NOT NULL DEFAULT '1.0.0',
+                "PushToken" character varying(512),
+                "LastIpAddress" character varying(64),
+                "LastLoginAtUtc" timestamptz,
+                "LastHeartbeatAtUtc" timestamptz,
+                "LastSyncAtUtc" timestamptz,
+                "Status" character varying(24) NOT NULL DEFAULT 'Active',
+                "IsDeleted" boolean NOT NULL DEFAULT false,
+                "DeletedAtUtc" timestamptz,
+                "CreatedBy" uuid,
+                "UpdatedBy" uuid,
+                "CreatedAtUtc" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "UpdatedAtUtc" timestamptz,
+                "RowVersion" bytea NOT NULL DEFAULT E'\\x',
+                CONSTRAINT "PK_MobileDevices" PRIMARY KEY ("Id")
+            );
+
+            CREATE TABLE IF NOT EXISTS "MobileLicenses" (
+                "Id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "CompanyId" uuid NOT NULL,
+                "MobileDeviceId" uuid,
+                "MobileSubscriptionId" uuid,
+                "Status" character varying(24) NOT NULL DEFAULT 'Active',
+                "IssuedAtUtc" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "ExpiryUtc" timestamptz,
+                "RevokedAtUtc" timestamptz,
+                "IsDeleted" boolean NOT NULL DEFAULT false,
+                "DeletedAtUtc" timestamptz,
+                "CreatedBy" uuid,
+                "UpdatedBy" uuid,
+                "CreatedAtUtc" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "UpdatedAtUtc" timestamptz,
+                "RowVersion" bytea NOT NULL DEFAULT E'\\x',
+                CONSTRAINT "PK_MobileLicenses" PRIMARY KEY ("Id")
+            );
+
+            DO $$
+            BEGIN
+                -- Legacy MobileDevices used UserId + DeviceFingerprintHash + DeviceName.
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'UserId'
+                ) AND NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'MobileUserId'
+                ) THEN
+                    ALTER TABLE "MobileDevices" ADD COLUMN "MobileUserId" uuid NULL;
+                    EXECUTE 'UPDATE "MobileDevices" SET "MobileUserId" = "UserId" WHERE "MobileUserId" IS NULL';
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'DeviceId'
+                ) THEN
+                    ALTER TABLE "MobileDevices" ADD COLUMN "DeviceId" character varying(120) NULL;
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'DeviceFingerprintHash'
+                ) THEN
+                    EXECUTE 'UPDATE "MobileDevices" SET "DeviceId" = COALESCE("DeviceId", "DeviceFingerprintHash", "Id"::text)';
+                ELSE
+                    EXECUTE 'UPDATE "MobileDevices" SET "DeviceId" = COALESCE("DeviceId", "Id"::text)';
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'Model'
+                ) THEN
+                    ALTER TABLE "MobileDevices" ADD COLUMN "Model" character varying(120) NULL;
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'DeviceName'
+                ) THEN
+                    EXECUTE 'UPDATE "MobileDevices" SET "Model" = COALESCE("Model", "DeviceName")';
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'Status'
+                ) THEN
+                    ALTER TABLE "MobileDevices" ADD COLUMN "Status" character varying(24) NULL;
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'IsActive'
+                ) THEN
+                    EXECUTE 'UPDATE "MobileDevices" SET "Status" = COALESCE("Status", CASE WHEN "IsActive" THEN ''Active'' ELSE ''Disabled'' END)';
+                ELSE
+                    EXECUTE 'UPDATE "MobileDevices" SET "Status" = COALESCE("Status", ''Active'')';
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'LastHeartbeatAtUtc'
+                ) THEN
+                    ALTER TABLE "MobileDevices" ADD COLUMN "LastHeartbeatAtUtc" timestamptz NULL;
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'LastSeenAtUtc'
+                ) THEN
+                    EXECUTE 'UPDATE "MobileDevices" SET "LastHeartbeatAtUtc" = COALESCE("LastHeartbeatAtUtc", "LastSeenAtUtc")';
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'IsDeleted'
+                ) THEN
+                    ALTER TABLE "MobileDevices" ADD COLUMN "IsDeleted" boolean NOT NULL DEFAULT false;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'CreatedBy'
+                ) THEN
+                    ALTER TABLE "MobileDevices" ADD COLUMN "CreatedBy" uuid NULL;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'UpdatedBy'
+                ) THEN
+                    ALTER TABLE "MobileDevices" ADD COLUMN "UpdatedBy" uuid NULL;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileDevices' AND column_name = 'RowVersion'
+                ) THEN
+                    ALTER TABLE "MobileDevices" ADD COLUMN "RowVersion" bytea NOT NULL DEFAULT E'\\x';
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileUsers' AND column_name = 'CustomerId'
+                ) AND NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileUsers' AND column_name = 'MobileCustomerId'
+                ) THEN
+                    ALTER TABLE "MobileUsers" ADD COLUMN "MobileCustomerId" uuid NULL;
+                    EXECUTE 'UPDATE "MobileUsers" SET "MobileCustomerId" = "CustomerId" WHERE "MobileCustomerId" IS NULL';
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'MobileUsers' AND column_name = 'IsDeleted'
+                ) THEN
+                    ALTER TABLE "MobileUsers" ADD COLUMN "IsDeleted" boolean NOT NULL DEFAULT false;
+                END IF;
+            END $$;
+
+            CREATE INDEX IF NOT EXISTS "IX_MobileUsers_CompanyId_Status" ON "MobileUsers" ("CompanyId", "Status");
+            CREATE INDEX IF NOT EXISTS "IX_MobileDevices_CompanyId_Status" ON "MobileDevices" ("CompanyId", "Status");
+            CREATE INDEX IF NOT EXISTS "IX_MobileLicenses_CompanyId_Status" ON "MobileLicenses" ("CompanyId", "Status");
+
+            INSERT INTO "SubscriptionPlans"
+            (
+                "Id", "Code", "Name", "PlanType", "MonthlyPrice", "AnnualPrice", "LifetimePrice", "TrialDays",
+                "OfflineDays", "GraceDays", "MaximumDevices", "MaximumStaff", "IncludedModulesJson", "IsActive",
+                "IsDeleted", "CreatedAtUtc", "RowVersion"
+            )
+            SELECT
+                uuid_generate_v4(),
+                'MOBILE_TRIAL',
+                'Mobile Trial',
+                'Basic',
+                0,
+                0,
+                0,
+                30,
+                3,
+                5,
+                2,
+                2,
+                '[]',
+                true,
+                false,
+                CURRENT_TIMESTAMP,
+                E'\\x'
+            WHERE NOT EXISTS (SELECT 1 FROM "SubscriptionPlans" WHERE "Code" = 'MOBILE_TRIAL');
+            """);
+        }
+
+        if (enableSeeding)
+        {
+            await DataSeeder.SeedAsync(app.Services);
+            await CategoryMigrationService.MigrateAsync(app.Services);
+        }
+        else
+        {
+            startupLogger.LogInformation("Database seeding is disabled by configuration.");
+        }
     }
-
-    await DataSeeder.SeedAsync(app.Services);
-
-    // Migrate existing products to use dynamic CategoryId
-    await CategoryMigrationService.MigrateAsync(app.Services);
 }
 catch (Exception ex)
 {
-    var logger = app.Services.GetRequiredService<ILogger<Program>>();
     if (failOnSeedError)
     {
-        logger.LogError(ex, "An error occurred during data seeding.");
+        startupLogger.LogError(ex, "An error occurred during startup database patching or seeding.");
         throw; // Keep strict behavior when configured.
     }
 
-    logger.LogWarning(ex, "Data seeding failed, but startup will continue because Database:FailOnSeedError is false.");
+    startupLogger.LogWarning(ex, "Startup database patching/seeding failed, but startup will continue because Database:FailOnSeedError is false.");
 }
 
 #endregion
 
 app.Run();
+
+static async Task<bool> CanConnectWithBackoffAsync(SumpoojDbContext db, ILogger logger, bool strictMode)
+{
+    const int maxRetries = 3;
+    var delay = TimeSpan.FromMilliseconds(250);
+
+    for (var attempt = 1; attempt <= maxRetries; attempt++)
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+        try
+        {
+            if (await db.Database.CanConnectAsync(cts.Token))
+            {
+                if (attempt > 1)
+                {
+                    logger.LogInformation("Database connectivity recovered on attempt {Attempt}.", attempt);
+                }
+
+                return true;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("Database startup connectivity attempt {Attempt} timed out.", attempt);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Database startup connectivity attempt {Attempt} failed.", attempt);
+        }
+
+        if (attempt < maxRetries)
+        {
+            logger.LogWarning("Retrying database startup connectivity in {DelayMs} ms.", delay.TotalMilliseconds);
+            await Task.Delay(delay);
+            delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2);
+        }
+    }
+
+    if (strictMode)
+    {
+        logger.LogError("Database connectivity failed after {MaxRetries} attempts in strict mode.", maxRetries);
+    }
+
+    return false;
+}
+
+static HealthCheckOptions BuildHealthOptions(Func<HealthCheckRegistration, bool> predicate)
+{
+    return new HealthCheckOptions
+    {
+        Predicate = predicate,
+        ResultStatusCodes =
+        {
+            [HealthStatus.Healthy] = StatusCodes.Status200OK,
+            [HealthStatus.Degraded] = StatusCodes.Status503ServiceUnavailable,
+            [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+        },
+        ResponseWriter = async (context, report) =>
+        {
+            context.Response.ContentType = "application/json";
+            var payload = new
+            {
+                status = report.Status.ToString(),
+                durationMs = report.TotalDuration.TotalMilliseconds,
+                checks = report.Entries.ToDictionary(
+                    entry => entry.Key,
+                    entry => new
+                    {
+                        status = entry.Value.Status.ToString(),
+                        description = entry.Value.Description,
+                        durationMs = entry.Value.Duration.TotalMilliseconds,
+                        data = entry.Value.Data
+                    })
+            };
+
+            await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+        }
+    };
+}
