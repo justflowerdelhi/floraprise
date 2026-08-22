@@ -5,9 +5,11 @@ import '../controllers/voice_dictation_controller.dart';
 import '../data/repositories/inventory_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../l10n/app_localizations.dart';
+import '../models/gst_calculation_type.dart';
 import '../providers/inventory_provider.dart';
 import '../services/speech_recognition_service.dart';
 import '../utils/locale_formatter.dart';
+import '../widgets/app_header.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/quantity_input_stepper.dart';
@@ -57,8 +59,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final provider = context.watch<InventoryProvider>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.inventoryTitle),
+      appBar: AppHeader(
+        title: l10n.inventoryTitle,
         actions: [
           IconButton(
             icon: const Icon(Icons.mic_outlined),
@@ -511,7 +513,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
       onSubmit: (form) => context.read<InventoryProvider>().purchase(
             productId: product.productId,
             quantity: form.quantity,
-            purchasePricePaise: form.purchasePricePaise!,
+            purchasePricePaise: calculateGstLineBreakup(
+              amountPaise: form.purchasePricePaise!,
+              gstPercent: product.gstPercent,
+              calculationType: product.gstCalculationType,
+            ).basicAmountPaise,
             supplier: form.supplier,
             note: form.note,
           ),

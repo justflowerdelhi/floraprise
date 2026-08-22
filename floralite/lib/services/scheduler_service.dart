@@ -64,8 +64,6 @@ class SchedulerService {
     final android = _notifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     await android?.requestNotificationsPermission();
-    await android?.requestExactAlarmsPermission();
-    await android?.requestFullScreenIntentPermission();
 
     // Initialize SmartAlertEngine which will create its own channels
     await _smartAlertEngine.initialize();
@@ -106,7 +104,7 @@ class SchedulerService {
         _detailsForTask(task),
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         payload: payload,
       );
       jobs.add((action: 'schedule_created', runAt: when, payloadJson: payload));
@@ -205,7 +203,9 @@ class SchedulerService {
         debugPrint('Scheduler: notification fired for task $taskId');
         // Trigger smart alert for high/urgent priority tasks
         final task = await _repository.getTask(taskId);
-        if (task != null && (task.priority == TaskPriority.high || task.priority == TaskPriority.urgent)) {
+        if (task != null &&
+            (task.priority == TaskPriority.high ||
+                task.priority == TaskPriority.urgent)) {
           await _smartAlertEngine.triggerAlert(task);
         }
         break;
@@ -234,8 +234,9 @@ class SchedulerService {
     final alertConfig = AlertConfig.fromPriority(task.priority);
     final alertSettings = SmartAlertEngine.instance.customizationSettings;
     final notificationService = SmartAlertNotificationService.instance;
-    
-    return notificationService.getNotificationDetails(alertConfig.level, alertSettings);
+
+    return notificationService.getNotificationDetails(
+        alertConfig.level, alertSettings);
   }
 
   String _bodyForTask(SchedulerTask task) {

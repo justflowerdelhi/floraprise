@@ -28,7 +28,7 @@ public class AuthApiService
             return null;
 
         var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        var token = result?.Access_Token;
+        var token = result?.AccessToken;
 
         if (!string.IsNullOrWhiteSpace(token))
         {

@@ -121,4 +121,46 @@ class OrderProvider extends ChangeNotifier {
       await loadOrderDetailProgressive(orderId);
     }
   }
+
+  Future<void> collectOrderPayment({
+    required int orderId,
+    required String method,
+    required int amountPaise,
+    String? reference,
+  }) async {
+    await _orderManager.collectOrderPayment(
+      orderId: orderId,
+      method: method,
+      amountPaise: amountPaise,
+      reference: reference,
+    );
+
+    await loadOrdersForTab(_activeTab);
+    if (_detailHeader?.id == orderId) {
+      await loadOrderDetailProgressive(orderId);
+    }
+  }
+
+  Future<void> adjustOrderPayment({
+    required int orderId,
+    required String event,
+    required String resolution,
+    required int amountPaise,
+    String? refundMethod,
+    String? remarks,
+  }) async {
+    await _orderManager.adjustOrderPayment(
+      orderId: orderId,
+      event: event,
+      resolution: resolution,
+      amountPaise: amountPaise,
+      refundMethod: refundMethod,
+      remarks: remarks,
+    );
+
+    await loadOrdersForTab(_activeTab);
+    if (_detailHeader?.id == orderId) {
+      await loadOrderDetailProgressive(orderId);
+    }
+  }
 }

@@ -147,6 +147,7 @@ class _BusinessRegistrationScreenState
                             controller: _cityController,
                             label: 'City',
                             icon: Icons.location_city_outlined,
+                            validator: _requiredValidator,
                           ),
                           _TextField(
                             controller: _emailController,
@@ -225,6 +226,11 @@ class _BusinessRegistrationScreenState
     if (!text.contains('@') || !text.contains('.')) {
       return 'Enter a valid email address';
     }
+    return null;
+  }
+
+  String? _requiredValidator(String? value) {
+    if ((value ?? '').trim().isEmpty) return 'City is required';
     return null;
   }
 }

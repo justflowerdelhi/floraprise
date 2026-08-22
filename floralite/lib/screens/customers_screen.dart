@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/customer_provider.dart';
 import '../services/contact_picker_service.dart';
+import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
 import 'customer_profile_screen.dart';
 
@@ -45,9 +46,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.customers),
-      ),
+      appBar: AppHeader(title: l10n.customers),
       body: SafeArea(
         top: false,
         child: Column(
@@ -176,6 +175,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                   pendingPayment:
                                       customer['pendingPayment'] as String,
                                   totalOrders: customer['totalOrders'] as int,
+                                  rewardPoints: customer['rewardPoints'] as int,
+                                  lifetimeRewardPoints:
+                                      customer['lifetimeRewardPoints'] as int,
+                                  redeemedRewardPoints:
+                                      customer['redeemedRewardPoints'] as int,
+                                  lastRewardActivity:
+                                      customer['lastRewardActivity'] as String,
                                 ),
                               ),
                             );
@@ -301,6 +307,25 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                               ),
                                             ),
                                           ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.shade100,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            'Rewards: ${customer['rewardPoints']} pts',
+                                            style: TextStyle(
+                                              color: Colors.green.shade700,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ],

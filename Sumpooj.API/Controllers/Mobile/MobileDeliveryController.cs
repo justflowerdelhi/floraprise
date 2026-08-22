@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Sumpooj.Application.Authorization;
 using Sumpooj.Application.DeliveryTracking;
 using Sumpooj.Application.DeliveryTracking.DTOs;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Domain.Entities;
+using Sumpooj.Infrastructure.Persistence;
 
 namespace Sumpooj.API.Controllers.Mobile;
 
@@ -16,17 +19,20 @@ public sealed class MobileDeliveryController : MobileApiControllerBase
     private readonly IDeliveryTrackingService _trackingService;
     private readonly IDeliveryRepository _deliveryRepository;
     private readonly DriverJourneyService _journeyService;
+    private readonly SumpoojDbContext _db;
 
     public MobileDeliveryController(
         IDeliveryTrackingService trackingService,
         IDeliveryRepository deliveryRepository,
         DriverJourneyService journeyService,
+        SumpoojDbContext db,
         ITenantContext tenantContext)
         : base(tenantContext)
     {
         _trackingService = trackingService;
         _deliveryRepository = deliveryRepository;
         _journeyService = journeyService;
+        _db = db;
     }
 
     [HttpGet("workspace")]
@@ -80,6 +86,129 @@ public sealed class MobileDeliveryController : MobileApiControllerBase
         {
             return ProblemFromException(ex);
         }
+    }
+
+    [HttpPost("sync-assignment")]
+    public async Task<IActionResult> SyncAssignment(
+        [FromBody] MobileDeliveryAssignmentSyncRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var companyId = GetCompanyId();
+            var orderNumber = request.OrderNumber?.Trim();
+            if (string.IsNullOrWhiteSpace(orderNumber))
+                throw new ArgumentException("Order number is required.", nameof(request.OrderNumber));
+
+            // Phase 1: Find or create Order and Delivery (driver optional)
+            var order = await _db.Orders
+                .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.OrderNumber == orderNumber, cancellationToken);
+
+            if (order == null)
+            {
+                var customerName = string.IsNullOrWhiteSpace(request.CustomerName)
+                    ? string.IsNullOrWhiteSpace(request.RecipientName) ? "POS Customer" : request.RecipientName.Trim()
+                    : request.CustomerName.Trim();
+                var customerPhone = string.IsNullOrWhiteSpace(request.CustomerPhone)
+                    ? request.RecipientPhone?.Trim()
+                    : request.CustomerPhone.Trim();
+
+                var customer = await _db.Customers
+                    .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Phone == customerPhone, cancellationToken);
+                if (customer == null)
+                {
+                    customer = new Customer(companyId, customerName, null, customerPhone);
+                    _db.Customers.Add(customer);
+                    await _db.SaveChangesAsync(cancellationToken);
+                }
+
+                order = new Order(
+                    companyId,
+                    customer.Id,
+                    request.DeliveryDate ?? DateTime.UtcNow,
+                    string.IsNullOrWhiteSpace(request.DeliveryAddress) ? "Address not specified" : request.DeliveryAddress.Trim(),
+                    request.DeliveryPincode,
+                    request.RecipientName,
+                    request.RecipientPhone);
+                order.SetImportedOrderNumber(orderNumber);
+                if (!string.IsNullOrWhiteSpace(request.DeliverySlot))
+                    order.SetTimeSlot(request.DeliverySlot.Trim());
+                _db.Orders.Add(order);
+                try
+                {
+                    await _db.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateException ex) when (IsDuplicateOrderNumber(ex))
+                {
+                    _db.Entry(order).State = EntityState.Detached;
+                    order = await _db.Orders
+                        .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.OrderNumber == orderNumber, cancellationToken)
+                        ?? throw new InvalidOperationException("Order already exists but could not be reloaded.");
+                }
+            }
+
+            var delivery = await _db.Deliveries
+                .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.SalesOrderId == order.Id, cancellationToken);
+            if (delivery == null)
+            {
+                // Create Delivery without driver - driver can be assigned later
+                delivery = new Delivery(
+                    companyId,
+                    order.Id,
+                    request.DeliveryDate ?? order.DeliveryDate,
+                    string.IsNullOrWhiteSpace(request.DeliverySlot) ? "Anytime" : request.DeliverySlot.Trim(),
+                    string.IsNullOrWhiteSpace(request.DeliveryAddress) ? order.DeliveryAddress ?? "Address not specified" : request.DeliveryAddress.Trim());
+                _db.Deliveries.Add(delivery);
+
+                if (!string.IsNullOrWhiteSpace(request.DeliveryPincode))
+                    delivery.SetPostalCode(request.DeliveryPincode.Trim());
+                delivery.SetCustomerContact(request.RecipientPhone ?? request.CustomerPhone, null);
+
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
+            // Phase 2: If driver info is provided, assign driver to Order and Delivery
+            if (!string.IsNullOrWhiteSpace(request.DriverName) || !string.IsNullOrWhiteSpace(request.DriverPhone))
+            {
+                var driverPhone = request.DriverPhone?.Trim();
+                var driverName = string.IsNullOrWhiteSpace(request.DriverName)
+                    ? driverPhone ?? "Delivery Driver"
+                    : request.DriverName.Trim();
+                var driver = await _db.Staff
+                    .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Phone == driverPhone, cancellationToken);
+                if (driver == null)
+                {
+                    driver = new Staff(companyId, driverName, StaffRole.Driver, null, driverPhone, null);
+                    _db.Staff.Add(driver);
+                    await _db.SaveChangesAsync(cancellationToken);
+                }
+
+                order.AssignDeliveryPerson(driver.Id);
+                delivery.AssignDeliveryPerson(driver.Id);
+
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
+            return Ok(new
+            {
+                backendOrderId = order.Id,
+                deliveryId = delivery.Id,
+                status = delivery.Status.ToString()
+            });
+        }
+        catch (Exception ex)
+        {
+            return ProblemFromException(ex);
+        }
+    }
+
+    private static bool IsDuplicateOrderNumber(DbUpdateException ex)
+    {
+        return ex.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "UQ_Orders_CompanyOrderNumber"
+        };
     }
 
     [HttpGet("orders/{orderId}/tracking")]
@@ -270,4 +399,19 @@ public sealed class MobileDeliveryLocationRequest
     public double? Speed { get; set; }
     public double? Heading { get; set; }
     public DateTime? RecordedAt { get; set; }
+}
+
+public sealed class MobileDeliveryAssignmentSyncRequest
+{
+    public string? OrderNumber { get; set; }
+    public string? CustomerName { get; set; }
+    public string? CustomerPhone { get; set; }
+    public string? RecipientName { get; set; }
+    public string? RecipientPhone { get; set; }
+    public string? DeliveryAddress { get; set; }
+    public string? DeliveryPincode { get; set; }
+    public DateTime? DeliveryDate { get; set; }
+    public string? DeliverySlot { get; set; }
+    public string? DriverName { get; set; }
+    public string? DriverPhone { get; set; }
 }

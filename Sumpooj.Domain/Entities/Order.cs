@@ -81,6 +81,15 @@ public class Order : BaseEntity
         return $"ORD-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpper()}";
     }
 
+    public void SetImportedOrderNumber(string orderNumber)
+    {
+        if (string.IsNullOrWhiteSpace(orderNumber))
+            throw new ArgumentException("Order number is required.", nameof(orderNumber));
+
+        OrderNumber = orderNumber.Trim();
+        MarkUpdated();
+    }
+
     public void AddItem(Guid productId, string productName, int quantity, decimal unitPrice)
     {
         if (Status != OrderStatus.Pending && Status != OrderStatus.Confirmed && Status != OrderStatus.AutoCreated)

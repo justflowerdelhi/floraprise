@@ -28,7 +28,18 @@ public class SubscriptionApiService
 
     public async Task<bool> ExtendLicenseAsync(Guid mobileUserId, Guid companyId, int extendByDays)
     {
-        var response = await _http.PostAsJsonAsync($"api/platform/mobile-admin/customers/{mobileUserId}/extend", new { extendByDays, companyId });
+        // Use subscription renewal instead of license extension
+        // Convert days to billing cycle: 30=monthly, 90=quarterly, 180=half-yearly, 365=annual
+        string billingCycle = extendByDays switch
+        {
+            30 => "monthly",
+            90 => "quarterly",
+            180 => "half-yearly",
+            365 => "annual",
+            _ => "quarterly"
+        };
+
+        var response = await _http.PostAsJsonAsync($"api/platform/mobile-admin/customers/{mobileUserId}/renew", new { companyId, billingCycle, autoRenew = true });
         return response.IsSuccessStatusCode;
     }
 

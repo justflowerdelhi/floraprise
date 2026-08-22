@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../data/database/app_database.dart';
 import '../managers/business_settings_manager.dart';
 import 'api_base_url.dart';
 import 'mobile_auth_service.dart';
@@ -37,12 +38,16 @@ class DeliveryLocationPoint {
     required this.longitude,
     required this.recordedAt,
     required this.speedKph,
+    this.accuracyMeters,
+    this.batteryPercentage,
   });
 
   final double latitude;
   final double longitude;
   final DateTime recordedAt;
   final double speedKph;
+  final double? accuracyMeters;
+  final int? batteryPercentage;
 }
 
 class DeliveryTimelineEvent {
@@ -63,12 +68,18 @@ class DeliveryProof {
     this.note,
     this.recipientName,
     this.recordedAt,
+    this.otpVerified,
+    this.signatureCaptured,
+    this.signatureValue,
   });
 
   final String photoUrl;
   final String? note;
   final String? recipientName;
   final DateTime? recordedAt;
+  final bool? otpVerified;
+  final bool? signatureCaptured;
+  final String? signatureValue;
 }
 
 class DeliveryTrackingSnapshot {
@@ -189,23 +200,366 @@ class DeliveryTrackingService {
   }
 
   Future<List<DeliveryWorkspaceRecord>> getWorkspace(String status) async {
-    final payload =
-        await _getJson('/api/v1/mobile/delivery/workspace?status=$status');
-    final rows = _asList(payload['items'] ?? payload['records']);
-    return rows.map(_toWorkspaceRecord).toList();
+    final localRows = await _getLocalWorkspace(status);
+
+    try {
+      final payload =
+          await _getJson('/api/v1/mobile/delivery/workspace?status=$status');
+      final rows = _asList(payload['items'] ?? payload['records']);
+      return _mergeWorkspaceRows(
+        localRows,
+        rows.map(_toWorkspaceRecord).toList(),
+      );
+    } on Object {
+      if (localRows.isNotEmpty) return localRows;
+      rethrow;
+    }
   }
 
   Future<List<DeliveryWorkspaceRecord>> getActiveDeliveries() async {
-    final payload = await _getJson('/api/v1/mobile/delivery/workspace/active');
-    final rows = _asList(payload['items'] ?? payload['records']);
-    return rows.map(_toWorkspaceRecord).toList();
+    final localRows = await _getLocalWorkspace('active');
+
+    try {
+      final payload =
+          await _getJson('/api/v1/mobile/delivery/workspace/active');
+      final rows = _asList(payload['items'] ?? payload['records']);
+      return _mergeWorkspaceRows(
+        localRows,
+        rows.map(_toWorkspaceRecord).toList(),
+      );
+    } on Object {
+      if (localRows.isNotEmpty) return localRows;
+      rethrow;
+    }
   }
 
-  Future<DeliveryTrackingSnapshot> getTrackingByOrderId(int orderId) async {
-    final payload =
-        await _getJson('/api/v1/mobile/delivery/orders/$orderId/tracking');
+  Future<String?> getCloudDeliveryIdForOrder(String orderNo) async {
+    final normalizedOrderNo = orderNo.trim().toLowerCase();
+    if (normalizedOrderNo.isEmpty) return null;
+
+    for (final status in const [
+      'active',
+      'Created',
+      'Confirmed',
+      'InProduction',
+      'Ready',
+      'Scheduled',
+    ]) {
+      final payload =
+          await _getJson('/api/v1/mobile/delivery/workspace?status=$status');
+      final rows = _asList(payload['items'] ?? payload['records']);
+      for (final row in rows) {
+        final cloudOrderNo = _readString(row, 'orderNo')?.trim();
+        final deliveryId = _readString(row, 'assignmentId');
+        if (cloudOrderNo?.toLowerCase() == normalizedOrderNo &&
+            deliveryId != null) {
+          return deliveryId;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Resolves or creates a cloud Delivery record for an order.
+  /// This method does NOT depend on local order_workflow_assignments.
+  /// It queries the local orders table directly and calls the backend
+  /// sync-assignment endpoint to create/retrieve the cloud Delivery.
+  ///
+  /// Returns the cloud Delivery UUID if successful, null otherwise.
+  Future<String?> resolveOrCreateCloudDeliveryId(int orderId) async {
+    debugPrint('[DeliveryService] resolveOrCreateCloudDeliveryId - Local Order ID: $orderId');
+
+    final db = await AppDatabase.instance.database;
+
+    // Query the local orders table directly
+    final orderRows = await db.query(
+      'orders',
+      where: 'id = ?',
+      whereArgs: [orderId],
+      limit: 1,
+    );
+
+    if (orderRows.isEmpty) {
+      throw const DeliveryTrackingException(
+        'Order not found locally.',
+      );
+    }
+
+    final order = orderRows.first;
+    final orderNo = order['order_no'] as String?;
+    if (orderNo == null || orderNo.trim().isEmpty) {
+      throw const DeliveryTrackingException(
+        'Order number is missing.',
+      );
+    }
+
+    debugPrint('[DeliveryService] resolveOrCreateCloudDeliveryId - Order Number: $orderNo');
+
+    // Try to find existing cloud Delivery first via workspace API
+    final existingDeliveryId = await getCloudDeliveryIdForOrder(orderNo);
+    if (existingDeliveryId != null && existingDeliveryId.trim().isNotEmpty) {
+      debugPrint('[DeliveryService] resolveOrCreateCloudDeliveryId - Found existing Cloud Delivery UUID: $existingDeliveryId');
+      return existingDeliveryId;
+    }
+
+    debugPrint('[DeliveryService] resolveOrCreateCloudDeliveryId - No existing Delivery, calling POST /api/v1/mobile/delivery/sync-assignment');
+
+    // Create cloud Delivery via sync-assignment without driver
+    // Use fresh HttpClient to avoid socket resolution issues
+    final payload = await _postSyncAssignmentWithFreshClient(
+      {
+        'orderNumber': orderNo.trim(),
+        'customerName': order['customer_name'],
+        'customerPhone': order['customer_phone'],
+        'recipientName': order['recipient_name'],
+        'recipientPhone': order['recipient_phone'],
+        'deliveryAddress': order['delivery_address'],
+        'deliveryPincode': order['delivery_pincode'],
+        'deliveryDate': order['scheduled_at'],
+        'deliverySlot': order['delivery_slot'],
+        // No driver info - backend will create unassigned Delivery
+      },
+    );
+
+    final backendOrderId = _readString(payload, 'backendOrderId') ??
+        _readString(payload, 'orderId') ??
+        '';
+    final backendDeliveryId = _readString(payload, 'deliveryId') ?? '';
+    if (backendOrderId.isEmpty || backendDeliveryId.isEmpty) {
+      throw const DeliveryTrackingException(
+        'Delivery creation did not return backend IDs.',
+      );
+    }
+
+    debugPrint('[DeliveryService] resolveOrCreateCloudDeliveryId - Created Cloud Delivery UUID: $backendDeliveryId');
+    return backendDeliveryId;
+  }
+
+  Future<List<DeliveryWorkspaceRecord>> _getLocalWorkspace(
+      String status) async {
+    // Simplified local workspace - no longer depends on workflow assignments
+    // Local orders are shown only when cloud is unavailable
+    final db = await AppDatabase.instance.database;
+    final normalized = status.trim().toLowerCase();
+    final statuses = switch (normalized) {
+      'completed' => const ['delivered'],
+      'cancelled' => const ['cancelled', 'delivery_failed'],
+      _ => const [
+          'confirmed',
+          'sent_to_designer',
+          'preparing',
+          'ready',
+          'out_for_delivery',
+        ],
+    };
+
+    final rows = await db.rawQuery('''
+      SELECT
+        o.id,
+        o.order_no,
+        o.customer_name,
+        o.customer_phone,
+        o.recipient_name,
+        o.recipient_phone,
+        o.delivery_address,
+        o.delivery_pincode,
+        o.delivery_slot,
+        o.scheduled_at,
+        o.status,
+        o.updated_at
+      FROM orders o
+      WHERE o.fulfilment_type = 'delivery'
+        AND o.status IN (${List.filled(statuses.length, '?').join(',')})
+      ORDER BY COALESCE(o.scheduled_at, o.updated_at, o.created_at) DESC
+    ''', statuses);
+
+    return rows.map(_toLocalWorkspaceRecord).toList();
+  }
+
+  List<DeliveryWorkspaceRecord> _mergeWorkspaceRows(
+    List<DeliveryWorkspaceRecord> localRows,
+    List<DeliveryWorkspaceRecord> cloudRows,
+  ) {
+    if (localRows.isEmpty) return cloudRows;
+    if (cloudRows.isEmpty) return localRows;
+
+    final seenOrderNos = localRows.map((row) => row.orderNo).toSet();
+    return [
+      ...localRows,
+      ...cloudRows.where((row) => !seenOrderNos.contains(row.orderNo)),
+    ];
+  }
+
+
+
+
+
+
+
+  /// Syncs driver information to an existing cloud delivery.
+  /// This is called after local driver assignment to update the cloud delivery.
+  /// The cloud delivery must already exist (created via resolveOrCreateCloudDeliveryId).
+  Future<void> syncDeliveryAssignment(int orderId) async {
+    debugPrint('[DeliveryService] syncDeliveryAssignment - Order ID: $orderId');
+
+    // First resolve the cloud delivery - it should already exist
+    final deliveryId = await resolveOrCreateCloudDeliveryId(orderId);
+    if (deliveryId == null || deliveryId.trim().isEmpty) {
+      debugPrint('[DeliveryService] syncDeliveryAssignment - No cloud delivery found, skipping sync');
+      return;
+    }
+
+    // Get local driver assignment info
+    final db = await AppDatabase.instance.database;
+    final rows = await db.rawQuery('''
+      SELECT
+        s.name AS driver_name,
+        s.phone AS driver_phone
+      FROM order_workflow_assignments owa
+      JOIN staff s ON s.id = owa.associate_id
+      WHERE owa.order_id = ? AND owa.assignment_type = 'delivery'
+      LIMIT 1
+    ''', [orderId]);
+
+    if (rows.isEmpty) {
+      debugPrint('[DeliveryService] syncDeliveryAssignment - No local driver assignment found');
+      return;
+    }
+
+    final row = rows.first;
+    final driverName = (row['driver_name'] as String?)?.trim() ?? '';
+    final driverPhone = (row['driver_phone'] as String?)?.trim() ?? '';
+
+    if (driverName.isEmpty && driverPhone.isEmpty) {
+      debugPrint('[DeliveryService] syncDeliveryAssignment - No driver info to sync');
+      return;
+    }
+
+    // Sync driver info to cloud delivery
+    try {
+      await _postJson(
+        '/api/v1/mobile/delivery/assignments/$deliveryId/driver',
+        {
+          'driverName': driverName,
+          'driverPhone': driverPhone,
+        },
+      );
+      debugPrint('[DeliveryService] syncDeliveryAssignment - Driver info synced to cloud delivery');
+    } on Object catch (error) {
+      debugPrint('[DeliveryService] syncDeliveryAssignment - Failed to sync driver info: $error');
+      // Don't throw - driver sync is non-critical
+    }
+  }
+
+  bool isPendingSyncAssignment(String assignmentId) =>
+      assignmentId.startsWith('local:') ||
+      assignmentId.startsWith('pending-sync:');
+
+  /// POST to sync-assignment endpoint using a fresh HttpClient instance.
+  /// This avoids socket resolution issues that occur with the shared client.
+  Future<Map<String, dynamic>> _postSyncAssignmentWithFreshClient(
+    Map<String, Object?> body,
+  ) async {
+    debugPrint('[DeliveryService] sync-assignment POST starting');
+
+    final freshClient = HttpClient();
+    try {
+      final token = await _readAccessToken();
+      if (token == null || token.trim().isEmpty) {
+        throw const DeliveryTrackingException(
+          'Cloud delivery session is not available on this device.',
+        );
+      }
+
+      final uri = _uri('/api/v1/mobile/delivery/sync-assignment');
+
+      final request = await freshClient.openUrl('POST', uri).timeout(
+            const Duration(seconds: 12),
+          );
+      request.headers.contentType = ContentType.json;
+      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+
+      request.add(utf8.encode(jsonEncode(body)));
+
+      final response =
+          await request.close().timeout(const Duration(seconds: 20));
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      debugPrint('[DeliveryService] sync-assignment POST HTTP ${response.statusCode}');
+      debugPrint('[DeliveryService] sync-assignment response $responseBody');
+
+      // Refresh token and retry once on 401
+      if (response.statusCode == 401) {
+        debugPrint('[DeliveryService] sync-assignment 401 received; refreshing token and retrying');
+        try {
+          final refreshed = await _auth.refreshAndBootstrap();
+          if (refreshed.accessToken.isNotEmpty) {
+            debugPrint('[DeliveryService] sync-assignment Token refresh succeeded, retrying');
+            // Retry with fresh client
+            return _postSyncAssignmentWithFreshClient(body);
+          }
+        } on Object catch (e) {
+          debugPrint('[DeliveryService] sync-assignment Token refresh failed: $e');
+          throw const DeliveryTrackingException(
+              'Cloud delivery session expired and could not be refreshed.');
+        }
+      }
+
+      final decoded = responseBody.trim().isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(responseBody) as Map<String, dynamic>);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        // Expose actual server response for 400/500
+        final serverMsg = _readString(_asMap(decoded['error']), 'message') ??
+            _readString(decoded, 'title') ??
+            _readString(decoded, 'detail') ??
+            responseBody;
+        throw DeliveryTrackingException(
+          'HTTP ${response.statusCode}: $serverMsg',
+        );
+      }
+
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return data.cast<String, dynamic>();
+      return decoded;
+    } on SocketException catch (e) {
+      debugPrint('[DeliveryService] sync-assignment socket failure: $e');
+      throw DeliveryTrackingException(_connectionFailureMessage());
+    } on DeliveryTrackingException {
+      rethrow;
+    } on Object catch (e) {
+      debugPrint('[DeliveryService] sync-assignment unexpected error: $e');
+      throw DeliveryTrackingException('Unexpected error: $e');
+    } finally {
+      freshClient.close();
+    }
+  }
+
+  /// Gets tracking for a local order by resolving the cloud delivery first.
+  /// This is the canonical order-centric tracking method.
+  Future<DeliveryTrackingSnapshot> getTrackingForLocalOrder(int orderId) async {
+    debugPrint('[DeliveryService] getTrackingForLocalOrder - Order ID: $orderId');
+
+    // Resolve cloud Delivery UUID first
+    final deliveryId = await resolveOrCreateCloudDeliveryId(orderId);
+    if (deliveryId == null || deliveryId.trim().isEmpty) {
+      throw const DeliveryTrackingException(
+        'Could not resolve cloud Delivery for this order.',
+      );
+    }
+
+    debugPrint('[DeliveryService] getTrackingForLocalOrder - Cloud Delivery UUID: $deliveryId');
+
+    // Use delivery UUID to get tracking
+    final payload = await _getJson(
+      '/api/v1/mobile/delivery/assignments/$deliveryId/tracking',
+    );
     return _toSnapshot(payload);
   }
+
 
   Future<DeliveryTrackingSnapshot> getTrackingByAssignmentId(
       String assignmentId) async {
@@ -373,6 +727,8 @@ class DeliveryTrackingService {
       final response =
           await request.close().timeout(const Duration(seconds: 20));
       final responseBody = await response.transform(utf8.decoder).join();
+      debugPrint('[DeliveryService] POST /api/public/tracking/generate-token -> HTTP ${response.statusCode}');
+      debugPrint('[DeliveryService] Response: $responseBody');
       final decoded = responseBody.trim().isEmpty
           ? <String, dynamic>{}
           : (jsonDecode(responseBody) as Map<String, dynamic>);
@@ -421,6 +777,7 @@ class DeliveryTrackingService {
         orderId: _readString(decoded, 'orderId') ?? '',
         orderNumber: _readString(decoded, 'orderNumber') ?? '',
         customerName: _readString(decoded, 'customerName') ?? '',
+        recipientName: _readString(decoded, 'recipientName') ?? '',
         deliveryAddress: _readString(decoded, 'deliveryAddress') ?? '',
         destinationLatitude: _readDouble(decoded, 'destinationLatitude'),
         destinationLongitude: _readDouble(decoded, 'destinationLongitude'),
@@ -428,6 +785,7 @@ class DeliveryTrackingService {
         timeSlot: _readString(decoded, 'timeSlot') ?? '',
         status: _readString(decoded, 'status') ?? '',
         trackingToken: _readString(decoded, 'trackingToken') ?? '',
+        mapsUrl: _readString(decoded, 'mapsUrl'),
       );
     } on SocketException {
       throw DeliveryTrackingException(_connectionFailureMessage());
@@ -531,9 +889,13 @@ class DeliveryTrackingService {
 
     Future<void> refreshWithPolling() async {
       try {
-        final next = current.assignmentId.trim().isNotEmpty
-            ? await getTrackingByAssignmentId(current.assignmentId)
-            : await getTrackingByOrderId(current.orderId);
+        // Only use assignmentId - orderId-based tracking is obsolete
+        if (current.assignmentId.trim().isEmpty) {
+          throw const DeliveryTrackingException(
+            'No assignment ID available for tracking.',
+          );
+        }
+        final next = await getTrackingByAssignmentId(current.assignmentId);
         current = next;
         if (!controller.isClosed) {
           controller.add(current);
@@ -792,9 +1154,7 @@ class DeliveryTrackingService {
     debugPrint('[DeliveryService] Request URL: $uri');
     debugPrint('[DeliveryService] Request Method: GET');
     debugPrint(
-        '[DeliveryService] Request Headers: ${jsonEncode(requestHeaders)}');
-    debugPrint(
-      '[DeliveryService] Authorization header: ${requestHeaders[HttpHeaders.authorizationHeader]?.join(', ') ?? 'NONE'}',
+      '[DeliveryService] Authorization header present: ${requestHeaders.containsKey(HttpHeaders.authorizationHeader)}',
     );
 
     try {
@@ -825,8 +1185,7 @@ class DeliveryTrackingService {
         try {
           final refreshed = await _auth.refreshAndBootstrap();
           if (refreshed.accessToken.isNotEmpty) {
-            debugPrint(
-                '[DeliveryService] Refresh succeeded. New Authorization header: Bearer ${refreshed.accessToken}');
+            debugPrint('[DeliveryService] Token refresh succeeded.');
             return _getJsonWithToken(
               path,
               retryOnUnauthorized: false,
@@ -1006,6 +1365,56 @@ class DeliveryTrackingService {
     );
   }
 
+  DeliveryWorkspaceRecord _toLocalWorkspaceRecord(Map<String, Object?> row) {
+    final orderId = row['id'] as int? ?? 0;
+    final scheduledAt = _parseLocalDate(row['scheduled_at']);
+    final updatedAt = _parseLocalDate(row['updated_at']) ?? DateTime.now();
+
+    return DeliveryWorkspaceRecord(
+      assignmentId: 'local:$orderId',
+      orderId: '$orderId',
+      orderNo: (row['order_no'] as String?) ?? 'ORD-$orderId',
+      customerName: (row['customer_name'] as String?) ?? '-',
+      recipientName: (row['recipient_name'] as String?) ??
+          (row['customer_name'] as String?) ??
+          '-',
+      deliveryAddress: (row['delivery_address'] as String?) ?? '-',
+      deliveryArea: (row['delivery_pincode'] as String?) ?? '-',
+      customerPhone: (row['recipient_phone'] as String?) ??
+          (row['customer_phone'] as String?),
+      deliveryTime: _localDeliveryTime(row, scheduledAt),
+      status: _cloudStatusForLocalOrder((row['status'] as String?) ?? ''),
+      trackingLink: '',
+      eta: scheduledAt,
+      updatedAt: updatedAt,
+      driver: null, // Local workspace no longer shows driver info - use cloud
+    );
+  }
+
+  String _cloudStatusForLocalOrder(String status) {
+    return switch (status) {
+      'out_for_delivery' => 'OutForDelivery',
+      'delivered' => 'Delivered',
+      'cancelled' => 'Cancelled',
+      'delivery_failed' => 'Failed',
+      'ready' || 'confirmed' || 'sent_to_designer' => 'Assigned',
+      'preparing' => 'Accepted',
+      _ => 'Assigned',
+    };
+  }
+
+  String _localDeliveryTime(Map<String, Object?> row, DateTime? scheduledAt) {
+    final slot = (row['delivery_slot'] as String?)?.trim() ?? '';
+    if (slot.isNotEmpty) return slot;
+    if (scheduledAt == null) return '-';
+    return scheduledAt.toLocal().toString().split('.').first;
+  }
+
+  DateTime? _parseLocalDate(Object? value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString());
+  }
+
   DeliveryTrackingSnapshot _toSnapshot(Map<String, dynamic> map) {
     final routeRows = _asList(map['route'] ?? map['locations']);
     final route = routeRows
@@ -1057,12 +1466,28 @@ class DeliveryTrackingService {
     final photoUrl = _readString(map, 'photoUrl') ??
         _readString(map, 'deliveryProofPhotoPath') ??
         '';
-    if (photoUrl.isEmpty) return null;
+    final otpVerified = _readBool(map, 'otpVerified') ??
+        _readBool(map, 'isOtpVerified') ??
+        _readBool(map, 'otpMatched');
+    final signatureCaptured = _readBool(map, 'signatureCaptured') ??
+        _readBool(map, 'isSignatureCaptured');
+    final signatureValue = _readString(map, 'signature') ??
+        _readString(map, 'signatureData') ??
+        _readString(map, 'signatureUrl');
+    final hasAnyProof = photoUrl.isNotEmpty ||
+        otpVerified == true ||
+        signatureCaptured == true ||
+        (signatureValue != null && signatureValue.trim().isNotEmpty);
+    if (!hasAnyProof) return null;
+
     return DeliveryProof(
       photoUrl: photoUrl,
       note: _readString(map, 'note'),
       recipientName: _readString(map, 'recipientName'),
       recordedAt: _readDate(map, 'recordedAt'),
+      otpVerified: otpVerified,
+      signatureCaptured: signatureCaptured,
+      signatureValue: signatureValue,
     );
   }
 
@@ -1081,6 +1506,10 @@ class DeliveryTrackingService {
       longitude: lng,
       speedKph: _readDouble(map, 'speedKph') ?? 0,
       recordedAt: _readDate(map, 'recordedAt') ?? DateTime.now(),
+      accuracyMeters:
+          _readDouble(map, 'accuracy') ?? _readDouble(map, 'accuracyMeters'),
+      batteryPercentage:
+          _readInt(map, 'batteryLevel') ?? _readInt(map, 'batteryPercentage'),
     );
   }
 
@@ -1216,6 +1645,22 @@ class DeliveryTrackingService {
     return double.tryParse(value.toString());
   }
 
+  static bool? _readBool(Map<String, dynamic> map, String key) {
+    final value = map[key] ?? map[_pascalCase(key)];
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value == null) return null;
+
+    final normalized = value.toString().trim().toLowerCase();
+    if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+      return false;
+    }
+    return null;
+  }
+
   static DateTime? _readDate(Map<String, dynamic> map, String key) {
     final value = map[key] ?? map[_pascalCase(key)];
     if (value == null) return null;
@@ -1296,6 +1741,7 @@ class DriverLinkResponse {
     required this.orderId,
     required this.orderNumber,
     required this.customerName,
+    required this.recipientName,
     required this.deliveryAddress,
     this.destinationLatitude,
     this.destinationLongitude,
@@ -1303,12 +1749,14 @@ class DriverLinkResponse {
     required this.timeSlot,
     required this.status,
     required this.trackingToken,
+    this.mapsUrl,
   });
 
   final String deliveryId;
   final String orderId;
   final String orderNumber;
   final String customerName;
+  final String recipientName;
   final String deliveryAddress;
   final double? destinationLatitude;
   final double? destinationLongitude;
@@ -1316,4 +1764,5 @@ class DriverLinkResponse {
   final String timeSlot;
   final String status;
   final String trackingToken;
+  final String? mapsUrl;
 }

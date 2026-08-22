@@ -9,7 +9,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import '../managers/business_settings_manager.dart';
+import '../managers/pricing_manager.dart';
+import '../data/repositories/order_repository.dart';
 import '../data/repositories/product_repository.dart';
+import '../models/gst_calculation_type.dart';
+import '../models/order_workspace_models.dart';
 import '../models/payment_split.dart';
 import '../models/walk_in_enums.dart';
 import '../models/walk_in_line_item.dart';
@@ -18,13 +22,16 @@ import '../providers/design_provider.dart';
 import '../providers/printer_provider.dart';
 import '../providers/walk_in_session_provider.dart';
 import '../services/discount_service.dart';
+import '../services/reward_summary_formatter.dart';
 import '../utils/locale_formatter.dart';
+import '../widgets/app_header.dart';
 import '../widgets/bill_discount_dialog.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/line_item_discount_dialog.dart';
 import '../widgets/product_picker_sheet.dart';
 import '../widgets/quantity_input_stepper.dart';
+import '../widgets/reward_summary_card.dart';
 import '../widgets/split_payment_sheet.dart';
 import 'my_designs_screen.dart';
 
@@ -59,6 +66,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
   static const String _splitPaymentLabel = 'Split Payment';
   final BusinessSettingsManager _businessSettingsManager =
       BusinessSettingsManager();
+  final PricingManager _pricingManager = PricingManager();
   final ProductRepository _productRepository = ProductRepository();
   final List<_ProductItem> _products = [];
   final TextEditingController _phoneController = TextEditingController();
@@ -76,6 +84,8 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
   String _businessAddress = '';
   String? _billDiscountType;
   int? _billDiscountValue;
+  int _rewardPointsRedeemed = 0;
+  int _rewardDiscountAmountPaise = 0;
   bool _isOrderSaved = false;
   int? _savedOrderId;
 
@@ -126,87 +136,40 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
   }
 
   int get _subtotalPaise {
-    var subtotal = 0;
-    for (final product in _products) {
-      final unitPaise = _parseCurrencyToPaise(product.price);
-      final lineSubtotal = unitPaise * product.quantity;
-      var lineTotal = lineSubtotal;
-      if (product.discountType != null && product.discountValue != null) {
-        final lineDiscount = DiscountService.calculateLineDiscount(
-          lineSubtotalPaise: lineSubtotal,
-          discountType: product.discountType!,
-          discountValue: product.discountValue!,
-        );
-        lineTotal -= lineDiscount;
-      }
-      subtotal += lineTotal;
-    }
-    return subtotal;
+    return _orderTotals.subtotalPaise;
   }
 
   int get _gstAmountPaise {
-    if (!_gstRegistered) {
-      return 0;
-    }
-
-    var gstTotal = 0;
-    for (final product in _products) {
-      final unitPaise = _parseCurrencyToPaise(product.price);
-      final lineSubtotal = unitPaise * product.quantity;
-      var lineTotal = lineSubtotal;
-      if (product.discountType != null && product.discountValue != null) {
-        final lineDiscount = DiscountService.calculateLineDiscount(
-          lineSubtotalPaise: lineSubtotal,
-          discountType: product.discountType!,
-          discountValue: product.discountValue!,
-        );
-        lineTotal -= lineDiscount;
-      }
-
-      final lineGst = (lineTotal * product.gstPercent / 100).round();
-      gstTotal += lineGst;
-    }
-
-    return gstTotal;
+    return _orderTotals.gstTotalPaise;
   }
 
   int get _totalAmountPaise {
-    var subtotal = _subtotalPaise;
-
-    var gstTotal = 0;
-    for (final product in _products) {
-      final unitPaise = _parseCurrencyToPaise(product.price);
-      final lineSubtotal = unitPaise * product.quantity;
-      var lineTotal = lineSubtotal;
-      if (product.discountType != null && product.discountValue != null) {
-        final lineDiscount = DiscountService.calculateLineDiscount(
-          lineSubtotalPaise: lineSubtotal,
-          discountType: product.discountType!,
-          discountValue: product.discountValue!,
-        );
-        lineTotal -= lineDiscount;
-      }
-
-      final lineGst = (lineTotal * product.gstPercent / 100).round();
-      gstTotal += lineGst;
-    }
-
-    final billDiscount = _billDiscountType != null && _billDiscountValue != null
-        ? DiscountService.calculateBillDiscount(
-            subtotalPaise: subtotal,
-            discountType: _billDiscountType!,
-            discountValue: _billDiscountValue!,
-          )
-        : 0;
-
-    final afterBillDiscount = subtotal - billDiscount;
-    final unrounded = afterBillDiscount + gstTotal;
-    final paise = unrounded % 100;
-    final roundOff = paise >= 50 ? (100 - paise) : -paise;
-    final grandTotal = unrounded + roundOff;
-
-    return grandTotal;
+    return _orderTotals.grandTotalPaise;
   }
+
+  OrderTotals get _orderTotals => _pricingManager.computeTotals(
+        lines: _walkInLines,
+        billDiscountType: _billDiscountType,
+        billDiscountValue: _billDiscountValue,
+        rewardDiscountPaise: _rewardDiscountAmountPaise,
+      );
+
+  List<WalkInLineItem> get _walkInLines => _products
+      .map(
+        (product) => WalkInLineItem(
+          productId: product.trackInventory ? product.productId : null,
+          description: product.designId,
+          quantity: product.quantity,
+          unitPricePaise: _parseCurrencyToPaise(product.price),
+          discountPaise: product.discountValue ?? 0,
+          discountType: product.discountType,
+          discountValue: product.discountValue,
+          gstPercent: _gstRegistered ? product.gstPercent : 0,
+          gstCalculationType: product.gstCalculationType,
+          source: product.source,
+        ),
+      )
+      .toList();
 
   Future<void> _loadDraftSession() async {
     final provider = context.read<WalkInSessionProvider>();
@@ -240,6 +203,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
               discountType: line.discountType,
               discountValue: line.discountValue,
               gstPercent: line.gstPercent,
+              gstCalculationType: line.gstCalculationType,
               source: line.source,
             ),
           ),
@@ -287,8 +251,9 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
         _handleBackWithUnsavedChanges();
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(l10n.pickupLater),
+        appBar: AppHeader(
+          title: l10n.pickupLater,
+          showBackButton: true,
           actions: [
             TextButton(
               onPressed: _isOrderSaved
@@ -343,25 +308,26 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
   }
 
   Future<void> _handleBackWithUnsavedChanges() async {
+    final l10n = AppLocalizations.of(context)!;
     final action = await showDialog<_UnsavedChangesAction>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('You have unsaved changes'),
+        title: Text(l10n.unsavedChangesTitle),
         actions: [
           TextButton(
             onPressed: () =>
                 Navigator.pop(context, _UnsavedChangesAction.cancel),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () =>
                 Navigator.pop(context, _UnsavedChangesAction.discard),
-            child: const Text('Discard'),
+            child: Text(l10n.discard),
           ),
           FilledButton(
             onPressed: () =>
                 Navigator.pop(context, _UnsavedChangesAction.saveDraft),
-            child: const Text('Save Draft'),
+            child: Text(l10n.saveDraft),
           ),
         ],
       ),
@@ -452,7 +418,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                                 product.discount!.isNotEmpty) ...[
                               const SizedBox(height: 2),
                               Text(
-                                'Discount: ${product.discount}',
+                                '${l10n.discountLabel}${product.discount}',
                                 style: TextStyle(
                                   color: Colors.green.shade700,
                                   fontSize: 12,
@@ -473,24 +439,25 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                           }
                         },
                         itemBuilder: (context) => [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'discount',
                             child: Row(
                               children: [
-                                Icon(Icons.discount, size: 18),
-                                SizedBox(width: 8),
-                                Text('Discount'),
+                                const Icon(Icons.discount, size: 18),
+                                const SizedBox(width: 8),
+                                Text(l10n.discount),
                               ],
                             ),
                           ),
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'remove',
                             child: Row(
                               children: [
-                                Icon(Icons.delete, size: 18, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text('Remove',
-                                    style: TextStyle(color: Colors.red)),
+                                const Icon(Icons.delete,
+                                    size: 18, color: Colors.red),
+                                const SizedBox(width: 8),
+                                Text(l10n.remove,
+                                    style: const TextStyle(color: Colors.red)),
                               ],
                             ),
                           ),
@@ -520,7 +487,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Rate ${product.price}',
+                          '${l10n.rate} ${product.price}',
                           style: TextStyle(
                             color: Colors.grey.shade600,
                             fontSize: 12,
@@ -570,7 +537,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                 icon: const Icon(Icons.add),
                 label: Text(
                   _products.isEmpty
-                      ? 'Add Product to cart'
+                      ? l10n.addProductToCart
                       : l10n.addAnotherProduct,
                 ),
                 style: OutlinedButton.styleFrom(
@@ -757,6 +724,22 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                           l10n.lastOrder, _customerInfo!.lastOrder),
                       _buildCustomerInfoRow(
                           l10n.favouriteDesign, _customerInfo!.favouriteDesign),
+                      _buildCustomerInfoRow('Reward Balance',
+                          '${_customerInfo!.rewardPoints} Points'),
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _products.isEmpty ||
+                                  _customerInfo!.rewardPoints <= 0
+                              ? null
+                              : _applyMaximumRewards,
+                          icon: const Icon(Icons.redeem, size: 18),
+                          label: Text(_rewardPointsRedeemed > 0
+                              ? 'Using $_rewardPointsRedeemed Points'
+                              : 'Use Reward Points'),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -951,7 +934,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Bill Discount',
+                      l10n.billDiscount,
                       style: TextStyle(
                         fontSize: 14,
                         color: _billDiscountType != null
@@ -967,7 +950,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                               discountType: _billDiscountType!,
                               discountValue: _billDiscountValue!,
                             )
-                          : 'Add',
+                          : l10n.add,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -979,6 +962,30 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                   ],
                 ),
               ),
+              if (_rewardDiscountAmountPaise > 0) ...[
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Reward Discount',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '-${_formatPaise(context, _rewardDiscountAmountPaise)}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const Divider(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1012,9 +1019,10 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'Place Pickup Order',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  child: Text(
+                    l10n.placePickupOrder,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -1051,8 +1059,8 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                 const SizedBox(height: 16),
                 ListTile(
                   leading: const Icon(Icons.inventory_2_rounded, size: 32),
-                  title: const Text('Products'),
-                  subtitle: const Text('Select from Product catalogue'),
+                  title: Text(l10n.products),
+                  subtitle: Text(l10n.selectFromProductCatalogue),
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _pickFromProducts(context);
@@ -1069,7 +1077,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.photo, size: 32),
-                  title: const Text('Gallery'),
+                  title: Text(l10n.gallery),
                   subtitle: Text(l10n.captureProductPhoto),
                   onTap: () {
                     Navigator.pop(sheetContext);
@@ -1128,6 +1136,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
         pricePaise: selected.sellingPricePaise,
         unit: selected.defaultUnit,
         gstPercent: _gstRegistered ? selected.gstPercent : 0,
+        gstCalculationType: selected.gstCalculationType,
       );
     });
   }
@@ -1151,16 +1160,17 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
           pricePaise: matched.sellingPricePaise,
           unit: matched.defaultUnit,
           gstPercent: _gstRegistered ? matched.gstPercent : 0,
+          gstCalculationType: matched.gstCalculationType,
         );
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Added to cart.')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.addedToCart)),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please try again.')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.pleaseTryAgain)),
       );
     }
   }
@@ -1172,6 +1182,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
     required int pricePaise,
     required String unit,
     required int gstPercent,
+    required GstCalculationType gstCalculationType,
   }) {
     final existingIndex = _products.indexWhere(
       (item) => item.productId == productId && item.source == 'product',
@@ -1193,6 +1204,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
         price: _formatPaise(context, pricePaise),
         unit: unit,
         gstPercent: gstPercent,
+        gstCalculationType: gstCalculationType,
         source: 'product',
       ),
     );
@@ -1203,14 +1215,14 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('No product found.'),
+        title: Text(l10n.noProductFound),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/products');
             },
-            child: const Text('Create Product'),
+            child: Text(l10n.createProduct),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context),
@@ -1415,6 +1427,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                           price: '₹$amountRupees',
                           gstPercent:
                               _gstRegistered ? (gstPercentOverride ?? 12) : 0,
+                          gstCalculationType: GstCalculationType.inclusive,
                           source: source,
                           attachmentPath: attachmentPath,
                           note: note,
@@ -1522,6 +1535,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                   quantity: 1,
                   price: '₹$amount',
                   gstPercent: _gstRegistered ? 12 : 0,
+                  gstCalculationType: GstCalculationType.inclusive,
                   discount: discountController.text.isNotEmpty
                       ? discountController.text
                       : null,
@@ -1584,6 +1598,8 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
     setState(() {
       if (customerName == null || customerName.isEmpty) {
         _customerInfo = null;
+        _rewardPointsRedeemed = 0;
+        _rewardDiscountAmountPaise = 0;
         return;
       }
 
@@ -1592,6 +1608,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
           customerStats?['lifetimePurchasePaise'] as int? ?? 0;
       final lastOrderDate = customerStats?['lastOrderDate'] as String?;
       final favouriteDesign = customerStats?['favouriteDesign'] as String?;
+      final rewardPoints = customerStats?['rewardPoints'] as int? ?? 0;
 
       _customerInfo = _CustomerInfo(
         previousOrders: previousOrders,
@@ -1599,8 +1616,20 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
             '₹${(lifetimePurchasePaise / 100).toStringAsFixed(0)}',
         lastOrder: lastOrderDate != null ? _formatDate(lastOrderDate) : 'N/A',
         favouriteDesign: favouriteDesign ?? 'N/A',
+        rewardPoints: rewardPoints,
       );
       _customerNameController.text = customerName;
+    });
+  }
+
+  Future<void> _applyMaximumRewards() async {
+    _syncProviderSession();
+    final provider = context.read<WalkInSessionProvider>();
+    final session = await provider.applyMaximumRewards();
+    if (!mounted) return;
+    setState(() {
+      _rewardPointsRedeemed = session.rewardPointsRedeemed;
+      _rewardDiscountAmountPaise = session.rewardDiscountAmountPaise;
     });
   }
 
@@ -1626,6 +1655,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
           quantity: product.quantity,
           unitPricePaise: _parseCurrencyToPaise(product.price),
           gstPercent: product.gstPercent,
+          gstCalculationType: product.gstCalculationType,
           discountPaise: product.discountValue ?? 0,
           discountType: product.discountType,
           discountValue: product.discountValue,
@@ -1755,12 +1785,30 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
 
   Future<void> _showCompletionDialog(int orderId) {
     final l10n = AppLocalizations.of(context)!;
+    final rewardFuture =
+        context.read<WalkInSessionProvider>().getOrderRewardSummary(orderId);
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Pickup Order Placed Successfully'),
-        content: Text('Order #$orderId'),
+        title: const Text('Order Completed'),
+        content: FutureBuilder<OrderRewardSummary?>(
+          future: rewardFuture,
+          builder: (context, snapshot) {
+            final summary = snapshot.data;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Order #$orderId'),
+                if (summary != null && summary.hasActivity) ...[
+                  const SizedBox(height: 12),
+                  RewardSummaryCard(summary: summary, compact: true),
+                ],
+              ],
+            );
+          },
+        ),
         actions: [
           TextButton.icon(
             onPressed: () {
@@ -1768,7 +1816,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
               _resetForNextOrder();
             },
             icon: const Icon(Icons.done),
-            label: const Text('New Order'),
+            label: const Text('Done'),
           ),
           OutlinedButton.icon(
             onPressed: () async {
@@ -1807,6 +1855,8 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
       _customerInfo = null;
       _billDiscountType = null;
       _billDiscountValue = null;
+      _rewardPointsRedeemed = 0;
+      _rewardDiscountAmountPaise = 0;
       _isOrderSaved = false;
       _savedOrderId = null;
     });
@@ -1874,21 +1924,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
       WalkInSession(
         draftOrderId: current.draftOrderId,
         fulfilmentType: _fulfilmentType,
-        lines: _products
-            .map(
-              (product) => WalkInLineItem(
-                productId: product.trackInventory ? product.productId : null,
-                description: product.designId,
-                quantity: product.quantity,
-                unitPricePaise: _parseCurrencyToPaise(product.price),
-                discountPaise: product.discountValue ?? 0,
-                discountType: product.discountType,
-                discountValue: product.discountValue,
-                gstPercent: _gstRegistered ? product.gstPercent : 0,
-                source: product.source,
-              ),
-            )
-            .toList(),
+        lines: _walkInLines,
         customerPhone: _phoneController.text.trim(),
         customerName: _customerNameController.text.trim(),
         occasion: _occasionController.text.trim(),
@@ -1896,6 +1932,8 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
         payments: _buildPayments(_totalAmountPaise),
         billDiscountType: _billDiscountType,
         billDiscountValue: _billDiscountValue,
+        rewardPointsRedeemed: _rewardPointsRedeemed,
+        rewardDiscountAmountPaise: _rewardDiscountAmountPaise,
       ),
     );
   }
@@ -2041,6 +2079,11 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
     final paidPaise = _paidAmountPaiseFromPayments(payments);
     final outstandingPaise =
         (_totalAmountPaise - paidPaise).clamp(0, _totalAmountPaise);
+    final rewardSummary = orderId == null
+        ? null
+        : await context
+            .read<WalkInSessionProvider>()
+            .getOrderRewardSummary(orderId);
     await printerProvider.enqueuePosBill({
       'invoiceNumber': orderId?.toString() ?? 'Draft',
       'dateTime': DateTime.now().toString().split('.').first,
@@ -2062,6 +2105,13 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
           .toList(growable: false),
       'paidPaise': paidPaise,
       'outstandingPaise': outstandingPaise,
+      if (rewardSummary != null && rewardSummary.hasActivity) ...{
+        'rewardOpeningBalance': rewardSummary.openingBalance,
+        'rewardPointsEarned': rewardSummary.earnedPoints,
+        'rewardPointsRedeemed': rewardSummary.redeemedPoints,
+        'rewardClosingBalance': rewardSummary.closingBalance,
+        'rewardValuePaise': rewardSummary.rewardValuePaise,
+      },
     });
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -2113,7 +2163,10 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
       return;
     }
 
-    final message = _buildReceiptMessage(orderId);
+    final rewardSummary = await context
+        .read<WalkInSessionProvider>()
+        .getOrderRewardSummary(orderId);
+    final message = _buildReceiptMessage(orderId, rewardSummary);
     final waUri = Uri.parse(
       'https://wa.me/$phone?text=${Uri.encodeComponent(message)}',
     );
@@ -2142,33 +2195,36 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
     return null;
   }
 
-  String _buildReceiptMessage(int orderId) {
+  String _buildReceiptMessage(int orderId, OrderRewardSummary? rewardSummary) {
+    final l10n = AppLocalizations.of(context)!;
     final lines = <String>[
       _shopName,
-      if (_businessPhone.isNotEmpty) 'Phone: $_businessPhone',
+      if (_businessPhone.isNotEmpty) '${l10n.phone}: $_businessPhone',
       if (_businessAddress.isNotEmpty) _businessAddress,
-      'Receipt',
-      'Order #$orderId',
+      l10n.receipt,
+      '${l10n.orderNumber}: #$orderId',
       '',
-      'Items:',
+      '${l10n.items}:',
       ..._products.map(
         (item) {
           final itemLine =
               '- ${item.designId} x${item.quantity} (${item.price})';
           if (item.discount != null && item.discount!.isNotEmpty) {
-            return '$itemLine (Discount: ${item.discount})';
+            return '$itemLine (${l10n.discountLabel}${item.discount})';
           }
           return itemLine;
         },
       ),
       '',
-      'Subtotal: ${_formatPaise(context, _subtotalPaise)}',
+      '${l10n.subtotal}: ${_formatPaise(context, _subtotalPaise)}',
       if (_billDiscountType != null && _billDiscountValue != null)
-        'Bill Discount: ${DiscountService.getDiscountDisplayText(discountType: _billDiscountType!, discountValue: _billDiscountValue!)}',
-      if (_gstRegistered) 'GST: ${_formatPaise(context, _gstAmountPaise)}',
-      'Grand Total: ${_formatPaise(context, _totalAmountPaise)}',
+        '${l10n.billDiscount}: ${DiscountService.getDiscountDisplayText(discountType: _billDiscountType!, discountValue: _billDiscountValue!)}',
+      if (_gstRegistered)
+        '${l10n.gst}: ${_formatPaise(context, _gstAmountPaise)}',
+      '${l10n.grandTotal}: ${_formatPaise(context, _totalAmountPaise)}',
+      buildRewardWhatsAppText(rewardSummary),
     ];
-    return lines.join('\n');
+    return lines.where((line) => line.trim().isNotEmpty).join('\n');
   }
 
   String _quantityUnitLabel(_ProductItem product) {
@@ -2216,6 +2272,7 @@ class _ProductItem {
   final String? discountType;
   final int? discountValue;
   final int gstPercent;
+  final GstCalculationType gstCalculationType;
   final String source;
   final String? attachmentPath;
   final String? note;
@@ -2231,6 +2288,7 @@ class _ProductItem {
     this.discountValue,
     this.unit = 'Piece',
     this.gstPercent = 12,
+    this.gstCalculationType = GstCalculationType.inclusive,
     this.source = 'manual',
     this.attachmentPath,
     this.note,
@@ -2253,6 +2311,7 @@ class _ProductItem {
       discountType: discountType ?? this.discountType,
       discountValue: discountValue ?? this.discountValue,
       gstPercent: gstPercent,
+      gstCalculationType: gstCalculationType,
       source: source,
       attachmentPath: attachmentPath,
       note: note,
@@ -2265,11 +2324,13 @@ class _CustomerInfo {
   final String lifetimePurchase;
   final String lastOrder;
   final String favouriteDesign;
+  final int rewardPoints;
 
   _CustomerInfo({
     required this.previousOrders,
     required this.lifetimePurchase,
     required this.lastOrder,
     required this.favouriteDesign,
+    required this.rewardPoints,
   });
 }

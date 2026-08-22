@@ -9,6 +9,10 @@ class CustomerProfileScreen extends StatelessWidget {
   final String birthday;
   final String pendingPayment;
   final int totalOrders;
+  final int rewardPoints;
+  final int lifetimeRewardPoints;
+  final int redeemedRewardPoints;
+  final String lastRewardActivity;
 
   const CustomerProfileScreen({
     super.key,
@@ -18,6 +22,10 @@ class CustomerProfileScreen extends StatelessWidget {
     required this.birthday,
     required this.pendingPayment,
     required this.totalOrders,
+    required this.rewardPoints,
+    required this.lifetimeRewardPoints,
+    required this.redeemedRewardPoints,
+    required this.lastRewardActivity,
   });
 
   @override
@@ -95,6 +103,28 @@ class CustomerProfileScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      label: 'Reward Balance',
+                      value: '$rewardPoints',
+                      icon: Icons.redeem,
+                      color: Colors.green,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildStatCard(
+                      label: 'Lifetime Earned',
+                      value: '$lifetimeRewardPoints',
+                      icon: Icons.stars,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               AppCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,6 +143,12 @@ class CustomerProfileScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                     _buildDetailRow(
                         Icons.shopping_bag, l10n.lastOrder, lastOrder),
+                    const SizedBox(height: 12),
+                    _buildDetailRow(Icons.redeem, 'Lifetime Redeemed',
+                        '$redeemedRewardPoints Points'),
+                    const SizedBox(height: 12),
+                    _buildDetailRow(Icons.history, 'Last Reward Activity',
+                        lastRewardActivity),
                   ],
                 ),
               ),

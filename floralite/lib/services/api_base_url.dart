@@ -13,9 +13,7 @@ String resolveFlorapriseApiBaseUrl({
   if (isDebug) {
     switch (platform) {
       case TargetPlatform.android:
-        // 10.0.2.2 only works inside the Android emulator.
-        // For a physical device connected to the same Wi-Fi, use the host LAN IP.
-        return 'http://192.168.1.8:5148';
+        return 'https://api.floraprise.com';
       case TargetPlatform.iOS:
         return 'http://localhost:5148';
       case TargetPlatform.windows:

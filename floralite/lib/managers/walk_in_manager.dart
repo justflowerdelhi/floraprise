@@ -1,4 +1,5 @@
 import '../models/payment_split.dart';
+import '../models/order_workspace_models.dart';
 import '../models/walk_in_enums.dart';
 import '../models/walk_in_line_item.dart';
 import '../models/walk_in_session.dart';
@@ -6,6 +7,7 @@ import 'customer_manager.dart';
 import 'inventory_manager.dart';
 import 'order_manager.dart';
 import 'pricing_manager.dart';
+import 'reward_manager.dart';
 import 'scheduler_manager.dart';
 
 class SaveDraftResult {
@@ -35,17 +37,20 @@ class WalkInManager {
     required OrderManager orderManager,
     required InventoryManager inventoryManager,
     required SchedulerManager schedulerManager,
+    RewardManager? rewardManager,
   })  : _customerManager = customerManager,
         _pricingManager = pricingManager,
         _orderManager = orderManager,
         _inventoryManager = inventoryManager,
-        _schedulerManager = schedulerManager;
+        _schedulerManager = schedulerManager,
+        _rewardManager = rewardManager ?? RewardManager();
 
   final CustomerManager _customerManager;
   final PricingManager _pricingManager;
   final OrderManager _orderManager;
   final InventoryManager _inventoryManager;
   final SchedulerManager _schedulerManager;
+  final RewardManager _rewardManager;
 
   Future<WalkInSession> startOrResume(FulfilmentType type) async {
     return WalkInSession.empty(type);
@@ -83,6 +88,7 @@ class WalkInManager {
       lines: session.lines,
       billDiscountType: session.billDiscountType,
       billDiscountValue: session.billDiscountValue,
+      rewardDiscountPaise: session.rewardDiscountAmountPaise,
     );
     final draftId = await _orderManager.saveDraft(
       session: session,
@@ -109,6 +115,7 @@ class WalkInManager {
       lines: session.lines,
       billDiscountType: session.billDiscountType,
       billDiscountValue: session.billDiscountValue,
+      rewardDiscountPaise: session.rewardDiscountAmountPaise,
     );
 
     await _orderManager.updateExistingOrder(
@@ -133,6 +140,7 @@ class WalkInManager {
       lines: session.lines,
       billDiscountType: session.billDiscountType,
       billDiscountValue: session.billDiscountValue,
+      rewardDiscountPaise: session.rewardDiscountAmountPaise,
     );
     final paymentValidation = _pricingManager.validatePayments(
       grandTotalPaise: totals.grandTotalPaise,
@@ -172,6 +180,10 @@ class WalkInManager {
     );
   }
 
+  Future<OrderRewardSummary?> getOrderRewardSummary(int orderId) {
+    return _orderManager.getOrderRewardSummary(orderId);
+  }
+
   WalkInSession withLines(WalkInSession session, List<WalkInLineItem> lines) {
     return session.copyWith(lines: lines);
   }
@@ -194,7 +206,39 @@ class WalkInManager {
           lines: session.lines,
           billDiscountType: session.billDiscountType,
           billDiscountValue: session.billDiscountValue,
+          rewardDiscountPaise: session.rewardDiscountAmountPaise,
         )
         .grandTotalPaise;
+  }
+
+  Future<WalkInSession> applyMaximumRewards(WalkInSession session) async {
+    final customer =
+        await _customerManager.lookupByPhone(session.customerPhone);
+    if (customer == null || customer.rewardPoints <= 0) {
+      return session.copyWith(
+        rewardPointsRedeemed: 0,
+        rewardDiscountAmountPaise: 0,
+      );
+    }
+
+    final settings = await _rewardManager.loadSettings();
+    final totalsBeforeReward = _pricingManager.computeTotals(
+      lines: session.lines,
+      billDiscountType: session.billDiscountType,
+      billDiscountValue: session.billDiscountValue,
+    );
+    final points = _rewardManager.calculateMaximumRedeemablePoints(
+      billPaise: totalsBeforeReward.grandTotalPaise,
+      availablePoints: customer.rewardPoints,
+      settings: settings,
+    );
+    final discountPaise = _rewardManager.redemptionAmountPaise(
+      points: points,
+      settings: settings,
+    );
+    return session.copyWith(
+      rewardPointsRedeemed: points,
+      rewardDiscountAmountPaise: discountPaise,
+    );
   }
 }

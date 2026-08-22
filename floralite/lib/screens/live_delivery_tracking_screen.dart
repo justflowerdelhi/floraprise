@@ -74,7 +74,8 @@ class _LiveDeliveryTrackingScreenState
                   widget.assignmentId!.trim().isNotEmpty
               ? await _trackingService
                   .getTrackingByAssignmentId(widget.assignmentId!)
-              : await _trackingService.getTrackingByOrderId(widget.orderId!);
+              : await _trackingService
+                  .getTrackingForLocalOrder(widget.orderId!);
 
       if (!mounted) return;
       setState(() {

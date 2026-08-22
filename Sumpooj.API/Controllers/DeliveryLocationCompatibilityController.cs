@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sumpooj.Application.DeliveryTracking;
+using Sumpooj.Application.DeliveryTracking.DTOs;
 using Sumpooj.Application.Interfaces;
 
 namespace Sumpooj.API.Controllers;
@@ -10,14 +11,17 @@ namespace Sumpooj.API.Controllers;
 [Authorize(Policy = "CompanyOnly")]
 public sealed class DeliveryLocationCompatibilityController : ControllerBase
 {
-    private readonly IDeliveryLocationService _locationService;
+    private readonly DriverJourneyService _journeyService;
+    private readonly IDeliveryRepository _deliveryRepository;
     private readonly ISignalRBroadcastService _signalRBroadcastService;
 
     public DeliveryLocationCompatibilityController(
-        IDeliveryLocationService locationService,
+        DriverJourneyService journeyService,
+        IDeliveryRepository deliveryRepository,
         ISignalRBroadcastService signalRBroadcastService)
     {
-        _locationService = locationService;
+        _journeyService = journeyService;
+        _deliveryRepository = deliveryRepository;
         _signalRBroadcastService = signalRBroadcastService;
     }
 
@@ -26,13 +30,25 @@ public sealed class DeliveryLocationCompatibilityController : ControllerBase
     {
         try
         {
-            var location = await _locationService.RecordLocationAsync(
-                request.DeliveryId,
-                request.Latitude,
-                request.Longitude,
-                request.SpeedKph ?? request.Speed ?? 0,
-                request.RouteId,
-                request.DriverId);
+            var delivery = await _deliveryRepository.GetByIdAsync(request.DeliveryId);
+            if (delivery == null)
+                return NotFound(new { error = "Delivery not found" });
+
+            var driverId = request.DriverId ?? delivery.DeliveryPersonId;
+            if (!driverId.HasValue)
+                return BadRequest(new { error = "DriverId is required for location updates" });
+
+            var speedMs = request.Speed
+                ?? (request.SpeedKph.HasValue ? request.SpeedKph.Value / 3.6d : (double?)null);
+
+            await _journeyService.UploadLocationAsync(driverId.Value, new UploadLocationRequest
+            {
+                DeliveryId = request.DeliveryId,
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
+                Speed = speedMs,
+                RecordedAt = request.RecordedAt ?? DateTime.UtcNow
+            });
 
             await _signalRBroadcastService.BroadcastLocationUpdateAsync(
                 request.DeliveryId,
@@ -40,7 +56,7 @@ public sealed class DeliveryLocationCompatibilityController : ControllerBase
                 request.Longitude,
                 request.SpeedKph ?? request.Speed ?? 0);
 
-            return Ok(new { locationId = location.Id, timestamp = location.RecordedAt });
+            return Ok(new { success = true, deliveryId = request.DeliveryId, timestamp = DateTime.UtcNow });
         }
         catch (Exception ex)
         {
@@ -56,15 +72,27 @@ public sealed class DeliveryLocationCompatibilityController : ControllerBase
             var items = new List<object>();
             foreach (var request in requests)
             {
-                var location = await _locationService.RecordLocationAsync(
-                    request.DeliveryId,
-                    request.Latitude,
-                    request.Longitude,
-                    request.SpeedKph ?? request.Speed ?? 0,
-                    request.RouteId,
-                    request.DriverId);
+                var delivery = await _deliveryRepository.GetByIdAsync(request.DeliveryId);
+                if (delivery == null)
+                    continue;
 
-                items.Add(new { locationId = location.Id, timestamp = location.RecordedAt });
+                var driverId = request.DriverId ?? delivery.DeliveryPersonId;
+                if (!driverId.HasValue)
+                    continue;
+
+                var speedMs = request.Speed
+                    ?? (request.SpeedKph.HasValue ? request.SpeedKph.Value / 3.6d : (double?)null);
+
+                await _journeyService.UploadLocationAsync(driverId.Value, new UploadLocationRequest
+                {
+                    DeliveryId = request.DeliveryId,
+                    Latitude = request.Latitude,
+                    Longitude = request.Longitude,
+                    Speed = speedMs,
+                    RecordedAt = request.RecordedAt ?? DateTime.UtcNow
+                });
+
+                items.Add(new { success = true, deliveryId = request.DeliveryId, timestamp = DateTime.UtcNow });
             }
 
             return Ok(new { items });
@@ -85,4 +113,5 @@ public sealed class LegacyLocationRequest
     public double? Speed { get; set; }
     public Guid? RouteId { get; set; }
     public Guid? DriverId { get; set; }
+    public DateTime? RecordedAt { get; set; }
 }

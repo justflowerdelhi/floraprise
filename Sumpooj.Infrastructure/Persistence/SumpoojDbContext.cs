@@ -125,6 +125,9 @@ public class SumpoojDbContext
     public DbSet<FeatureEntitlement> FeatureEntitlements => Set<FeatureEntitlement>();
     public DbSet<TrialHistory> TrialHistories => Set<TrialHistory>();
 
+    // WhatsApp Business API
+    public DbSet<WhatsAppAccount> WhatsAppAccounts => Set<WhatsAppAccount>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -133,16 +136,30 @@ public class SumpoojDbContext
         // ===============================
         // Column mappings
         // ===============================
+        modelBuilder.Entity<Order>(entity =>
+        {
+            entity.HasOne<Staff>()
+                .WithMany()
+                .HasForeignKey(o => o.DeliveryPersonId)
+                .HasConstraintName("FK_Orders_DeliveryPerson")
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
         modelBuilder.Entity<Delivery>(entity =>
         {
             entity.Property(d => d.SalesOrderId).HasColumnName("OrderId");
             entity.Property(d => d.DeliveryDate).HasColumnName("ScheduledDateTime");
+            entity.Property(d => d.DeliveryAddressLatitude).HasColumnName("DeliveryLatitude");
+            entity.Property(d => d.DeliveryAddressLongitude).HasColumnName("DeliveryLongitude");
 
             entity.HasOne<Staff>()
                 .WithMany()
                 .HasForeignKey(d => d.DeliveryPersonId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            entity.HasIndex(d => d.CompanyId);
+            entity.HasIndex(d => d.TrackingToken).IsUnique();
+            entity.HasIndex(d => d.DeliveryPersonId);
             entity.Property(d => d.TrackingToken).HasMaxLength(256);
             entity.Property(d => d.CustomerPhone).HasMaxLength(50);
             entity.Property(d => d.CustomerEmail).HasMaxLength(256);
@@ -155,9 +172,14 @@ public class SumpoojDbContext
         {
             entity.ToTable("DriverLocations");
             entity.HasKey(d => d.Id);
+            entity.HasOne(d => d.Delivery)
+                .WithMany()
+                .HasForeignKey(d => d.DeliveryId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(d => d.DriverId);
             entity.HasIndex(d => d.DeliveryId);
             entity.HasIndex(d => d.RecordedAt);
+            entity.HasIndex(d => d.CreatedAtUtc);
             entity.HasIndex(d => new { d.DriverId, d.DeliveryId });
             entity.HasIndex(d => new { d.DriverId, d.RecordedAt });
         });
@@ -610,6 +632,17 @@ public class SumpoojDbContext
             .WithMany()
             .HasForeignKey(s => s.IdentityUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // ===============================
+        // WhatsApp Account
+        // ===============================
+        modelBuilder.Entity<WhatsAppAccount>()
+            .HasIndex(w => w.MemberId)
+            .IsUnique();
+
+        modelBuilder.Entity<WhatsAppAccount>()
+            .HasIndex(w => w.PhoneNumberId)
+            .IsUnique();
 
     }
 }

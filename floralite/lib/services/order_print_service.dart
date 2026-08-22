@@ -1,8 +1,11 @@
+import 'package:intl/intl.dart';
+
 import '../data/repositories/job_repository.dart';
 import '../managers/onboarding_manager.dart';
 import '../managers/order_manager.dart';
 import '../models/order_status.dart';
 import '../models/order_workspace_models.dart';
+import 'reward_summary_formatter.dart';
 import '../models/printer_models.dart';
 import 'printer/printer_manager.dart';
 
@@ -39,7 +42,7 @@ class OrderPrintService {
     }
 
     final bundle = await _orderManager.getOrderDetailBundle(orderId);
-    final payload = _posPayload(header, bundle);
+    final payload = await _posPayload(header, bundle);
     await repo.enqueueReceiptJob(orderId, payload);
     await _printerManager.enqueue(
       type: PrintJobType.posBill,
@@ -125,13 +128,34 @@ class OrderPrintService {
     for (final line in bundle?.lines ?? []) {
       final name = line['product_name'] ?? 'Item';
       final qty = line['quantity'] ?? 1;
-      final price = line['unit_price_paise'] ?? 0;
-      final lineTotal = (qty as int) * (price as int) / 100.0;
-      buffer.writeln('$name x$qty - ₹${lineTotal.toStringAsFixed(2)}');
+      final basic = ((line['line_subtotal_paise'] as int?) ?? 0) / 100.0;
+      final gst = ((line['line_gst_paise'] as int?) ?? 0) / 100.0;
+      final total = ((line['line_total_paise'] as int?) ?? 0) / 100.0;
+      buffer.writeln(
+        '$name x$qty - Basic ₹${basic.toStringAsFixed(2)}, GST ₹${gst.toStringAsFixed(2)}, Total ₹${total.toStringAsFixed(2)}',
+      );
     }
     buffer.writeln('');
+    final basicTotal = (bundle?.lines ?? const <Map<String, Object?>>[])
+        .fold<int>(0,
+            (sum, line) => sum + ((line['line_subtotal_paise'] as int?) ?? 0));
+    final gstTotal = (bundle?.lines ?? const <Map<String, Object?>>[])
+        .fold<int>(
+            0, (sum, line) => sum + ((line['line_gst_paise'] as int?) ?? 0));
+    buffer.writeln('Basic Amount: ₹${(basicTotal / 100.0).toStringAsFixed(2)}');
+    buffer.writeln('GST Amount: ₹${(gstTotal / 100.0).toStringAsFixed(2)}');
+    if (header.rewardDiscountAmountPaise > 0) {
+      buffer.writeln(
+          'Reward Discount: -₹${(header.rewardDiscountAmountPaise / 100.0).toStringAsFixed(2)}');
+    }
     buffer.writeln(
         'Total: ₹${(header.grandTotalPaise / 100.0).toStringAsFixed(2)}');
+    if (header.rewardPointsEarned > 0 || header.rewardPointsRedeemed > 0) {
+      buffer.writeln('');
+      buffer.writeln(buildRewardSummaryText(
+        await _orderManager.getOrderRewardSummary(orderId),
+      ));
+    }
     return buffer.toString();
   }
 
@@ -164,10 +188,10 @@ class OrderPrintService {
     return buffer.toString();
   }
 
-  Map<String, dynamic> _posPayload(
+  Future<Map<String, dynamic>> _posPayload(
     OrderDetailHeader header,
     OrderDetailBundle? bundle,
-  ) {
+  ) async {
     final paymentRows =
         (bundle?.payments ?? const <Map<String, Object?>>[]).map((row) {
       final method = (row['method'] as String?) ?? '';
@@ -189,18 +213,43 @@ class OrderPrintService {
         .fold<int>(0, (sum, row) => sum + ((row['amountPaise'] as int?) ?? 0));
     final outstandingPaise =
         (header.grandTotalPaise - paidPaise).clamp(0, header.grandTotalPaise);
+    final lines = bundle?.lines ?? const <Map<String, Object?>>[];
+    final basicAmountPaise = lines.fold<int>(
+      0,
+      (sum, line) => sum + ((line['line_subtotal_paise'] as int?) ?? 0),
+    );
+    final gstAmountPaise = lines.fold<int>(
+      0,
+      (sum, line) => sum + ((line['line_gst_paise'] as int?) ?? 0),
+    );
+    final discountPaise = lines.fold<int>(
+      0,
+      (sum, line) => sum + ((line['discount_paise'] as int?) ?? 0),
+    );
+    final rewardSummary = await _orderManager.getOrderRewardSummary(header.id);
 
     return {
       'order_id': header.id,
       'order_no': header.orderNo,
       'invoiceNumber': header.orderNo,
       'printed_at': DateTime.now().toIso8601String(),
-      'dateTime': DateTime.now().toString().split('.').first,
+      'dateTime': DateFormat('dd-MM-yyyy').format(DateTime.now()),
       'type': 'receipt',
       'customerName': header.customerName,
       'customerPhone': header.customerPhone,
-      'items': bundle?.lines ?? const [],
+      'items': lines,
+      'basicAmountPaise': basicAmountPaise,
+      'gstPaise': gstAmountPaise,
+      'discountPaise': discountPaise,
+      'rewardDiscountPaise': header.rewardDiscountAmountPaise,
       'grandTotalPaise': header.grandTotalPaise,
+      'rewardPointsEarned': header.rewardPointsEarned,
+      'rewardPointsRedeemed': header.rewardPointsRedeemed,
+      if (rewardSummary != null && rewardSummary.hasActivity) ...{
+        'rewardOpeningBalance': rewardSummary.openingBalance,
+        'rewardClosingBalance': rewardSummary.closingBalance,
+        'rewardValuePaise': rewardSummary.rewardValuePaise,
+      },
       'paymentMode': paymentMode,
       'paymentSummary': paymentRows,
       'paidPaise': paidPaise,

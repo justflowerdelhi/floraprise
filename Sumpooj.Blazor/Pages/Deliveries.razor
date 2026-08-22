@@ -1,9 +1,11 @@
 @page "/deliveries"
 @layout MainLayout
+@implements IDisposable
 @inject DeliveryApiService DeliveryService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
+@inject IConfiguration Configuration
 
 <div class="page-shell">
     <div class="section-header">
@@ -185,10 +187,31 @@
     private List<LiveDeliveryDto> _deliveries = new();
     private LiveDeliveryDto? _selected;
     private bool _drawerOpen;
+    private string _publicBaseUrl = string.Empty;
+    private CancellationTokenSource? _refreshCts;
+
+    private string PublicBaseUrl
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(_publicBaseUrl)) return _publicBaseUrl;
+
+            var configured = Configuration["ApiBaseUrl"];
+            if (string.IsNullOrWhiteSpace(configured))
+            {
+                _publicBaseUrl = "http://localhost:5148";
+                return _publicBaseUrl;
+            }
+
+            _publicBaseUrl = configured.TrimEnd('/');
+            return _publicBaseUrl;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
         await LoadDeliveries();
+        StartAutoRefresh();
     }
 
     private async Task LoadDeliveries()
@@ -203,6 +226,47 @@
         {
             _selected = _deliveries.FirstOrDefault(x => x.DeliveryId == _selected.DeliveryId) ?? _selected;
         }
+    }
+
+    private void StartAutoRefresh()
+    {
+        _refreshCts = new CancellationTokenSource();
+        _ = RunAutoRefreshAsync(_refreshCts.Token);
+    }
+
+    private async Task RunAutoRefreshAsync(CancellationToken cancellationToken)
+    {
+        var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadDeliveries();
+                    if (_selected != null)
+                    {
+                        _selected = _deliveries.FirstOrDefault(x => x.DeliveryId == _selected.DeliveryId) ?? _selected;
+                    }
+
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during component disposal.
+        }
+        finally
+        {
+            timer.Dispose();
+        }
+    }
+
+    public void Dispose()
+    {
+        _refreshCts?.Cancel();
+        _refreshCts?.Dispose();
     }
 
     private void CallPhone(string? phone)
@@ -233,13 +297,13 @@
     private void OpenTrackingPage(string? token)
     {
         if (string.IsNullOrEmpty(token)) return;
-        Navigation.NavigateTo($"http://localhost:5148/api/public/tracking/driver/{token}", forceLoad: true);
+        Navigation.NavigateTo($"{PublicBaseUrl}/delivery/start/{token}", forceLoad: true);
     }
 
     private async Task CopyTrackingLink(string? token)
     {
         if (string.IsNullOrEmpty(token)) return;
-        var link = $"http://localhost:5148/api/public/tracking/driver/{token}";
+        var link = $"{PublicBaseUrl}/delivery/start/{token}";
         await JS.InvokeVoidAsync("navigator.clipboard.writeText", link);
         Snackbar.Add("Driver link copied to clipboard.", Severity.Success);
     }

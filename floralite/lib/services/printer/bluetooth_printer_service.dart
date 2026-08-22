@@ -26,6 +26,10 @@ class BluetoothPrinterService implements PrinterService {
           .toList();
     } on PlatformException catch (error) {
       throw PrinterServiceException(_friendlyError(error));
+    } catch (_) {
+      throw const PrinterServiceException(
+        'Bluetooth is unavailable. Please turn on Bluetooth and try again.',
+      );
     }
   }
 
@@ -37,12 +41,23 @@ class BluetoothPrinterService implements PrinterService {
         'name': printer.name,
         'address': printer.address,
       }).timeout(const Duration(seconds: 18));
-      return connected ?? false;
+      if (connected != true) {
+        throw const PrinterServiceException(
+          'Could not connect to the printer. Make sure it is switched on and nearby, then try again.',
+        );
+      }
+      return true;
     } on PlatformException catch (error) {
       throw PrinterServiceException(_friendlyError(error));
+    } on PrinterServiceException {
+      rethrow;
     } on TimeoutException {
       throw const PrinterServiceException(
           'Printer connection timed out. Keep the printer nearby and try again.');
+    } catch (_) {
+      throw const PrinterServiceException(
+        'Could not connect to the printer. Make sure it is switched on and nearby, then try again.',
+      );
     }
   }
 
@@ -98,16 +113,19 @@ class BluetoothPrinterService implements PrinterService {
   String _friendlyError(PlatformException error) {
     final text = '${error.code} ${error.message}'.toLowerCase();
     if (text.contains('permission')) {
-      return 'Bluetooth permission was not granted.';
+      return 'Bluetooth permission is required. Allow Nearby devices permission in Android Settings and try again.';
     }
-    if (text.contains('disabled')) {
-      return 'Bluetooth is turned off. Please enable Bluetooth and try again.';
+    if (text.contains('disabled') || text.contains('unavailable')) {
+      return 'Bluetooth is unavailable. Please turn on Bluetooth and try again.';
     }
     if (text.contains('not_found')) {
       return 'Printer unavailable. Please pair the printer in Android Bluetooth settings.';
     }
-    if (text.contains('not_connected') || text.contains('connection')) {
-      return 'Connection lost. Keep the printer nearby and try again.';
+    if (text.contains('not_connected')) {
+      return 'Please select and connect a printer first.';
+    }
+    if (text.contains('connection')) {
+      return 'Could not connect to the printer. Make sure it is switched on and nearby, then try again.';
     }
     if (text.contains('paper')) {
       return 'Printer may be out of paper.';

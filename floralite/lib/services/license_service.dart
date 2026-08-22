@@ -92,6 +92,7 @@ class LicenseService {
   ) async {
     final accessToken = await _secureStorage.read(key: _accessTokenKey);
     if (accessToken != null && accessToken.trim().isNotEmpty) {
+      await getDeviceId();
       return checkLicense();
     }
 

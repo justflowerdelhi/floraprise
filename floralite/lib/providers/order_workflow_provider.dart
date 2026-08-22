@@ -100,6 +100,7 @@ class OrderWorkflowProvider extends ChangeNotifier {
     required int orderId,
     required int deliveryPartnerId,
     String? notes,
+    bool syncDeliveryInBackground = true,
   }) async {
     _setLoading(true);
     try {
@@ -107,6 +108,7 @@ class OrderWorkflowProvider extends ChangeNotifier {
         orderId: orderId,
         deliveryPartnerId: deliveryPartnerId,
         notes: notes,
+        syncDeliveryInBackground: syncDeliveryInBackground,
       );
       _statusMessage = 'Delivery person assigned';
       await loadWorkflow(orderId);

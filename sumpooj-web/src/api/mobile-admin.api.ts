@@ -385,12 +385,12 @@ export const getMobileAdminSupportActivity = async (
   return res.data;
 };
 
-export const exportMobileAdminSupportActivityUrl = (params: MobileAdminSupportActivityQuery): string => {
-  const qs = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && String(value).length > 0) {
-      qs.append(key, String(value));
-    }
+export const exportMobileAdminSupportActivity = async (
+  params: MobileAdminSupportActivityQuery,
+): Promise<Blob> => {
+  const res = await api.get('/platform/mobile-admin/support-activity/export', {
+    params,
+    responseType: 'blob',
   });
-  return `/platform/mobile-admin/support-activity/export?${qs.toString()}`;
+  return res.data;
 };

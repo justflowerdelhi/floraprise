@@ -85,6 +85,15 @@ public sealed class MobileDeviceRepository : IMobileDeviceRepository
             .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Id == mobileDeviceId && !x.IsDeleted);
     }
 
+    public Task<int> CountActiveByUserAsync(Guid companyId, Guid mobileUserId)
+    {
+        return _db.MobileDevices.CountAsync(x =>
+            x.CompanyId == companyId &&
+            x.MobileUserId == mobileUserId &&
+            x.Status == MobileDeviceStatus.Active &&
+            !x.IsDeleted);
+    }
+
     public async Task AddAsync(MobileDevice device)
     {
         await _db.MobileDevices.AddAsync(device);

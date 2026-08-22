@@ -47,8 +47,9 @@ class _VoiceStockEntryScreenState extends State<VoiceStockEntryScreen>
         showActive: true,
         showInactive: false,
       );
+      if (!mounted) return;
       final controller = VoiceEntryController(
-        speechRecognition: SpeechRecognitionService(),
+        speechRecognition: SpeechRecognitionService(context: context),
         voiceEntry: VoiceStockEntryService(
           parser: VoiceParser(),
           matcher: ProductMatcher(

@@ -8,6 +8,7 @@ import '../presentation/splash/splash_screen.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/subscription_provider.dart';
+import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -87,9 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final subscriptionSummary = _subscriptionSummary(subscription);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.settingsTitle),
-      ),
+      appBar: AppHeader(title: l10n.settingsTitle),
       body: SafeArea(
         top: false,
         child: ListView(
@@ -171,6 +170,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'Design share watermark, price and footer style',
                     Icons.share_outlined,
                     () => Navigator.pushNamed(context, '/share-branding'),
+                  ),
+                  const Divider(height: 1),
+                  _buildSettingTile(
+                    context,
+                    'Rewards Settings',
+                    'Customer points and redemption rules',
+                    Icons.redeem,
+                    () => Navigator.pushNamed(context, '/rewards-settings'),
                   ),
                 ],
               ),

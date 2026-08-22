@@ -21,7 +21,7 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import {
-  exportMobileAdminSupportActivityUrl,
+  exportMobileAdminSupportActivity,
   getMobileAdminSupportActivity,
   type MobileAdminSupportActivityItem,
 } from '../../api/mobile-admin.api';
@@ -104,15 +104,24 @@ const MobileAdminSupportActivityPage: React.FC = () => {
     fetchActivity().catch(() => setError('Unable to load support activity.'));
   }, [fetchActivity]);
 
-  const exportCsv = () => {
-    const url = exportMobileAdminSupportActivityUrl({
-      companyId: companyId || undefined,
-      search: search || undefined,
-      action: action || undefined,
-      fromUtc: fromUtc || undefined,
-      toUtc: toUtc || undefined,
-    });
-    window.open(url, '_blank');
+  const exportCsv = async () => {
+    try {
+      const blob = await exportMobileAdminSupportActivity({
+        companyId: companyId || undefined,
+        search: search || undefined,
+        action: action || undefined,
+        fromUtc: fromUtc || undefined,
+        toUtc: toUtc || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'mobile-support-activity.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to export support activity.');
+    }
   };
 
   return (

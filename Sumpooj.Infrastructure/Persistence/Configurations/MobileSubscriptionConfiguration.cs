@@ -70,7 +70,10 @@ public sealed class MobileDeviceConfiguration : IEntityTypeConfiguration<MobileD
         builder.ToTable("MobileDevices");
         builder.HasKey(x => x.Id);
 
+        builder.Property(x => x.LegacyUserId).HasColumnName("UserId").IsRequired();
         builder.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();
+        builder.Property(x => x.DeviceFingerprintHash).IsRequired();
+        builder.Property(x => x.DeviceName).IsRequired();
         builder.Property(x => x.Manufacturer).HasMaxLength(80);
         builder.Property(x => x.Model).HasMaxLength(120);
         builder.Property(x => x.Platform).HasMaxLength(24).IsRequired();
@@ -117,7 +120,7 @@ public sealed class SubscriptionPlanConfiguration : IEntityTypeConfiguration<Sub
         builder.Property(x => x.MonthlyPrice).HasColumnType("decimal(18,2)");
         builder.Property(x => x.AnnualPrice).HasColumnType("decimal(18,2)");
         builder.Property(x => x.LifetimePrice).HasColumnType("decimal(18,2)");
-        builder.Property(x => x.IncludedModulesJson).HasColumnType("jsonb");
+        builder.Property(x => x.IncludedModulesJson).HasColumnType("text");
 
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.Property(x => x.CreatedAtUtc).HasColumnType("timestamptz");

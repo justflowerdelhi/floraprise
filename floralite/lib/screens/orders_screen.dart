@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/order_workspace_models.dart';
 import '../providers/order_provider.dart';
+import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
 import 'order_detail_screen.dart';
 
@@ -60,8 +61,8 @@ class _OrdersScreenState extends State<OrdersScreen>
     final selectedDate = context.watch<OrderProvider>().filters.selectedDate;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.orders),
+      appBar: AppHeader(
+        title: l10n.orders,
         bottom: TabBar(
           controller: _tabController,
           tabs: [

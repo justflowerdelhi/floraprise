@@ -86,9 +86,12 @@ class ReceiptBuilder {
       ], widths);
     }
     builder.separator();
+    builder.row('Basic Amount',
+        _money(_int(payload, 'basicAmountPaise', 'subtotal_paise')));
     builder.row('Discount',
         _money(_int(payload, 'discountPaise', 'discount_total_paise')));
-    builder.row('GST', _money(_int(payload, 'gstPaise', 'gst_total_paise')));
+    builder.row(
+        'GST Amount', _money(_int(payload, 'gstPaise', 'gst_total_paise')));
     builder.row('Grand Total',
         _money(_int(payload, 'grandTotalPaise', 'grand_total_paise')),
         bold: true);

@@ -1735,4 +1735,94 @@ class AppLocalizationsGu extends AppLocalizations {
   @override
   String get resetOnboardingDialogMessage =>
       'આથી પ્રથમ ઇન્સ્ટોલ ઓનબોર્ડિંગ ફરી બતાવાશે. ચાલુ રાખશો?';
+
+  @override
+  String get unsavedChangesTitle => 'તમારા ફેરફારો સાચવાયા નથી';
+
+  @override
+  String get discard => 'છોડી દો';
+
+  @override
+  String get remove => 'દૂર કરો';
+
+  @override
+  String get addProductToCart => 'કાર્ટમાં ઉત્પાદન ઉમેરો';
+
+  @override
+  String get rate => 'દર';
+
+  @override
+  String get billDiscount => 'બિલ ડિસ્કાઉન્ટ';
+
+  @override
+  String get completeSale => 'વેચાણ પૂર્ણ કરો';
+
+  @override
+  String get placePickupOrder => 'પિકઅપ ઓર્ડર મૂકો';
+
+  @override
+  String get placeDeliveryOrder => 'ડિલિવરી ઓર્ડર મૂકો';
+
+  @override
+  String get productCatalogue => 'ઉત્પાદન કેટલોગ';
+
+  @override
+  String get selectFromProductCatalogue => 'ઉત્પાદન કેટલોગમાંથી પસંદ કરો';
+
+  @override
+  String get gallery => 'ગેલેરી';
+
+  @override
+  String get addedToCart => 'કાર્ટમાં ઉમેરાયું.';
+
+  @override
+  String get noProductFound => 'કોઈ ઉત્પાદન મળ્યું નથી.';
+
+  @override
+  String get createProduct => 'ઉત્પાદન બનાવો';
+
+  @override
+  String get selectCustomTime => 'કસ્ટમ સમય પસંદ કરો';
+
+  @override
+  String get deliveryCharge => 'ડિલિવરી ચાર્જ';
+
+  @override
+  String get customerBuyer => 'ગ્રાહક (ખરીદદાર)';
+
+  @override
+  String get searchCustomer => 'ગ્રાહક શોધો';
+
+  @override
+  String get phone => 'ફોન';
+
+  @override
+  String get purchaseHistory => 'ખરીદી ઇતિહાસ';
+
+  @override
+  String get senderSameAsCustomer => 'મોકલનાર ગ્રાહક જેવો જ છે';
+
+  @override
+  String get partial => 'આંશિક';
+
+  @override
+  String get paymentMode => 'ચુકવણી મોડ';
+
+  @override
+  String get bank => 'બેંક';
+
+  @override
+  String get other => 'અન્ય';
+
+  @override
+  String get amountReceived => 'મળેલી રકમ';
+
+  @override
+  String get balance => 'બાકી';
+
+  @override
+  String get receipt => 'રસીદ';
+
+  @override
+  String get items => 'આઇટમ્સ';
 }

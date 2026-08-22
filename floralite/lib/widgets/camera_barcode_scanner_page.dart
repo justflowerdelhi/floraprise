@@ -1,10 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import '../services/first_use_permission_service.dart';
 
 Future<String?> showCameraBarcodeScanner(
   BuildContext context, {
   required String title,
 }) {
+  return _showCameraScannerWithPermission(
+    context: context,
+    title: title,
+  );
+}
+
+Future<String?> _showCameraScannerWithPermission({
+  required BuildContext context,
+  required String title,
+}) async {
+  final granted = await FirstUsePermissionService.ensurePermission(
+    context: context,
+    flowKey: 'camera.capture_or_scan',
+    permission: Permission.camera,
+    title: 'Use camera to capture product photos and delivery proof.',
+    body:
+        'Floraprise requests camera access only when you use camera features.',
+    permanentlyDeniedMessage:
+        'Camera permission is disabled. You can enable it anytime from Settings > Apps > Floraprise > Permissions to use camera features.',
+  );
+
+  if (!granted || !context.mounted) {
+    return null;
+  }
+
   return Navigator.of(context).push<String>(
     MaterialPageRoute(
       fullscreenDialog: true,

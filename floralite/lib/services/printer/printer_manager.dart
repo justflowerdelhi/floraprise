@@ -24,6 +24,11 @@ class PrinterManager {
 
   bool get isConnected => _isConnected;
 
+  Future<bool> refreshConnectionState() async {
+    _isConnected = await _transport.isConnected();
+    return _isConnected;
+  }
+
   Future<PrinterConfig> loadConfig() => _repository.getConfig();
 
   Future<List<PrinterDeviceInfo>> scanBluetoothPrinters({
@@ -33,6 +38,9 @@ class PrinterManager {
   }
 
   Future<void> connect(PrinterDeviceInfo device) async {
+    if (device.address.trim().isEmpty) {
+      throw const PrinterServiceException('Please select a printer first.');
+    }
     try {
       _isConnected = await _transport.connect(device);
       if (_isConnected) {
@@ -47,12 +55,20 @@ class PrinterManager {
 
   Future<bool> autoConnect() async {
     final config = await _repository.getConfig();
-    if (!config.autoConnect || !config.hasPrinter) return false;
+    final printerName = config.printerName?.trim();
+    final printerAddress = config.printerAddress?.trim();
+    if (!config.autoConnect ||
+        printerName == null ||
+        printerName.isEmpty ||
+        printerAddress == null ||
+        printerAddress.isEmpty) {
+      return false;
+    }
     try {
       await connect(
         PrinterDeviceInfo(
-          name: config.printerName!,
-          address: config.printerAddress!,
+          name: printerName,
+          address: printerAddress,
         ),
       );
       return _isConnected;
@@ -119,7 +135,7 @@ class PrinterManager {
   Future<void> cancelJob(int id) => _repository.cancel(id);
 
   Future<void> processQueue() async {
-    _isConnected = await _transport.isConnected();
+    await refreshConnectionState();
     if (!_isConnected) {
       final connected = await autoConnect();
       if (!connected) return;
@@ -151,6 +167,9 @@ class PrinterManager {
   }
 
   String _friendlyError(Object error) {
+    if (error is PrinterServiceException) {
+      return error.message;
+    }
     final text = error.toString().toLowerCase();
     if (text.contains('bluetooth') && text.contains('permission')) {
       return 'Bluetooth permission was not granted.';

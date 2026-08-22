@@ -1,5 +1,6 @@
 import '../data/repositories/order_repository.dart';
 import '../models/payment_split.dart';
+import '../models/gst_calculation_type.dart';
 import '../models/walk_in_line_item.dart';
 import '../services/discount_service.dart';
 
@@ -16,9 +17,12 @@ class PricingManager {
     String? billDiscountType,
     int? billDiscountValue,
     int deliveryChargePaise = 0,
+    int rewardDiscountPaise = 0,
   }) {
-    var subtotal = 0;
+    var grossSubtotal = 0;
     var lineDiscountTotal = 0;
+    var taxableSubtotal = 0;
+    var gstTotal = 0;
 
     for (final line in lines) {
       final lineSubtotal = line.unitPricePaise * line.quantity;
@@ -33,54 +37,54 @@ class PricingManager {
                 )
               : line.discountPaise;
 
-      subtotal += lineSubtotal;
+      final discountedAmount = lineSubtotal - lineDiscount;
+      final breakup = calculateGstLineBreakup(
+        amountPaise: discountedAmount,
+        gstPercent: line.gstPercent,
+        calculationType: line.gstCalculationType,
+      );
+
+      grossSubtotal += lineSubtotal;
       lineDiscountTotal += lineDiscount;
+      taxableSubtotal += breakup.basicAmountPaise;
+      gstTotal += breakup.gstAmountPaise;
     }
 
     // Calculate bill discount using DiscountService
     final billDiscount = billDiscountType != null && billDiscountValue != null
         ? DiscountService.calculateBillDiscount(
-            subtotalPaise: subtotal - lineDiscountTotal,
+            subtotalPaise: grossSubtotal - lineDiscountTotal,
             discountType: billDiscountType,
             discountValue: billDiscountValue,
           )
         : 0;
 
-    final afterLineDiscount = subtotal - lineDiscountTotal;
-    final afterBillDiscount = afterLineDiscount - billDiscount;
-    final afterDelivery = afterBillDiscount + deliveryChargePaise;
-
-    // Calculate GST on post-line-discount amount (before bill discount and delivery)
-    var gstTotal = 0;
-    for (final line in lines) {
-      final lineSubtotal = line.unitPricePaise * line.quantity;
-      final lineDiscount =
-          line.discountType != null && line.discountValue != null
-              ? DiscountService.calculateLineDiscount(
-                  lineSubtotalPaise: lineSubtotal,
-                  discountType: line.discountType!,
-                  discountValue: line.discountValue!,
-                )
-              : line.discountPaise;
-      final taxable = lineSubtotal - lineDiscount;
-
-      // Proportionally allocate GST based on line's share of taxable amount
-      final proportion = taxable > 0 ? taxable / afterLineDiscount : 0.0;
-      final lineGst =
-          ((afterLineDiscount * proportion) * line.gstPercent / 100).round();
-      gstTotal += lineGst;
-    }
+    final afterLineDiscount = grossSubtotal - lineDiscountTotal;
+    final taxableAfterBillDiscount = afterLineDiscount == 0
+        ? taxableSubtotal
+        : (taxableSubtotal *
+                (afterLineDiscount - billDiscount) /
+                afterLineDiscount)
+            .round();
+    final gstAfterBillDiscount = afterLineDiscount == 0
+        ? gstTotal
+        : (gstTotal * (afterLineDiscount - billDiscount) / afterLineDiscount)
+            .round();
+    final afterDelivery =
+        taxableAfterBillDiscount + gstAfterBillDiscount + deliveryChargePaise;
 
     final totalDiscount = lineDiscountTotal + billDiscount;
-    final unrounded = afterDelivery + gstTotal;
+    final unrounded = afterDelivery;
     final paise = unrounded % 100;
     final roundOff = paise >= 50 ? (100 - paise) : -paise;
-    final grandTotal = unrounded + roundOff;
+    final rewardDiscount = rewardDiscountPaise.clamp(0, unrounded + roundOff);
+    final grandTotal = unrounded + roundOff - rewardDiscount;
 
     return OrderTotals(
-      subtotalPaise: subtotal,
-      gstTotalPaise: gstTotal,
+      subtotalPaise: taxableAfterBillDiscount,
+      gstTotalPaise: gstAfterBillDiscount,
       discountTotalPaise: totalDiscount,
+      rewardDiscountPaise: rewardDiscount,
       roundOffPaise: roundOff,
       grandTotalPaise: grandTotal,
     );

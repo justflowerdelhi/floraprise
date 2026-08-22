@@ -20,6 +20,7 @@ public interface IMobileDeviceRepository
 {
     Task<MobileDevice?> GetByDeviceIdAsync(Guid companyId, Guid mobileUserId, string deviceId);
     Task<MobileDevice?> GetByIdAsync(Guid companyId, Guid mobileDeviceId);
+    Task<int> CountActiveByUserAsync(Guid companyId, Guid mobileUserId);
     Task AddAsync(MobileDevice device);
 }
 

@@ -1734,4 +1734,94 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get resetOnboardingDialogMessage =>
       'This will show first install onboarding again. Continue?';
+
+  @override
+  String get unsavedChangesTitle => 'You have unsaved changes';
+
+  @override
+  String get discard => 'Discard';
+
+  @override
+  String get remove => 'Remove';
+
+  @override
+  String get addProductToCart => 'Add Product to cart';
+
+  @override
+  String get rate => 'Rate';
+
+  @override
+  String get billDiscount => 'Bill Discount';
+
+  @override
+  String get completeSale => 'Complete Sale';
+
+  @override
+  String get placePickupOrder => 'Place Pickup Order';
+
+  @override
+  String get placeDeliveryOrder => 'Place Delivery Order';
+
+  @override
+  String get productCatalogue => 'Product catalogue';
+
+  @override
+  String get selectFromProductCatalogue => 'Select from Product catalogue';
+
+  @override
+  String get gallery => 'Gallery';
+
+  @override
+  String get addedToCart => 'Added to cart.';
+
+  @override
+  String get noProductFound => 'No product found.';
+
+  @override
+  String get createProduct => 'Create Product';
+
+  @override
+  String get selectCustomTime => 'Select Custom Time';
+
+  @override
+  String get deliveryCharge => 'Delivery Charge';
+
+  @override
+  String get customerBuyer => 'Customer (Buyer)';
+
+  @override
+  String get searchCustomer => 'Search Customer';
+
+  @override
+  String get phone => 'Phone';
+
+  @override
+  String get purchaseHistory => 'Purchase History';
+
+  @override
+  String get senderSameAsCustomer => 'Sender is same as Customer';
+
+  @override
+  String get partial => 'Partial';
+
+  @override
+  String get paymentMode => 'Payment Mode';
+
+  @override
+  String get bank => 'Bank';
+
+  @override
+  String get other => 'Other';
+
+  @override
+  String get amountReceived => 'Amount Received';
+
+  @override
+  String get balance => 'Balance';
+
+  @override
+  String get receipt => 'Receipt';
+
+  @override
+  String get items => 'Items';
 }

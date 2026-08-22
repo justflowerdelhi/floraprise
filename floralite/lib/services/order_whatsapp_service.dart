@@ -4,6 +4,7 @@ import '../data/repositories/job_repository.dart';
 import '../managers/order_manager.dart';
 import '../models/order_status.dart';
 import '../utils/whatsapp_phone_utils.dart';
+import 'reward_summary_formatter.dart';
 import 'whatsapp_template_service.dart';
 
 /// WhatsApp service for the Order Workflow module.
@@ -143,7 +144,8 @@ class OrderWhatsappService {
         '';
     final address = header.address;
 
-    final message = fallbackMessage ??
+    final rewardSummary = await _orderManager.getOrderRewardSummary(orderId);
+    final baseMessage = fallbackMessage ??
         await buildMessage(
           template,
           orderId,
@@ -153,6 +155,7 @@ class OrderWhatsappService {
           itemsText,
           address,
         );
+    final message = '$baseMessage${buildRewardWhatsAppText(rewardSummary)}';
 
     await shareByPhone(orderId: orderId, phone: phone, message: message);
   }

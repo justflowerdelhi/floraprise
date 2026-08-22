@@ -1,11 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import '../l10n/app_localizations.dart';
 import '../services/gps_tracking_service.dart';
 import '../services/auth_service.dart';
-import '../widgets/common_widgets.dart';
 
 class DriverJourneyScreen extends StatefulWidget {
   final String deliveryId;
@@ -26,18 +24,18 @@ class DriverJourneyScreen extends StatefulWidget {
 }
 
 class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
-  final GPSTrackingService _gpsService = GPSTrackingService();
+  late final GPSTrackingService _gpsService;
   final AuthService _authService = AuthService();
-  
+
   String _status = 'Assigned';
   bool _isTracking = false;
   Position? _currentPosition;
-  String? _errorMessage;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _gpsService = GPSTrackingService(context: context);
     _checkTrackingState();
   }
 
@@ -96,11 +94,11 @@ class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
 
       if (response.statusCode == 200) {
         setState(() => _status = 'PickedUp');
-        
+
         // Start GPS tracking
         await _gpsService.startTracking(Guid(widget.deliveryId));
         setState(() => _isTracking = true);
-        
+
         _showSuccessSnackBar('Journey started - GPS tracking active');
       } else {
         _showErrorSnackBar('Failed to start journey');
@@ -168,7 +166,7 @@ class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
     setState(() => _isLoading = true);
     try {
       final token = await _authService.getAccessToken();
-      
+
       // Get current position for completion coordinates
       Position? position;
       try {
@@ -199,9 +197,9 @@ class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
           _status = 'Delivered';
           _isTracking = false;
         });
-        
+
         _showSuccessSnackBar('Delivery completed successfully');
-        
+
         if (mounted) {
           Navigator.of(context).pop();
         }
@@ -233,35 +231,36 @@ class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Driver Journey'),
+        title: const Text('Driver Journey'),
         actions: [
           if (_isTracking)
             Container(
-              margin: EdgeInsets.all(8),
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              margin: const EdgeInsets.all(8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.green,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Row(
+              child: const Row(
                 children: [
                   Icon(Icons.gps_fixed, size: 16, color: Colors.white),
                   SizedBox(width: 4),
-                  Text('Tracking', style: TextStyle(color: Colors.white, fontSize: 12)),
+                  Text('Tracking',
+                      style: TextStyle(color: Colors.white, fontSize: 12)),
                 ],
               ),
             ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Delivery Info Card
             Card(
               child: Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -269,19 +268,20 @@ class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
                       'Order #${widget.orderNumber}',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text('Customer: ${widget.customerName}'),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text('Address: ${widget.address}'),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         _buildStatusChip(_status),
-                        SizedBox(width: 16),
+                        const SizedBox(width: 16),
                         if (_currentPosition != null)
                           Text(
                             'GPS: ${_currentPosition!.latitude.toStringAsFixed(6)}, ${_currentPosition!.longitude.toStringAsFixed(6)}',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.grey),
                           ),
                       ],
                     ),
@@ -289,11 +289,11 @@ class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
                 ),
               ),
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Status Timeline
             _buildStatusTimeline(),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Action Buttons
             _buildActionButtons(localizations),
@@ -327,7 +327,7 @@ class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
 
     return Chip(
       label: Text(status),
-      backgroundColor: color.withOpacity(0.2),
+      backgroundColor: color.withValues(alpha: 0.2),
       labelStyle: TextStyle(color: color, fontWeight: FontWeight.bold),
     );
   }
@@ -351,7 +351,7 @@ class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
           'Delivery Progress',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         ...steps.asMap().entries.map((entry) {
           final index = entry.key;
           final step = entry.value;
@@ -359,7 +359,7 @@ class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
           final isCurrent = index == currentIndex;
 
           return Padding(
-            padding: EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.only(bottom: 16),
             child: Row(
               children: [
                 Container(
@@ -374,11 +374,12 @@ class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
                   ),
                   child: Center(
                     child: isCompleted
-                        ? Icon(Icons.check, color: Colors.white, size: 18)
-                        : Text('${index + 1}', style: TextStyle(color: Colors.white)),
+                        ? const Icon(Icons.check, color: Colors.white, size: 18)
+                        : Text('${index + 1}',
+                            style: const TextStyle(color: Colors.white)),
                   ),
                 ),
-                SizedBox(width: 16),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,12 +387,13 @@ class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
                       Text(
                         step,
                         style: TextStyle(
-                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                          fontWeight:
+                              isCurrent ? FontWeight.bold : FontWeight.normal,
                           color: isCompleted ? Colors.green : Colors.grey,
                         ),
                       ),
                       if (isCurrent)
-                        Text(
+                        const Text(
                           'Current Status',
                           style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
@@ -413,57 +415,57 @@ class _DriverJourneyScreenState extends State<DriverJourneyScreen> {
         if (_status == 'Assigned')
           ElevatedButton.icon(
             onPressed: _isLoading ? null : _acceptDelivery,
-            icon: Icon(Icons.check_circle),
-            label: Text('Accept Delivery'),
+            icon: const Icon(Icons.check_circle),
+            label: const Text('Accept Delivery'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
-              padding: EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),
         if (_status == 'Accepted')
           ElevatedButton.icon(
             onPressed: _isLoading ? null : _startJourney,
-            icon: Icon(Icons.directions_car),
-            label: Text('Start Journey'),
+            icon: const Icon(Icons.directions_car),
+            label: const Text('Start Journey'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
-              padding: EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),
         if (_status == 'PickedUp')
           ElevatedButton.icon(
             onPressed: _isLoading ? null : _markEnRoute,
-            icon: Icon(Icons.local_shipping),
-            label: Text('Mark En Route'),
+            icon: const Icon(Icons.local_shipping),
+            label: const Text('Mark En Route'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.purple,
-              padding: EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),
         if (_status == 'OutForDelivery')
           ElevatedButton.icon(
             onPressed: _isLoading ? null : _markArrived,
-            icon: Icon(Icons.location_on),
-            label: Text('Mark Arrived'),
+            icon: const Icon(Icons.location_on),
+            label: const Text('Mark Arrived'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.teal,
-              padding: EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),
         if (_status == 'ArrivedNearby')
           ElevatedButton.icon(
             onPressed: _isLoading ? null : _completeDelivery,
-            icon: Icon(Icons.done_all),
-            label: Text('Complete Delivery'),
+            icon: const Icon(Icons.done_all),
+            label: const Text('Complete Delivery'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
-              padding: EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),
         if (_status == 'Delivered')
           Card(
-            color: Colors.green.withOpacity(0.1),
-            child: Padding(
+            color: Colors.green.withValues(alpha: 0.1),
+            child: const Padding(
               padding: EdgeInsets.all(16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,

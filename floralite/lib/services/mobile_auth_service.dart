@@ -519,7 +519,8 @@ class MobileAuthService {
               _readString(bootstrap, 'minimumSupportedVersion') ?? '',
           'forceUpdate': bootstrap['forceUpdate'] == true,
         };
-    final featureFlags = bootstrap['featureFlags'] ?? [];
+    final featureFlags =
+        bootstrap['featureFlags'] ?? bootstrap['featureEntitlements'] ?? [];
 
     await _secureStorage.write(key: _userKey, value: jsonEncode(payload.user));
     await _secureStorage.write(key: _companyKey, value: jsonEncode(company));
@@ -571,9 +572,12 @@ class MobileAuthService {
         bootstrap.containsKey('permissions')) {
       normalized['permissions'] = bootstrap['permissions'];
     }
-    if (!normalized.containsKey('featureFlags') &&
-        bootstrap.containsKey('featureFlags')) {
-      normalized['featureFlags'] = bootstrap['featureFlags'];
+    if (!normalized.containsKey('featureFlags')) {
+      if (bootstrap.containsKey('featureFlags')) {
+        normalized['featureFlags'] = bootstrap['featureFlags'];
+      } else if (bootstrap.containsKey('featureEntitlements')) {
+        normalized['featureFlags'] = bootstrap['featureEntitlements'];
+      }
     }
     if (!normalized.containsKey('language')) {
       normalized['language'] = _readString(bootstrap, 'language') ?? 'en';

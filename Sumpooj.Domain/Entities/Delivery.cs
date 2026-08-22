@@ -51,6 +51,11 @@ public class Delivery : BaseEntity
     public string? CustomerPhone { get; private set; }
     public string? CustomerEmail { get; private set; }
 
+    // Driver portal lifecycle timestamps
+    public DateTime? StartedAtUtc { get; private set; }
+    public DateTime? CompletedAtUtc { get; private set; }
+    public DateTime? LastLocationUtc { get; private set; }
+
     public void SetTrackingToken(string? token)
     {
         TrackingToken = token;
@@ -74,6 +79,12 @@ public class Delivery : BaseEntity
     {
         CustomerPhone = phone;
         CustomerEmail = email;
+        MarkUpdated();
+    }
+
+    public void SetLastLocationUtc(DateTime recordedAtUtc)
+    {
+        LastLocationUtc = EnsureUtc(recordedAtUtc);
         MarkUpdated();
     }
 
@@ -201,6 +212,7 @@ public class Delivery : BaseEntity
             throw new InvalidOperationException("Only PickedUp deliveries can be marked OutForDelivery.");
 
         Status = DeliveryStatus.OutForDelivery;
+        StartedAtUtc ??= DateTime.UtcNow;
         MarkUpdated();
     }
 
@@ -225,6 +237,7 @@ public class Delivery : BaseEntity
             throw new InvalidOperationException("Only ArrivedNearby or OutForDelivery deliveries can be marked Delivered.");
 
         Status = DeliveryStatus.Delivered;
+        CompletedAtUtc = DateTime.UtcNow;
         MarkUpdated();
     }
 

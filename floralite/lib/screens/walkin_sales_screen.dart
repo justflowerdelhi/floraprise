@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/repositories/order_repository.dart';
 import '../l10n/app_localizations.dart';
+import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
 import 'take_away_screen.dart';
 import 'pickup_later_screen.dart';
@@ -48,9 +49,7 @@ class WalkinSalesScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.walkinSales),
-      ),
+      appBar: AppHeader(title: l10n.walkinSales),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, 20, 20, 24 + bottomInset),

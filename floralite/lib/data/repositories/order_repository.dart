@@ -1,16 +1,19 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../models/payment_split.dart';
+import '../../models/gst_calculation_type.dart';
 import '../../models/order_workspace_models.dart';
 import '../../models/walk_in_enums.dart';
 import '../../models/walk_in_line_item.dart';
 import '../../models/walk_in_session.dart';
 import '../database/app_database.dart';
+import '../../managers/reward_manager.dart';
 
 class OrderTotals {
   final int subtotalPaise;
   final int gstTotalPaise;
   final int discountTotalPaise;
+  final int rewardDiscountPaise;
   final int roundOffPaise;
   final int grandTotalPaise;
 
@@ -18,6 +21,7 @@ class OrderTotals {
     required this.subtotalPaise,
     required this.gstTotalPaise,
     required this.discountTotalPaise,
+    this.rewardDiscountPaise = 0,
     required this.roundOffPaise,
     required this.grandTotalPaise,
   });
@@ -65,6 +69,10 @@ class CustomerOrderStatistics {
   final int lifetimePurchasePaise;
   final String? lastOrderDate;
   final String? favouriteDesign;
+  final int rewardPoints;
+  final int lifetimeRewardPoints;
+  final int redeemedRewardPoints;
+  final String? lastRewardActivity;
 
   const CustomerOrderStatistics({
     required this.customerId,
@@ -74,6 +82,10 @@ class CustomerOrderStatistics {
     required this.lifetimePurchasePaise,
     required this.lastOrderDate,
     required this.favouriteDesign,
+    this.rewardPoints = 0,
+    this.lifetimeRewardPoints = 0,
+    this.redeemedRewardPoints = 0,
+    this.lastRewardActivity,
   });
 
   Map<String, dynamic> toCardMap() {
@@ -82,6 +94,10 @@ class CustomerOrderStatistics {
       'lifetimePurchasePaise': lifetimePurchasePaise,
       'lastOrderDate': lastOrderDate,
       'favouriteDesign': favouriteDesign,
+      'rewardPoints': rewardPoints,
+      'lifetimeRewardPoints': lifetimeRewardPoints,
+      'redeemedRewardPoints': redeemedRewardPoints,
+      'lastRewardActivity': lastRewardActivity,
     };
   }
 }
@@ -317,6 +333,9 @@ class OrderRepository {
           .toList(),
       billDiscountType: order['bill_discount_type'] as String?,
       billDiscountValue: order['bill_discount_value'] as int?,
+      rewardPointsRedeemed: (order['reward_points_redeemed'] as int?) ?? 0,
+      rewardDiscountAmountPaise:
+          (order['reward_discount_amount_paise'] as int?) ?? 0,
     );
   }
 
@@ -370,6 +389,8 @@ class OrderRepository {
         'discount_total_paise': totals.discountTotalPaise,
         'bill_discount_type': session.billDiscountType,
         'bill_discount_value': session.billDiscountValue,
+        'reward_points_redeemed': session.rewardPointsRedeemed,
+        'reward_discount_amount_paise': totals.rewardDiscountPaise,
         'round_off_paise': totals.roundOffPaise,
         'grand_total_paise': totals.grandTotalPaise,
         'is_paid': _paidAmountPaiseFromPayments(session.payments) >=
@@ -411,9 +432,12 @@ class OrderRepository {
 
       for (final line in session.lines) {
         final subtotal = line.unitPricePaise * line.quantity;
-        final taxable = subtotal - line.discountPaise;
-        final gst = (taxable * line.gstPercent) ~/ 100;
-        final total = taxable + gst;
+        final discountedAmount = subtotal - line.discountPaise;
+        final breakup = calculateGstLineBreakup(
+          amountPaise: discountedAmount,
+          gstPercent: line.gstPercent,
+          calculationType: line.gstCalculationType,
+        );
 
         await txn.insert('order_lines', {
           'order_id': orderId,
@@ -426,9 +450,9 @@ class OrderRepository {
           'discount_paise': line.discountPaise,
           'discount_type': line.discountType,
           'discount_value': line.discountValue,
-          'line_subtotal_paise': subtotal,
-          'line_gst_paise': gst,
-          'line_total_paise': total,
+          'line_subtotal_paise': breakup.basicAmountPaise,
+          'line_gst_paise': breakup.gstAmountPaise,
+          'line_total_paise': breakup.totalAmountPaise,
           'source': line.source,
         });
       }
@@ -450,20 +474,87 @@ class OrderRepository {
   Future<ConfirmedOrder> confirmDraft({required int orderId}) async {
     final db = await AppDatabase.instance.database;
     final now = DateTime.now().toIso8601String();
+    final rewardManager = RewardManager();
+    final rewardSettings = await rewardManager.loadSettings();
 
     return db.transaction<ConfirmedOrder>((txn) async {
       final orderNo = 'ORD-${DateTime.now().millisecondsSinceEpoch}';
+      final orderRows = await txn.query(
+        'orders',
+        columns: [
+          'customer_id',
+          'is_paid',
+          'grand_total_paise',
+          'reward_points_redeemed',
+          'reward_discount_amount_paise',
+        ],
+        where: 'id = ?',
+        whereArgs: [orderId],
+        limit: 1,
+      );
+      if (orderRows.isEmpty) {
+        throw StateError('Order $orderId not found');
+      }
+      final order = orderRows.first;
+      final customerId = order['customer_id'] as int?;
+      final isPaid = ((order['is_paid'] as int?) ?? 0) == 1;
+      final redeemedPoints = (order['reward_points_redeemed'] as int?) ?? 0;
+      final rewardDiscountPaise =
+          (order['reward_discount_amount_paise'] as int?) ?? 0;
+      final earnedPoints = customerId == null || !isPaid
+          ? 0
+          : rewardManager.calculateEarnedPoints(
+              paidBillPaise: (order['grand_total_paise'] as int?) ?? 0,
+              settings: rewardSettings,
+            );
+
       await txn.update(
         'orders',
         {
           'status': 'confirmed',
           'order_no': orderNo,
+          'reward_points_earned': earnedPoints,
           'confirmed_at': now,
           'updated_at': now,
         },
         where: 'id = ?',
         whereArgs: [orderId],
       );
+
+      if (customerId != null &&
+          isPaid &&
+          (earnedPoints > 0 || redeemedPoints > 0)) {
+        await txn.rawUpdate(
+          '''
+          UPDATE customers
+          SET reward_points = MAX(0, reward_points - ?) + ?,
+              lifetime_reward_points = lifetime_reward_points + ?,
+              redeemed_reward_points = redeemed_reward_points + ?,
+              last_reward_activity = ?,
+              updated_at = ?
+          WHERE id = ?
+          ''',
+          [
+            redeemedPoints,
+            earnedPoints,
+            earnedPoints,
+            redeemedPoints,
+            now,
+            now,
+            customerId,
+          ],
+        );
+      } else if (rewardDiscountPaise > 0 && !isPaid) {
+        await txn.update(
+          'orders',
+          {
+            'reward_points_redeemed': 0,
+            'reward_discount_amount_paise': 0,
+          },
+          where: 'id = ?',
+          whereArgs: [orderId],
+        );
+      }
 
       await txn.insert('order_timeline_events', {
         'order_id': orderId,
@@ -506,6 +597,33 @@ class OrderRepository {
       return {};
     }
     return rows.first;
+  }
+
+  Future<OrderRewardSummary?> getOrderRewardSummary(int orderId) async {
+    final db = await AppDatabase.instance.database;
+    final rows = await db.rawQuery('''
+      SELECT
+        o.reward_points_earned,
+        o.reward_points_redeemed,
+        COALESCE(c.reward_points, 0) AS closing_balance
+      FROM orders o
+      LEFT JOIN customers c ON c.id = o.customer_id
+      WHERE o.id = ?
+      LIMIT 1
+    ''', [orderId]);
+    if (rows.isEmpty) return null;
+    final row = rows.first;
+    final earned = (row['reward_points_earned'] as int?) ?? 0;
+    final redeemed = (row['reward_points_redeemed'] as int?) ?? 0;
+    final closing = (row['closing_balance'] as int?) ?? 0;
+    final opening = (closing - earned + redeemed).clamp(0, closing + redeemed);
+    return OrderRewardSummary(
+      openingBalance: opening,
+      earnedPoints: earned,
+      redeemedPoints: redeemed,
+      closingBalance: closing,
+      rewardValuePaise: closing * 100,
+    );
   }
 
   OrderListItem _toListItem(Map<String, Object?> row) {
@@ -718,6 +836,8 @@ class OrderRepository {
         'discount_total_paise': totals.discountTotalPaise,
         'bill_discount_type': session.billDiscountType,
         'bill_discount_value': session.billDiscountValue,
+        'reward_points_redeemed': session.rewardPointsRedeemed,
+        'reward_discount_amount_paise': totals.rewardDiscountPaise,
         'round_off_paise': totals.roundOffPaise,
         'grand_total_paise': totals.grandTotalPaise,
         'is_paid': _paidAmountPaiseFromPayments(session.payments) >=
@@ -741,9 +861,12 @@ class OrderRepository {
 
       for (final line in session.lines) {
         final subtotal = line.unitPricePaise * line.quantity;
-        final taxable = subtotal - line.discountPaise;
-        final gst = (taxable * line.gstPercent) ~/ 100;
-        final total = taxable + gst;
+        final discountedAmount = subtotal - line.discountPaise;
+        final breakup = calculateGstLineBreakup(
+          amountPaise: discountedAmount,
+          gstPercent: line.gstPercent,
+          calculationType: line.gstCalculationType,
+        );
 
         await txn.insert('order_lines', {
           'order_id': orderId,
@@ -756,9 +879,9 @@ class OrderRepository {
           'discount_paise': line.discountPaise,
           'discount_type': line.discountType,
           'discount_value': line.discountValue,
-          'line_subtotal_paise': subtotal,
-          'line_gst_paise': gst,
-          'line_total_paise': total,
+          'line_subtotal_paise': breakup.basicAmountPaise,
+          'line_gst_paise': breakup.gstAmountPaise,
+          'line_total_paise': breakup.totalAmountPaise,
           'source': line.source,
         });
       }
@@ -836,6 +959,10 @@ class OrderRepository {
       cardMessage: (row['card_message'] as String?) ?? '',
       isPaid: (row['is_paid'] as int?) ?? 0,
       paidAmountPaise: (row['paid_amount_paise'] as int?) ?? 0,
+      rewardPointsEarned: (row['reward_points_earned'] as int?) ?? 0,
+      rewardPointsRedeemed: (row['reward_points_redeemed'] as int?) ?? 0,
+      rewardDiscountAmountPaise:
+          (row['reward_discount_amount_paise'] as int?) ?? 0,
       deliveryPincode: (row['delivery_pincode'] as String?) ?? '',
       deliveryLandmark: (row['delivery_landmark'] as String?) ?? '',
       specialInstructions: (row['special_instructions'] as String?) ?? '',
@@ -850,7 +977,7 @@ class OrderRepository {
       SELECT
         ol.*,
         p.name AS product_name,
-        NULL AS product_image_path
+        p.image_path AS product_image_path
       FROM order_lines ol
       LEFT JOIN products p ON p.id = ol.product_id
       WHERE ol.order_id = ?
@@ -990,6 +1117,202 @@ class OrderRepository {
     });
   }
 
+  Future<void> addOrderPaymentTransaction({
+    required int orderId,
+    required String method,
+    required int amountPaise,
+    String? reference,
+    required String actor,
+    String? note,
+  }) async {
+    if (amountPaise <= 0) {
+      throw ArgumentError('amountPaise must be greater than 0');
+    }
+
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+
+    await db.transaction((txn) async {
+      await _assertOrderExists(txn, orderId);
+
+      await txn.insert('order_payments', {
+        'order_id': orderId,
+        'method': method,
+        'amount_paise': amountPaise,
+        'reference': reference,
+        'created_at': now,
+      });
+
+      final order = await _getOrderPaymentState(txn, orderId);
+      final paidAmountPaise = order['paid_amount_paise'] as int;
+      final grandTotalPaise = order['grand_total_paise'] as int;
+
+      await txn.update(
+        'orders',
+        {
+          'is_paid': paidAmountPaise >= grandTotalPaise ? 1 : 0,
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [orderId],
+      );
+
+      await txn.insert('order_timeline_events', {
+        'order_id': orderId,
+        'status': 'payment_collected',
+        'notes': note ??
+            'Payment collected (${method.toUpperCase()}) ${_formatMoneyForAudit(amountPaise)}',
+        'created_at': now,
+        'created_by': actor,
+      });
+    });
+  }
+
+  Future<void> addOrderPaymentAdjustment({
+    required int orderId,
+    required String event,
+    required String resolution,
+    required int amountPaise,
+    String? refundMethod,
+    String? remarks,
+    required String actor,
+  }) async {
+    if (amountPaise <= 0) {
+      throw ArgumentError('amountPaise must be greater than 0');
+    }
+
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+
+    await db.transaction((txn) async {
+      await _assertOrderExists(txn, orderId);
+
+      final order = await _getOrderPaymentState(txn, orderId);
+      final grandTotalPaise = order['grand_total_paise'] as int;
+      final paidAmountPaise = order['paid_amount_paise'] as int;
+
+      // Never allow refund/adjustment more than currently received.
+      if (amountPaise > paidAmountPaise) {
+        throw StateError('Adjustment amount cannot exceed received amount.');
+      }
+
+      final method = _adjustmentMethodCode(
+        resolution: resolution,
+        refundMethod: refundMethod,
+      );
+      final reference = _adjustmentReference(
+        event: event,
+        resolution: resolution,
+        refundMethod: refundMethod,
+        remarks: remarks,
+      );
+
+      await txn.insert('order_payments', {
+        'order_id': orderId,
+        'method': method,
+        'amount_paise': -amountPaise,
+        'reference': reference,
+        'created_at': now,
+      });
+
+      final netPaidAmount = paidAmountPaise - amountPaise;
+
+      await txn.update(
+        'orders',
+        {
+          'is_paid': netPaidAmount >= grandTotalPaise ? 1 : 0,
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [orderId],
+      );
+
+      await txn.insert('order_timeline_events', {
+        'order_id': orderId,
+        'status': 'payment_adjusted',
+        'notes': 'Payment adjusted ${_formatMoneyForAudit(amountPaise)} '
+            '(${_prettyCode(event)} / ${_prettyCode(resolution)}${refundMethod == null || refundMethod.trim().isEmpty ? '' : ' / ${_prettyCode(refundMethod)}'})',
+        'created_at': now,
+        'created_by': actor,
+      });
+    });
+  }
+
+  Future<void> _assertOrderExists(DatabaseExecutor txn, int orderId) async {
+    final rows = await txn.query(
+      'orders',
+      columns: ['id'],
+      where: 'id = ?',
+      whereArgs: [orderId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw StateError('Order $orderId not found');
+    }
+  }
+
+  Future<Map<String, Object?>> _getOrderPaymentState(
+    DatabaseExecutor txn,
+    int orderId,
+  ) async {
+    final rows = await txn.rawQuery(
+      '''
+      SELECT
+        o.grand_total_paise,
+        COALESCE((
+          SELECT SUM(op.amount_paise)
+          FROM order_payments op
+          WHERE op.order_id = o.id
+            AND LOWER(COALESCE(op.method, '')) != 'credit'
+        ), 0) AS paid_amount_paise
+      FROM orders o
+      WHERE o.id = ?
+      LIMIT 1
+      ''',
+      [orderId],
+    );
+    if (rows.isEmpty) {
+      throw StateError('Order $orderId not found');
+    }
+    return rows.first;
+  }
+
+  String _adjustmentMethodCode({
+    required String resolution,
+    String? refundMethod,
+  }) {
+    final normalizedResolution = resolution.trim().toLowerCase();
+    if (normalizedResolution == 'refund_customer') {
+      final normalizedRefund =
+          (refundMethod ?? '').trim().toLowerCase().replaceAll(' ', '_');
+      return 'refund_${normalizedRefund.isEmpty ? 'cash' : normalizedRefund}';
+    }
+    return 'adjust_${normalizedResolution.replaceAll(' ', '_')}';
+  }
+
+  String _adjustmentReference({
+    required String event,
+    required String resolution,
+    String? refundMethod,
+    String? remarks,
+  }) {
+    final safeEvent = event.trim();
+    final safeResolution = resolution.trim();
+    final safeRefund = (refundMethod ?? '').trim();
+    final safeRemarks = (remarks ?? '').trim();
+    return [safeEvent, safeResolution, safeRefund, safeRemarks].join(' | ');
+  }
+
+  String _formatMoneyForAudit(int paise) {
+    return 'Rs ${(paise / 100).toStringAsFixed(2)}';
+  }
+
+  String _prettyCode(String code) {
+    if (code.trim().isEmpty) return '-';
+    return code.replaceAll('_', ' ').replaceAllMapped(RegExp(r'(^|\s)([a-z])'),
+        (m) => '${m.group(1)}${m.group(2)!.toUpperCase()}');
+  }
+
   Future<void> updateRelayMetadata({
     required int orderId,
     required Map<String, Object?> relay,
@@ -1117,7 +1440,30 @@ class OrderRepository {
       customerId: customerId,
       customerPhone: customerPhone,
     );
-    return stats.toCardMap();
+    final db = await AppDatabase.instance.database;
+    final rows = await db.query(
+      'customers',
+      columns: [
+        'reward_points',
+        'lifetime_reward_points',
+        'redeemed_reward_points',
+        'last_reward_activity',
+      ],
+      where: 'id = ?',
+      whereArgs: [customerId],
+      limit: 1,
+    );
+    final map = stats.toCardMap();
+    if (rows.isNotEmpty) {
+      final row = rows.first;
+      map['rewardPoints'] = (row['reward_points'] as int?) ?? 0;
+      map['lifetimeRewardPoints'] =
+          (row['lifetime_reward_points'] as int?) ?? 0;
+      map['redeemedRewardPoints'] =
+          (row['redeemed_reward_points'] as int?) ?? 0;
+      map['lastRewardActivity'] = row['last_reward_activity'] as String?;
+    }
+    return map;
   }
 
   Future<CustomerOrderStatistics> getCustomerOrderStatistics({

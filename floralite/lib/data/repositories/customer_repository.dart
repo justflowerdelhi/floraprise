@@ -13,6 +13,10 @@ class CustomerRecord {
   final int totalOrders;
   final String? lastOrderAt;
   final int pendingPaymentPaise;
+  final int rewardPoints;
+  final int lifetimeRewardPoints;
+  final int redeemedRewardPoints;
+  final String? lastRewardActivity;
 
   const CustomerRecord({
     required this.id,
@@ -27,6 +31,10 @@ class CustomerRecord {
     this.totalOrders = 0,
     this.lastOrderAt,
     this.pendingPaymentPaise = 0,
+    this.rewardPoints = 0,
+    this.lifetimeRewardPoints = 0,
+    this.redeemedRewardPoints = 0,
+    this.lastRewardActivity,
   });
 }
 
@@ -52,6 +60,10 @@ class CustomerRepository {
       totalOrders: (row['total_orders'] as int?) ?? 0,
       lastOrderAt: row['last_order_at'] as String?,
       pendingPaymentPaise: (row['pending_payment_paise'] as int?) ?? 0,
+      rewardPoints: (row['reward_points'] as int?) ?? 0,
+      lifetimeRewardPoints: (row['lifetime_reward_points'] as int?) ?? 0,
+      redeemedRewardPoints: (row['redeemed_reward_points'] as int?) ?? 0,
+      lastRewardActivity: row['last_reward_activity'] as String?,
     );
   }
 
@@ -66,6 +78,10 @@ class CustomerRepository {
       c.department,
       c.notes,
       c.created_at,
+      c.reward_points,
+      c.lifetime_reward_points,
+      c.redeemed_reward_points,
+      c.last_reward_activity,
       COALESCE(SUM(CASE
         WHEN o.status IN ('confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered') THEN 1
         ELSE 0

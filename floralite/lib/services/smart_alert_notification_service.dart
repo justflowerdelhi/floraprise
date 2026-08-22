@@ -8,7 +8,8 @@ class SmartAlertNotificationService {
     FlutterLocalNotificationsPlugin? notifications,
   }) : _notifications = notifications ?? FlutterLocalNotificationsPlugin();
 
-  static final SmartAlertNotificationService instance = SmartAlertNotificationService._();
+  static final SmartAlertNotificationService instance =
+      SmartAlertNotificationService._();
 
   final FlutterLocalNotificationsPlugin _notifications;
   bool _initialized = false;
@@ -20,16 +21,14 @@ class SmartAlertNotificationService {
 
     final android = _notifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-    
+
     if (android == null) {
       debugPrint('SmartAlert: Android platform not available');
       return;
     }
 
-    // Request necessary permissions
+    // Request notification permission; scheduled alerts use inexact alarms.
     await android.requestNotificationsPermission();
-    await android.requestExactAlarmsPermission();
-    await android.requestFullScreenIntentPermission();
 
     // Create Floraprise Info Channel
     await android.createNotificationChannel(
@@ -74,7 +73,8 @@ class SmartAlertNotificationService {
       const AndroidNotificationChannel(
         'floraprise_critical',
         'Floraprise Critical',
-        description: 'Critical alarm-style notifications with full screen intent',
+        description:
+            'Critical alarm-style notifications with full screen intent',
         importance: Importance.max,
         playSound: true,
         enableVibration: true,
@@ -103,7 +103,7 @@ class SmartAlertNotificationService {
     AlertCustomizationSettings settings,
   ) {
     final channelId = getChannelId(level);
-    
+
     switch (level) {
       case AlertLevel.info:
         return AndroidNotificationDetails(
@@ -116,7 +116,7 @@ class SmartAlertNotificationService {
           enableVibration: false,
           autoCancel: true,
         );
-      
+
       case AlertLevel.reminder:
         return AndroidNotificationDetails(
           channelId,
@@ -127,11 +127,11 @@ class SmartAlertNotificationService {
           playSound: settings.vibrationEnabled,
           enableVibration: settings.vibrationEnabled,
           autoCancel: true,
-          sound: settings.notificationSound != 'default' 
+          sound: settings.notificationSound != 'default'
               ? RawResourceAndroidNotificationSound(settings.notificationSound)
               : null,
         );
-      
+
       case AlertLevel.important:
         return AndroidNotificationDetails(
           channelId,
@@ -146,19 +146,20 @@ class SmartAlertNotificationService {
           sound: settings.notificationSound != 'default'
               ? RawResourceAndroidNotificationSound(settings.notificationSound)
               : null,
-          vibrationPattern: settings.vibrationEnabled 
-              ? Int64List.fromList([0, 1000]) 
+          vibrationPattern: settings.vibrationEnabled
+              ? Int64List.fromList([0, 1000])
               : Int64List.fromList([0]),
           ledColor: const Color(0xFFFF5722),
           ledOnMs: 500,
           ledOffMs: 500,
         );
-      
+
       case AlertLevel.critical:
         return AndroidNotificationDetails(
           channelId,
           'Floraprise Critical',
-          channelDescription: 'Critical alarm-style notifications with full screen intent',
+          channelDescription:
+              'Critical alarm-style notifications with full screen intent',
           importance: Importance.max,
           priority: Priority.max,
           playSound: settings.vibrationEnabled,
@@ -189,7 +190,7 @@ class SmartAlertNotificationService {
           presentSound: false,
           interruptionLevel: InterruptionLevel.passive,
         );
-      
+
       case AlertLevel.reminder:
         return const DarwinNotificationDetails(
           presentAlert: true,
@@ -197,7 +198,7 @@ class SmartAlertNotificationService {
           presentSound: true,
           interruptionLevel: InterruptionLevel.active,
         );
-      
+
       case AlertLevel.important:
         return const DarwinNotificationDetails(
           presentAlert: true,
@@ -205,7 +206,7 @@ class SmartAlertNotificationService {
           presentSound: true,
           interruptionLevel: InterruptionLevel.timeSensitive,
         );
-      
+
       case AlertLevel.critical:
         return const DarwinNotificationDetails(
           presentAlert: true,

@@ -114,7 +114,7 @@ class SubscriptionPlans {
     id: 'quarterly',
     name: 'Quarterly Plan',
     durationDays: 90,
-    pricePaise: 299900,
+    pricePaise: 499900,
     productId: 'floraprise_quarterly',
     description: '90 Days',
   );
@@ -124,7 +124,7 @@ class SubscriptionPlans {
     id: 'half_yearly',
     name: 'Half Yearly Plan',
     durationDays: 180,
-    pricePaise: 549900,
+    pricePaise: 899900,
     productId: 'floraprise_half_yearly',
     description: '180 Days',
   );
@@ -134,7 +134,7 @@ class SubscriptionPlans {
     id: 'annual',
     name: 'Annual Plan',
     durationDays: 365,
-    pricePaise: 999900,
+    pricePaise: 1499900,
     productId: 'floraprise_annual',
     description: '365 Days',
     badge: '⭐ MOST POPULAR',

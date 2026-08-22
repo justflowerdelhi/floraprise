@@ -62,7 +62,17 @@ public sealed class MobileClientService : IMobileClientService
         _logger = logger;
     }
 
-    public async Task<MobileAuthTokenResponse> LoginAsync(MobileApiLoginRequest request, CancellationToken cancellationToken = default)
+    public Task<MobileAuthTokenResponse> LoginAsync(MobileApiLoginRequest request, CancellationToken cancellationToken = default)
+    {
+        return LoginInternalAsync(request, registrationRequest: null, cancellationToken);
+    }
+
+    public Task<MobileAuthTokenResponse> LoginAsync(MobileApiLoginRequest request, RegisterMobileCustomerRequest registrationRequest, CancellationToken cancellationToken = default)
+    {
+        return LoginInternalAsync(request, registrationRequest, cancellationToken);
+    }
+
+    private async Task<MobileAuthTokenResponse> LoginInternalAsync(MobileApiLoginRequest request, RegisterMobileCustomerRequest? registrationRequest, CancellationToken cancellationToken)
     {
         _logger.LogInformation("[Mobile Login] Starting login for companyId: {CompanyId}, identifier: {Identifier}, deviceId: {DeviceId}", request.CompanyId, request.Identifier, request.DeviceId);
 
@@ -110,7 +120,7 @@ public sealed class MobileClientService : IMobileClientService
 
         _logger.LogInformation("[Mobile Login] Calling RegisterOrStartTrialAsync for companyId: {CompanyId}, deviceId: {DeviceId}", request.CompanyId, request.DeviceId);
         var registration = await _mobileSubscriptionService.RegisterOrStartTrialAsync(
-            new RegisterMobileCustomerRequest(
+            registrationRequest ?? new RegisterMobileCustomerRequest(
                 CompanyId: request.CompanyId,
                 BusinessName: company.Name,
                 OwnerName: identityUser.UserName ?? company.Name,
@@ -128,6 +138,7 @@ public sealed class MobileClientService : IMobileClientService
                 AppVersion: request.AppVersion,
                 PushToken: request.PushToken,
                 IpAddress: request.IpAddress,
+                IdentityUserId: identityUser.Id,
                 ActorUserId: identityUser.Id),
             cancellationToken);
         _logger.LogInformation("[Mobile Login] RegisterOrStartTrialAsync completed. MobileUserId: {MobileUserId}, MobileDeviceId: {MobileDeviceId}", registration.MobileUserId, registration.MobileDeviceId);
@@ -249,6 +260,16 @@ public sealed class MobileClientService : IMobileClientService
             .FirstOrDefaultAsync(x => x.Id == user.MobileCustomerId && x.CompanyId == companyId, cancellationToken)
             ?? throw new KeyNotFoundException("Mobile customer not found.");
 
+        var identityUserId = await _userManager.Users
+            .Where(x => x.CompanyId == companyId)
+            .Where(x =>
+                (!string.IsNullOrWhiteSpace(user.Email) && x.Email == user.Email) ||
+                x.PhoneNumber == user.Mobile)
+            .Select(x => x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (identityUserId == Guid.Empty)
+            throw new KeyNotFoundException("Identity user not found for mobile device registration.");
+
         var registration = await _mobileSubscriptionService.RegisterOrStartTrialAsync(
             new RegisterMobileCustomerRequest(
                 companyId,
@@ -268,7 +289,8 @@ public sealed class MobileClientService : IMobileClientService
                 request.AppVersion,
                 request.PushToken,
                 request.IpAddress,
-                mobileUserId),
+                identityUserId,
+                identityUserId),
             cancellationToken);
 
         var device = await _mobileDevices.GetByIdAsync(companyId, registration.MobileDeviceId)
@@ -441,12 +463,13 @@ public sealed class MobileClientService : IMobileClientService
     public async Task<MobileSubscriptionActionResponse> RenewAsync(Guid companyId, Guid mobileUserId, MobileRenewRequest request, CancellationToken cancellationToken = default)
     {
         var subscription = await GetSubscriptionEntityAsync(companyId, mobileUserId, cancellationToken);
-        var months = BillingCycleToMonths(request.BillingCycle ?? "annual");
-        var start = subscription.EndUtc.HasValue && subscription.EndUtc > DateTime.UtcNow
-            ? subscription.EndUtc.Value
-            : DateTime.UtcNow;
-        var end = start.AddMonths(months);
-        subscription.Activate(start, end, request.AutoRenew, mobileUserId);
+
+        if (subscription.AutoRenew != request.AutoRenew && subscription.EndUtc.HasValue)
+        {
+            var start = subscription.StartUtc ?? DateTime.UtcNow;
+            subscription.Activate(start, subscription.EndUtc.Value, request.AutoRenew, mobileUserId);
+        }
+
         await _uow.SaveChangesAsync(cancellationToken);
         return new MobileSubscriptionActionResponse(Action: "renew", Subscription: ToSubscriptionState(subscription));
     }
@@ -600,8 +623,25 @@ public sealed class MobileClientService : IMobileClientService
         if (subscription.Id != request.SubscriptionId)
             throw new UnauthorizedAccessException("Subscription does not belong to the authenticated user.");
 
-        var gateway = _paymentGatewayFactory.Resolve(request.Gateway);
-        var (gatewayOrderId, clientPayload) = await gateway.CreateOrderAsync(request, cancellationToken);
+        var targetPlanCode = string.IsNullOrWhiteSpace(request.PlanCode)
+            ? subscription.SubscriptionPlan?.Code ?? string.Empty
+            : request.PlanCode.Trim().ToUpperInvariant();
+        var targetPlan = await _subscriptionPlans.GetByCodeAsync(targetPlanCode)
+            ?? throw new KeyNotFoundException($"Subscription plan '{targetPlanCode}' not found.");
+
+        if (!targetPlan.IsActive || targetPlan.IsDeleted)
+            throw new InvalidOperationException("Selected subscription plan is not active.");
+
+        var serverAmount = ResolvePlanAmount(targetPlan, request.BillingCycle);
+        var serverRequest = request with
+        {
+            Amount = serverAmount,
+            PlanCode = targetPlan.Code,
+            Currency = string.IsNullOrWhiteSpace(request.Currency) ? "INR" : request.Currency.Trim().ToUpperInvariant()
+        };
+
+        var gateway = _paymentGatewayFactory.Resolve(serverRequest.Gateway);
+        var (gatewayOrderId, clientPayload) = await gateway.CreateOrderAsync(serverRequest, cancellationToken);
 
         var txRef = $"MOB-{DateTime.UtcNow:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
         var paymentType = subscription.Status is MobileSubscriptionStatus.Active or MobileSubscriptionStatus.Grace
@@ -615,8 +655,8 @@ public sealed class MobileClientService : IMobileClientService
             mobileSubscriptionId: subscription.Id,
             paymentType: paymentType,
             transactionRef: txRef,
-            amount: request.Amount,
-            currency: request.Currency);
+            amount: serverRequest.Amount,
+            currency: serverRequest.Currency);
         tx.SetGatewayOrder(gatewayOrderId, mobileUserId);
         tx.SetCreatedBy(mobileUserId);
 
@@ -627,7 +667,7 @@ public sealed class MobileClientService : IMobileClientService
         {
             ["transactionId"] = tx.Id.ToString(),
             ["transactionRef"] = tx.TransactionRef,
-            ["gateway"] = request.Gateway.ToString().ToLowerInvariant(),
+            ["gateway"] = serverRequest.Gateway.ToString().ToLowerInvariant(),
             ["paymentStatus"] = tx.PaymentStatus.ToString(),
             ["orderId"] = gatewayOrderId,
             ["amount"] = tx.Amount.ToString("0.00"),
@@ -638,7 +678,7 @@ public sealed class MobileClientService : IMobileClientService
         return new CreateSubscriptionOrderResponse(
             TransactionId: tx.Id,
             TransactionRef: tx.TransactionRef,
-            Gateway: request.Gateway,
+            Gateway: serverRequest.Gateway,
             GatewayOrderId: gatewayOrderId,
             PaymentStatus: tx.PaymentStatus.ToString(),
             Amount: tx.Amount,
@@ -662,9 +702,12 @@ public sealed class MobileClientService : IMobileClientService
 
         var gateway = _paymentGatewayFactory.Resolve(request.Gateway);
         var normalized = await gateway.NormalizeCallbackStatusAsync(request, cancellationToken);
+        var wasAlreadyPaid = tx.PaymentStatus == MobilePaymentStatus.Paid;
+        if (wasAlreadyPaid && string.Equals(normalized, "paid", StringComparison.OrdinalIgnoreCase))
+            return new PaymentCallbackResponse(tx.TransactionRef, tx.PaymentStatus.ToString(), false, "Already Processed");
 
         ApplyPaymentStatus(tx, normalized, request.GatewayOrderId, request.GatewayPaymentId, mobileUserId);
-        if (string.Equals(normalized, "paid", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalized, "paid", StringComparison.OrdinalIgnoreCase) && !wasAlreadyPaid)
         {
             await ApplyVerifiedSubscriptionChangeAsync(
                 effectiveCompanyId,
@@ -691,13 +734,20 @@ public sealed class MobileClientService : IMobileClientService
             .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.TransactionRef == request.TransactionRef && !x.IsDeleted, cancellationToken)
             ?? throw new KeyNotFoundException("Transaction not found.");
 
+        if (tx.PaymentStatus == MobilePaymentStatus.Paid)
+            return new PaymentVerificationResponse(tx.TransactionRef, true, tx.PaymentStatus.ToString().ToLowerInvariant(), "Already Processed");
+
         var gateway = _paymentGatewayFactory.Resolve(request.Gateway);
         var verified = await gateway.VerifyPaymentAsync(request, cancellationToken);
 
         if (verified)
         {
-            tx.MarkPaid(request.GatewayOrderId, request.GatewayPaymentId, mobileUserId);
-            await ApplyVerifiedSubscriptionChangeAsync(companyId, mobileUserId, tx, request, cancellationToken);
+            var wasAlreadyPaid = tx.PaymentStatus == MobilePaymentStatus.Paid;
+            if (!wasAlreadyPaid)
+            {
+                tx.MarkPaid(request.GatewayOrderId, request.GatewayPaymentId, mobileUserId);
+                await ApplyVerifiedSubscriptionChangeAsync(companyId, mobileUserId, tx, request, cancellationToken);
+            }
         }
         else
         {
@@ -858,11 +908,27 @@ public sealed class MobileClientService : IMobileClientService
             ? Math.Max(0, (int)Math.Ceiling((expiry.Value - DateTime.UtcNow).TotalDays))
             : 0;
 
+        // Determine the correct status based on expiry date
+        var correctStatus = subscription.Status;
+        if (expiry.HasValue)
+        {
+            if (expiry.Value <= DateTime.UtcNow)
+            {
+                // Subscription has expired
+                correctStatus = MobileSubscriptionStatus.Expired;
+            }
+            else if (subscription.Status == MobileSubscriptionStatus.Expired)
+            {
+                // Status is Expired but expiry is in the future - should be Active
+                correctStatus = MobileSubscriptionStatus.Active;
+            }
+        }
+
         return new MobileSubscriptionStateResponse(
             SubscriptionId: subscription.Id,
             PlanCode: subscription.SubscriptionPlan?.Code ?? "MOBILE_TRIAL",
             PlanName: subscription.SubscriptionPlan?.Name ?? "Mobile Trial",
-            Status: subscription.Status,
+            Status: correctStatus,
             IsTrial: subscription.Status == MobileSubscriptionStatus.Trial,
             TrialEndUtc: subscription.Status == MobileSubscriptionStatus.Trial ? subscription.TrialEndUtc : null,
             EndUtc: subscription.EndUtc,
@@ -1019,7 +1085,8 @@ public sealed class MobileClientService : IMobileClientService
         switch (normalizedStatus)
         {
             case "paid":
-                tx.MarkPaid(gatewayOrderId, gatewayPaymentId ?? gatewayOrderId, actorUserId);
+                if (tx.PaymentStatus != MobilePaymentStatus.Paid)
+                    tx.MarkPaid(gatewayOrderId, gatewayPaymentId ?? gatewayOrderId, actorUserId);
                 break;
             case "failed":
                 tx.MarkFailed("Payment failed by gateway callback.", actorUserId);

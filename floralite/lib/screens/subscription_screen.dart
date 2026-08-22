@@ -475,7 +475,7 @@ class _PlanDetails extends StatelessWidget {
           Text(config.description),
           if (config.plan == SubscriptionPlan.halfYearly) ...[
             const SizedBox(height: 4),
-            const Text('Save ₹1,000 compared to renewing Quarterly twice.'),
+            const Text('Save ₹999 compared to renewing Quarterly twice.'),
           ],
           if (config.plan == SubscriptionPlan.annual) ...[
             const SizedBox(height: 4),

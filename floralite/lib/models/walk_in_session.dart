@@ -21,6 +21,8 @@ class WalkInSession {
   final List<PaymentSplit> payments;
   final String? billDiscountType;
   final int? billDiscountValue;
+  final int rewardPointsRedeemed;
+  final int rewardDiscountAmountPaise;
 
   const WalkInSession({
     this.draftOrderId,
@@ -41,6 +43,8 @@ class WalkInSession {
     this.payments = const [],
     this.billDiscountType,
     this.billDiscountValue,
+    this.rewardPointsRedeemed = 0,
+    this.rewardDiscountAmountPaise = 0,
   });
 
   WalkInSession copyWith({
@@ -63,6 +67,8 @@ class WalkInSession {
     List<PaymentSplit>? payments,
     String? billDiscountType,
     int? billDiscountValue,
+    int? rewardPointsRedeemed,
+    int? rewardDiscountAmountPaise,
   }) {
     return WalkInSession(
       draftOrderId: draftOrderId ?? this.draftOrderId,
@@ -83,6 +89,9 @@ class WalkInSession {
       payments: payments ?? this.payments,
       billDiscountType: billDiscountType ?? this.billDiscountType,
       billDiscountValue: billDiscountValue ?? this.billDiscountValue,
+      rewardPointsRedeemed: rewardPointsRedeemed ?? this.rewardPointsRedeemed,
+      rewardDiscountAmountPaise:
+          rewardDiscountAmountPaise ?? this.rewardDiscountAmountPaise,
     );
   }
 

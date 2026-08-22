@@ -3513,6 +3513,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This will show first install onboarding again. Continue?'**
   String get resetOnboardingDialogMessage;
+
+  /// No description provided for @unsavedChangesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You have unsaved changes'**
+  String get unsavedChangesTitle;
+
+  /// No description provided for @discard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get discard;
+
+  /// No description provided for @remove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get remove;
+
+  /// No description provided for @addProductToCart.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Product to cart'**
+  String get addProductToCart;
+
+  /// No description provided for @rate.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate'**
+  String get rate;
+
+  /// No description provided for @billDiscount.
+  ///
+  /// In en, this message translates to:
+  /// **'Bill Discount'**
+  String get billDiscount;
+
+  /// No description provided for @completeSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete Sale'**
+  String get completeSale;
+
+  /// No description provided for @placePickupOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Place Pickup Order'**
+  String get placePickupOrder;
+
+  /// No description provided for @placeDeliveryOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Place Delivery Order'**
+  String get placeDeliveryOrder;
+
+  /// No description provided for @productCatalogue.
+  ///
+  /// In en, this message translates to:
+  /// **'Product catalogue'**
+  String get productCatalogue;
+
+  /// No description provided for @selectFromProductCatalogue.
+  ///
+  /// In en, this message translates to:
+  /// **'Select from Product catalogue'**
+  String get selectFromProductCatalogue;
+
+  /// No description provided for @gallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery'**
+  String get gallery;
+
+  /// No description provided for @addedToCart.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to cart.'**
+  String get addedToCart;
+
+  /// No description provided for @noProductFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No product found.'**
+  String get noProductFound;
+
+  /// No description provided for @createProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Product'**
+  String get createProduct;
+
+  /// No description provided for @selectCustomTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Custom Time'**
+  String get selectCustomTime;
+
+  /// No description provided for @deliveryCharge.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery Charge'**
+  String get deliveryCharge;
+
+  /// No description provided for @customerBuyer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer (Buyer)'**
+  String get customerBuyer;
+
+  /// No description provided for @searchCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Customer'**
+  String get searchCustomer;
+
+  /// No description provided for @phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get phone;
+
+  /// No description provided for @purchaseHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase History'**
+  String get purchaseHistory;
+
+  /// No description provided for @senderSameAsCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Sender is same as Customer'**
+  String get senderSameAsCustomer;
+
+  /// No description provided for @partial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial'**
+  String get partial;
+
+  /// No description provided for @paymentMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Mode'**
+  String get paymentMode;
+
+  /// No description provided for @bank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank'**
+  String get bank;
+
+  /// No description provided for @other.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get other;
+
+  /// No description provided for @amountReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount Received'**
+  String get amountReceived;
+
+  /// No description provided for @balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get balance;
+
+  /// No description provided for @receipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt'**
+  String get receipt;
+
+  /// No description provided for @items.
+  ///
+  /// In en, this message translates to:
+  /// **'Items'**
+  String get items;
 }
 
 class _AppLocalizationsDelegate

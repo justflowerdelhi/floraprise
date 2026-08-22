@@ -99,10 +99,17 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
         var device = await _devices.GetByDeviceIdAsync(request.CompanyId, user.Id, request.DeviceId);
         if (device == null)
         {
+            var subscriptionForLimit = await _subscriptions.GetByUserIdAsync(request.CompanyId, user.Id);
+            var planForLimit = subscriptionForLimit?.SubscriptionPlan ?? await EnsureTrialPlanAsync(request.ActorUserId);
+            var activeDeviceCount = await _devices.CountActiveByUserAsync(request.CompanyId, user.Id);
+            if (activeDeviceCount >= planForLimit.MaximumDevices)
+                throw new InvalidOperationException($"Maximum device limit reached for plan '{planForLimit.Code}'.");
+
             _logger.LogInformation("[MobileSubscription] Creating new MobileDevice for userId: {UserId}, deviceId: {DeviceId}", user.Id, request.DeviceId);
             device = new MobileDevice(
                 companyId: request.CompanyId,
                 mobileUserId: user.Id,
+                identityUserId: request.IdentityUserId,
                 deviceId: request.DeviceId,
                 manufacturer: request.Manufacturer,
                 model: request.Model,
@@ -150,7 +157,20 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
         }
         else
         {
-            _logger.LogInformation("[MobileSubscription] MobileSubscription already exists: {SubscriptionId}", subscription.Id);
+            _logger.LogInformation("[MobileSubscription] MobileSubscription already exists: {SubscriptionId}, Status: {Status}", subscription.Id, subscription.Status);
+            
+            // Ensure subscription status is correct based on expiry
+            var expiry = subscription.Status == MobileSubscriptionStatus.Trial ? subscription.TrialEndUtc : subscription.EndUtc;
+            if (expiry.HasValue && expiry.Value <= now)
+            {
+                _logger.LogInformation("[MobileSubscription] Subscription expired, moving to Expired status");
+                subscription.Expire(request.ActorUserId);
+            }
+            else if (subscription.Status == MobileSubscriptionStatus.Expired && expiry.HasValue && expiry.Value > now)
+            {
+                _logger.LogInformation("[MobileSubscription] Subscription was renewed, reactivating to Active status");
+                subscription.Activate(subscription.StartUtc ?? now, expiry.Value, subscription.AutoRenew, request.ActorUserId);
+            }
         }
 
         _logger.LogInformation("[MobileSubscription] Getting/creating MobileLicense for deviceId: {DeviceId}", device.Id);
@@ -292,7 +312,7 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
             name: "Quarterly Plan",
             planType: MobilePlanType.Pro,
             monthlyPrice: 0,
-            annualPrice: _configuration.GetValue<decimal?>("MobileSubscription:Plans:Quarterly:Price") ?? 2999m,
+            annualPrice: _configuration.GetValue<decimal?>("MobileSubscription:Plans:Quarterly:Price") ?? 4999m,
             lifetimePrice: 0,
             trialDays: trialDays,
             offlineDays: offlineDays,
@@ -308,7 +328,7 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
             name: "Half Yearly Plan",
             planType: MobilePlanType.Pro,
             monthlyPrice: 0,
-            annualPrice: _configuration.GetValue<decimal?>("MobileSubscription:Plans:HalfYearly:Price") ?? 5499m,
+            annualPrice: _configuration.GetValue<decimal?>("MobileSubscription:Plans:HalfYearly:Price") ?? 8999m,
             lifetimePrice: 0,
             trialDays: trialDays,
             offlineDays: offlineDays,
@@ -324,7 +344,7 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
             name: "Annual Plan",
             planType: MobilePlanType.Pro,
             monthlyPrice: 0,
-            annualPrice: _configuration.GetValue<decimal?>("MobileSubscription:Plans:Annual:Price") ?? 9999m,
+            annualPrice: _configuration.GetValue<decimal?>("MobileSubscription:Plans:Annual:Price") ?? 14999m,
             lifetimePrice: 0,
             trialDays: trialDays,
             offlineDays: offlineDays,
@@ -425,11 +445,17 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
         var expiryUtc = ResolveSubscriptionExpiry(subscription);
         var remainingDays = ComputeRemainingDays(expiryUtc);
 
+        // Ensure subscription status is correct based on expiry date
         if (expiryUtc.HasValue && expiryUtc.Value <= now)
         {
             subscription.Expire(actorUserId);
             license.Expire(actorUserId);
             remainingDays = 0;
+        }
+        else if (subscription.Status == MobileSubscriptionStatus.Expired && expiryUtc.HasValue && expiryUtc.Value > now)
+        {
+            // Status is Expired but expiry is in the future - reactivate
+            subscription.Activate(subscription.StartUtc ?? now, expiryUtc.Value, subscription.AutoRenew, actorUserId);
         }
 
         subscription.MarkValidated(now, actorUserId);
@@ -452,10 +478,11 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
         var graceDays = subscription.SubscriptionPlan?.GraceDays ?? 0;
         var offlineDays = subscription.SubscriptionPlan?.OfflineDays ?? 0;
 
+        // Determine allowsAccess based on actual expiry date, not just status
         var allowsAccess = license.Status == MobileLicenseStatus.Active &&
                            subscription.Status != MobileSubscriptionStatus.Cancelled &&
                            subscription.Status != MobileSubscriptionStatus.Suspended &&
-                           subscription.Status != MobileSubscriptionStatus.Expired;
+                           (subscription.Status != MobileSubscriptionStatus.Expired || (expiryUtc.HasValue && expiryUtc.Value > DateTime.UtcNow));
 
         return new MobileLicenseCheckResult(
             license.Status,

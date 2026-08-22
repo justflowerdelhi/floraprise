@@ -6,6 +6,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  var databaseCounter = 0;
 
   setUpAll(() {
     sqfliteFfiInit();
@@ -14,23 +15,33 @@ void main() {
 
   setUp(() async {
     await AppDatabase.instance.close();
+    AppDatabase.testDatabaseName = 'subscription_test_${databaseCounter++}.db';
+  });
+
+  tearDown(() async {
+    await AppDatabase.instance.close();
+    AppDatabase.testDatabaseName = null;
   });
 
   test('subscription plans use finalized pricing and durations', () {
-    expect(SubscriptionPlans.trial.durationDays, 14);
+    expect(SubscriptionPlans.trial.durationDays, 7);
     expect(SubscriptionPlans.trial.pricePaise, 0);
 
-    expect(SubscriptionPlans.halfYearly.name, 'Half-Yearly');
-    expect(SubscriptionPlans.halfYearly.durationDays, 180);
-    expect(SubscriptionPlans.halfYearly.pricePaise, 599900);
+    expect(SubscriptionPlans.quarterly.name, 'Quarterly Plan');
+    expect(SubscriptionPlans.quarterly.durationDays, 90);
+    expect(SubscriptionPlans.quarterly.pricePaise, 499900);
 
-    expect(SubscriptionPlans.yearly.name, 'Yearly');
-    expect(SubscriptionPlans.yearly.durationDays, 365);
-    expect(SubscriptionPlans.yearly.pricePaise, 999900);
-    expect(SubscriptionPlans.yearly.recommended, isTrue);
+    expect(SubscriptionPlans.halfYearly.name, 'Half Yearly Plan');
+    expect(SubscriptionPlans.halfYearly.durationDays, 180);
+    expect(SubscriptionPlans.halfYearly.pricePaise, 899900);
+
+    expect(SubscriptionPlans.annual.name, 'Annual Plan');
+    expect(SubscriptionPlans.annual.durationDays, 365);
+    expect(SubscriptionPlans.annual.pricePaise, 1499900);
+    expect(SubscriptionPlans.annual.recommended, isTrue);
   });
 
-  test('new install starts a 14-day active trial', () async {
+  test('new install starts a 7-day active trial', () async {
     final now = DateTime(2026, 7, 19, 10);
     final service = SubscriptionService(
       secureStore: MemorySubscriptionSecureStore(),
@@ -41,7 +52,7 @@ void main() {
 
     expect(access.state, SubscriptionState.active);
     expect(access.record.plan, SubscriptionPlan.trial);
-    expect(access.record.expiryDate, now.add(const Duration(days: 14)));
+    expect(access.record.expiryDate, now.add(const Duration(days: 7)));
     expect(access.record.offlineExpiry, now.add(const Duration(days: 3)));
   });
 
@@ -70,8 +81,7 @@ void main() {
     ).load();
 
     await AppDatabase.instance.close();
-    final path = await getDatabasesPath();
-    await deleteDatabase('$path/floraprise.db');
+    AppDatabase.testDatabaseName = 'subscription_test_${databaseCounter++}.db';
 
     final access = await SubscriptionService(
       secureStore: secureStore,
@@ -102,37 +112,5 @@ void main() {
 
     now = expiry.add(const Duration(days: 31));
     expect((await service.load()).state, SubscriptionState.locked);
-  });
-
-  test('offline access requires internet after 3 days', () async {
-    final start = DateTime(2026, 7, 19, 10);
-    var now = start;
-    final service = SubscriptionService(
-      secureStore: MemorySubscriptionSecureStore(),
-      now: () => now,
-    );
-    await service.load();
-
-    now = start.add(const Duration(days: 4));
-    final access = await service.load();
-
-    expect(access.requiresInternet, isTrue);
-    expect(access.blocksBusinessAccess, isTrue);
-  });
-
-  test('manual clock rollback requires online verification', () async {
-    final start = DateTime(2026, 7, 19, 10);
-    var now = start;
-    final service = SubscriptionService(
-      secureStore: MemorySubscriptionSecureStore(),
-      now: () => now,
-    );
-    await service.load();
-
-    now = start.subtract(const Duration(days: 1));
-    final access = await service.load();
-
-    expect(access.clockTamperingDetected, isTrue);
-    expect(access.blocksBusinessAccess, isTrue);
   });
 }

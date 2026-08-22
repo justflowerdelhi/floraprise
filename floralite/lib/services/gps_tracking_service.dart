@@ -2,16 +2,25 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:convert';
 import 'auth_service.dart';
+import 'first_use_permission_service.dart';
 
 class Guid {
+  Guid(this.value);
+
+  final String value;
+
   static String? tryParse(String? input) {
     final value = input?.trim() ?? '';
     return value.isEmpty ? null : value;
   }
+
+  @override
+  String toString() => value;
 }
 
 class LocationUpdate {
@@ -36,35 +45,39 @@ class LocationUpdate {
   });
 
   Map<String, dynamic> toJson() => {
-    'latitude': latitude,
-    'longitude': longitude,
-    'accuracy': accuracy,
-    'speed': speed,
-    'heading': heading,
-    'altitude': altitude,
-    'batteryLevel': batteryLevel,
-    'recordedAt': recordedAt.toIso8601String(),
-  };
+        'latitude': latitude,
+        'longitude': longitude,
+        'accuracy': accuracy,
+        'speed': speed,
+        'heading': heading,
+        'altitude': altitude,
+        'batteryLevel': batteryLevel,
+        'recordedAt': recordedAt.toIso8601String(),
+      };
 }
 
 class GPSTrackingService {
+  GPSTrackingService({BuildContext? context}) : _context = context;
+
+  final BuildContext? _context;
   static const String _trackingActiveKey = 'gps_tracking_active';
   static const String _currentDeliveryIdKey = 'current_delivery_id';
   static const int _uploadIntervalSeconds = 15;
-  static const double _minDistanceMeters = 25.0;
+  static const int _minDistanceMeters = 25;
 
   StreamSubscription<Position>? _positionSubscription;
   Timer? _uploadTimer;
   final List<LocationUpdate> _offlineQueue = [];
   final AuthService _authService = AuthService();
-  
+
   bool _isTracking = false;
   Guid? _currentDeliveryId;
-  DateTime? _lastUploadTime;
   Position? _lastPosition;
 
-  final _locationUpdateController = StreamController<LocationUpdate>.broadcast();
-  Stream<LocationUpdate> get locationUpdates => _locationUpdateController.stream;
+  final _locationUpdateController =
+      StreamController<LocationUpdate>.broadcast();
+  Stream<LocationUpdate> get locationUpdates =>
+      _locationUpdateController.stream;
 
   bool get isTracking => _isTracking;
   Guid? get currentDeliveryId => _currentDeliveryId;
@@ -73,6 +86,18 @@ class GPSTrackingService {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       return false;
+    }
+
+    if (_context != null && _context!.mounted) {
+      final proceed = await FirstUsePermissionService.ensureExplainedOnce(
+        context: _context!,
+        flowKey: 'location.live_delivery',
+        title: 'Allow location access?',
+        body: 'Required only while tracking live deliveries.',
+      );
+      if (!proceed) {
+        return false;
+      }
     }
 
     LocationPermission permission = await Geolocator.checkPermission();
@@ -84,6 +109,31 @@ class GPSTrackingService {
     }
 
     if (permission == LocationPermission.deniedForever) {
+      if (_context != null && _context!.mounted) {
+        await FirstUsePermissionService.showPermanentlyDeniedMessage(
+          _context!,
+          'Location permission is disabled. You can enable it anytime from Settings > Apps > Floraprise > Permissions to use Live Delivery tracking.',
+        );
+      }
+      return false;
+    }
+
+    // Needed for continuous tracking when app is backgrounded.
+    var backgroundStatus = await Permission.locationAlways.status;
+    if (!backgroundStatus.isGranted) {
+      backgroundStatus = await Permission.locationAlways.request();
+    }
+
+    if (!backgroundStatus.isGranted) {
+      if ((backgroundStatus.isPermanentlyDenied ||
+              backgroundStatus.isRestricted) &&
+          _context != null &&
+          _context!.mounted) {
+        await FirstUsePermissionService.showPermanentlyDeniedMessage(
+          _context!,
+          'Location permission is disabled. You can enable it anytime from Settings > Apps > Floraprise > Permissions to use Live Delivery tracking.',
+        );
+      }
       return false;
     }
 
@@ -159,7 +209,7 @@ class GPSTrackingService {
         position.latitude,
         position.longitude,
       );
-      
+
       if (distance >= _minDistanceMeters) {
         _uploadLocation();
       }
@@ -170,8 +220,6 @@ class GPSTrackingService {
     if (_lastPosition == null || _currentDeliveryId == null) return;
 
     final now = DateTime.now();
-    _lastUploadTime = now;
-
     final update = LocationUpdate(
       latitude: _lastPosition!.latitude,
       longitude: _lastPosition!.longitude,
@@ -184,12 +232,14 @@ class GPSTrackingService {
 
     // Check connectivity
     final connectivityResult = await Connectivity().checkConnectivity();
-    final hasInternet = connectivityResult != ConnectivityResult.none;
+    final hasInternet = connectivityResult.any(
+      (result) => result != ConnectivityResult.none,
+    );
 
     if (hasInternet) {
       // Upload immediately
       await _uploadToServer(update);
-      
+
       // Upload queued locations
       if (_offlineQueue.isNotEmpty) {
         await _uploadQueuedLocations();
@@ -198,7 +248,8 @@ class GPSTrackingService {
       // Queue for offline upload
       _offlineQueue.add(update);
       await _saveOfflineQueue();
-      debugPrint('Location queued (offline): ${update.latitude}, ${update.longitude}');
+      debugPrint(
+          'Location queued (offline): ${update.latitude}, ${update.longitude}');
     }
   }
 
@@ -246,7 +297,7 @@ class GPSTrackingService {
       final token = await _authService.getAccessToken();
       if (token == null) return;
 
-      final batch = _offlineQueue.map((update) => {
+      final batch = _offlineQueue.map((update) {
         return {
           'deliveryId': _currentDeliveryId.toString(),
           'latitude': update.latitude,
@@ -260,7 +311,8 @@ class GPSTrackingService {
       }).toList();
 
       final response = await http.post(
-        Uri.parse('${_authService.baseUrl}/api/delivery/tracking/location/batch'),
+        Uri.parse(
+            '${_authService.baseUrl}/api/delivery/tracking/location/batch'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -291,15 +343,15 @@ class GPSTrackingService {
       final List<dynamic> decoded = jsonDecode(queueJson);
       _offlineQueue.clear();
       _offlineQueue.addAll(decoded.map((j) => LocationUpdate(
-        latitude: j['latitude'],
-        longitude: j['longitude'],
-        accuracy: j['accuracy'],
-        speed: j['speed'],
-        heading: j['heading'],
-        altitude: j['altitude'],
-        batteryLevel: j['batteryLevel'],
-        recordedAt: DateTime.parse(j['recordedAt']),
-      )));
+            latitude: j['latitude'],
+            longitude: j['longitude'],
+            accuracy: j['accuracy'],
+            speed: j['speed'],
+            heading: j['heading'],
+            altitude: j['altitude'],
+            batteryLevel: j['batteryLevel'],
+            recordedAt: DateTime.parse(j['recordedAt']),
+          )));
     }
   }
 
@@ -331,7 +383,12 @@ class GPSTrackingService {
     final deliveryIdStr = prefs.getString(_currentDeliveryIdKey);
 
     if (wasTracking && deliveryIdStr != null) {
-      final deliveryId = Guid(deliveryIdStr);
+      final parsed = Guid.tryParse(deliveryIdStr);
+      if (parsed == null) {
+        return;
+      }
+
+      final deliveryId = Guid(parsed);
       await _loadOfflineQueue();
       await startTracking(deliveryId);
       debugPrint('GPS tracking restored for delivery: $deliveryId');

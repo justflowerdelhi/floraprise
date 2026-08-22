@@ -156,7 +156,7 @@ class _PlanCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 if (plan.plan == SubscriptionPlan.halfYearly)
                   Text(
-                    'Save ₹1,000 compared to renewing Quarterly twice.',
+                    'Save ₹999 compared to renewing Quarterly twice.',
                     style: TextStyle(
                       color: Colors.green.shade700,
                       fontSize: 12,

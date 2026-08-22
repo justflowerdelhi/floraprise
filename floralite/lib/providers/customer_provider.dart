@@ -117,6 +117,10 @@ class CustomerProvider extends ChangeNotifier {
               'pendingPaymentPaise': record.pendingPaymentPaise,
               'pendingPayment': _formatPaise(record.pendingPaymentPaise),
               'totalOrders': record.totalOrders,
+              'rewardPoints': record.rewardPoints,
+              'lifetimeRewardPoints': record.lifetimeRewardPoints,
+              'redeemedRewardPoints': record.redeemedRewardPoints,
+              'lastRewardActivity': _formatLastOrder(record.lastRewardActivity),
             },
           )
           .toList();

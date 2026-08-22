@@ -25,16 +25,14 @@ class SmartAlarmScreen extends StatefulWidget {
 class _SmartAlarmScreenState extends State<SmartAlarmScreen>
     with TickerProviderStateMixin {
   late AnimationController _pulseController;
-  late AnimationController _countdownController;
   late Animation<double> _pulseAnimation;
-  late Animation<double> _countdownAnimation;
   Timer? _countdownTimer;
   int _remainingSeconds = 0;
 
   @override
   void initState() {
     super.initState();
-    
+
     // Keep screen on
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -49,12 +47,6 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
     )..repeat(reverse: true);
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-
-    // Countdown animation
-    _countdownController = AnimationController(
-      duration: const Duration(seconds: 1),
-      vsync: this,
     );
 
     // Start countdown
@@ -84,7 +76,6 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
   @override
   void dispose() {
     _pulseController.dispose();
-    _countdownController.dispose();
     _countdownTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
@@ -93,7 +84,6 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isDelivery = widget.task.type == TaskType.delivery;
 
     return Scaffold(
@@ -103,11 +93,11 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
           children: [
             // Status bar spacer
             const SizedBox(height: 24),
-            
+
             // Queue indicator
             if (widget.queue != null && widget.queue!.count > 1)
               _buildQueueIndicator(),
-            
+
             // Main content
             Expanded(
               child: Center(
@@ -118,36 +108,36 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
                     children: [
                       // Priority badge
                       _buildPriorityBadge(),
-                      
+
                       const SizedBox(height: 32),
-                      
+
                       // Countdown animation
                       _buildCountdownAnimation(),
-                      
+
                       const SizedBox(height: 32),
-                      
+
                       // Task title
                       _buildTaskTitle(),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Order number
                       if (widget.task.linkedOrderId != null)
                         _buildOrderNumber(),
-                      
+
                       const SizedBox(height: 8),
-                      
+
                       // Customer info
                       if (widget.task.linkedCustomerId != null)
                         _buildCustomerInfo(),
-                      
+
                       const SizedBox(height: 8),
-                      
+
                       // Task type badge
                       _buildTaskTypeBadge(),
-                      
+
                       const SizedBox(height: 48),
-                      
+
                       // Action buttons
                       _buildActionButtons(isDelivery),
                     ],
@@ -155,7 +145,7 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
                 ),
               ),
             ),
-            
+
             // Bottom dismiss button
             _buildDismissButton(),
           ],
@@ -182,7 +172,7 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -203,7 +193,8 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
               onPressed: _showNextInQueue,
               child: const Text(
                 'Next',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),
         ],
@@ -224,7 +215,7 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
               borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withValues(alpha: 0.3),
                   blurRadius: 12,
                   spreadRadius: 4,
                 ),
@@ -282,7 +273,7 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
             height: 200,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
             ),
           ),
           // Progress circle
@@ -328,7 +319,7 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
     final hours = seconds ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
     final secs = seconds % 60;
-    
+
     if (hours > 0) {
       return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
     }
@@ -353,7 +344,7 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -378,7 +369,7 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -402,7 +393,7 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white54, width: 1),
       ),
@@ -636,11 +627,11 @@ class _CountdownPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 8;
-    final strokeWidth = 8.0;
+    const strokeWidth = 8.0;
 
     // Background circle
     final backgroundPaint = Paint()
-      ..color = color.withOpacity(0.3)
+      ..color = color.withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth;
     canvas.drawCircle(center, radius, backgroundPaint);
@@ -652,10 +643,10 @@ class _CountdownPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
         ..strokeCap = StrokeCap.round;
-      
-      final startAngle = -math.pi / 2;
+
+      const startAngle = -math.pi / 2;
       final sweepAngle = 2 * math.pi * progress;
-      
+
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
         startAngle,

@@ -19,7 +19,9 @@ import '../widgets/quantity_input_stepper.dart';
 import '../widgets/voice_dictation_field_header.dart';
 
 class PurchaseListScreen extends StatefulWidget {
-  const PurchaseListScreen({super.key});
+  const PurchaseListScreen({super.key, this.initialProductId});
+
+  final int? initialProductId;
 
   @override
   State<PurchaseListScreen> createState() => _PurchaseListScreenState();
@@ -34,6 +36,7 @@ class _PurchaseListScreenState extends State<PurchaseListScreen> {
   int _shownVoiceMessageVersion = 0;
   int _handledVoiceAddedVersion = 0;
   int? _highlightedItemId;
+  bool _initialAddDialogShown = false;
   Timer? _highlightTimer;
 
   @override
@@ -43,8 +46,15 @@ class _PurchaseListScreenState extends State<PurchaseListScreen> {
       if (context.mounted) {
         context.read<PurchaseProvider>().loadItems();
         _initializeVoiceEntry();
+        _showInitialAddDialog();
       }
     });
+  }
+
+  void _showInitialAddDialog() {
+    if (_initialAddDialogShown || widget.initialProductId == null) return;
+    _initialAddDialogShown = true;
+    _showAddItemDialog(context, initialProductId: widget.initialProductId);
   }
 
   Future<void> _initializeVoiceEntry() async {
@@ -62,7 +72,7 @@ class _PurchaseListScreenState extends State<PurchaseListScreen> {
       }
 
       final controller = VoicePurchaseController(
-        speechRecognition: SpeechRecognitionService(),
+        speechRecognition: SpeechRecognitionService(context: context),
         voiceEntry: VoicePurchaseEntryService(
           parser: VoicePurchaseParser(),
           matcher: ProductMatcher(
@@ -641,10 +651,10 @@ class _PurchaseListScreenState extends State<PurchaseListScreen> {
     );
   }
 
-  void _showAddItemDialog(BuildContext context) {
+  void _showAddItemDialog(BuildContext context, {int? initialProductId}) {
     showDialog(
       context: context,
-      builder: (context) => _AddItemDialog(),
+      builder: (context) => _AddItemDialog(initialProductId: initialProductId),
     );
   }
 
@@ -865,6 +875,10 @@ class _VoicePurchaseAddedBanner extends StatelessWidget {
 }
 
 class _AddItemDialog extends StatefulWidget {
+  const _AddItemDialog({this.initialProductId});
+
+  final int? initialProductId;
+
   @override
   State<_AddItemDialog> createState() => _AddItemDialogState();
 }
@@ -901,8 +915,23 @@ class _AddItemDialogState extends State<_AddItemDialog> {
   Future<void> _loadProducts() async {
     final provider = context.read<PurchaseProvider>();
     final products = await provider.getInventoryTrackedProducts();
+    final initialProductId = widget.initialProductId;
+    Map<String, dynamic>? selectedProduct;
+    if (initialProductId != null) {
+      for (final product in products) {
+        if (product['id'] == initialProductId) {
+          selectedProduct = product;
+          break;
+        }
+      }
+    }
+    if (!mounted) return;
     setState(() {
       _products = products;
+      if (selectedProduct != null) {
+        _selectedProductId = initialProductId;
+        _unit = (selectedProduct['default_unit'] as String?) ?? 'Piece';
+      }
       _isLoading = false;
     });
   }

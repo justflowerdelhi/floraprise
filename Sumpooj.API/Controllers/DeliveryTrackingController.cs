@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sumpooj.Application.DeliveryTracking;
+using Sumpooj.Application.DeliveryTracking.DTOs;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Domain.Entities;
 
@@ -11,27 +12,30 @@ namespace Sumpooj.API.Controllers;
 [Authorize(Policy = "CompanyOnly")]
 public class DeliveryTrackingController : ControllerBase
 {
-    private readonly IDeliveryLocationService _locationService;
+    private readonly DriverJourneyService _journeyService;
     private readonly IDeliveryTimelineService _timelineService;
     private readonly IDeliveryProofService _proofService;
     private readonly IDeliveryTrackingService _trackingService;
     private readonly ISignalRBroadcastService _signalRBroadcastService;
     private readonly ITenantContext _tenantContext;
+    private readonly IDriverLocationRepository _driverLocationRepository;
 
     public DeliveryTrackingController(
-        IDeliveryLocationService locationService,
+        DriverJourneyService journeyService,
         IDeliveryTimelineService timelineService,
         IDeliveryProofService proofService,
         IDeliveryTrackingService trackingService,
         ISignalRBroadcastService signalRBroadcastService,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IDriverLocationRepository driverLocationRepository)
     {
-        _locationService = locationService;
+        _journeyService = journeyService;
         _timelineService = timelineService;
         _proofService = proofService;
         _trackingService = trackingService;
         _signalRBroadcastService = signalRBroadcastService;
         _tenantContext = tenantContext;
+        _driverLocationRepository = driverLocationRepository;
     }
 
     private Guid CompanyId => _tenantContext.CompanyId
@@ -45,13 +49,17 @@ public class DeliveryTrackingController : ControllerBase
     {
         try
         {
-            var location = await _locationService.RecordLocationAsync(
-                request.DeliveryId,
-                request.Latitude,
-                request.Longitude,
-                request.SpeedKph,
-                request.RouteId,
-                request.DriverId);
+            if (!request.DriverId.HasValue)
+                return BadRequest(new { error = "DriverId is required" });
+
+            await _journeyService.UploadLocationAsync(request.DriverId.Value, new UploadLocationRequest
+            {
+                DeliveryId = request.DeliveryId,
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
+                Speed = request.SpeedKph / 3.6d,
+                RecordedAt = DateTime.UtcNow
+            });
 
             // Broadcast real-time update
             await _signalRBroadcastService.BroadcastLocationUpdateAsync(
@@ -60,7 +68,7 @@ public class DeliveryTrackingController : ControllerBase
                 request.Longitude,
                 request.SpeedKph);
 
-            return Ok(new { locationId = location.Id, timestamp = location.RecordedAt, deliveryId = request.DeliveryId });
+            return Ok(new { success = true, timestamp = DateTime.UtcNow, deliveryId = request.DeliveryId });
         }
         catch (Exception ex)
         {
@@ -214,7 +222,7 @@ public class DeliveryTrackingController : ControllerBase
     {
         try
         {
-            var location = await _locationService.GetLatestDriverLocationAsync(driverId);
+            var location = await _journeyService.GetLatestDriverLocationAsync(driverId);
             return Ok(new
             {
                 driverId,
@@ -222,7 +230,7 @@ public class DeliveryTrackingController : ControllerBase
                 {
                     latitude = location.Latitude,
                     longitude = location.Longitude,
-                    speedKph = location.SpeedKph,
+                    speedKph = (location.Speed ?? 0d) * 3.6d,
                     timestamp = location.RecordedAt
                 } : null,
                 timestamp = DateTime.UtcNow
@@ -242,7 +250,9 @@ public class DeliveryTrackingController : ControllerBase
     {
         try
         {
-            var locations = await _locationService.GetDeliveryRouteAsync(deliveryId);
+            var locations = (await _driverLocationRepository.GetLocationsByDeliveryAsync(deliveryId, 500))
+                .OrderBy(l => l.RecordedAt)
+                .ToList();
             var timeline = await _timelineService.GetDeliveryTimelineAsync(deliveryId);
             var proof = await _proofService.GetDeliveryProofAsync(deliveryId);
 
@@ -253,7 +263,7 @@ public class DeliveryTrackingController : ControllerBase
                 {
                     latitude = l.Latitude,
                     longitude = l.Longitude,
-                    speedKph = l.SpeedKph,
+                    speedKph = (l.Speed ?? 0d) * 3.6d,
                     timestamp = l.RecordedAt
                 }),
                 timeline = timeline.Select(t => new

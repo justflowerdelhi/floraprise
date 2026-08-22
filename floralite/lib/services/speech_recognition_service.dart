@@ -1,15 +1,20 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import 'first_use_permission_service.dart';
+
 class SpeechRecognitionService {
-  SpeechRecognitionService({SpeechToText? speech})
-      : _speech = speech ?? SpeechToText();
+  SpeechRecognitionService({SpeechToText? speech, BuildContext? context})
+      : _speech = speech ?? SpeechToText(),
+        _context = context;
 
   final SpeechToText _speech;
+  final BuildContext? _context;
   bool _initialized = false;
   bool _shouldListen = false;
   bool _starting = false;
@@ -246,19 +251,23 @@ class SpeechRecognitionService {
   }
 
   Future<bool> _ensureRuntimePermission() async {
-    final microphone = await Permission.microphone.status;
-    if (microphone.isGranted) {
-      return true;
-    }
+    final granted = await FirstUsePermissionService.ensurePermission(
+      context: _context,
+      flowKey: 'microphone.voice_entry',
+      permission: Permission.microphone,
+      title: 'Floraprise uses your microphone',
+      body:
+          'Floraprise uses your microphone to understand your voice commands.\n\nYour recordings are processed only for voice input.',
+      permanentlyDeniedMessage:
+          'Microphone permission is disabled. You can enable it anytime from Settings > Apps > Floraprise > Permissions to use Voice Entry.',
+    );
 
-    final requested = await Permission.microphone.request();
-    if (requested.isGranted) {
-      return true;
-    }
+    if (granted) return true;
 
-    if (requested.isPermanentlyDenied || requested.isRestricted) {
+    final status = await Permission.microphone.status;
+    if (status.isPermanentlyDenied || status.isRestricted) {
       _startFailureMessage =
-          'Microphone permission is blocked. Enable it in app settings.';
+          'Microphone permission is disabled. Enable it in app settings to use Voice Entry.';
       return false;
     }
 

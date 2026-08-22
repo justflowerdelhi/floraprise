@@ -35,9 +35,11 @@ import 'screens/reports/expense_report_screen.dart';
 import 'screens/reports/day_closing_report_screen.dart';
 import 'screens/reports/wastage_report_screen.dart';
 import 'screens/reports/production_report_screen.dart';
+import 'screens/reports/rewards_report_screen.dart';
 import 'screens/products_screen.dart';
 import 'screens/scheduler_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/rewards_settings_screen.dart';
 import 'screens/shop_details_screen.dart';
 import 'screens/share_branding_settings_screen.dart';
 import 'screens/about_screen.dart';
@@ -215,6 +217,7 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
     final mobileAuthService = MobileAuthService();
     final schedulerManager = SchedulerManager(schedulerRepository);
     final languageManager = LanguageManager();
+    final printerManager = PrinterManager();
 
     final orderManager = OrderManager(orderRepository, jobRepository);
 
@@ -230,6 +233,7 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
       printService: OrderPrintService(
         orderManager: orderManager,
         jobRepository: jobRepository,
+        printerManager: printerManager,
       ),
     );
     final customerManager = CustomerManager(customerRepository);
@@ -333,7 +337,10 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
           create: (_) => ProductProvider(ProductRepository())..loadProducts(),
         ),
         ChangeNotifierProvider(
-          create: (_) => PrinterProvider(PrinterManager())..load(),
+          create: (_) => PrinterProvider(
+            printerManager,
+            contextProvider: () => _navigatorKey.currentState?.overlay?.context,
+          )..load(),
         ),
         ChangeNotifierProvider(
           create: (context) => PurchaseProvider(
@@ -484,6 +491,8 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
                   const _SubscriptionGate(child: ShopDetailsScreen()),
               '/share-branding': (context) =>
                   const _SubscriptionGate(child: ShareBrandingSettingsScreen()),
+              '/rewards-settings': (context) =>
+                  const _SubscriptionGate(child: RewardsSettingsScreen()),
               '/about': (context) => const AboutScreen(),
               '/my-designs': (context) =>
                   const _SubscriptionGate(child: MyDesignsScreen()),
@@ -549,6 +558,8 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
                   const _SubscriptionGate(child: OrderStatusReportScreen()),
               '/reports/top-customers': (context) =>
                   const _SubscriptionGate(child: TopCustomersReportScreen()),
+              '/reports/rewards': (context) =>
+                  const _SubscriptionGate(child: RewardsReportScreen()),
               '/reports/top-products': (context) =>
                   const _SubscriptionGate(child: TopProductsReportScreen()),
               '/reports/low-stock': (context) =>

@@ -1,9 +1,6 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
-import '../managers/business_settings_manager.dart';
 import '../data/repositories/ready_bouquet_repository.dart';
 import '../data/repositories/scheduler_repository.dart';
 import '../models/dashboard_summary.dart';
@@ -14,7 +11,7 @@ import '../providers/license_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../services/app_route_observer.dart';
 import '../services/delivery_tracking_service.dart';
-import '../widgets/botanical_signature.dart';
+import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
 
 const double _kSectionSpacing = 24;
@@ -36,14 +33,9 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen>
     with WidgetsBindingObserver, RouteAware {
-  final BusinessSettingsManager _businessSettingsManager =
-      BusinessSettingsManager();
   final DeliveryTrackingService _deliveryTrackingService =
       DeliveryTrackingService();
   final SchedulerRepository _schedulerRepository = SchedulerRepository();
-  String _shopName = 'My Flower Shop';
-  String _shopAddress = '';
-  String _logoPath = '';
   bool _subscribedToRouteObserver = false;
 
   @override
@@ -54,7 +46,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (mounted) {
         context.read<DashboardProvider>().loadSummary(showLoading: true);
         context.read<LicenseProvider>().heartbeat();
-        _loadBusinessIdentity();
       }
     });
   }
@@ -100,53 +91,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     Navigator.of(context).pushNamedAndRemoveUntil(routeName, (route) => false);
   }
 
-  Future<void> _loadBusinessIdentity() async {
-    final settings = await _businessSettingsManager.load();
-    final logoPath = await _businessSettingsManager.getLogoPath();
-    if (!mounted) return;
-    setState(() {
-      _shopName = settings.shopName;
-      _shopAddress = settings.address;
-      _logoPath = logoPath;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
-    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
+      appBar: const AppHeader(),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + bottomInset),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _DashboardHeader(
-                shopName: _shopName,
-                shopAddress: _shopAddress,
-                logoPath: _logoPath,
-                onProfileSelected: (value) {
-                  if (value == l10n.shopDetails) {
-                    Navigator.pushNamed(context, '/shop-details');
-                    return;
-                  }
-                  if (value == l10n.backup) {
-                    Navigator.pushNamed(context, '/backup-restore');
-                    return;
-                  }
-                  if (value == l10n.settingsTitle) {
-                    Navigator.pushNamed(context, '/settings');
-                    return;
-                  }
-                  if (value == l10n.about) {
-                    Navigator.pushNamed(context, '/about');
-                    return;
-                  }
-                },
-              ),
-              const SizedBox(height: _kSectionSpacing),
               _buildSubscriptionBanner(context),
               _buildBusinessSnapshot(context),
               _buildReadyBouquetAttention(context),
@@ -711,193 +667,6 @@ class _DashboardScreenState extends State<DashboardScreen>
           ],
         );
       },
-    );
-  }
-}
-
-class _DashboardHeader extends StatelessWidget {
-  final String shopName;
-  final String shopAddress;
-  final String logoPath;
-  final ValueChanged<String> onProfileSelected;
-
-  const _DashboardHeader({
-    required this.shopName,
-    required this.shopAddress,
-    required this.logoPath,
-    required this.onProfileSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final displayName = shopName.trim().isEmpty ? 'My Flower Shop' : shopName;
-    final displayAddress = shopAddress.trim();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Row(
-                children: [
-                  Image.asset(
-                    'assets/icon.png',
-                    width: 32,
-                    height: 32,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Floraprise',
-                          style: textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          l10n.onboardingPoweringModernFlorists,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            PopupMenuButton<String>(
-              onSelected: onProfileSelected,
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                    value: l10n.shopDetails, child: Text(l10n.shopDetails)),
-                PopupMenuItem(value: l10n.backup, child: Text(l10n.backup)),
-                PopupMenuItem(
-                    value: l10n.settingsTitle, child: Text(l10n.settingsTitle)),
-                PopupMenuItem(value: l10n.about, child: Text(l10n.about)),
-              ],
-              child: CircleAvatar(
-                radius: 22,
-                backgroundColor: colorScheme.primaryContainer,
-                child: Icon(
-                  Icons.person_rounded,
-                  color: colorScheme.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Consumer<DashboardProvider>(
-          builder: (context, provider, child) {
-            return AppCard(
-              padding: const EdgeInsets.all(12),
-              child: Stack(
-                children: [
-                  const Positioned(
-                    right: -26,
-                    top: -48,
-                    child: BotanicalSignature(width: 150, height: 112),
-                  ),
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: _BusinessLogo(path: logoPath, size: 40),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              displayName,
-                              style: textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            if (displayAddress.isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                displayAddress,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _BusinessLogo extends StatelessWidget {
-  final String path;
-  final double size;
-
-  const _BusinessLogo({required this.path, required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    final trimmed = path.trim();
-    if (trimmed.isNotEmpty) {
-      final file = File(trimmed);
-      if (file.existsSync()) {
-        return Image.file(
-          file,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _fallbackLogo(context),
-        );
-      }
-    }
-
-    return _fallbackLogo(context);
-  }
-
-  Widget _fallbackLogo(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(size <= 32 ? 8 : 10),
-      ),
-      child: Icon(
-        Icons.store_rounded,
-        color: colorScheme.primary,
-        size: size * 0.56,
-      ),
     );
   }
 }

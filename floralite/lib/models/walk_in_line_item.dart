@@ -1,3 +1,5 @@
+import 'gst_calculation_type.dart';
+
 class WalkInLineItem {
   final int? productId;
   final String? designRef;
@@ -5,6 +7,7 @@ class WalkInLineItem {
   final int quantity;
   final int unitPricePaise;
   final int gstPercent;
+  final GstCalculationType gstCalculationType;
   final int discountPaise;
   final String? discountType;
   final int? discountValue;
@@ -17,6 +20,7 @@ class WalkInLineItem {
     required this.quantity,
     required this.unitPricePaise,
     this.gstPercent = 12,
+    this.gstCalculationType = GstCalculationType.inclusive,
     this.discountPaise = 0,
     this.discountType,
     this.discountValue,
@@ -37,6 +41,7 @@ class WalkInLineItem {
       quantity: quantity ?? this.quantity,
       unitPricePaise: unitPricePaise ?? this.unitPricePaise,
       gstPercent: gstPercent,
+      gstCalculationType: gstCalculationType,
       discountPaise: discountPaise ?? this.discountPaise,
       discountType: discountType ?? this.discountType,
       discountValue: discountValue ?? this.discountValue,

@@ -5,6 +5,7 @@
     "dev": "ts-node-dev --respawn --transpile-only server/index.ts",
     "web": "vite",
     "build": "vite build",
+    "build:mobile-admin": "vite build --config vite.config.mobile-admin.ts",
     "preview": "vite preview"
   },
   "dependencies": {

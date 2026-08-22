@@ -74,6 +74,50 @@ public enum TrialActionType
     Revoked = 5
 }
 
+public sealed class WhatsAppAccount : BaseEntity
+{
+    private WhatsAppAccount() { }
+
+    public WhatsAppAccount(int memberId, string businessName, string phoneNumber, string phoneNumberId, string wabaId, string accessToken, string verifyToken)
+    {
+        MemberId = memberId;
+        BusinessName = businessName.Trim();
+        PhoneNumber = phoneNumber.Trim();
+        PhoneNumberId = phoneNumberId.Trim();
+        WabaId = wabaId.Trim();
+        AccessToken = accessToken.Trim();
+        VerifyToken = verifyToken.Trim();
+    }
+
+    public int MemberId { get; private set; }
+    public string BusinessName { get; private set; } = string.Empty;
+    public string PhoneNumber { get; private set; } = string.Empty;
+    public string PhoneNumberId { get; private set; } = string.Empty;
+    public string WabaId { get; private set; } = string.Empty;
+    public string AccessToken { get; private set; } = string.Empty;
+    public string VerifyToken { get; private set; } = string.Empty;
+    public bool IsActive { get; private set; } = true;
+
+    public void UpdateTokens(string accessToken, string verifyToken)
+    {
+        AccessToken = accessToken.Trim();
+        VerifyToken = verifyToken.Trim();
+        MarkUpdated();
+    }
+
+    public void Activate()
+    {
+        IsActive = true;
+        MarkUpdated();
+    }
+
+    public void Deactivate()
+    {
+        IsActive = false;
+        MarkUpdated();
+    }
+}
+
 public abstract class MobileAuditableEntity : BaseEntity
 {
     public bool IsDeleted { get; protected set; }
@@ -194,6 +238,7 @@ public sealed class MobileDevice : MobileAuditableEntity
     public MobileDevice(
         Guid companyId,
         Guid mobileUserId,
+        Guid identityUserId,
         string deviceId,
         string? manufacturer,
         string? model,
@@ -208,6 +253,9 @@ public sealed class MobileDevice : MobileAuditableEntity
         Manufacturer = string.IsNullOrWhiteSpace(manufacturer) ? null : manufacturer.Trim();
         Model = string.IsNullOrWhiteSpace(model) ? null : model.Trim();
         Platform = platform.Trim();
+        LegacyUserId = identityUserId;
+        DeviceFingerprintHash = DeviceId;
+        DeviceName = Model ?? Manufacturer ?? Platform;
         OsVersion = string.IsNullOrWhiteSpace(osVersion) ? null : osVersion.Trim();
         AppVersion = appVersion.Trim();
         PushToken = string.IsNullOrWhiteSpace(pushToken) ? null : pushToken.Trim();
@@ -218,7 +266,10 @@ public sealed class MobileDevice : MobileAuditableEntity
 
     public Guid CompanyId { get; private set; }
     public Guid MobileUserId { get; private set; }
+    public Guid LegacyUserId { get; private set; }
     public string DeviceId { get; private set; } = string.Empty;
+    public string DeviceFingerprintHash { get; private set; } = string.Empty;
+    public string DeviceName { get; private set; } = string.Empty;
     public string? Manufacturer { get; private set; }
     public string? Model { get; private set; }
     public string Platform { get; private set; } = string.Empty;

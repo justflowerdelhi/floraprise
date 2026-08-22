@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../controllers/voice_dictation_controller.dart';
@@ -17,6 +21,7 @@ import '../models/walk_in_session.dart';
 import '../providers/order_provider.dart';
 import '../providers/order_workflow_provider.dart';
 import '../services/delivery_tracking_service.dart';
+import '../services/product_image_service.dart';
 import '../services/speech_recognition_service.dart';
 import 'delivery_screen.dart';
 import 'live_delivery_tracking_screen.dart';
@@ -41,6 +46,14 @@ class OrderDetailScreen extends StatefulWidget {
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final DeliveryTrackingService _deliveryTrackingService =
       DeliveryTrackingService();
+  final ProductImageService _productImageService = const ProductImageService();
+  Timer? _deliveryConnectivityTimer;
+  DeliveryTrackingSnapshot? _deliveryTrackingSnapshot;
+  Object? _deliveryTrackingError;
+  DateTime? _deliveryTrackingLastSyncAt;
+  int? _deliveryConnectivityOrderId;
+  bool _deliveryConnectivityLoading = false;
+  bool _generatingStartDeliveryLink = false;
 
   @override
   void initState() {
@@ -51,6 +64,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       workflowProvider.loadWorkflow(widget.orderId);
       workflowProvider.loadAssignableAssociates();
     });
+  }
+
+  @override
+  void dispose() {
+    _deliveryConnectivityTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -83,6 +102,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             if (header == null) {
               return Center(child: Text(l10n.orderNotFound));
             }
+
+            _ensureDeliveryConnectivityPolling(header);
 
             return SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(16, 16, 16, 24 + bottomInset),
@@ -242,19 +263,39 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         children: [
           // Order Number row
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                header.orderNo,
-                style: TextStyle(
-                  color: colorScheme.primary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+              Expanded(
+                child: Text(
+                  header.orderNo,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colorScheme.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
-              const Spacer(),
-              StatusChip(
-                label: _pretty(header.status),
-                color: _getStatusColor(header.status),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  runAlignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    if (_shouldShowDeliveryConnectivity(header))
+                      _buildDeliveryConnectivityIndicator(
+                        header,
+                        colorScheme,
+                      ),
+                    StatusChip(
+                      label: _pretty(header.status),
+                      color: _getStatusColor(header.status),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -398,6 +439,382 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  void _ensureDeliveryConnectivityPolling(OrderDetailHeader header) {
+    if (!_shouldShowDeliveryConnectivity(header)) {
+      _deliveryConnectivityTimer?.cancel();
+      _deliveryConnectivityTimer = null;
+      _deliveryConnectivityOrderId = null;
+      return;
+    }
+
+    if (_deliveryConnectivityOrderId == header.id) return;
+    _deliveryConnectivityOrderId = header.id;
+    _deliveryConnectivityTimer?.cancel();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _deliveryConnectivityOrderId != header.id) return;
+      _refreshDeliveryConnectivity(header.id);
+      _deliveryConnectivityTimer = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => _refreshDeliveryConnectivity(header.id),
+      );
+    });
+  }
+
+  bool _shouldShowDeliveryConnectivity(OrderDetailHeader header) {
+    final fulfilment = header.fulfilmentType.toLowerCase();
+    return fulfilment.contains('delivery') ||
+        ((header.deliveryName ?? '').trim().isNotEmpty) ||
+        _isDeliveryInMotion(header.status);
+  }
+
+  Future<void> _refreshDeliveryConnectivity(int orderId) async {
+    if (_deliveryConnectivityLoading) return;
+    if (mounted) {
+      setState(() => _deliveryConnectivityLoading = true);
+    }
+
+    try {
+      final snapshot =
+          await _deliveryTrackingService.getTrackingForLocalOrder(orderId);
+      if (!mounted || _deliveryConnectivityOrderId != orderId) return;
+      setState(() {
+        _deliveryTrackingSnapshot = snapshot;
+        _deliveryTrackingError = null;
+        _deliveryTrackingLastSyncAt = DateTime.now();
+        _deliveryConnectivityLoading = false;
+      });
+    } catch (error) {
+      if (!mounted || _deliveryConnectivityOrderId != orderId) return;
+      setState(() {
+        _deliveryTrackingError = error;
+        _deliveryConnectivityLoading = false;
+      });
+    }
+  }
+
+  Widget _buildDeliveryConnectivityIndicator(
+    OrderDetailHeader header,
+    ColorScheme colorScheme,
+  ) {
+    final state = _deliveryConnectivityState(header);
+    final updatedLabel = _deliveryUpdatedAgoLabel();
+    return Tooltip(
+      message: state.tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => _showDeliveryConnectivitySheet(header),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+          decoration: BoxDecoration(
+            color: state.color.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: state.color.withValues(alpha: 0.35)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: state.color,
+                      shape: BoxShape.circle,
+                      border: state.kind == _DeliveryConnectivityKind.notStarted
+                          ? Border.all(color: Colors.grey.shade500)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    state.label,
+                    style: TextStyle(
+                      color: state.textColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              if (updatedLabel != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  updatedLabel,
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  _DeliveryConnectivityState _deliveryConnectivityState(
+    OrderDetailHeader header,
+  ) {
+    final snapshot = _deliveryTrackingSnapshot;
+    final lastLocation = snapshot?.lastLocation;
+    final now = DateTime.now();
+    final status = (snapshot?.status ?? header.status).toLowerCase();
+    final accepted = _isDeliveryInMotion(status);
+
+    if (!accepted && lastLocation == null) {
+      return _DeliveryConnectivityState.notStarted();
+    }
+
+    if (_deliveryTrackingError != null && _deliveryTrackingLastSyncAt == null) {
+      return _DeliveryConnectivityState.noInternet();
+    }
+
+    if (lastLocation == null) {
+      return _DeliveryConnectivityState.driverOffline();
+    }
+
+    final age = now.difference(lastLocation.recordedAt.toLocal());
+    if (_deliveryTrackingError != null) {
+      return _DeliveryConnectivityState.serverUnreachable();
+    }
+    if (age > const Duration(minutes: 5)) {
+      return _DeliveryConnectivityState.driverOffline();
+    }
+    if (age <= const Duration(seconds: 60)) {
+      return _DeliveryConnectivityState.live();
+    }
+    return _DeliveryConnectivityState.delayed();
+  }
+
+  String? _deliveryUpdatedAgoLabel() {
+    final lastGps = _deliveryTrackingSnapshot?.lastLocation?.recordedAt;
+    final updatedAt = lastGps ?? _deliveryTrackingLastSyncAt;
+    if (updatedAt == null) return null;
+    return 'Updated ${_relativeTime(updatedAt)} ago';
+  }
+
+  String _relativeTime(DateTime value) {
+    final elapsed = DateTime.now().difference(value.toLocal());
+    if (elapsed.inSeconds < 5) return 'now';
+    if (elapsed.inSeconds < 60) return '${elapsed.inSeconds} sec';
+    if (elapsed.inMinutes < 60) return '${elapsed.inMinutes} min';
+    if (elapsed.inHours < 24) return '${elapsed.inHours} hr';
+    return '${elapsed.inDays} d';
+  }
+
+  String _clockTime(DateTime value) {
+    final local = value.toLocal();
+    final hour = local.hour == 0
+        ? 12
+        : local.hour > 12
+            ? local.hour - 12
+            : local.hour;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final suffix = local.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $suffix';
+  }
+
+  Color _batteryColor(int battery) {
+    if (battery <= 20) return Colors.red;
+    if (battery <= 40) return Colors.amber.shade700;
+    return Colors.green;
+  }
+
+  String _batteryLabel(int? battery) {
+    if (battery == null) return 'Not available';
+    return '$battery%';
+  }
+
+  bool _isDeliveryInMotion(String status) {
+    final normalized = status.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+    return normalized.contains('accepted') ||
+        normalized.contains('pickedup') ||
+        normalized.contains('outfordelivery') ||
+        normalized.contains('intransit') ||
+        normalized.contains('started') ||
+        normalized.contains('delivered');
+  }
+
+  void _showDeliveryConnectivitySheet(OrderDetailHeader header) {
+    final state = _deliveryConnectivityState(header);
+    final snapshot = _deliveryTrackingSnapshot;
+    final location = snapshot?.lastLocation;
+    final driverOnline = state.kind == _DeliveryConnectivityKind.live ||
+        state.kind == _DeliveryConnectivityKind.delayed;
+    final battery = location?.batteryPercentage;
+    final driverName = snapshot?.driver?.name.trim();
+
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Delivery Tracking',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    _statusDot(state),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        state.label,
+                        style: TextStyle(
+                          color: state.textColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    if (state.kind == _DeliveryConnectivityKind.live)
+                      FilledButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _openLiveTracking(header.id);
+                        },
+                        icon: const Icon(Icons.location_searching_rounded),
+                        label: const Text('Track Driver'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _connectivityDetailRow(
+                  'Driver Online',
+                  driverOnline ? 'Yes' : 'No',
+                ),
+                _connectivityDetailRow(
+                  'Driver',
+                  driverName == null || driverName.isEmpty ? '-' : driverName,
+                ),
+                _connectivityDetailRow(
+                  'Last Seen',
+                  location == null
+                      ? 'Not available'
+                      : _clockTime(location.recordedAt),
+                ),
+                _connectivityDetailRow(
+                  'GPS Accuracy',
+                  location?.accuracyMeters == null
+                      ? 'Not available'
+                      : '${location!.accuracyMeters!.toStringAsFixed(0)} m',
+                ),
+                _connectivityDetailRow(
+                  'Battery',
+                  _batteryLabel(battery),
+                  valueColor: battery == null ? null : _batteryColor(battery),
+                ),
+                _connectivityDetailRow(
+                  'Last Updated',
+                  location == null
+                      ? 'Not available'
+                      : '${_relativeTime(location.recordedAt)} ago',
+                ),
+                _connectivityDetailRow(
+                  'Last Known Location',
+                  location == null
+                      ? 'Not available'
+                      : '${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}',
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            _refreshDeliveryConnectivity(header.id),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Refresh Now'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _openLiveTracking(header.id);
+                        },
+                        icon: const Icon(Icons.map_outlined),
+                        label: const Text('Track Driver'),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_deliveryTrackingError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Tracking is unavailable right now. Last known location is preserved when available.',
+                    style: TextStyle(color: Colors.grey.shade700),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _statusDot(_DeliveryConnectivityState state) {
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(
+        color: state.color,
+        shape: BoxShape.circle,
+        border: state.kind == _DeliveryConnectivityKind.notStarted
+            ? Border.all(color: Colors.grey.shade500)
+            : null,
+      ),
+    );
+  }
+
+  Widget _connectivityDetailRow(
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 132,
+            child: Text(
+              label,
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: valueColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildWorkflowQuickActions(
     OrderDetailHeader header,
     OrderDetailBundle? detail,
@@ -410,29 +827,57 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 header.status == 'out_for_delivery' ||
                 header.status == 'delivered';
         final actions = [
+          if (header.isPaid == 1)
+            _OrderQuickAction(
+              'Collect Payment',
+              Icons.payments_outlined,
+              disabled ? null : () => _collectPayment(header),
+            ),
+          if (header.paidAmountPaise > 0)
+            _OrderQuickAction(
+              'Adjust Payment',
+              Icons.tune_rounded,
+              disabled ? null : () => _startPaymentAdjustment(header),
+            ),
           _OrderQuickAction(
             'Assign Designer',
             Icons.design_services,
             disabled ? null : () => _assignDesigner(header, detail),
           ),
+          if (!deliveryAssigned)
+            _OrderQuickAction(
+              'Assign Delivery',
+              Icons.delivery_dining,
+              disabled ? null : () => _assignDelivery(header, detail),
+            ),
           _OrderQuickAction(
-            'Assign Delivery',
-            Icons.delivery_dining,
-            disabled ? null : () => _assignDelivery(header, detail),
+            _generatingStartDeliveryLink
+                ? 'Generating Link...'
+                : 'Generate Start Delivery Link',
+            Icons.local_shipping_outlined,
+            disabled || _generatingStartDeliveryLink
+                ? null
+                : () => _generateStartDeliveryLink(header),
+            isLoading: _generatingStartDeliveryLink,
           ),
           _OrderQuickAction(
-            'Track Delivery',
+            'Call Driver',
+            Icons.call_rounded,
+            disabled || !deliveryAssigned ? null : () => _callDriver(header.id),
+          ),
+          _OrderQuickAction(
+            'Navigate',
+            Icons.near_me_rounded,
+            disabled || header.address.trim().isEmpty
+                ? null
+                : () => _navigateToCustomerAddress(header.address),
+          ),
+          _OrderQuickAction(
+            'Track Driver',
             Icons.location_searching_rounded,
             disabled || !deliveryAssigned
                 ? null
                 : () => _openLiveTracking(header.id),
-          ),
-          _OrderQuickAction(
-            'Copy Tracking Link',
-            Icons.link_rounded,
-            disabled || !deliveryAssigned
-                ? null
-                : () => _copyTrackingLink(header.id),
           ),
           _OrderQuickAction(
             'Share Tracking Link',
@@ -442,21 +887,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 : () => _shareTrackingLinkViaWhatsApp(header.id),
           ),
           _OrderQuickAction(
-            'Preview Customer View',
-            Icons.public_rounded,
-            disabled || !deliveryAssigned
-                ? null
-                : () => _openPublicTrackingView(header.id),
-          ),
-          _OrderQuickAction(
             'Forward Associate',
             Icons.forward_to_inbox,
             disabled ? null : () => _forwardAssociate(header, detail),
-          ),
-          _OrderQuickAction(
-            'Update Status',
-            Icons.sync_alt,
-            disabled ? null : () => _showStatusPicker(header),
           ),
           _OrderQuickAction(
             'Print',
@@ -487,7 +920,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
-                  childAspectRatio: 3.2,
+                  mainAxisExtent: 56,
                 ),
                 itemBuilder: (context, index) {
                   final action = actions[index];
@@ -507,7 +940,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                       child: Row(
                         children: [
-                          Icon(action.icon, color: color, size: 20),
+                          if (action.isLoading)
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: color,
+                              ),
+                            )
+                          else
+                            Icon(action.icon, color: color, size: 20),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -540,6 +983,111 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  Future<void> _generateStartDeliveryLink(OrderDetailHeader header) async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _generatingStartDeliveryLink = true);
+    String? driverLink;
+    Object? failure;
+    try {
+      final deliveryId = await _deliveryTrackingService
+          .resolveOrCreateCloudDeliveryId(header.id);
+      if (deliveryId == null || deliveryId.trim().isEmpty) {
+        throw const DeliveryTrackingException(
+          'Unable to create or find delivery record.',
+        );
+      }
+
+      final links = await _deliveryTrackingService.generateTrackingLinks(
+        deliveryId.trim(),
+      );
+      driverLink = links.driverLink.trim();
+      if (driverLink.isEmpty) {
+        throw const DeliveryTrackingException(
+          'The Start Delivery link was not returned. Please try again.',
+        );
+      }
+    } catch (error) {
+      failure = error;
+    } finally {
+      if (mounted) {
+        setState(() => _generatingStartDeliveryLink = false);
+      }
+    }
+
+    if (!mounted) return;
+    if (failure != null) {
+      messenger.showSnackBar(SnackBar(content: Text(failure.toString())));
+      return;
+    }
+
+    await _showStartDeliveryLinkDialog(driverLink!);
+  }
+
+  Future<void> _showStartDeliveryLinkDialog(String driverLink) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final linkUri = Uri.parse(driverLink);
+    final shareMessage = 'START DELIVERY LINK\n\n$driverLink';
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('START DELIVERY LINK'),
+        content: SelectableText(driverLink),
+        actions: [
+          TextButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: driverLink));
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Start Delivery link copied.')),
+              );
+            },
+            icon: const Icon(Icons.copy_rounded),
+            label: const Text('Copy Link'),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              final opened = await _launchExternalUri(linkUri);
+              if (!opened) {
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Unable to open the Start Delivery link.'),
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.open_in_new_rounded),
+            label: const Text('Open Link'),
+          ),
+          TextButton.icon(
+            onPressed: () => Share.share(
+              shareMessage,
+              subject: 'Floraprise Start Delivery link',
+            ),
+            icon: const Icon(Icons.share_rounded),
+            label: const Text('Share'),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              final uri = Uri.https('wa.me', '/', {'text': shareMessage});
+              final opened = await _launchExternalUri(uri);
+              if (!opened) {
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Unable to open WhatsApp.')),
+                );
+              }
+            },
+            icon: const Icon(Icons.chat_rounded),
+            label: const Text('Send via WhatsApp'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _openLiveTracking(int orderId) async {
     if (!mounted) return;
     await Navigator.of(context).push(
@@ -549,36 +1097,57 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Future<void> _copyTrackingLink(int orderId) async {
+  Future<void> _callDriver(int orderId) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final snapshot =
-          await _deliveryTrackingService.getTrackingByOrderId(orderId);
-      final link = snapshot.trackingLink.trim();
-      if (link.isEmpty) {
+      final snapshot = _deliveryTrackingSnapshot ??
+          await _deliveryTrackingService.getTrackingForLocalOrder(orderId);
+      final phone = snapshot.driver?.phone.trim() ?? '';
+      if (phone.isEmpty || phone == '-') {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Tracking link is not available yet.')),
+          const SnackBar(content: Text('Driver phone is not available yet.')),
         );
         return;
       }
-      await Clipboard.setData(ClipboardData(text: link));
+      final uri = Uri(scheme: 'tel', path: phone);
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
       if (!mounted) return;
       messenger.showSnackBar(
-        const SnackBar(content: Text('Tracking link copied.')),
+        const SnackBar(content: Text('Unable to open phone dialer.')),
       );
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('Unable to copy tracking link: $e')),
+        SnackBar(content: Text('Unable to call driver: $error')),
       );
     }
+  }
+
+  Future<void> _navigateToCustomerAddress(String address) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final normalized = address.trim();
+    if (normalized.isEmpty || normalized == '-') {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Delivery address is not available.')),
+      );
+      return;
+    }
+
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(normalized)}',
+    );
+    if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    if (!mounted) return;
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Unable to open navigation.')),
+    );
   }
 
   Future<void> _shareTrackingLinkViaWhatsApp(int orderId) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final snapshot =
-          await _deliveryTrackingService.getTrackingByOrderId(orderId);
+          await _deliveryTrackingService.getTrackingForLocalOrder(orderId);
       final link = snapshot.trackingLink.trim();
       if (link.isEmpty) {
         messenger.showSnackBar(
@@ -611,36 +1180,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(content: Text('Unable to share tracking link: $e')),
-      );
-    }
-  }
-
-  Future<void> _openPublicTrackingView(int orderId) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final snapshot =
-          await _deliveryTrackingService.getTrackingByOrderId(orderId);
-      final link = snapshot.trackingLink.trim();
-      if (link.isEmpty) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Tracking link is not available yet.')),
-        );
-        return;
-      }
-      if (!mounted) return;
-      await Navigator.pushNamed(
-        context,
-        '/public-delivery-tracking',
-        arguments: {
-          'trackingLink': link,
-          'orderId': orderId,
-          'assignmentId': snapshot.assignmentId,
-        },
-      );
-    } catch (e) {
-      if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text('Unable to open customer tracking view: $e')),
       );
     }
   }
@@ -739,7 +1278,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     await orderProvider.loadOrderDetailProgressive(header.id);
 
     final sendWhatsApp = await _showAssignmentChoiceDialog(
-      'Designer Assigned Successfully',
+      title: 'Designer Assigned Successfully',
+      header: header,
+      detail: detail,
     );
     if (sendWhatsApp != true || !mounted) return;
 
@@ -808,17 +1349,50 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       orderId: header.id,
       deliveryPartnerId: delivery.id,
       notes: 'Assigned to ${delivery.name}',
+      syncDeliveryInBackground: false,
     );
     if (!mounted) return;
 
     await orderProvider.loadOrderDetailProgressive(header.id);
     if (!mounted) return;
 
+    // Resolve or create cloud Delivery and generate tracking link
+    String? startDeliveryLink;
+    try {
+      final deliveryId = await _deliveryTrackingService
+          .resolveOrCreateCloudDeliveryId(header.id);
+      if (deliveryId != null && deliveryId.trim().isNotEmpty) {
+        final links =
+            await _deliveryTrackingService.generateTrackingLinks(deliveryId);
+        if (links.driverLink.trim().isNotEmpty) {
+          startDeliveryLink = links.driverLink.trim();
+        }
+      }
+    } catch (error) {
+      debugPrint(
+        '[OrderDetail] Tracking link generation failed after assignment: $error',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Delivery assigned but Start Delivery link could not be generated: $error'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+
     await _launchWhatsAppMessage(
       phone: delivery.whatsapp?.trim().isNotEmpty == true
           ? delivery.whatsapp!
           : delivery.phone,
-      message: _deliveryChecklist(header, detail, delivery.name),
+      message: _deliveryChecklist(
+        header,
+        detail,
+        delivery.name,
+        startDeliveryLink: startDeliveryLink,
+      ),
     );
   }
 
@@ -851,6 +1425,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       const SnackBar(content: Text('Third-party delivery assigned')),
     );
 
+    // Resolve or create cloud Delivery and generate tracking link
+    String? startDeliveryLink;
+    try {
+      final deliveryId = await _deliveryTrackingService
+          .resolveOrCreateCloudDeliveryId(header.id);
+      if (deliveryId != null && deliveryId.trim().isNotEmpty) {
+        final links =
+            await _deliveryTrackingService.generateTrackingLinks(deliveryId);
+        if (links.driverLink.trim().isNotEmpty) {
+          startDeliveryLink = links.driverLink.trim();
+        }
+      }
+    } catch (error) {
+      debugPrint(
+        '[OrderDetail] Tracking link generation failed for third-party delivery: $error',
+      );
+    }
+
     final driverMobile = input.driverMobile?.trim();
     if (driverMobile != null && driverMobile.isNotEmpty) {
       await _launchWhatsAppMessage(
@@ -861,6 +1453,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           input.driverName?.trim().isNotEmpty == true
               ? input.driverName!.trim()
               : input.deliveryPartner.trim(),
+          startDeliveryLink: startDeliveryLink,
         ),
       );
     }
@@ -987,12 +1580,48 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  Future<bool?> _showAssignmentChoiceDialog(String title) {
+  Future<bool?> _showAssignmentChoiceDialog({
+    required String title,
+    required OrderDetailHeader header,
+    required OrderDetailBundle? detail,
+  }) {
     return showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(title),
-        content: const Text('Do you want to send WhatsApp now?'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDesignerAssignmentProductPreview(detail),
+              const SizedBox(height: 12),
+              Text(
+                'Customer: ${header.customerName}',
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Occasion: ${header.occasion.trim().isEmpty ? '-' : header.occasion}',
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Delivery: ${_formatDate(header.scheduledAt)} ${header.deliverySlot.trim().isEmpty ? '' : header.deliverySlot}',
+                style: const TextStyle(fontSize: 13),
+              ),
+              if (header.specialInstructions.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Special Instructions: ${header.specialInstructions}',
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ],
+              const SizedBox(height: 12),
+              const Text('Do you want to send WhatsApp now?'),
+            ],
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -1005,6 +1634,281 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildDesignerAssignmentProductPreview(OrderDetailBundle? detail) {
+    final lines = detail?.lines ?? const <Map<String, Object?>>[];
+
+    if (lines.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Product Preview',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          _buildPreviewPlaceholder(),
+        ],
+      );
+    }
+
+    if (lines.length == 1) {
+      final line = lines.first;
+      final name = (line['product_name'] as String?) ??
+          (line['description'] as String?) ??
+          'Product';
+      final qty = (line['qty'] as int?) ?? 1;
+      final image = _productImageService.resolveForOrderLine(line);
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Product Preview',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  height: 132,
+                  child: _buildPreviewImage(
+                    image,
+                    size: 132,
+                    fullWidth: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text('Qty : $qty', style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    final productionItems = lines
+        .where((line) => _isLikelyProductionItem(line))
+        .toList(growable: false);
+    final otherItems = lines
+        .where((line) => !_isLikelyProductionItem(line))
+        .toList(growable: false);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Product Preview',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        if (productionItems.isNotEmpty)
+          _buildCompactProductGroup(
+            title: 'Production Items',
+            items: productionItems,
+            icon: Icons.local_florist_outlined,
+          ),
+        if (otherItems.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _buildCompactProductGroup(
+            title: 'Other Items',
+            items: otherItems,
+            icon: Icons.inventory_2_outlined,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCompactProductGroup({
+    required String title,
+    required List<Map<String, Object?>> items,
+    required IconData icon,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 220),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+            child: Row(
+              children: [
+                Icon(icon, size: 16, color: Colors.grey.shade700),
+                const SizedBox(width: 6),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final line = items[index];
+                final name = (line['product_name'] as String?) ??
+                    (line['description'] as String?) ??
+                    'Product';
+                final qty = (line['qty'] as int?) ?? 1;
+                final image = _productImageService.resolveForOrderLine(line);
+
+                return ListTile(
+                  dense: true,
+                  leading: _buildPreviewImage(image, size: 46),
+                  title: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Qty : $qty',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewImage(
+    ProductImageResult image, {
+    double size = 48,
+    bool fullWidth = false,
+  }) {
+    Widget fallback() => _buildPreviewPlaceholder(size: size);
+
+    if (!image.hasImage) {
+      return fallback();
+    }
+
+    final ref = image.reference!.trim();
+    if (image.isNetwork) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          ref,
+          width: fullWidth ? double.infinity : size,
+          height: size,
+          fit: BoxFit.cover,
+          cacheWidth: fullWidth ? 480 : 160,
+          cacheHeight: fullWidth ? 300 : 160,
+          filterQuality: FilterQuality.low,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return SizedBox(
+              width: fullWidth ? double.infinity : size,
+              height: size,
+              child: const Center(
+                child: SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          },
+          errorBuilder: (_, __, ___) => fallback(),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.file(
+        File(ref),
+        width: fullWidth ? double.infinity : size,
+        height: size,
+        fit: BoxFit.cover,
+        cacheWidth: fullWidth ? 480 : 160,
+        cacheHeight: fullWidth ? 300 : 160,
+        filterQuality: FilterQuality.low,
+        errorBuilder: (_, __, ___) => fallback(),
+      ),
+    );
+  }
+
+  Widget _buildPreviewPlaceholder({double size = 48}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(Icons.local_florist_outlined, size: 20),
+    );
+  }
+
+  bool _isLikelyProductionItem(Map<String, Object?> line) {
+    final productName = ((line['product_name'] as String?) ??
+            (line['description'] as String?) ??
+            '')
+        .toLowerCase();
+    final source = ((line['source'] as String?) ?? '').toLowerCase();
+
+    const nonProductionKeywords = <String>[
+      'cake',
+      'chocolate',
+      'teddy',
+      'balloon',
+      'gift card',
+      'mug',
+      'candle',
+    ];
+
+    final explicitlyNonProduction = nonProductionKeywords.any(
+      (keyword) => productName.contains(keyword),
+    );
+    if (explicitlyNonProduction) {
+      return false;
+    }
+
+    // Design/manual bouquet lines are generally production-relevant.
+    if (source == 'design' || source == 'manual') {
+      return true;
+    }
+
+    return true;
   }
 
   Future<void> _launchWhatsAppMessage({
@@ -1145,45 +2049,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<void> _waitForRouteTeardown() async {
     await WidgetsBinding.instance.endOfFrame;
-  }
-
-  Future<void> _showStatusPicker(OrderDetailHeader header) async {
-    const statuses = [
-      OrderStatus.preparing,
-      OrderStatus.ready,
-      OrderStatus.outForDelivery,
-      OrderStatus.delivered,
-      OrderStatus.cancelled,
-    ];
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(title: Text('Update Status')),
-            ...statuses.map(
-              (status) => ListTile(
-                leading: Icon(Icons.circle, color: OrderStatus.color(status)),
-                title: Text(OrderStatus.label(status)),
-                enabled: OrderStatus.canTransition(header.status, status),
-                onTap: OrderStatus.canTransition(header.status, status)
-                    ? () => Navigator.pop(sheetContext, status)
-                    : null,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (selected == null || !mounted) return;
-    await context.read<OrderProvider>().updateOrderStatus(
-          orderId: header.id,
-          currentStatus: header.status,
-          newStatus: selected,
-        );
-    if (!mounted) return;
-    await context.read<OrderWorkflowProvider>().loadWorkflow(header.id);
   }
 
   Future<void> _showPrintMenu(
@@ -1534,14 +2399,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   String _deliveryChecklist(
     OrderDetailHeader header,
     OrderDetailBundle? detail,
-    String deliveryName,
-  ) {
+    String deliveryName, {
+    String? startDeliveryLink,
+  }) {
     final address = header.address.trim();
     final mapsLink = address.isNotEmpty
         ? 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}'
         : '-';
     final outstanding = header.outstandingAmountPaise;
-    return [
+    final lines = [
       '🚚 DELIVERY ASSIGNMENT',
       '',
       'Order : ${header.orderNo}',
@@ -1578,7 +2444,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       '',
       'Delivery Person',
       deliveryName,
-    ].join('\n');
+      if (startDeliveryLink != null && startDeliveryLink.trim().isNotEmpty) ...[
+        '',
+        '▶ START DELIVERY',
+        startDeliveryLink.trim(),
+      ],
+    ];
+    return lines.join('\n');
   }
 
   String _forwardAssociateMessage(
@@ -1711,6 +2583,328 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return '₹${(paise / 100).toStringAsFixed(0)}';
   }
 
+  Future<void> _collectPayment(OrderDetailHeader header) async {
+    final amountController = TextEditingController(
+      text: (header.outstandingAmountPaise / 100).toStringAsFixed(0),
+    );
+    String method = 'cash';
+    final referenceController = TextEditingController();
+    var isSaving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setStateDialog) => AlertDialog(
+            title: const Text('Collect Payment'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                    'Outstanding: ${_formatPaise(header.outstandingAmountPaise)}'),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: amountController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Amount',
+                    prefixText: '₹ ',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: method,
+                  items: const [
+                    DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                    DropdownMenuItem(value: 'upi', child: Text('UPI')),
+                    DropdownMenuItem(value: 'card', child: Text('Card')),
+                    DropdownMenuItem(
+                        value: 'bank_transfer', child: Text('Bank Transfer')),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setStateDialog(() => method = value);
+                  },
+                  decoration: const InputDecoration(labelText: 'Method'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: referenceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Reference (optional)',
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        final amountPaise =
+                            _parseCurrencyToPaise(amountController.text);
+                        if (amountPaise <= 0) {
+                          _showSnack('Enter a valid payment amount.');
+                          return;
+                        }
+                        if (amountPaise > header.outstandingAmountPaise) {
+                          _showSnack(
+                              'Amount cannot exceed outstanding balance.');
+                          return;
+                        }
+
+                        setStateDialog(() => isSaving = true);
+                        try {
+                          await context
+                              .read<OrderProvider>()
+                              .collectOrderPayment(
+                                orderId: header.id,
+                                method: method,
+                                amountPaise: amountPaise,
+                                reference:
+                                    referenceController.text.trim().isEmpty
+                                        ? null
+                                        : referenceController.text.trim(),
+                              );
+                          if (!mounted || !dialogContext.mounted) return;
+                          Navigator.pop(dialogContext);
+                          _showSnack('Payment collected successfully.');
+                        } catch (e) {
+                          if (!mounted || !dialogContext.mounted) return;
+                          _showSnack('Unable to collect payment: $e');
+                          setStateDialog(() => isSaving = false);
+                        }
+                      },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _startPaymentAdjustment(OrderDetailHeader header) async {
+    final detail = context.read<OrderProvider>().detailBundle;
+    final payments = detail?.payments ?? const <Map<String, Object?>>[];
+    final receivedPaise = _sumNonCreditPayments(payments);
+    final refundedPaise = _sumRefundAdjustments(payments);
+    final netReceivedPaise = receivedPaise - refundedPaise;
+    final outstandingPaise = (header.grandTotalPaise - netReceivedPaise)
+        .clamp(0, header.grandTotalPaise);
+    final suggestedPaise =
+        (receivedPaise - refundedPaise).clamp(0, receivedPaise);
+
+    String whatHappened = 'customer_cancelled';
+    String action = 'refund_customer';
+    String refundMethod = 'cash';
+    final amountController = TextEditingController(
+      text: (suggestedPaise / 100).toStringAsFixed(0),
+    );
+    final remarksController = TextEditingController();
+    var isSaving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setStateDialog) => AlertDialog(
+            title: const Text('Adjust Payment'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Step 1: What happened?'),
+                  const SizedBox(height: 6),
+                  _choiceGroup(
+                    value: whatHappened,
+                    onChanged: (value) =>
+                        setStateDialog(() => whatHappened = value),
+                    options: const [
+                      _CodeLabel('customer_cancelled', 'Customer Cancelled'),
+                      _CodeLabel('order_modified', 'Order Modified'),
+                      _CodeLabel('money_returned', 'Money Returned'),
+                      _CodeLabel('duplicate_payment', 'Duplicate Payment'),
+                      _CodeLabel('wrong_entry', 'Wrong Entry'),
+                      _CodeLabel('other', 'Other'),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('Payment Summary'),
+                  const SizedBox(height: 6),
+                  _billRow('Order Total', _formatPaise(header.grandTotalPaise)),
+                  _billRow('Received', _formatPaise(receivedPaise)),
+                  _billRow('Refunded', _formatPaise(refundedPaise)),
+                  _billRow('Net Received', _formatPaise(netReceivedPaise)),
+                  _billRow('Outstanding', _formatPaise(outstandingPaise)),
+                  const SizedBox(height: 10),
+                  const Text('Step 2: Enter adjustment amount'),
+                  TextField(
+                    controller: amountController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      prefixText: '₹ ',
+                      helperText: 'Suggested: Paid - Already Refunded',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('Step 3: What to do?'),
+                  _choiceGroup(
+                    value: action,
+                    onChanged: (value) => setStateDialog(() => action = value),
+                    options: const [
+                      _CodeLabel('refund_customer', 'Refund Customer'),
+                      _CodeLabel('keep_as_advance', 'Keep as Advance'),
+                      _CodeLabel('adjust_next_order', 'Adjust in Next Order'),
+                      _CodeLabel('no_refund', 'No Refund'),
+                    ],
+                  ),
+                  if (action == 'refund_customer') ...[
+                    const SizedBox(height: 8),
+                    const Text('Refund Method (record only)'),
+                    DropdownButtonFormField<String>(
+                      initialValue: refundMethod,
+                      items: const [
+                        DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                        DropdownMenuItem(value: 'upi', child: Text('UPI')),
+                        DropdownMenuItem(
+                            value: 'bank_transfer',
+                            child: Text('Bank Transfer')),
+                        DropdownMenuItem(
+                            value: 'credit_note', child: Text('Credit Note')),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setStateDialog(() => refundMethod = value);
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: remarksController,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Remarks (optional)',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        final amountPaise =
+                            _parseCurrencyToPaise(amountController.text);
+                        if (amountPaise <= 0) {
+                          _showSnack('Enter a valid adjustment amount.');
+                          return;
+                        }
+                        if (amountPaise > receivedPaise) {
+                          _showSnack(
+                              'Adjustment cannot exceed amount received.');
+                          return;
+                        }
+
+                        setStateDialog(() => isSaving = true);
+                        try {
+                          await context
+                              .read<OrderProvider>()
+                              .adjustOrderPayment(
+                                orderId: header.id,
+                                event: whatHappened,
+                                resolution: action,
+                                amountPaise: amountPaise,
+                                refundMethod: action == 'refund_customer'
+                                    ? refundMethod
+                                    : null,
+                                remarks: remarksController.text.trim().isEmpty
+                                    ? null
+                                    : remarksController.text.trim(),
+                              );
+                          if (!mounted || !dialogContext.mounted) return;
+                          Navigator.pop(dialogContext);
+                          _showSnack('Payment adjustment saved.');
+                        } catch (e) {
+                          if (!mounted || !dialogContext.mounted) return;
+                          _showSnack('Unable to save adjustment: $e');
+                          setStateDialog(() => isSaving = false);
+                        }
+                      },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _choiceGroup({
+    required String value,
+    required ValueChanged<String> onChanged,
+    required List<_CodeLabel> options,
+  }) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: options
+          .map(
+            (option) => ChoiceChip(
+              label: Text(option.label),
+              selected: option.code == value,
+              onSelected: (_) => onChanged(option.code),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  int _parseCurrencyToPaise(String? value) {
+    if (value == null || value.trim().isEmpty) return 0;
+    final normalized = value.replaceAll('₹', '').replaceAll(',', '').trim();
+    final parsed = double.tryParse(normalized) ?? 0;
+    return (parsed * 100).round();
+  }
+
+  int _sumNonCreditPayments(List<Map<String, Object?>> rows) {
+    return rows.where((row) {
+      final method = ((row['method'] as String?) ?? '').toLowerCase();
+      return method != 'credit';
+    }).fold<int>(
+      0,
+      (sum, row) => sum + ((row['amount_paise'] as int?) ?? 0),
+    );
+  }
+
+  int _sumRefundAdjustments(List<Map<String, Object?>> rows) {
+    return rows.where((row) {
+      final amount = (row['amount_paise'] as int?) ?? 0;
+      return amount < 0;
+    }).fold<int>(
+      0,
+      (sum, row) => sum + (((row['amount_paise'] as int?) ?? 0).abs()),
+    );
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
   String _pretty(String value) {
     return value.replaceAll('_', ' ').replaceAllMapped(
           RegExp(r'(^|\s)([a-z])'),
@@ -1764,14 +2958,101 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 }
 
+enum _DeliveryConnectivityKind { notStarted, live, delayed, offline }
+
+class _DeliveryConnectivityState {
+  const _DeliveryConnectivityState._({
+    required this.kind,
+    required this.label,
+    required this.tooltip,
+    required this.color,
+    required this.textColor,
+  });
+
+  factory _DeliveryConnectivityState.notStarted() {
+    return _DeliveryConnectivityState._(
+      kind: _DeliveryConnectivityKind.notStarted,
+      label: 'Not Started',
+      tooltip: 'Driver has not accepted this delivery.',
+      color: Colors.white,
+      textColor: Colors.grey.shade800,
+    );
+  }
+
+  factory _DeliveryConnectivityState.live() {
+    return _DeliveryConnectivityState._(
+      kind: _DeliveryConnectivityKind.live,
+      label: 'Live',
+      tooltip: 'Driver session active. GPS updated within 60 seconds.',
+      color: Colors.green,
+      textColor: Colors.green.shade800,
+    );
+  }
+
+  factory _DeliveryConnectivityState.delayed() {
+    return _DeliveryConnectivityState._(
+      kind: _DeliveryConnectivityKind.delayed,
+      label: 'Delayed',
+      tooltip: 'Driver connected, but GPS updates are delayed.',
+      color: Colors.amber,
+      textColor: Colors.orange.shade900,
+    );
+  }
+
+  factory _DeliveryConnectivityState.driverOffline() {
+    return _DeliveryConnectivityState._(
+      kind: _DeliveryConnectivityKind.offline,
+      label: 'Driver Offline',
+      tooltip: 'Driver is offline or GPS updates are stale.',
+      color: Colors.red,
+      textColor: Colors.red.shade800,
+    );
+  }
+
+  factory _DeliveryConnectivityState.noInternet() {
+    return _DeliveryConnectivityState._(
+      kind: _DeliveryConnectivityKind.offline,
+      label: 'No Internet',
+      tooltip: 'Tracking cannot connect from this device.',
+      color: Colors.red,
+      textColor: Colors.red.shade800,
+    );
+  }
+
+  factory _DeliveryConnectivityState.serverUnreachable() {
+    return _DeliveryConnectivityState._(
+      kind: _DeliveryConnectivityKind.offline,
+      label: 'Server Unreachable',
+      tooltip: 'Tracking server did not respond. Last location is preserved.',
+      color: Colors.red,
+      textColor: Colors.red.shade800,
+    );
+  }
+
+  final _DeliveryConnectivityKind kind;
+  final String label;
+  final String tooltip;
+  final Color color;
+  final Color textColor;
+}
+
 class _OrderQuickAction {
   const _OrderQuickAction(
     this.label,
     this.icon,
-    this.onTap,
-  );
+    this.onTap, {
+    this.isLoading = false,
+  });
 
   final String label;
   final IconData icon;
   final VoidCallback? onTap;
+  final bool isLoading;
+}
+
+class _CodeLabel {
+  const _CodeLabel(this.code, this.label);
+
+  final String code;
+  final String label;
 }

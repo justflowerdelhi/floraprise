@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../database/app_database.dart';
+import '../../models/gst_calculation_type.dart';
 
 class InventoryProductRecord {
   final int productId;
@@ -11,6 +12,8 @@ class InventoryProductRecord {
   final String sku;
   final String barcode;
   final bool trackInventory;
+  final int gstPercent;
+  final GstCalculationType gstCalculationType;
   final int currentQty;
   final int minQty;
 
@@ -22,6 +25,8 @@ class InventoryProductRecord {
     required this.sku,
     required this.barcode,
     required this.trackInventory,
+    required this.gstPercent,
+    required this.gstCalculationType,
     required this.currentQty,
     required this.minQty,
   });
@@ -191,6 +196,8 @@ class InventoryRepository {
         COALESCE(p.sku, '') AS sku,
         COALESCE(NULLIF(p.manufacturer_barcode, ''), NULLIF(p.floraprise_barcode, ''), COALESCE(p.barcode, '')) AS barcode,
         p.track_inventory,
+        p.gst_percent,
+        p.gst_calculation_type,
         COALESCE(i.current_qty, 0) AS current_qty,
         COALESCE(i.min_qty, p.min_stock, 0) AS min_qty
       FROM products p
@@ -209,6 +216,10 @@ class InventoryRepository {
             sku: (row['sku'] as String?) ?? '',
             barcode: (row['barcode'] as String?) ?? '',
             trackInventory: (row['track_inventory'] as int? ?? 0) == 1,
+            gstPercent: (row['gst_percent'] as int?) ?? 0,
+            gstCalculationType: GstCalculationType.fromStorage(
+              row['gst_calculation_type'] as String?,
+            ),
             currentQty: row['current_qty'] as int,
             minQty: row['min_qty'] as int,
           ),
@@ -225,22 +236,27 @@ class InventoryRepository {
     String? reason,
   }) async {
     final db = await AppDatabase.instance.database;
-    
+
     // First, check what txn_type values actually exist
-    final allTxnTypes = await db.rawQuery('SELECT DISTINCT txn_type FROM inventory_transactions');
-    debugPrint('Available txn_type values: ${allTxnTypes.map((r) => r['txn_type']).toList()}');
-    
+    final allTxnTypes = await db
+        .rawQuery('SELECT DISTINCT txn_type FROM inventory_transactions');
+    debugPrint(
+        'Available txn_type values: ${allTxnTypes.map((r) => r['txn_type']).toList()}');
+
     // Check wastage transactions without date filter first
     final allWastage = await db.rawQuery(
-      "SELECT COUNT(*) as count FROM inventory_transactions WHERE txn_type IN ('wastage', 'expired_bouquet')"
-    );
-    debugPrint('Total wastage transactions in DB: ${allWastage.first['count']}');
-    
-    final startOfDay = DateTime(startDate.year, startDate.month, startDate.day).toIso8601String();
-    final endOfDay = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59).toIso8601String();
-    
+        "SELECT COUNT(*) as count FROM inventory_transactions WHERE txn_type IN ('wastage', 'expired_bouquet')");
+    debugPrint(
+        'Total wastage transactions in DB: ${allWastage.first['count']}');
+
+    final startOfDay = DateTime(startDate.year, startDate.month, startDate.day)
+        .toIso8601String();
+    final endOfDay =
+        DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)
+            .toIso8601String();
+
     debugPrint('Date range filter: $startOfDay to $endOfDay');
-    
+
     final whereParts = <String>[
       'it.txn_type IN (?, ?)',
       'it.created_at >= ?',
@@ -252,27 +268,27 @@ class InventoryRepository {
       startOfDay,
       endOfDay,
     ];
-    
+
     if (category != null) {
       whereParts.add('p.category = ?');
       whereArgs.add(category);
     }
-    
+
     if (productId != null) {
       whereParts.add('it.product_id = ?');
       whereArgs.add(productId);
     }
-    
+
     if (supplier != null && supplier.isNotEmpty) {
       whereParts.add('it.supplier = ?');
       whereArgs.add(supplier);
     }
-    
+
     if (reason != null && reason.isNotEmpty) {
       whereParts.add('it.reason = ?');
       whereArgs.add(reason);
     }
-    
+
     final rows = await db.rawQuery('''
       SELECT
         it.id,
@@ -293,24 +309,26 @@ class InventoryRepository {
       WHERE ${whereParts.join(' AND ')}
       ORDER BY it.created_at DESC
     ''', whereArgs);
-    
+
     debugPrint('Query executed, returned ${rows.length} rows');
-    
-    return rows.map((row) => InventoryTransactionRecord(
-      id: row['id'] as int,
-      productId: row['product_id'] as int,
-      txnType: row['txn_type'] as String,
-      qty: row['qty'] as int,
-      purchasePricePaise: row['purchase_price_paise'] as int?,
-      supplier: row['supplier'] as String? ?? '',
-      source: row['source'] as String,
-      reason: row['reason'] as String? ?? '',
-      note: row['note'] as String? ?? '',
-      createdAt: row['created_at'] as String,
-      productName: row['product_name'] as String?,
-      category: row['category'] as String?,
-      unit: row['unit'] as String?,
-    )).toList();
+
+    return rows
+        .map((row) => InventoryTransactionRecord(
+              id: row['id'] as int,
+              productId: row['product_id'] as int,
+              txnType: row['txn_type'] as String,
+              qty: row['qty'] as int,
+              purchasePricePaise: row['purchase_price_paise'] as int?,
+              supplier: row['supplier'] as String? ?? '',
+              source: row['source'] as String,
+              reason: row['reason'] as String? ?? '',
+              note: row['note'] as String? ?? '',
+              createdAt: row['created_at'] as String,
+              productName: row['product_name'] as String?,
+              category: row['category'] as String?,
+              unit: row['unit'] as String?,
+            ))
+        .toList();
   }
 
   Future<List<InventoryTransactionRecord>> listTransactionsForProduct(
@@ -473,7 +491,6 @@ class InventoryRepository {
         'note': note,
         'created_at': now,
       });
-
     });
   }
 }

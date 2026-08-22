@@ -181,6 +181,10 @@ class OrderManager {
     );
   }
 
+  Future<OrderRewardSummary?> getOrderRewardSummary(int orderId) {
+    return _orderRepository.getOrderRewardSummary(orderId);
+  }
+
   Future<void> updateOrderStatus({
     required int orderId,
     required String currentStatus,
@@ -213,5 +217,40 @@ class OrderManager {
 
   Future<Map<String, int>> getTodaySummary() {
     return _orderRepository.getTodaySummary();
+  }
+
+  Future<void> collectOrderPayment({
+    required int orderId,
+    required String method,
+    required int amountPaise,
+    String? reference,
+  }) {
+    return _orderRepository.addOrderPaymentTransaction(
+      orderId: orderId,
+      method: method,
+      amountPaise: amountPaise,
+      reference: reference,
+      actor: 'orderManager',
+      note: 'Payment collected ${method.toUpperCase()}',
+    );
+  }
+
+  Future<void> adjustOrderPayment({
+    required int orderId,
+    required String event,
+    required String resolution,
+    required int amountPaise,
+    String? refundMethod,
+    String? remarks,
+  }) {
+    return _orderRepository.addOrderPaymentAdjustment(
+      orderId: orderId,
+      event: event,
+      resolution: resolution,
+      amountPaise: amountPaise,
+      refundMethod: refundMethod,
+      remarks: remarks,
+      actor: 'orderManager',
+    );
   }
 }

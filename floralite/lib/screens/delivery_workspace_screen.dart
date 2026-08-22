@@ -1,12 +1,14 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/delivery_tracking_service.dart';
+import '../utils/whatsapp_phone_utils.dart';
 
 class DeliveryWorkspaceScreen extends StatefulWidget {
   const DeliveryWorkspaceScreen({super.key});
@@ -268,32 +270,30 @@ class DeliveryWorkspaceDetailScreen extends StatefulWidget {
 class _DeliveryWorkspaceDetailScreenState
     extends State<DeliveryWorkspaceDetailScreen> {
   final DeliveryTrackingService _service = DeliveryTrackingService();
-  final TextEditingController _notesController = TextEditingController();
   DeliveryWorkspaceRecord get delivery => widget.delivery;
 
   DeliveryTrackingSnapshot? _snapshot;
   StreamSubscription<DeliveryTrackingSnapshot>? _trackingSubscription;
-  StreamSubscription<Position>? _positionSubscription;
-  bool _busy = false;
   String? _error;
-
-  bool get _isTracking => _positionSubscription != null;
+  bool get _isWaitingToSync =>
+      DeliveryTrackingService().isPendingSyncAssignment(delivery.assignmentId);
 
   @override
   void initState() {
     super.initState();
-    _loadTracking();
+    if (!_isWaitingToSync) {
+      _loadTracking();
+    }
   }
 
   @override
   void dispose() {
     _trackingSubscription?.cancel();
-    _positionSubscription?.cancel();
-    _notesController.dispose();
     super.dispose();
   }
 
   Future<void> _loadTracking() async {
+    if (_isWaitingToSync) return;
     setState(() => _error = null);
     try {
       final snapshot =
@@ -314,126 +314,96 @@ class _DeliveryWorkspaceDetailScreenState
     }
   }
 
-  Future<void> _runAction(String action) async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await _service.updateAssignmentStatus(
-        assignmentId: delivery.assignmentId,
-        action: action,
-        notes: _notesController.text,
-      );
-      if (action == 'start') await _startGpsPublishing();
-      if (action == 'complete' || action == 'reject' || action == 'cancel') {
-        await _stopGpsPublishing();
-      }
-      await _loadTracking();
-    } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _startGpsPublishing() async {
-    await _ensureLocationPermission();
-    await _service.flushAssignmentLocationQueue();
-    await _positionSubscription?.cancel();
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: _locationSettings(),
-    ).listen((position) async {
-      try {
-        await _service.uploadAssignmentLocation(
-          assignmentId: delivery.assignmentId,
-          latitude: position.latitude,
-          longitude: position.longitude,
-          accuracy: position.accuracy,
-          speed: position.speed,
-          heading: position.heading,
-          recordedAt: position.timestamp,
-        );
-        await _service.flushAssignmentLocationQueue();
-      } catch (_) {
-        await _service.queueAssignmentLocation(
-          assignmentId: delivery.assignmentId,
-          latitude: position.latitude,
-          longitude: position.longitude,
-          accuracy: position.accuracy,
-          speed: position.speed,
-          heading: position.heading,
-          recordedAt: position.timestamp,
-        );
-      }
-    });
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _stopGpsPublishing() async {
-    await _positionSubscription?.cancel();
-    _positionSubscription = null;
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _ensureLocationPermission() async {
-    if (!await Geolocator.isLocationServiceEnabled()) {
-      throw const DeliveryTrackingException('Location services are disabled.');
-    }
-
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.denied) {
-      throw const DeliveryTrackingException('Location permission was denied.');
-    }
-    if (permission == LocationPermission.deniedForever) {
-      throw const DeliveryTrackingException(
-        'Location permission is permanently denied. Enable it in app settings.',
-      );
-    }
-  }
-
-  LocationSettings _locationSettings() {
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return AndroidSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 20,
-        intervalDuration: const Duration(seconds: 20),
-        foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: 'Floraprise delivery tracking',
-          notificationText:
-              'Sharing delivery location while this trip is active.',
-          enableWakeLock: true,
-        ),
-      );
-    }
-    return const LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 20,
-    );
-  }
-
   Future<void> _callCustomer() async {
     final phone = delivery.customerPhone;
     if (phone == null || phone.trim().isEmpty) return;
     await launchUrl(Uri.parse('tel:$phone'));
   }
 
+  Future<void> _callDriver() async {
+    final phone = _snapshot?.driver?.phone ?? delivery.driver?.phone;
+    if (phone == null || phone.trim().isEmpty || phone.trim() == '-') return;
+    await launchUrl(Uri.parse('tel:$phone'));
+  }
+
   Future<void> _navigate() async {
-    final address = delivery.deliveryAddress.trim();
-    if (address.isEmpty || address == '-') return;
-    final uri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}',
-    );
+    final lastLocation = _snapshot?.lastLocation;
+    final uri = lastLocation != null
+        ? Uri.parse(
+            'https://www.google.com/maps/search/?api=1&query=${lastLocation.latitude},${lastLocation.longitude}',
+          )
+        : Uri.parse(
+            'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(delivery.deliveryAddress.trim())}',
+          );
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _shareCustomerTrackingLink() async {
+    final trackingLink =
+        (_snapshot?.trackingLink ?? delivery.trackingLink).trim();
+    if (trackingLink.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Customer tracking link is not ready yet.')),
+      );
+      return;
+    }
+
+    await Share.share(
+      'Track your delivery live for ${delivery.orderNo}:\n$trackingLink',
+      subject: 'Floraprise customer tracking link',
+    );
+  }
+
+  Future<void> _shareDriverPanel() async {
+    if (_isWaitingToSync) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Delivery link is available after sync completes.')),
+      );
+      return;
+    }
+
+    String? driverLink;
+    try {
+      // Generate tracking links - backend reuses existing tokens if available
+      final links = await _service.generateTrackingLinks(delivery.assignmentId);
+      driverLink = links.driverLink.trim();
+    } catch (error) {
+      // If link generation fails, log it but still allow sending basic WhatsApp message
+      debugPrint('[DeliveryWorkspace] Link generation failed: $error');
+    }
+
+    final phone = _snapshot?.driver?.phone ?? delivery.driver?.phone;
+    // Send WhatsApp with link if available, or without link if generation failed
+    final message = _driverWhatsappMessage(driverLink);
+    final primary = WhatsAppPhoneUtils.buildUri(phone, message: message);
+    final fallback = WhatsAppPhoneUtils.buildFallbackUri(
+      phone,
+      message: message,
+    );
+
+    final openedPrimary = primary != null &&
+        await launchUrl(primary, mode: LaunchMode.externalApplication);
+    if (openedPrimary) return;
+
+    final openedFallback = fallback != null &&
+        await launchUrl(fallback, mode: LaunchMode.externalApplication);
+    if (openedFallback) return;
+
+    await Share.share(message, subject: 'Floraprise delivery link');
   }
 
   @override
   Widget build(BuildContext context) {
     final snapshot = _snapshot;
     final status = snapshot?.status ?? delivery.status;
+    final normalizedStatus = _normalizeStatus(status);
+    final driverAccepted = _isDriverAccepted(normalizedStatus);
+    final showSendDeliveryLink = !driverAccepted && !_isWaitingToSync;
+    final showMonitoringActions = driverAccepted;
     return Scaffold(
       appBar: AppBar(title: Text(delivery.orderNo)),
       body: ListView(
@@ -484,51 +454,121 @@ class _DeliveryWorkspaceDetailScreenState
                   _DetailRow(
                     icon: Icons.badge_outlined,
                     label: 'Driver',
-                    value: delivery.driver?.name ?? 'Driver not assigned',
+                    value: snapshot?.driver?.name ??
+                        delivery.driver?.name ??
+                        'Driver not assigned',
+                  ),
+                  _DetailRow(
+                    icon: Icons.update_rounded,
+                    label: 'Status',
+                    value: _statusHeadline(normalizedStatus),
+                  ),
+                  _DetailRow(
+                    icon: Icons.circle,
+                    label: 'Driver Connectivity',
+                    value: _onlineLabel(snapshot?.lastLocation),
+                    valueColor: _onlineColor(snapshot?.lastLocation),
+                  ),
+                  _DetailRow(
+                    icon: Icons.battery_charging_full_rounded,
+                    label: 'Battery',
+                    value: _batteryLabel(
+                      snapshot?.lastLocation?.batteryPercentage,
+                    ),
+                    valueColor: _batteryColor(
+                      snapshot?.lastLocation?.batteryPercentage,
+                    ),
+                  ),
+                  _DetailRow(
+                    icon: Icons.my_location_rounded,
+                    label: 'Last GPS',
+                    value: _lastGpsLabel(snapshot?.lastLocation),
+                  ),
+                  _DetailRow(
+                    icon: Icons.history_rounded,
+                    label: 'Last Updated',
+                    value: _lastUpdatedLabel(snapshot?.lastLocation),
+                  ),
+                  _DetailRow(
+                    icon: Icons.timer_outlined,
+                    label: 'ETA',
+                    value: _etaLabel(
+                      snapshot?.eta ?? delivery.eta,
+                      normalizedStatus,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _callCustomer,
-                  icon: const Icon(Icons.call_outlined),
-                  label: const Text('Call Customer'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _navigate,
-                  icon: const Icon(Icons.navigation_outlined),
-                  label: const Text('Navigate'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _notesController,
-            minLines: 2,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              labelText: 'Delivery Notes',
-              border: OutlineInputBorder(),
+          if (normalizedStatus == 'delivered') ...[
+            const SizedBox(height: 12),
+            _DeliveredSummaryCard(
+              deliveredAt: _deliveredAt(snapshot),
+              deliveredBy:
+                  snapshot?.driver?.name ?? delivery.driver?.name ?? '-',
+              hasPhoto: (snapshot?.proof?.photoUrl.trim().isNotEmpty ?? false),
+              otpVerified: snapshot?.proof?.otpVerified == true,
+              signatureCaptured: snapshot?.proof?.signatureCaptured == true ||
+                  ((snapshot?.proof?.signatureValue ?? '').trim().isNotEmpty),
             ),
-          ),
+          ],
           const SizedBox(height: 12),
-          _ActionPanel(
-            status: status,
-            busy: _busy,
-            tracking: _isTracking,
-            onAccept: () => _runAction('accept'),
-            onStart: () => _runAction('start'),
-            onComplete: () => _runAction('complete'),
-            onReject: () => _runAction('reject'),
+          if (showSendDeliveryLink) ...[
+            OutlinedButton.icon(
+              onPressed: _shareDriverPanel,
+              icon: const Icon(Icons.send_to_mobile_rounded),
+              label: const Text('Send Delivery Link'),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (showMonitoringActions) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _callDriver,
+                    icon: const Icon(Icons.support_agent_rounded),
+                    label: const Text('Call Driver'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _shareCustomerTrackingLink,
+                    icon: const Icon(Icons.share_outlined),
+                    label: const Text('Share Tracking Link'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _callCustomer,
+                    icon: const Icon(Icons.call_outlined),
+                    label: const Text('Call Customer'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _navigate,
+                    icon: const Icon(Icons.map_outlined),
+                    label: const Text('Open Google Map'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+          const SizedBox(height: 12),
+          _MonitoringPanel(
+            snapshot: snapshot,
+            status: normalizedStatus,
+            onOpenMap: _navigate,
           ),
           const SizedBox(height: 16),
           _TimelineCard(snapshot: snapshot),
@@ -536,80 +576,358 @@ class _DeliveryWorkspaceDetailScreenState
       ),
     );
   }
+
+  String _etaLabel(DateTime? eta, String normalizedStatus) {
+    if (eta == null) {
+      return _isDriverAccepted(normalizedStatus)
+          ? 'Waiting for GPS start'
+          : 'Waiting for driver';
+    }
+    return DateFormat('dd MMM, h:mm a').format(eta.toLocal());
+  }
+
+  String _statusHeadline(String normalizedStatus) {
+    return switch (normalizedStatus) {
+      'assigned' => 'Waiting for Driver',
+      'accepted' => 'Preparing to Start',
+      'pickedup' => 'Picked Up',
+      'outfordelivery' => 'Out for Delivery',
+      'arrivednearby' => 'Arrived Nearby',
+      'delivered' => 'Delivered',
+      'rejected' => 'Rejected',
+      'cancelled' => 'Cancelled',
+      _ => delivery.status,
+    };
+  }
+
+  bool _isDriverAccepted(String normalizedStatus) {
+    return normalizedStatus != 'assigned' &&
+        normalizedStatus != 'rejected' &&
+        normalizedStatus != 'cancelled';
+  }
+
+  String _onlineLabel(DeliveryLocationPoint? location) {
+    if (location == null) return 'Waiting for Driver Location';
+    return _isOnline(location) ? 'Online' : 'Offline';
+  }
+
+  Color? _onlineColor(DeliveryLocationPoint? location) {
+    if (location == null) return null;
+    return _isOnline(location) ? Colors.green : Colors.grey.shade700;
+  }
+
+  bool _isOnline(DeliveryLocationPoint location) {
+    return DateTime.now().difference(location.recordedAt.toLocal()) <=
+        const Duration(minutes: 3);
+  }
+
+  String _batteryLabel(int? battery) {
+    if (battery == null) return 'Not available';
+    return '$battery%';
+  }
+
+  Color? _batteryColor(int? battery) {
+    if (battery == null) return null;
+    if (battery <= 20) return Colors.red;
+    if (battery <= 40) return Colors.amber.shade700;
+    return Colors.green;
+  }
+
+  String _lastGpsLabel(DeliveryLocationPoint? location) {
+    if (location == null) return 'Not available';
+    return DateFormat('h:mm a').format(location.recordedAt.toLocal());
+  }
+
+  String _lastUpdatedLabel(DeliveryLocationPoint? location) {
+    if (location == null) return 'Waiting for first ping';
+    final diff = DateTime.now().difference(location.recordedAt.toLocal());
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} hr ago';
+    return '${diff.inDays} day ago';
+  }
+
+  String _driverWhatsappMessage(String? driverLink) {
+    final googleMaps =
+        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(delivery.deliveryAddress.trim())}';
+    final phone = (delivery.customerPhone ?? '').trim();
+    final slot =
+        delivery.deliveryTime.trim().isEmpty ? '-' : delivery.deliveryTime;
+
+    final lines = [
+      'FLORAPRISE DELIVERY',
+      '',
+      'Order: ${delivery.orderNo}',
+      '',
+      'Recipient',
+      delivery.recipientName.trim().isEmpty ? '-' : delivery.recipientName,
+      '',
+      'Customer',
+      delivery.customerName,
+      '',
+      'Phone',
+      phone.isEmpty ? '-' : phone,
+      '',
+      'Address',
+      delivery.deliveryAddress,
+      '',
+      'Time Slot',
+      slot,
+      '',
+      'Google Maps',
+      googleMaps,
+    ];
+
+    // Only include START DELIVERY link if it was successfully generated
+    if (driverLink != null && driverLink.trim().isNotEmpty) {
+      lines.addAll([
+        '',
+        'START DELIVERY',
+        driverLink.trim(),
+        '',
+        'Click the Start Delivery link when you leave the shop.',
+        'Your live location will be shared with the florist and customer.',
+      ]);
+    }
+
+    return lines.join('\n');
+  }
+
+  DateTime? _deliveredAt(DeliveryTrackingSnapshot? snapshot) {
+    final proofTime = snapshot?.proof?.recordedAt;
+    if (proofTime != null) return proofTime;
+
+    final timeline = snapshot?.timeline ?? const <DeliveryTimelineEvent>[];
+    DateTime? lastDelivered;
+    for (final event in timeline) {
+      final normalized = _normalizeStatus(event.status);
+      if (normalized == 'delivered') {
+        lastDelivered = event.recordedAt;
+      }
+    }
+    if (lastDelivered != null) return lastDelivered;
+    return snapshot?.lastLocation?.recordedAt;
+  }
 }
 
-class _ActionPanel extends StatelessWidget {
-  const _ActionPanel({
-    required this.status,
-    required this.busy,
-    required this.tracking,
-    required this.onAccept,
-    required this.onStart,
-    required this.onComplete,
-    required this.onReject,
+class _DeliveredSummaryCard extends StatelessWidget {
+  const _DeliveredSummaryCard({
+    required this.deliveredAt,
+    required this.deliveredBy,
+    required this.hasPhoto,
+    required this.otpVerified,
+    required this.signatureCaptured,
   });
 
-  final String status;
-  final bool busy;
-  final bool tracking;
-  final VoidCallback onAccept;
-  final VoidCallback onStart;
-  final VoidCallback onComplete;
-  final VoidCallback onReject;
+  final DateTime? deliveredAt;
+  final String deliveredBy;
+  final bool hasPhoto;
+  final bool otpVerified;
+  final bool signatureCaptured;
 
   @override
   Widget build(BuildContext context) {
-    final normalized = _normalizeStatus(status);
-    final canAccept = normalized == 'assigned';
-    final canStart = normalized == 'assigned' ||
-        normalized == 'accepted' ||
-        normalized == 'pickedup';
-    final canComplete = normalized == 'outfordelivery' ||
-        normalized == 'arrivednearby' ||
-        tracking;
-    final canReject = normalized == 'assigned' || normalized == 'accepted';
+    final proofRows = <Widget>[];
+    if (hasPhoto) {
+      proofRows.add(
+        const _DetailRow(
+          icon: Icons.photo_camera_outlined,
+          label: 'Proof',
+          value: 'Photo Available',
+          valueColor: Colors.green,
+        ),
+      );
+    }
+    if (otpVerified) {
+      proofRows.add(
+        const _DetailRow(
+          icon: Icons.verified_outlined,
+          label: 'OTP',
+          value: 'Verified',
+          valueColor: Colors.green,
+        ),
+      );
+    }
+    if (signatureCaptured) {
+      proofRows.add(
+        const _DetailRow(
+          icon: Icons.draw_outlined,
+          label: 'Signature',
+          value: 'Captured',
+          valueColor: Colors.green,
+        ),
+      );
+    }
 
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              tracking
-                  ? 'GPS publishing is active'
-                  : 'GPS starts after Start Delivery',
-              style: Theme.of(context).textTheme.titleSmall,
+            Row(
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.green.shade700,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Delivered Successfully',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.green.shade800,
+                      ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
-            if (canAccept)
-              FilledButton.icon(
-                onPressed: busy ? null : onAccept,
-                icon: const Icon(Icons.check_circle_outline_rounded),
-                label: const Text('Accept Delivery'),
-              ),
-            if (canStart)
-              FilledButton.icon(
-                onPressed: busy ? null : onStart,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Start Delivery'),
-              ),
-            if (canComplete)
-              FilledButton.icon(
-                onPressed: busy ? null : onComplete,
-                icon: const Icon(Icons.done_all_rounded),
-                label: const Text('Complete Delivery'),
-              ),
-            if (canReject)
-              OutlinedButton.icon(
-                onPressed: busy ? null : onReject,
-                icon: const Icon(Icons.close_rounded),
-                label: const Text('Reject Delivery'),
-              ),
+            _DetailRow(
+              icon: Icons.access_time_rounded,
+              label: 'Delivered At',
+              value: deliveredAt == null
+                  ? 'Not available'
+                  : DateFormat('h:mm a').format(deliveredAt!.toLocal()),
+            ),
+            _DetailRow(
+              icon: Icons.badge_outlined,
+              label: 'By',
+              value: deliveredBy.trim().isEmpty ? '-' : deliveredBy,
+            ),
+            if (proofRows.isNotEmpty) ...proofRows,
           ],
         ),
       ),
     );
+  }
+}
+
+class _MonitoringPanel extends StatelessWidget {
+  const _MonitoringPanel({
+    required this.snapshot,
+    required this.status,
+    required this.onOpenMap,
+  });
+
+  final DeliveryTrackingSnapshot? snapshot;
+  final String status;
+  final VoidCallback onOpenMap;
+
+  @override
+  Widget build(BuildContext context) {
+    final route = snapshot?.route ?? const <DeliveryLocationPoint>[];
+    final center = route.isNotEmpty
+        ? LatLng(route.last.latitude, route.last.longitude)
+        : const LatLng(19.076, 72.8777);
+    final points =
+        route.map((point) => LatLng(point.latitude, point.longitude)).toList();
+    final statusLabel = _statusLabel(status);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Live Monitoring',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              route.isEmpty
+                  ? 'Driver GPS will appear here after the driver taps Start Delivery.'
+                  : 'Current trip is publishing live location updates.',
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 220,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: FlutterMap(
+                  options: MapOptions(
+                    initialCenter: center,
+                    initialZoom: route.isEmpty ? 11 : 14,
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom,
+                    ),
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.floraprise.mobile',
+                    ),
+                    if (points.length >= 2)
+                      PolylineLayer(
+                        polylines: [
+                          Polyline(
+                            points: points,
+                            color: Theme.of(context).colorScheme.primary,
+                            strokeWidth: 4,
+                          ),
+                        ],
+                      ),
+                    if (route.isNotEmpty)
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: points.last,
+                            width: 44,
+                            height: 44,
+                            child: const Icon(
+                              Icons.local_shipping_rounded,
+                              size: 28,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Chip(
+                  avatar: const Icon(Icons.route_outlined, size: 18),
+                  label: Text(statusLabel),
+                ),
+                Chip(
+                  avatar: const Icon(Icons.place_outlined, size: 18),
+                  label: Text(route.isEmpty
+                      ? 'Awaiting first location'
+                      : 'Last update ${DateFormat('h:mm a').format(route.last.recordedAt.toLocal())}'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: route.isEmpty ? null : onOpenMap,
+              icon: const Icon(Icons.map_rounded),
+              label: const Text('Open in Google Maps'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _statusLabel(String rawStatus) {
+    final normalized = _normalizeStatus(rawStatus);
+    return switch (normalized) {
+      'assigned' => 'Driver assigned',
+      'accepted' => 'Accepted by driver',
+      'pickedup' => 'Picked up',
+      'outfordelivery' => 'Out for delivery',
+      'arrivednearby' => 'Driver arrived nearby',
+      'delivered' => 'Delivered',
+      'cancelled' => 'Cancelled',
+      'rejected' => 'Rejected by driver',
+      _ => rawStatus,
+    };
   }
 }
 
@@ -621,6 +939,12 @@ class _TimelineCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final events = snapshot?.timeline ?? const <DeliveryTimelineEvent>[];
+    final proof = snapshot?.proof;
+    final hasPhoto = proof?.photoUrl.trim().isNotEmpty ?? false;
+    final otpVerified = proof?.otpVerified == true;
+    final signatureCaptured = proof?.signatureCaptured == true ||
+        ((proof?.signatureValue ?? '').trim().isNotEmpty);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -634,14 +958,88 @@ class _TimelineCard extends StatelessWidget {
               const Text('Waiting for the first delivery update.')
             else
               ...events.map(
-                (event) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.radio_button_checked_rounded),
-                  title: Text(event.status),
-                  subtitle: Text(DateFormat('dd MMM, h:mm a')
-                      .format(event.recordedAt.toLocal())),
-                ),
+                (event) {
+                  final delivered =
+                      _normalizeStatus(event.status) == 'delivered';
+                  final showProofBadges = delivered &&
+                      (hasPhoto || otpVerified || signatureCaptured);
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.radio_button_checked_rounded),
+                        title: Text(event.status),
+                        subtitle: Text(DateFormat('dd MMM, h:mm a')
+                            .format(event.recordedAt.toLocal())),
+                      ),
+                      if (showProofBadges) ...[
+                        const SizedBox(height: 6),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 40),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              if (hasPhoto)
+                                _proofChip(
+                                  context,
+                                  icon: Icons.photo_camera_outlined,
+                                  text: 'Photo Available',
+                                ),
+                              if (otpVerified)
+                                _proofChip(
+                                  context,
+                                  icon: Icons.verified_outlined,
+                                  text: 'OTP Verified',
+                                ),
+                              if (signatureCaptured)
+                                _proofChip(
+                                  context,
+                                  icon: Icons.draw_outlined,
+                                  text: 'Signature Captured',
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                    ],
+                  );
+                },
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _proofChip(
+    BuildContext context, {
+    required IconData icon,
+    required String text,
+  }) {
+    final color = Colors.green.shade700;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: color),
+            const SizedBox(width: 6),
+            Text(
+              text,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -734,12 +1132,17 @@ class _InfoLine extends StatelessWidget {
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow(
-      {required this.icon, required this.label, required this.value});
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
 
   final IconData icon;
   final String label;
   final String value;
+  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
@@ -755,7 +1158,7 @@ class _DetailRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label, style: Theme.of(context).textTheme.labelMedium),
-                Text(value),
+                Text(value, style: TextStyle(color: valueColor)),
               ],
             ),
           ),
@@ -794,6 +1197,8 @@ String _normalizeStatus(String status) {
 }
 
 String _readableStatus(String status) {
+  if (_normalizeStatus(status) == 'waitingtosync') return 'Waiting to sync';
+
   final compact = status.replaceAllMapped(
     RegExp(r'(?<=[a-z])(?=[A-Z])'),
     (_) => ' ',
@@ -805,6 +1210,7 @@ Color _statusColor(String status, ColorScheme colorScheme) {
   return switch (_normalizeStatus(status)) {
     'assigned' => colorScheme.outline,
     'accepted' => colorScheme.primary,
+    'waitingtosync' => Colors.orange.shade800,
     'pickedup' => colorScheme.tertiary,
     'outfordelivery' => colorScheme.primary,
     'arrivednearby' => colorScheme.secondary,

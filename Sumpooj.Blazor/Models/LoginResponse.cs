@@ -1,7 +1,18 @@
-﻿namespace Sumpooj.Blazor.Models;
+﻿using System.Text.Json.Serialization;
+
+namespace Sumpooj.Blazor.Models;
 
 public class LoginResponse
 {
-    public string Access_Token { get; set; } = "";
-    public int Expires_In { get; set; }
+    [JsonPropertyName("access_token")]
+    public string AccessToken { get; set; } = "";
+
+    [JsonPropertyName("refresh_token")]
+    public string RefreshToken { get; set; } = "";
+
+    [JsonPropertyName("user")]
+    public object? User { get; set; }
+
+    [JsonPropertyName("tenant")]
+    public object? Tenant { get; set; }
 }

@@ -20,6 +20,7 @@ import {
   TrendingUp, TrendingDown, ErrorOutline
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { apiClient } from '../../core/api/apiClient';
 
 interface DashboardStats {
   totalDrivers: number;
@@ -127,10 +128,10 @@ export default function DeliveryControlCenter() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/delivery/control-center/dashboard?date=${selectedDate}`);
-      if (!response.ok) throw new Error('Failed to fetch dashboard data');
-      const dashboardData = await response.json();
-      setData(dashboardData);
+      const response = await apiClient.get<DashboardData>('/delivery/control-center/dashboard', {
+        params: { date: selectedDate },
+      });
+      setData(response.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {

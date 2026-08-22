@@ -1,4 +1,5 @@
 import '../database/app_database.dart';
+import '../../models/gst_calculation_type.dart';
 import '../../services/barcode_service.dart';
 
 enum ProductSort {
@@ -17,6 +18,7 @@ class ProductRecord {
   final int sellingPricePaise;
   final int? purchasePricePaise;
   final int gstPercent;
+  final GstCalculationType gstCalculationType;
   final String sku;
   final String manufacturerBarcode;
   final String florapriseBarcode;
@@ -39,6 +41,7 @@ class ProductRecord {
     required this.sellingPricePaise,
     required this.purchasePricePaise,
     required this.gstPercent,
+    this.gstCalculationType = GstCalculationType.inclusive,
     required this.sku,
     required this.manufacturerBarcode,
     required this.florapriseBarcode,
@@ -62,6 +65,7 @@ class ProductUpsertInput {
   final int sellingPricePaise;
   final int? purchasePricePaise;
   final int gstPercent;
+  final GstCalculationType gstCalculationType;
   final String sku;
   final String manufacturerBarcode;
   final String florapriseBarcode;
@@ -79,6 +83,7 @@ class ProductUpsertInput {
     required this.sellingPricePaise,
     this.purchasePricePaise,
     this.gstPercent = 12,
+    this.gstCalculationType = GstCalculationType.inclusive,
     this.sku = '',
     this.manufacturerBarcode = '',
     this.florapriseBarcode = '',
@@ -97,6 +102,7 @@ class ProductLookupRecord {
   final String name;
   final int sellingPricePaise;
   final int gstPercent;
+  final GstCalculationType gstCalculationType;
   final bool trackInventory;
 
   const ProductLookupRecord({
@@ -105,6 +111,7 @@ class ProductLookupRecord {
     required this.name,
     required this.sellingPricePaise,
     required this.gstPercent,
+    this.gstCalculationType = GstCalculationType.inclusive,
     required this.trackInventory,
   });
 }
@@ -122,6 +129,7 @@ class ProductInventoryRecord {
   final int sellingPricePaise;
   final int? purchasePricePaise;
   final int gstPercent;
+  final GstCalculationType gstCalculationType;
   final bool trackInventory;
   final bool active;
   final bool favorite;
@@ -141,6 +149,7 @@ class ProductInventoryRecord {
     required this.sellingPricePaise,
     required this.purchasePricePaise,
     required this.gstPercent,
+    this.gstCalculationType = GstCalculationType.inclusive,
     required this.trackInventory,
     required this.active,
     required this.favorite,
@@ -327,6 +336,7 @@ class ProductRepository {
       'selling_price_paise': input.sellingPricePaise,
       'purchase_price_paise': input.purchasePricePaise,
       'gst_percent': input.gstPercent,
+      'gst_calculation_type': input.gstCalculationType.storageValue,
       'sku': input.sku.trim().isEmpty ? null : input.sku.trim(),
       'barcode': input.manufacturerBarcode.trim().isEmpty
           ? null
@@ -377,6 +387,7 @@ class ProductRepository {
         'selling_price_paise': input.sellingPricePaise,
         'purchase_price_paise': input.purchasePricePaise,
         'gst_percent': input.gstPercent,
+        'gst_calculation_type': input.gstCalculationType.storageValue,
         'sku': input.sku.trim().isEmpty ? null : input.sku.trim(),
         'barcode': input.manufacturerBarcode.trim().isEmpty
             ? null
@@ -491,6 +502,7 @@ class ProductRepository {
           LIMIT 1
         ) AS latest_purchase_price_paise,
         p.gst_percent,
+        p.gst_calculation_type,
         p.track_inventory,
         p.active,
         p.is_favorite,
@@ -522,6 +534,9 @@ class ProductRepository {
         sellingPricePaise: row['selling_price_paise'] as int,
         purchasePricePaise: row['latest_purchase_price_paise'] as int?,
         gstPercent: row['gst_percent'] as int,
+        gstCalculationType: GstCalculationType.fromStorage(
+          row['gst_calculation_type'] as String?,
+        ),
         trackInventory: (row['track_inventory'] as int? ?? 0) == 1,
         active: (row['active'] as int? ?? 1) == 1,
         favorite: (row['is_favorite'] as int? ?? 0) == 1,
@@ -575,6 +590,7 @@ class ProductRepository {
         p.selling_price_paise,
         p.purchase_price_paise,
         p.gst_percent,
+        p.gst_calculation_type,
         p.track_inventory,
         p.active,
         p.is_favorite,
@@ -647,6 +663,9 @@ class ProductRepository {
       sellingPricePaise: row['selling_price_paise'] as int,
       purchasePricePaise: row['purchase_price_paise'] as int?,
       gstPercent: row['gst_percent'] as int,
+      gstCalculationType: GstCalculationType.fromStorage(
+        row['gst_calculation_type'] as String?,
+      ),
       trackInventory: (row['track_inventory'] as int? ?? 0) == 1,
       active: (row['active'] as int? ?? 1) == 1,
       favorite: (row['is_favorite'] as int? ?? 0) == 1,
@@ -667,6 +686,7 @@ class ProductRepository {
       name: matched.name,
       sellingPricePaise: matched.sellingPricePaise,
       gstPercent: matched.gstPercent,
+      gstCalculationType: matched.gstCalculationType,
       trackInventory: matched.trackInventory,
     );
   }
@@ -694,6 +714,9 @@ class ProductRepository {
       sellingPricePaise: (row['selling_price_paise'] as int?) ?? 0,
       purchasePricePaise: row['purchase_price_paise'] as int?,
       gstPercent: (row['gst_percent'] as int?) ?? 0,
+      gstCalculationType: GstCalculationType.fromStorage(
+        row['gst_calculation_type'] as String?,
+      ),
       sku: sku,
       manufacturerBarcode: manufacturer,
       florapriseBarcode: floraprise,

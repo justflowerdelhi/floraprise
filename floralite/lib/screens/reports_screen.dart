@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -13,9 +14,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reports'),
-      ),
+      appBar: const AppHeader(title: 'Reports'),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -41,6 +40,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
             description: 'Who are my best customers?',
             color: Colors.purple,
             onTap: () => Navigator.pushNamed(context, '/reports/top-customers'),
+          ),
+          const SizedBox(height: 12),
+          _ReportCard(
+            icon: Icons.redeem_rounded,
+            title: 'Rewards Report',
+            description: 'Track points earned, redeemed and outstanding.',
+            color: Colors.green,
+            onTap: () => Navigator.pushNamed(context, '/reports/rewards'),
           ),
           const SizedBox(height: 12),
           _ReportCard(

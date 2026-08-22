@@ -44,6 +44,17 @@ interface Driver {
   };
 }
 
+interface DriverLocationResponse {
+  driverId: string;
+  driverName: string;
+  driverPhone: string;
+  latitude: number;
+  longitude: number;
+  speedKph: number;
+  lastUpdate?: string;
+  isOnline: boolean;
+}
+
 export default function DeliveryLiveMap() {
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
@@ -55,8 +66,28 @@ export default function DeliveryLiveMap() {
 
   const fetchDrivers = useCallback(async () => {
     try {
-      const response = await apiClient.get('/delivery/drivers/active');
-      setDrivers(response.data || []);
+      const response = await apiClient.get<{ items: DriverLocationResponse[] }>(
+        '/delivery/control-center/drivers/locations',
+      );
+      const mappedDrivers: Driver[] = (response.data.items || []).map((driver) => ({
+        id: driver.driverId,
+        name: driver.driverName,
+        phone: driver.driverPhone,
+        status: driver.isOnline ? 'Moving' : 'Offline',
+        currentLocation: {
+          lat: driver.latitude,
+          lng: driver.longitude,
+          accuracy: 0,
+          speed: driver.speedKph / 3.6,
+          heading: 0,
+          updatedAt: driver.lastUpdate || new Date().toISOString(),
+        },
+      }));
+      setDrivers(mappedDrivers);
+      const firstLocation = mappedDrivers[0]?.currentLocation;
+      if (firstLocation) {
+        setMapCenter({ lat: firstLocation.lat, lng: firstLocation.lng });
+      }
       setError(null);
     } catch (err) {
       console.error('Failed to fetch drivers:', err);
@@ -121,7 +152,7 @@ export default function DeliveryLiveMap() {
           </Box>
         ) : (
           <LoadScript
-            googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || ''}
+            googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}
             onLoad={() => setIsLoaded(true)}
           >
             {isLoaded && (

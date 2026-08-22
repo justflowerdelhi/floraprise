@@ -324,14 +324,20 @@
             return;
         }
 
+        if (_target == "selected_device" && _selectedDevice == null)
+        {
+            Snackbar.Add("Select a device before sending.", Severity.Warning);
+            return;
+        }
+
         _sending = true;
         try
         {
             var request = new NotificationRequest
             {
                 Type = _notificationType,
-                RecipientType = _recipientGroup,
-                CompanyIds = GetTargetCompanyIds(),
+                RecipientType = GetApiRecipientType(),
+                CompanyIds = _target == "selected_subscribers" ? GetTargetCompanyIds() : null,
                 DeviceId = _target == "selected_device" ? _selectedDevice?.MobileDeviceId : null,
                 Title = _title,
                 Message = _body
@@ -339,9 +345,24 @@
             var ok = await NotificationService.SendNotificationAsync(request);
             Snackbar.Add(ok ? "Notification sent." : "Send failed — check API.", ok ? Severity.Success : Severity.Error);
         }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Send failed: {ex.Message}", Severity.Error);
+        }
         finally
         {
             _sending = false;
         }
+    }
+
+    private string GetApiRecipientType()
+    {
+        return _target switch
+        {
+            "all_devices"      => "all",
+            "selected_device"  => "onedevice",
+            "online_devices"   => "onlinedevices",
+            _                  => "selectedcompanies",
+        };
     }
 }

@@ -10,8 +10,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../controllers/voice_dictation_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../managers/business_settings_manager.dart';
+import '../managers/pricing_manager.dart';
 import '../data/repositories/customer_repository.dart';
+import '../data/repositories/order_repository.dart';
 import '../data/repositories/product_repository.dart';
+import '../models/gst_calculation_type.dart';
+import '../models/order_workspace_models.dart';
 import '../models/payment_split.dart';
 import '../models/walk_in_enums.dart';
 import '../models/walk_in_line_item.dart';
@@ -20,15 +24,18 @@ import '../providers/design_provider.dart';
 import '../providers/printer_provider.dart';
 import '../providers/walk_in_session_provider.dart';
 import '../services/discount_service.dart';
+import '../services/reward_summary_formatter.dart';
 import '../services/speech_recognition_service.dart';
 import '../utils/delivery_slot_utils.dart';
 import '../utils/locale_formatter.dart';
+import '../widgets/app_header.dart';
 import '../widgets/bill_discount_dialog.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/line_item_discount_dialog.dart';
 import '../widgets/product_picker_sheet.dart';
 import '../widgets/quantity_input_stepper.dart';
+import '../widgets/reward_summary_card.dart';
 import '../widgets/voice_dictation_field_header.dart';
 import 'my_designs_screen.dart';
 
@@ -64,6 +71,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   final BusinessSettingsManager _businessSettingsManager =
       BusinessSettingsManager();
+  final PricingManager _pricingManager = PricingManager();
   final CustomerRepository _customerRepository = CustomerRepository();
   final ProductRepository _productRepository = ProductRepository();
   final List<_ProductItem> _products = [];
@@ -116,6 +124,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   String _businessAddress = '';
   String? _billDiscountType;
   int? _billDiscountValue;
+  int _rewardPointsRedeemed = 0;
+  int _rewardDiscountAmountPaise = 0;
   bool _isOrderSaved = false;
   int? _savedOrderId;
 
@@ -206,87 +216,40 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   }
 
   int get _subtotalPaise {
-    var subtotal = 0;
-    for (final product in _products) {
-      final unitPaise = _parseCurrencyToPaise(product.price);
-      final lineSubtotal = unitPaise * product.quantity;
-      var lineTotal = lineSubtotal;
-      if (product.discountType != null && product.discountValue != null) {
-        final lineDiscount = DiscountService.calculateLineDiscount(
-          lineSubtotalPaise: lineSubtotal,
-          discountType: product.discountType!,
-          discountValue: product.discountValue!,
-        );
-        lineTotal -= lineDiscount;
-      }
-      subtotal += lineTotal;
-    }
-    return subtotal;
+    return _orderTotals.subtotalPaise;
   }
 
   int get _gstAmountPaise {
-    if (!_gstRegistered) {
-      return 0;
-    }
-
-    var gstTotal = 0;
-    for (final product in _products) {
-      final unitPaise = _parseCurrencyToPaise(product.price);
-      final lineSubtotal = unitPaise * product.quantity;
-      var lineTotal = lineSubtotal;
-      if (product.discountType != null && product.discountValue != null) {
-        final lineDiscount = DiscountService.calculateLineDiscount(
-          lineSubtotalPaise: lineSubtotal,
-          discountType: product.discountType!,
-          discountValue: product.discountValue!,
-        );
-        lineTotal -= lineDiscount;
-      }
-
-      final lineGst = (lineTotal * product.gstPercent / 100).round();
-      gstTotal += lineGst;
-    }
-
-    return gstTotal;
+    return _orderTotals.gstTotalPaise;
   }
 
   int get _totalAmountPaise {
-    var subtotal = _subtotalPaise;
-
-    var gstTotal = 0;
-    for (final product in _products) {
-      final unitPaise = _parseCurrencyToPaise(product.price);
-      final lineSubtotal = unitPaise * product.quantity;
-      var lineTotal = lineSubtotal;
-      if (product.discountType != null && product.discountValue != null) {
-        final lineDiscount = DiscountService.calculateLineDiscount(
-          lineSubtotalPaise: lineSubtotal,
-          discountType: product.discountType!,
-          discountValue: product.discountValue!,
-        );
-        lineTotal -= lineDiscount;
-      }
-
-      final lineGst = (lineTotal * product.gstPercent / 100).round();
-      gstTotal += lineGst;
-    }
-
-    final billDiscount = _billDiscountType != null && _billDiscountValue != null
-        ? DiscountService.calculateBillDiscount(
-            subtotalPaise: subtotal,
-            discountType: _billDiscountType!,
-            discountValue: _billDiscountValue!,
-          )
-        : 0;
-
-    final afterBillDiscount = subtotal - billDiscount;
-    final unrounded = afterBillDiscount + gstTotal;
-    final paise = unrounded % 100;
-    final roundOff = paise >= 50 ? (100 - paise) : -paise;
-    final grandTotal = unrounded + roundOff;
-
-    return grandTotal;
+    return _orderTotals.grandTotalPaise;
   }
+
+  OrderTotals get _orderTotals => _pricingManager.computeTotals(
+        lines: _walkInLines,
+        billDiscountType: _billDiscountType,
+        billDiscountValue: _billDiscountValue,
+        rewardDiscountPaise: _rewardDiscountAmountPaise,
+      );
+
+  List<WalkInLineItem> get _walkInLines => _products
+      .map(
+        (product) => WalkInLineItem(
+          productId: product.trackInventory ? product.productId : null,
+          description: product.designId,
+          quantity: product.quantity,
+          unitPricePaise: _parseCurrencyToPaise(product.price),
+          discountPaise: product.discountValue ?? 0,
+          discountType: product.discountType,
+          discountValue: product.discountValue,
+          gstPercent: _gstRegistered ? product.gstPercent : 0,
+          gstCalculationType: product.gstCalculationType,
+          source: product.source,
+        ),
+      )
+      .toList();
 
   Future<void> _loadDraftSession() async {
     final provider = context.read<WalkInSessionProvider>();
@@ -320,6 +283,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               discountType: line.discountType,
               discountValue: line.discountValue,
               gstPercent: line.gstPercent,
+              gstCalculationType: line.gstCalculationType,
               source: line.source,
             ),
           ),
@@ -410,8 +374,9 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         _handleBackWithUnsavedChanges();
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(l10n.delivery),
+        appBar: AppHeader(
+          title: l10n.delivery,
+          showBackButton: true,
           actions: [
             TextButton(
               onPressed: _isOrderSaved
@@ -478,25 +443,26 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   }
 
   Future<void> _handleBackWithUnsavedChanges() async {
+    final l10n = AppLocalizations.of(context)!;
     final action = await showDialog<_UnsavedChangesAction>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('You have unsaved changes'),
+        title: Text(l10n.unsavedChangesTitle),
         actions: [
           TextButton(
             onPressed: () =>
                 Navigator.pop(context, _UnsavedChangesAction.cancel),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () =>
                 Navigator.pop(context, _UnsavedChangesAction.discard),
-            child: const Text('Discard'),
+            child: Text(l10n.discard),
           ),
           FilledButton(
             onPressed: () =>
                 Navigator.pop(context, _UnsavedChangesAction.saveDraft),
-            child: const Text('Save Draft'),
+            child: Text(l10n.saveDraft),
           ),
         ],
       ),
@@ -587,7 +553,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                                 product.discount!.isNotEmpty) ...[
                               const SizedBox(height: 2),
                               Text(
-                                'Discount: ${product.discount}',
+                                '${l10n.discountLabel}${product.discount}',
                                 style: TextStyle(
                                   color: Colors.green.shade700,
                                   fontSize: 12,
@@ -613,24 +579,25 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                           }
                         },
                         itemBuilder: (context) => [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'discount',
                             child: Row(
                               children: [
-                                Icon(Icons.discount, size: 18),
-                                SizedBox(width: 8),
-                                Text('Discount'),
+                                const Icon(Icons.discount, size: 18),
+                                const SizedBox(width: 8),
+                                Text(l10n.discount),
                               ],
                             ),
                           ),
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'remove',
                             child: Row(
                               children: [
-                                Icon(Icons.delete, size: 18, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text('Remove',
-                                    style: TextStyle(color: Colors.red)),
+                                const Icon(Icons.delete,
+                                    size: 18, color: Colors.red),
+                                const SizedBox(width: 8),
+                                Text(l10n.remove,
+                                    style: const TextStyle(color: Colors.red)),
                               ],
                             ),
                           ),
@@ -660,7 +627,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Rate ${product.price}',
+                          '${l10n.rate} ${product.price}',
                           style: TextStyle(
                             color: Colors.grey.shade600,
                             fontSize: 12,
@@ -710,7 +677,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 icon: const Icon(Icons.add),
                 label: Text(
                   _products.isEmpty
-                      ? 'Add Product to cart'
+                      ? l10n.addProductToCart
                       : l10n.addAnotherProduct,
                 ),
                 style: OutlinedButton.styleFrom(
@@ -880,7 +847,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                           color: colorScheme.primary, size: 20),
                       title: Text(
                         _customDeliveryTime == null
-                            ? 'Select Custom Time'
+                            ? l10n.selectCustomTime
                             : '${_customDeliveryTime!.hour}:${_customDeliveryTime!.minute.toString().padLeft(2, '0')}',
                         style: const TextStyle(fontSize: 14),
                       ),
@@ -894,7 +861,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 controller: _deliveryChargeController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText: 'Delivery Charge',
+                  labelText: l10n.deliveryCharge,
                   prefixIcon: const Icon(Icons.local_shipping),
                   prefixText: '₹',
                   border: OutlineInputBorder(
@@ -954,9 +921,9 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Customer (Buyer)',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        Text(
+          l10n.customerBuyer,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         AppCard(
@@ -967,14 +934,14 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _showCustomerSearch,
                   icon: const Icon(Icons.search),
-                  label: const Text('Search Customer'),
+                  label: Text(l10n.searchCustomer),
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _customerNameController,
                 decoration: InputDecoration(
-                  labelText: 'Name',
+                  labelText: l10n.name,
                   prefixIcon: const Icon(Icons.person),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -988,7 +955,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               TextField(
                 controller: _customerPhoneController,
                 decoration: InputDecoration(
-                  labelText: 'Mobile',
+                  labelText: l10n.phoneNumber,
                   prefixIcon: const Icon(Icons.phone),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -1030,13 +997,30 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
-          Text('Phone: ${_customerPhoneController.text.trim()}'),
+          Text(
+              '${AppLocalizations.of(context)!.phone}: ${_customerPhoneController.text.trim()}'),
           const SizedBox(height: 8),
+          _buildCustomerInfoRow(AppLocalizations.of(context)!.purchaseHistory,
+              '${_customerInfo!.previousOrders} ${AppLocalizations.of(context)!.orders}'),
+          _buildCustomerInfoRow(AppLocalizations.of(context)!.lifetimePurchase,
+              _customerInfo!.lifetimePurchase),
+          _buildCustomerInfoRow(AppLocalizations.of(context)!.lastOrder,
+              _customerInfo!.lastOrder),
           _buildCustomerInfoRow(
-              'Purchase History', '${_customerInfo!.previousOrders} Orders'),
-          _buildCustomerInfoRow(
-              'Lifetime Purchase', _customerInfo!.lifetimePurchase),
-          _buildCustomerInfoRow('Last Order', _customerInfo!.lastOrder),
+              'Reward Balance', '${_customerInfo!.rewardPoints} Points'),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _products.isEmpty || _customerInfo!.rewardPoints <= 0
+                  ? null
+                  : _applyMaximumRewards,
+              icon: const Icon(Icons.redeem, size: 18),
+              label: Text(_rewardPointsRedeemed > 0
+                  ? 'Using $_rewardPointsRedeemed Points'
+                  : 'Use Reward Points'),
+            ),
+          ),
         ],
       ),
     );
@@ -1065,7 +1049,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                     _syncSenderFromCustomerIfNeeded();
                   });
                 },
-                title: const Text('Sender is same as Customer'),
+                title: Text(l10n.senderSameAsCustomer),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -1162,11 +1146,11 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             children: [
               DropdownButtonFormField<String>(
                 initialValue: _paymentStatus,
-                decoration: const InputDecoration(labelText: 'Payment Status'),
-                items: const [
-                  DropdownMenuItem(value: 'Paid', child: Text('Paid')),
-                  DropdownMenuItem(value: 'Partial', child: Text('Partial')),
-                  DropdownMenuItem(value: 'Pending', child: Text('Pending')),
+                decoration: InputDecoration(labelText: l10n.paymentStatus),
+                items: [
+                  DropdownMenuItem(value: 'Paid', child: Text(l10n.paid)),
+                  DropdownMenuItem(value: 'Partial', child: Text(l10n.partial)),
+                  DropdownMenuItem(value: 'Pending', child: Text(l10n.pending)),
                 ],
                 onChanged: (value) {
                   if (value == null) return;
@@ -1183,22 +1167,24 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               ),
               if (_paymentStatus != 'Pending') ...[
                 const SizedBox(height: 12),
-                const Text(
-                  'Payment Mode',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                Text(
+                  l10n.paymentMode,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    _buildPaymentChip('Cash', Icons.payments, colorScheme),
+                    _buildPaymentChip(l10n.cash, Icons.payments, colorScheme),
                     _buildPaymentChip(
-                        'UPI', Icons.qr_code_scanner, colorScheme),
-                    _buildPaymentChip('Card', Icons.credit_card, colorScheme),
+                        l10n.upi, Icons.qr_code_scanner, colorScheme),
                     _buildPaymentChip(
-                        'Bank', Icons.account_balance, colorScheme),
-                    _buildPaymentChip('Other', Icons.more_horiz, colorScheme),
+                        l10n.card, Icons.credit_card, colorScheme),
+                    _buildPaymentChip(
+                        l10n.bank, Icons.account_balance, colorScheme),
+                    _buildPaymentChip(
+                        l10n.other, Icons.more_horiz, colorScheme),
                   ],
                 ),
               ],
@@ -1208,8 +1194,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 readOnly: _paymentStatus != 'Partial',
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Amount Received',
+                decoration: InputDecoration(
+                  labelText: l10n.amountReceived,
                   prefixText: '₹ ',
                 ),
                 onChanged: (_) => setState(() {}),
@@ -1218,7 +1204,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Balance'),
+                  Text(l10n.balance),
                   Text(
                     _formatPaise(context, balancePaise),
                     style: TextStyle(
@@ -1339,7 +1325,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Bill Discount',
+                      l10n.billDiscount,
                       style: TextStyle(
                         fontSize: 14,
                         color: _billDiscountType != null
@@ -1355,7 +1341,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                               discountType: _billDiscountType!,
                               discountValue: _billDiscountValue!,
                             )
-                          : 'Add',
+                          : l10n.add,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -1367,6 +1353,30 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                   ],
                 ),
               ),
+              if (_rewardDiscountAmountPaise > 0) ...[
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Reward Discount',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '-${_formatPaise(context, _rewardDiscountAmountPaise)}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const Divider(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1405,9 +1415,10 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'Place Delivery Order',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  child: Text(
+                    l10n.placeDeliveryOrder,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -1444,8 +1455,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 const SizedBox(height: 16),
                 ListTile(
                   leading: const Icon(Icons.inventory_2_rounded, size: 32),
-                  title: const Text('Products'),
-                  subtitle: const Text('Select from Product catalogue'),
+                  title: Text(l10n.products),
+                  subtitle: Text(l10n.selectFromProductCatalogue),
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _pickFromProducts(context);
@@ -1462,7 +1473,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.photo, size: 32),
-                  title: const Text('Gallery'),
+                  title: Text(l10n.gallery),
                   subtitle: Text(l10n.captureProductPhoto),
                   onTap: () {
                     Navigator.pop(sheetContext);
@@ -1521,6 +1532,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         pricePaise: selected.sellingPricePaise,
         unit: selected.defaultUnit,
         gstPercent: _gstRegistered ? selected.gstPercent : 0,
+        gstCalculationType: selected.gstCalculationType,
       );
     });
   }
@@ -1544,16 +1556,17 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           pricePaise: matched.sellingPricePaise,
           unit: matched.defaultUnit,
           gstPercent: _gstRegistered ? matched.gstPercent : 0,
+          gstCalculationType: matched.gstCalculationType,
         );
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Added to cart.')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.addedToCart)),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please try again.')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.pleaseTryAgain)),
       );
     }
   }
@@ -1565,6 +1578,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     required int pricePaise,
     required String unit,
     required int gstPercent,
+    required GstCalculationType gstCalculationType,
   }) {
     final existingIndex = _products.indexWhere(
       (item) => item.productId == productId && item.source == 'product',
@@ -1586,6 +1600,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         price: _formatPaise(context, pricePaise),
         unit: unit,
         gstPercent: gstPercent,
+        gstCalculationType: gstCalculationType,
         source: 'product',
       ),
     );
@@ -1596,14 +1611,14 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('No product found.'),
+        title: Text(l10n.noProductFound),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/products');
             },
-            child: const Text('Create Product'),
+            child: Text(l10n.createProduct),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context),
@@ -1808,6 +1823,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                           price: '₹$amountRupees',
                           gstPercent:
                               _gstRegistered ? (gstPercentOverride ?? 12) : 0,
+                          gstCalculationType: GstCalculationType.inclusive,
                           source: source,
                           attachmentPath: attachmentPath,
                           note: note,
@@ -1915,6 +1931,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                   quantity: 1,
                   price: '₹$amount',
                   gstPercent: _gstRegistered ? 12 : 0,
+                  gstCalculationType: GstCalculationType.inclusive,
                   discount: discountController.text.isNotEmpty
                       ? discountController.text
                       : null,
@@ -2026,6 +2043,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             ? 'N/A'
             : _formatDate(selected.lastOrderAt!),
         favouriteDesign: 'N/A',
+        rewardPoints: selected.rewardPoints,
       );
       _syncSenderFromCustomerIfNeeded();
     });
@@ -2048,6 +2066,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     setState(() {
       if (customerName == null || customerName.isEmpty) {
         _customerInfo = null;
+        _rewardPointsRedeemed = 0;
+        _rewardDiscountAmountPaise = 0;
         return;
       }
 
@@ -2060,6 +2080,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           customerStats?['lifetimePurchasePaise'] as int? ?? 0;
       final lastOrderDate = customerStats?['lastOrderDate'] as String?;
       final favouriteDesign = customerStats?['favouriteDesign'] as String?;
+      final rewardPoints = customerStats?['rewardPoints'] as int? ?? 0;
 
       _customerInfo = _CustomerInfo(
         previousOrders: previousOrders,
@@ -2067,8 +2088,20 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             '₹${(lifetimePurchasePaise / 100).toStringAsFixed(0)}',
         lastOrder: lastOrderDate != null ? _formatDate(lastOrderDate) : 'N/A',
         favouriteDesign: favouriteDesign ?? 'N/A',
+        rewardPoints: rewardPoints,
       );
       _syncSenderFromCustomerIfNeeded();
+    });
+  }
+
+  Future<void> _applyMaximumRewards() async {
+    _syncProviderSession();
+    final provider = context.read<WalkInSessionProvider>();
+    final session = await provider.applyMaximumRewards();
+    if (!mounted) return;
+    setState(() {
+      _rewardPointsRedeemed = session.rewardPointsRedeemed;
+      _rewardDiscountAmountPaise = session.rewardDiscountAmountPaise;
     });
   }
 
@@ -2094,6 +2127,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           quantity: product.quantity,
           unitPricePaise: _parseCurrencyToPaise(product.price),
           gstPercent: product.gstPercent,
+          gstCalculationType: product.gstCalculationType,
           discountPaise: product.discountValue ?? 0,
           discountType: product.discountType,
           discountValue: product.discountValue,
@@ -2284,12 +2318,30 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   Future<void> _showCompletionDialog(int orderId) {
     final l10n = AppLocalizations.of(context)!;
+    final rewardFuture =
+        context.read<WalkInSessionProvider>().getOrderRewardSummary(orderId);
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Order Placed Successfully'),
-        content: Text('Order #$orderId'),
+        title: const Text('Order Completed'),
+        content: FutureBuilder<OrderRewardSummary?>(
+          future: rewardFuture,
+          builder: (context, snapshot) {
+            final summary = snapshot.data;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Order #$orderId'),
+                if (summary != null && summary.hasActivity) ...[
+                  const SizedBox(height: 12),
+                  RewardSummaryCard(summary: summary, compact: true),
+                ],
+              ],
+            );
+          },
+        ),
         actions: [
           TextButton.icon(
             onPressed: () {
@@ -2297,7 +2349,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               _resetForNextOrder();
             },
             icon: const Icon(Icons.done),
-            label: const Text('New Order'),
+            label: const Text('Done'),
           ),
           OutlinedButton.icon(
             onPressed: () async {
@@ -2346,6 +2398,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       _customerInfo = null;
       _billDiscountType = null;
       _billDiscountValue = null;
+      _rewardPointsRedeemed = 0;
+      _rewardDiscountAmountPaise = 0;
       _isOrderSaved = false;
       _savedOrderId = null;
       _deliveryChargeController.text =
@@ -2410,21 +2464,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       WalkInSession(
         draftOrderId: current.draftOrderId,
         fulfilmentType: _fulfilmentType,
-        lines: _products
-            .map(
-              (product) => WalkInLineItem(
-                productId: product.trackInventory ? product.productId : null,
-                description: product.designId,
-                quantity: product.quantity,
-                unitPricePaise: _parseCurrencyToPaise(product.price),
-                discountPaise: product.discountValue ?? 0,
-                discountType: product.discountType,
-                discountValue: product.discountValue,
-                gstPercent: _gstRegistered ? product.gstPercent : 0,
-                source: product.source,
-              ),
-            )
-            .toList(),
+        lines: _walkInLines,
         customerPhone: _customerPhoneController.text.trim(),
         customerName: _customerNameController.text.trim(),
         recipientName: _recipientNameController.text.trim(),
@@ -2439,6 +2479,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         payments: _buildPayments(_totalAmountPaise),
         billDiscountType: _billDiscountType,
         billDiscountValue: _billDiscountValue,
+        rewardPointsRedeemed: _rewardPointsRedeemed,
+        rewardDiscountAmountPaise: _rewardDiscountAmountPaise,
       ),
     );
   }
@@ -2550,7 +2592,10 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       return;
     }
 
-    final message = _buildReceiptMessage(orderId);
+    final rewardSummary = await context
+        .read<WalkInSessionProvider>()
+        .getOrderRewardSummary(orderId);
+    final message = _buildReceiptMessage(orderId, rewardSummary);
     final waUri = Uri.parse(
       'https://wa.me/$phone?text=${Uri.encodeComponent(message)}',
     );
@@ -2579,33 +2624,36 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     return null;
   }
 
-  String _buildReceiptMessage(int orderId) {
+  String _buildReceiptMessage(int orderId, OrderRewardSummary? rewardSummary) {
+    final l10n = AppLocalizations.of(context)!;
     final lines = <String>[
       _shopName,
-      if (_businessPhone.isNotEmpty) 'Phone: $_businessPhone',
+      if (_businessPhone.isNotEmpty) '${l10n.phone}: $_businessPhone',
       if (_businessAddress.isNotEmpty) _businessAddress,
-      'Receipt',
-      'Order #$orderId',
+      l10n.receipt,
+      '${l10n.orderNumber}: #$orderId',
       '',
-      'Items:',
+      '${l10n.items}:',
       ..._products.map(
         (item) {
           final itemLine =
               '- ${item.designId} x${item.quantity} (${item.price})';
           if (item.discount != null && item.discount!.isNotEmpty) {
-            return '$itemLine (Discount: ${item.discount})';
+            return '$itemLine (${l10n.discountLabel}${item.discount})';
           }
           return itemLine;
         },
       ),
       '',
-      'Subtotal: ${_formatPaise(context, _subtotalPaise)}',
+      '${l10n.subtotal}: ${_formatPaise(context, _subtotalPaise)}',
       if (_billDiscountType != null && _billDiscountValue != null)
-        'Bill Discount: ${DiscountService.getDiscountDisplayText(discountType: _billDiscountType!, discountValue: _billDiscountValue!)}',
-      if (_gstRegistered) 'GST: ${_formatPaise(context, _gstAmountPaise)}',
-      'Grand Total: ${_formatPaise(context, _totalAmountPaise)}',
+        '${l10n.billDiscount}: ${DiscountService.getDiscountDisplayText(discountType: _billDiscountType!, discountValue: _billDiscountValue!)}',
+      if (_gstRegistered)
+        '${l10n.gst}: ${_formatPaise(context, _gstAmountPaise)}',
+      '${l10n.grandTotal}: ${_formatPaise(context, _totalAmountPaise)}',
+      buildRewardWhatsAppText(rewardSummary),
     ];
-    return lines.join('\n');
+    return lines.where((line) => line.trim().isNotEmpty).join('\n');
   }
 
   String _quantityUnitLabel(_ProductItem product) {
@@ -2651,10 +2699,11 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
     _products.add(
       _ProductItem(
-        designId: 'Delivery Charge',
+        designId: AppLocalizations.of(context)!.deliveryCharge,
         quantity: 1,
         price: '₹$amountRupees',
         gstPercent: _gstRegistered ? 12 : 0,
+        gstCalculationType: GstCalculationType.inclusive,
         source: _deliveryChargeSource,
       ),
     );
@@ -2805,6 +2854,7 @@ class _ProductItem {
   final String? discountType;
   final int? discountValue;
   final int gstPercent;
+  final GstCalculationType gstCalculationType;
   final String source;
   final String? attachmentPath;
   final String? note;
@@ -2820,6 +2870,7 @@ class _ProductItem {
     this.discountType,
     this.discountValue,
     this.gstPercent = 12,
+    this.gstCalculationType = GstCalculationType.inclusive,
     this.source = 'manual',
     this.attachmentPath,
     this.note,
@@ -2842,6 +2893,7 @@ class _ProductItem {
       discountType: discountType ?? this.discountType,
       discountValue: discountValue ?? this.discountValue,
       gstPercent: gstPercent,
+      gstCalculationType: gstCalculationType,
       source: source,
       attachmentPath: attachmentPath,
       note: note,
@@ -2889,6 +2941,7 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.75,
       child: Column(
@@ -2898,10 +2951,10 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
             child: TextField(
               controller: _controller,
               autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Search Customer',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.searchCustomer,
+                prefixIcon: const Icon(Icons.search),
+                border: const OutlineInputBorder(),
               ),
               onChanged: _search,
             ),
@@ -2910,7 +2963,7 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _results.isEmpty
-                    ? const Center(child: Text('No customers found'))
+                    ? Center(child: Text(l10n.noCustomersFound))
                     : ListView.separated(
                         itemCount: _results.length,
                         separatorBuilder: (_, __) => const Divider(height: 1),
@@ -2919,7 +2972,8 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
                           return ListTile(
                             title: Text(customer.name),
                             subtitle: Text(customer.phone),
-                            trailing: Text('${customer.totalOrders} orders'),
+                            trailing:
+                                Text('${customer.totalOrders} ${l10n.orders}'),
                             onTap: () => Navigator.pop(context, customer),
                           );
                         },
@@ -2936,11 +2990,13 @@ class _CustomerInfo {
   final String lifetimePurchase;
   final String lastOrder;
   final String favouriteDesign;
+  final int rewardPoints;
 
   _CustomerInfo({
     required this.previousOrders,
     required this.lifetimePurchase,
     required this.lastOrder,
     required this.favouriteDesign,
+    required this.rewardPoints,
   });
 }

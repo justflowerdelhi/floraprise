@@ -1734,4 +1734,94 @@ class AppLocalizationsHi extends AppLocalizations {
   @override
   String get resetOnboardingDialogMessage =>
       'इससे पहली बार वाला ऑनबोर्डिंग फिर दिखेगा। जारी रखें?';
+
+  @override
+  String get unsavedChangesTitle => 'आपके बदलाव सहेजे नहीं गए हैं';
+
+  @override
+  String get discard => 'छोड़ें';
+
+  @override
+  String get remove => 'हटाएं';
+
+  @override
+  String get addProductToCart => 'कार्ट में उत्पाद जोड़ें';
+
+  @override
+  String get rate => 'दर';
+
+  @override
+  String get billDiscount => 'बिल छूट';
+
+  @override
+  String get completeSale => 'बिक्री पूरी करें';
+
+  @override
+  String get placePickupOrder => 'पिकअप ऑर्डर रखें';
+
+  @override
+  String get placeDeliveryOrder => 'डिलीवरी ऑर्डर रखें';
+
+  @override
+  String get productCatalogue => 'उत्पाद कैटलॉग';
+
+  @override
+  String get selectFromProductCatalogue => 'उत्पाद कैटलॉग से चुनें';
+
+  @override
+  String get gallery => 'गैलरी';
+
+  @override
+  String get addedToCart => 'कार्ट में जोड़ा गया।';
+
+  @override
+  String get noProductFound => 'कोई उत्पाद नहीं मिला।';
+
+  @override
+  String get createProduct => 'उत्पाद बनाएं';
+
+  @override
+  String get selectCustomTime => 'कस्टम समय चुनें';
+
+  @override
+  String get deliveryCharge => 'डिलीवरी शुल्क';
+
+  @override
+  String get customerBuyer => 'ग्राहक (खरीदार)';
+
+  @override
+  String get searchCustomer => 'ग्राहक खोजें';
+
+  @override
+  String get phone => 'फोन';
+
+  @override
+  String get purchaseHistory => 'खरीद इतिहास';
+
+  @override
+  String get senderSameAsCustomer => 'भेजने वाला ग्राहक के समान है';
+
+  @override
+  String get partial => 'आंशिक';
+
+  @override
+  String get paymentMode => 'भुगतान मोड';
+
+  @override
+  String get bank => 'बैंक';
+
+  @override
+  String get other => 'अन्य';
+
+  @override
+  String get amountReceived => 'प्राप्त राशि';
+
+  @override
+  String get balance => 'बकाया';
+
+  @override
+  String get receipt => 'रसीद';
+
+  @override
+  String get items => 'आइटम';
 }

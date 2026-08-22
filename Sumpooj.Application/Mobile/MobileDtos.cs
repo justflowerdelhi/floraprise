@@ -20,6 +20,7 @@ public sealed record RegisterMobileCustomerRequest(
     string AppVersion,
     string? PushToken,
     string? IpAddress,
+    Guid IdentityUserId,
     Guid? ActorUserId);
 
 public sealed record RegisterMobileCustomerResult(

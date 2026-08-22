@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/order_workspace_models.dart';
 import '../models/walk_in_enums.dart';
 import '../models/walk_in_line_item.dart';
 import '../models/walk_in_session.dart';
@@ -107,6 +108,16 @@ class WalkInSessionProvider extends ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<WalkInSession> applyMaximumRewards() async {
+    _session = await _walkInManager.applyMaximumRewards(_session);
+    notifyListeners();
+    return _session;
+  }
+
+  Future<OrderRewardSummary?> getOrderRewardSummary(int orderId) {
+    return _walkInManager.getOrderRewardSummary(orderId);
   }
 
   void setSinglePayment(PaymentMethod method) {

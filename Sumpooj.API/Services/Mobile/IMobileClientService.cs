@@ -5,6 +5,7 @@ namespace Sumpooj.API.Services.Mobile;
 public interface IMobileClientService
 {
     Task<MobileAuthTokenResponse> LoginAsync(MobileApiLoginRequest request, CancellationToken cancellationToken = default);
+    Task<MobileAuthTokenResponse> LoginAsync(MobileApiLoginRequest request, RegisterMobileCustomerRequest registrationRequest, CancellationToken cancellationToken = default);
     Task<MobileAuthTokenResponse> RefreshAsync(MobileApiRefreshRequest request, CancellationToken cancellationToken = default);
     Task LogoutAsync(Guid companyId, Guid mobileUserId, string deviceId, MobileApiLogoutRequest request, CancellationToken cancellationToken = default);
 

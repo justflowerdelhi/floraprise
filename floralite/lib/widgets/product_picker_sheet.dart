@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../data/repositories/product_repository.dart';
+import '../providers/inventory_provider.dart';
+import '../screens/purchase_list_screen.dart';
 
 Future<ProductRecord?> showProductPickerSheet(BuildContext context) {
   return showModalBottomSheet<ProductRecord>(
@@ -24,6 +27,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
   final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
+  bool _showAllProducts = false;
   String? _error;
   List<ProductInventoryRecord> _products = const [];
 
@@ -64,12 +68,16 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final query = _searchController.text.trim().toLowerCase();
+    final hasSearchQuery = query.isNotEmpty;
     final filtered = _products.where((p) {
-      if (query.isEmpty) return true;
-      return p.name.toLowerCase().contains(query) ||
+      final matchesQuery = query.isEmpty ||
+          p.name.toLowerCase().contains(query) ||
           p.sku.toLowerCase().contains(query) ||
           p.manufacturerBarcode.toLowerCase().contains(query) ||
           p.florapriseBarcode.toLowerCase().contains(query);
+      if (!matchesQuery) return false;
+      if (_showAllProducts || hasSearchQuery) return true;
+      return productPickerIsSellable(p);
     }).toList();
 
     return SizedBox(
@@ -106,6 +114,24 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                         icon: const Icon(Icons.clear),
                       ),
               ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(
+              children: [
+                ChoiceChip(
+                  label: const Text('Available Only'),
+                  selected: !_showAllProducts,
+                  onSelected: (_) => setState(() => _showAllProducts = false),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Show All Products'),
+                  selected: _showAllProducts,
+                  onSelected: (_) => setState(() => _showAllProducts = true),
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -146,16 +172,63 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final product = filtered[index];
+        final isOutOfStock = productPickerIsOutOfStock(product);
         return ListTile(
-          title: Text(product.name),
+          enabled: true,
+          title: _buildProductTitle(product),
           subtitle: _buildStockSubtitle(product),
           trailing: Text(
             '₹${(product.sellingPricePaise / 100).toStringAsFixed(0)}',
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: isOutOfStock ? Colors.grey : null,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          onTap: () => Navigator.pop(context, _toProductRecord(product)),
+          onTap: isOutOfStock
+              ? () => _showOutOfStockActions(product)
+              : () => Navigator.pop(context, _toProductRecord(product)),
         );
       },
+    );
+  }
+
+  Widget _buildProductTitle(ProductInventoryRecord product) {
+    final isOutOfStock = productPickerIsOutOfStock(product);
+    final isLowStock = productPickerIsLowStock(product);
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            product.name,
+            style: TextStyle(color: isOutOfStock ? Colors.grey : null),
+          ),
+        ),
+        if (isOutOfStock)
+          _buildStockBadge('Out of Stock', Colors.red)
+        else if (isLowStock)
+          _buildStockBadge('Low Stock', Colors.orange),
+      ],
+    );
+  }
+
+  Widget _buildStockBadge(String label, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(left: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 
@@ -190,6 +263,79 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
     return Colors.green;
   }
 
+  Future<void> _showOutOfStockActions(ProductInventoryRecord product) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                product.name,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'OUT OF STOCK',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.add_box_outlined),
+                title: const Text('Update Stock'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showUpdateStockDialog(product);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.shopping_basket_outlined),
+                title: const Text('Create Purchase List'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _openPurchaseList(product);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showUpdateStockDialog(ProductInventoryRecord product) async {
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => _UpdateStockDialog(product: product),
+    );
+    if (updated == true) {
+      await _load();
+    }
+  }
+
+  void _openPurchaseList(ProductInventoryRecord product) {
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    Navigator.pop(context);
+    rootNavigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => PurchaseListScreen(initialProductId: product.id),
+      ),
+    );
+  }
+
   ProductRecord _toProductRecord(ProductInventoryRecord product) {
     return ProductRecord(
       id: product.id,
@@ -213,6 +359,162 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
       updatedAt: '',
     );
   }
+}
+
+class _UpdateStockDialog extends StatefulWidget {
+  const _UpdateStockDialog({required this.product});
+
+  final ProductInventoryRecord product;
+
+  @override
+  State<_UpdateStockDialog> createState() => _UpdateStockDialogState();
+}
+
+class _UpdateStockDialogState extends State<_UpdateStockDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _receivedQuantityController = TextEditingController();
+  final _purchasePriceController = TextEditingController();
+  final _supplierController = TextEditingController();
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final purchasePricePaise = widget.product.purchasePricePaise;
+    if (purchasePricePaise != null && purchasePricePaise > 0) {
+      _purchasePriceController.text =
+          (purchasePricePaise / 100).toStringAsFixed(0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _receivedQuantityController.dispose();
+    _purchasePriceController.dispose();
+    _supplierController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Update Stock'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.product.name,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              Text(
+                'Current Stock: ${_formatStockQuantity(widget.product.currentQty, widget.product.defaultUnit)}',
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _receivedQuantityController,
+                decoration:
+                    const InputDecoration(labelText: 'Received Quantity'),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  final quantity = int.tryParse(value?.trim() ?? '');
+                  if (quantity == null || quantity <= 0) {
+                    return 'Enter a quantity greater than zero';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _purchasePriceController,
+                decoration: const InputDecoration(labelText: 'Purchase Price'),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (value) {
+                  final price = double.tryParse(value?.trim() ?? '');
+                  if (price == null || price <= 0) {
+                    return 'Enter a purchase price greater than zero';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _supplierController,
+                decoration:
+                    const InputDecoration(labelText: 'Supplier (optional)'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isSaving ? null : _save,
+          child: _isSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSaving = true);
+
+    final quantity = int.parse(_receivedQuantityController.text.trim());
+    final price = double.parse(_purchasePriceController.text.trim());
+    final purchasePricePaise = (price * 100).round();
+    final supplier = _supplierController.text.trim();
+
+    try {
+      await context.read<InventoryProvider>().purchase(
+            productId: widget.product.id,
+            quantity: quantity,
+            purchasePricePaise: purchasePricePaise,
+            supplier: supplier.isEmpty ? null : supplier,
+            note: 'POS stock update',
+          );
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not update stock.')),
+      );
+    }
+  }
+}
+
+@visibleForTesting
+bool productPickerIsSellable(ProductInventoryRecord product) {
+  return !product.trackInventory || product.currentQty > 0;
+}
+
+@visibleForTesting
+bool productPickerIsOutOfStock(ProductInventoryRecord product) {
+  return product.trackInventory && product.currentQty <= 0;
+}
+
+@visibleForTesting
+bool productPickerIsLowStock(ProductInventoryRecord product) {
+  return product.trackInventory &&
+      product.currentQty > 0 &&
+      product.minQty > 0 &&
+      product.currentQty <= product.minQty;
 }
 
 @visibleForTesting

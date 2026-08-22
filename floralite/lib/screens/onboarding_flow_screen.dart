@@ -16,6 +16,7 @@ import '../models/license.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/license_provider.dart';
+import '../services/first_use_permission_service.dart';
 import '../services/speech_recognition_service.dart';
 import '../widgets/voice_dictation_field_header.dart';
 
@@ -89,7 +90,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
       1 => _buildWelcomeStep(l10n),
       2 => _buildBusinessSetupStep(l10n),
       3 => _buildRecommendedStep(l10n),
-      4 => _buildPermissionsStep(l10n),
+      4 => _buildPermissionInfoStep(l10n),
       _ => _buildPreparingStep(l10n),
     };
 
@@ -466,26 +467,43 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     );
   }
 
-  Widget _buildPermissionsStep(AppLocalizations l10n) {
+  Widget _buildPermissionInfoStep(AppLocalizations l10n) {
     return Padding(
-      key: const ValueKey<String>('permissions'),
+      key: const ValueKey<String>('permission-info'),
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            l10n.onboardingPermissionsTitle,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+          const Text(
+            'Permission Information',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          _permissionRow(Icons.contacts, l10n.onboardingContactsPermission),
-          _permissionRow(Icons.camera_alt, l10n.onboardingCameraPermission),
-          _permissionRow(Icons.folder, l10n.onboardingStoragePermission),
+          const Text(
+            'Floraprise will ask for each permission only when you use the feature that needs it.',
+            style: TextStyle(fontSize: 16, height: 1.4),
+          ),
+          const SizedBox(height: 16),
+          _permissionInfoRow(
+            Icons.contacts,
+            'Contacts',
+            'Asked only when you import a customer or staff contact.',
+          ),
+          _permissionInfoRow(
+            Icons.camera_alt,
+            'Camera',
+            'Asked only when you add a logo or capture a photo in a feature that needs it.',
+          ),
+          _permissionInfoRow(
+            Icons.folder,
+            'Photos and files',
+            'Asked only when you choose an image or file from your device.',
+          ),
           const Spacer(),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: _requestPermissionsAndContinue,
+              onPressed: _continueFromPermissionInfo,
               child: Text(l10n.onboardingContinue),
             ),
           ),
@@ -494,13 +512,14 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     );
   }
 
-  Widget _permissionRow(IconData icon, String text) {
+  Widget _permissionInfoRow(IconData icon, String title, String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Card(
         child: ListTile(
           leading: Icon(icon),
-          title: Text(text),
+          title: Text(title),
+          subtitle: Text(text),
         ),
       ),
     );
@@ -576,6 +595,26 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   }
 
   Future<void> _pickLogo(ImageSource source) async {
+    final requiredPermission =
+        source == ImageSource.camera ? Permission.camera : Permission.photos;
+    final granted = await FirstUsePermissionService.ensurePermission(
+      context: context,
+      flowKey: source == ImageSource.camera
+          ? 'camera.capture_or_scan'
+          : 'storage.pick_media',
+      permission: requiredPermission,
+      title: source == ImageSource.camera
+          ? 'Use camera to capture product photos and delivery proof.'
+          : 'Allow access to photos and files?',
+      body: source == ImageSource.camera
+          ? 'Floraprise requests camera access only when you use camera features.'
+          : 'Required only when you choose an image or file from your device.',
+      permanentlyDeniedMessage: source == ImageSource.camera
+          ? 'Camera permission is disabled. You can enable it anytime from Settings > Apps > Floraprise > Permissions to use camera features.'
+          : 'Photos and files permission is disabled. You can enable it anytime from Settings > Apps > Floraprise > Permissions to choose images and files.',
+    );
+    if (!granted) return;
+
     final image = await _imagePicker.pickImage(
       source: source,
       imageQuality: 88,
@@ -639,25 +678,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     );
   }
 
-  Future<void> _requestPermissionsAndContinue() async {
-    final permissions = <Permission>[
-      Permission.contacts,
-      Permission.camera,
-    ];
-
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      permissions.add(Permission.storage);
-    }
-
-    try {
-      await permissions.request();
-    } catch (error, stackTrace) {
-      if (kDebugMode) {
-        debugPrint('Permission request failed: $error');
-        debugPrintStack(stackTrace: stackTrace);
-      }
-    }
-
+  Future<void> _continueFromPermissionInfo() async {
     try {
       await _onboardingManager.setPermissionsRequested(true);
     } catch (error, stackTrace) {

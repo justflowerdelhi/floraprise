@@ -5,11 +5,13 @@ import 'package:provider/provider.dart';
 
 import '../controllers/voice_dictation_controller.dart';
 import '../data/repositories/product_repository.dart';
+import '../models/gst_calculation_type.dart';
 import 'bouquet_builder_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/printer_provider.dart';
 import '../providers/product_provider.dart';
 import '../services/speech_recognition_service.dart';
+import '../widgets/app_header.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/voice_dictation_field_header.dart';
@@ -65,8 +67,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     final provider = context.watch<ProductProvider>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.products),
+      appBar: AppHeader(
+        title: l10n.products,
         actions: [
           PopupMenuButton<ProductSort>(
             icon: const Icon(Icons.sort),
@@ -356,7 +358,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'GST ${product.gstPercent}%',
+                        'GST ${product.gstPercent}% ${product.gstCalculationType.label}',
                         style: TextStyle(
                           color: Colors.grey.shade600,
                           fontSize: 12,
@@ -800,6 +802,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     var minStock = int.tryParse(minStockController.text.trim()) ?? 0;
     var active = existing?.active ?? true;
     var favorite = existing?.favorite ?? false;
+    var gstCalculationType =
+        existing?.gstCalculationType ?? GstCalculationType.inclusive;
     var unitManuallyChanged = existing != null &&
         existing.defaultUnit !=
             ProductRepository.defaultUnitForCategory(category);
@@ -886,6 +890,27 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       controller: gstController,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(labelText: 'GST %'),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<GstCalculationType>(
+                      initialValue: gstCalculationType,
+                      decoration: const InputDecoration(
+                        labelText: 'GST Calculation Type',
+                      ),
+                      items: GstCalculationType.values
+                          .map(
+                            (type) => DropdownMenuItem(
+                              value: type,
+                              child: Text(type.label),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setStateDialog(() {
+                          gstCalculationType = value;
+                        });
+                      },
                     ),
                     const SizedBox(height: 10),
                     TextField(
@@ -1009,6 +1034,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     sellingPricePaise: sellingRupees * 100,
                     purchasePricePaise: existing?.purchasePricePaise,
                     gstPercent: gstPercent,
+                    gstCalculationType: gstCalculationType,
                     sku: skuController.text.trim(),
                     manufacturerBarcode:
                         manufacturerBarcodeController.text.trim(),

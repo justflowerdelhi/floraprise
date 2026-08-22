@@ -24,5 +24,7 @@
     <ProjectReference Include="..\Floraprise.Mobile\src\Floraprise.Mobile.Application\Floraprise.Mobile.Application.csproj" />
     <ProjectReference Include="..\Floraprise.Mobile\src\Floraprise.Mobile.Domain\Floraprise.Mobile.Domain.csproj" />
     <ProjectReference Include="..\Floraprise.Mobile\src\Floraprise.Mobile.Infrastructure\Floraprise.Mobile.Infrastructure.csproj" />
+    <ProjectReference Include="..\Sumpooj.Domain\Sumpooj.Domain.csproj" />
+    <ProjectReference Include="..\Sumpooj.Infrastructure\Sumpooj.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

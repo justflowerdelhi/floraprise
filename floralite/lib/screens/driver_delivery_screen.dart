@@ -3,9 +3,12 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/delivery_tracking_service.dart';
+import '../services/first_use_permission_service.dart';
 
 class DriverDeliveryScreen extends StatefulWidget {
   const DriverDeliveryScreen({super.key, required this.token});
@@ -83,6 +86,31 @@ class _DriverDeliveryScreenState extends State<DriverDeliveryScreen> {
     }
   }
 
+  Future<void> _acceptDelivery() async {
+    await _changeStatus('Accepted');
+  }
+
+  Future<void> _rejectDelivery() async {
+    await _changeStatus('Rejected');
+    await _stopGpsPublishing();
+    await _load();
+  }
+
+  Future<void> _changeStatus(String status) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await _service.updateDeliveryStatus(widget.token, status);
+      await _load();
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _completeDelivery() async {
     setState(() {
       _busy = true;
@@ -143,6 +171,19 @@ class _DriverDeliveryScreenState extends State<DriverDeliveryScreen> {
       throw const DeliveryTrackingException('Location services are disabled.');
     }
 
+    if (mounted) {
+      final proceed = await FirstUsePermissionService.ensureExplainedOnce(
+        context: context,
+        flowKey: 'location.live_delivery',
+        title: 'Allow location access?',
+        body: 'Required only while tracking live deliveries.',
+      );
+      if (!proceed) {
+        throw const DeliveryTrackingException(
+            'Location permission was denied.');
+      }
+    }
+
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
@@ -151,8 +192,32 @@ class _DriverDeliveryScreenState extends State<DriverDeliveryScreen> {
       throw const DeliveryTrackingException('Location permission was denied.');
     }
     if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        await FirstUsePermissionService.showPermanentlyDeniedMessage(
+          context,
+          'Location permission is disabled. You can enable it anytime from Settings > Apps > Floraprise > Permissions to use Live Delivery tracking.',
+        );
+      }
       throw const DeliveryTrackingException(
         'Location permission is permanently denied. Enable it in app settings.',
+      );
+    }
+
+    // Ensure background location is granted for uninterrupted delivery tracking.
+    var backgroundStatus = await Permission.locationAlways.status;
+    if (!backgroundStatus.isGranted) {
+      backgroundStatus = await Permission.locationAlways.request();
+    }
+
+    if (!backgroundStatus.isGranted) {
+      if (mounted) {
+        await FirstUsePermissionService.showPermanentlyDeniedMessage(
+          context,
+          'Location permission is disabled. You can enable it anytime from Settings > Apps > Floraprise > Permissions to use Live Delivery tracking.',
+        );
+      }
+      throw const DeliveryTrackingException(
+        'Background location permission is required for live tracking when the app is minimized.',
       );
     }
   }
@@ -199,6 +264,18 @@ class _DriverDeliveryScreenState extends State<DriverDeliveryScreen> {
       );
     }
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _shareCustomerTrackingLink() async {
+    final token = _delivery?.trackingToken;
+    if (token == null || token.trim().isEmpty) return;
+
+    final customerLink =
+        await _service.generateTrackingLinks(_delivery!.deliveryId);
+    await Share.share(
+      'Track your delivery live for order ${_delivery!.orderNumber}:\n${customerLink.customerLink}',
+      subject: 'Floraprise customer tracking link',
+    );
   }
 
   @override
@@ -294,6 +371,26 @@ class _DriverDeliveryScreenState extends State<DriverDeliveryScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _shareCustomerTrackingLink,
+                            icon: const Icon(Icons.share_outlined),
+                            label: const Text('Share Tracking'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _load,
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('Refresh'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: _notesController,
                       minLines: 2,
@@ -317,6 +414,13 @@ class _DriverDeliveryScreenState extends State<DriverDeliveryScreen> {
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
                             const SizedBox(height: 12),
+                            if (_canAccept(delivery.status))
+                              FilledButton.icon(
+                                onPressed: _busy ? null : _acceptDelivery,
+                                icon: const Icon(
+                                    Icons.check_circle_outline_rounded),
+                                label: const Text('Accept Delivery'),
+                              ),
                             if (_canStart(delivery.status))
                               FilledButton.icon(
                                 onPressed: _busy ? null : _startDelivery,
@@ -328,6 +432,12 @@ class _DriverDeliveryScreenState extends State<DriverDeliveryScreen> {
                                 onPressed: _busy ? null : _completeDelivery,
                                 icon: const Icon(Icons.done_all_rounded),
                                 label: const Text('Complete Delivery'),
+                              ),
+                            if (_canReject(delivery.status))
+                              OutlinedButton.icon(
+                                onPressed: _busy ? null : _rejectDelivery,
+                                icon: const Icon(Icons.close_rounded),
+                                label: const Text('Reject Delivery'),
                               ),
                           ],
                         ),
@@ -345,9 +455,18 @@ class _DriverDeliveryScreenState extends State<DriverDeliveryScreen> {
         normalized == 'pickedup';
   }
 
+  bool _canAccept(String status) {
+    return _normalizeStatus(status) == 'assigned';
+  }
+
   bool _canComplete(String status) {
     final normalized = _normalizeStatus(status);
     return normalized == 'outfordelivery' || normalized == 'arrivednearby';
+  }
+
+  bool _canReject(String status) {
+    final normalized = _normalizeStatus(status);
+    return normalized == 'assigned' || normalized == 'accepted';
   }
 }
 

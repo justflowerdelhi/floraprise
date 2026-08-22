@@ -34,7 +34,9 @@ using Sumpooj.Application.Marketing;
 using Sumpooj.Application.Email;
 using Sumpooj.Application.Mobile;
 using Sumpooj.Application.Services;
+using Sumpooj.Application.WhatsApp;
 using Sumpooj.Infrastructure.Email;
+using Sumpooj.Infrastructure.WhatsApp;
 using System.Diagnostics;
 using System.Security.Claims;
 using System.Text;
@@ -258,7 +260,7 @@ builder.Services.AddScoped<DriverJourneyService>();
 builder.Services.AddScoped<SmartETACalculator>();
 builder.Services.AddScoped<ETAUpdateService>();
 builder.Services.AddScoped<DeliveryNotificationService>();
-builder.Services.AddScoped<GeofenceService>();
+
 
 builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
 builder.Services.AddScoped<PurchaseOrderPdfService>();
@@ -389,6 +391,9 @@ builder.Services.AddScoped<DemoRequestService>();
 // Audit Action Filter (auto-logs all mutating API actions)
 builder.Services.AddScoped<AuditActionFilter>();
 
+// WhatsApp Account Services
+builder.Services.AddScoped<IWhatsAppAccountService, Sumpooj.Infrastructure.WhatsApp.WhatsAppAccountService>();
+
 if (builder.Configuration.GetValue("Corporate:EnableBirthdayAutomation", false))
 {
     builder.Services.AddHostedService<CorporateBirthdayAutomationHostedService>();
@@ -463,7 +468,10 @@ app.UseCors("DefaultCorsPolicy");
 
 app.UseStaticFiles();
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 
@@ -653,6 +661,41 @@ try
             """
             DO $$
             BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'FK_Orders_DeliveryPerson'
+                      AND conrelid = '"Orders"'::regclass
+                ) THEN
+                    ALTER TABLE "Orders" DROP CONSTRAINT "FK_Orders_DeliveryPerson";
+                END IF;
+
+                UPDATE "Orders" o
+                SET "DeliveryPersonId" = s."Id"
+                FROM "Staff" s
+                WHERE o."DeliveryPersonId" IS NOT NULL
+                  AND o."CompanyId" = s."CompanyId"
+                  AND (o."DeliveryPersonId" = s."IdentityUserId" OR o."DeliveryPersonId" = s."UserId");
+
+                UPDATE "Orders" o
+                SET "DeliveryPersonId" = NULL
+                WHERE o."DeliveryPersonId" IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM "Staff" s WHERE s."Id" = o."DeliveryPersonId"
+                  );
+
+                ALTER TABLE "Orders"
+                ADD CONSTRAINT "FK_Orders_DeliveryPerson"
+                FOREIGN KEY ("DeliveryPersonId")
+                REFERENCES "Staff" ("Id")
+                ON DELETE SET NULL;
+            END $$;
+            """);
+
+            await db.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
                 IF NOT EXISTS (
                     SELECT 1
                     FROM information_schema.columns
@@ -664,6 +707,132 @@ try
 
                 END IF;
             END $$;
+            """);
+
+            // Self-heal: add driver portal lifecycle columns if missing.
+            await db.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'Deliveries'
+                      AND column_name = 'StartedAtUtc'
+                ) THEN
+                    ALTER TABLE "Deliveries" ADD COLUMN "StartedAtUtc" timestamptz NULL;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'Deliveries'
+                      AND column_name = 'CompletedAtUtc'
+                ) THEN
+                    ALTER TABLE "Deliveries" ADD COLUMN "CompletedAtUtc" timestamptz NULL;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'Deliveries'
+                      AND column_name = 'LastLocationUtc'
+                ) THEN
+                    ALTER TABLE "Deliveries" ADD COLUMN "LastLocationUtc" timestamptz NULL;
+                END IF;
+            END $$;
+            """);
+
+            // Self-heal: ensure live GPS history exists for public driver tracking.
+            await db.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name = 'DriverLocations'
+                ) THEN
+                    CREATE TABLE "DriverLocations" (
+                        "Id" uuid NOT NULL,
+                        "DriverId" uuid NOT NULL,
+                        "DeliveryId" uuid NOT NULL,
+                        "Latitude" double precision NOT NULL,
+                        "Longitude" double precision NOT NULL,
+                        "Accuracy" double precision NULL,
+                        "Speed" double precision NULL,
+                        "Heading" double precision NULL,
+                        "Altitude" double precision NULL,
+                        "BatteryLevel" integer NULL,
+                        "RecordedAt" timestamp with time zone NOT NULL,
+                        "CreatedAtUtc" timestamp with time zone NOT NULL,
+                        "UpdatedAtUtc" timestamp with time zone NULL,
+                        CONSTRAINT "PK_DriverLocations" PRIMARY KEY ("Id"),
+                        CONSTRAINT "FK_DriverLocations_Deliveries_DeliveryId" FOREIGN KEY ("DeliveryId") REFERENCES "Deliveries" ("Id") ON DELETE CASCADE
+                    );
+
+                    CREATE INDEX "IX_DriverLocations_DeliveryId" ON "DriverLocations" ("DeliveryId");
+                    CREATE INDEX "IX_DriverLocations_DriverId" ON "DriverLocations" ("DriverId");
+                    CREATE INDEX "IX_DriverLocations_RecordedAt" ON "DriverLocations" ("RecordedAt");
+                    CREATE INDEX "IX_DriverLocations_CreatedAtUtc" ON "DriverLocations" ("CreatedAtUtc");
+                    CREATE INDEX "IX_DriverLocations_DriverId_DeliveryId" ON "DriverLocations" ("DriverId", "DeliveryId");
+                    CREATE INDEX "IX_DriverLocations_DriverId_RecordedAt" ON "DriverLocations" ("DriverId", "RecordedAt");
+                END IF;
+            END $$;
+            """);
+
+            // Self-heal: ensure delivery settings table exists for token-based public flows.
+            await db.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name = 'DeliverySettings'
+                ) THEN
+                    CREATE TABLE "DeliverySettings" (
+                        "Id" uuid NOT NULL,
+                        "CompanyId" uuid NOT NULL,
+                        "LocationUploadIntervalSeconds" integer NOT NULL,
+                        "MinDistanceMetersForUpload" double precision NOT NULL,
+                        "LocationRetentionDays" integer NOT NULL,
+                        "ArrivedNearbyRadiusMeters" double precision NOT NULL,
+                        "ImOutsideRadiusMeters" double precision NOT NULL,
+                        "DelayThresholdMinutes" integer NOT NULL,
+                        "AutoNotifyDelay" boolean NOT NULL,
+                        "RequirePhotoProof" boolean NOT NULL,
+                        "RequireSignature" boolean NOT NULL,
+                        "RequireOTP" boolean NOT NULL,
+                        "OTPLength" integer NOT NULL,
+                        "EnableBatteryOptimization" boolean NOT NULL,
+                        "LowBatteryThresholdPercent" integer NOT NULL,
+                        "NotifyCustomerOnAccept" boolean NOT NULL,
+                        "NotifyCustomerOnPickup" boolean NOT NULL,
+                        "NotifyCustomerOnEnRoute" boolean NOT NULL,
+                        "NotifyCustomerOnArrived" boolean NOT NULL,
+                        "NotifyCustomerOnDelivered" boolean NOT NULL,
+                        "NotifyFloristOnStatusChange" boolean NOT NULL,
+                        "ShowDriverPhoneToCustomer" boolean NOT NULL,
+                        "ShowDriverPhotoToCustomer" boolean NOT NULL,
+                        "AllowCustomerTracking" boolean NOT NULL,
+                        "CreatedAtUtc" timestamp with time zone NOT NULL,
+                        "UpdatedAtUtc" timestamp with time zone NULL,
+                        CONSTRAINT "PK_DeliverySettings" PRIMARY KEY ("Id")
+                    );
+                END IF;
+            END $$;
+            """);
+
+            await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_DeliverySettings_CompanyId"
+            ON "DeliverySettings" ("CompanyId");
             """);
 
             // Self-heal: add purchase mismatch flags if database is missing these newer columns.

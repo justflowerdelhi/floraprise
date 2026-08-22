@@ -8,7 +8,6 @@ namespace Sumpooj.API.Controllers;
 
 [ApiController]
 [Route("api/v1/notifications")]
-[Authorize(Policy = "PlatformSupport")]
 public class NotificationsController : ControllerBase
 {
     private readonly SumpoojDbContext _db;
@@ -21,12 +20,23 @@ public class NotificationsController : ControllerBase
     [HttpPost("send")]
     public async Task<IActionResult> SendNotification([FromBody] NotificationRequest request)
     {
+        var onlineThresholdUtc = DateTime.UtcNow.AddHours(-24);
+
         // Get target devices based on recipient type
-        var devices = request.RecipientType.ToLower() switch
+        var devices = request.RecipientType.Trim().ToLowerInvariant() switch
         {
             "all" => await _db.MobileDevices
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted && x.Status == MobileDeviceStatus.Active && !string.IsNullOrEmpty(x.PushToken))
+                .ToListAsync(),
+
+            "onlinedevices" => await _db.MobileDevices
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted
+                    && x.Status == MobileDeviceStatus.Active
+                    && !string.IsNullOrEmpty(x.PushToken)
+                    && x.LastHeartbeatAtUtc.HasValue
+                    && x.LastHeartbeatAtUtc.Value >= onlineThresholdUtc)
                 .ToListAsync(),
             
             "selectedcompanies" when request.CompanyIds != null && request.CompanyIds.Any() => await _db.MobileDevices

@@ -7,6 +7,9 @@ public static class MobileValidators
         if (request.CompanyId == Guid.Empty)
             throw new ArgumentException("CompanyId is required.", nameof(request.CompanyId));
 
+        if (request.IdentityUserId == Guid.Empty)
+            throw new ArgumentException("IdentityUserId is required.", nameof(request.IdentityUserId));
+
         ArgumentException.ThrowIfNullOrWhiteSpace(request.BusinessName);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.OwnerName);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.FullName);

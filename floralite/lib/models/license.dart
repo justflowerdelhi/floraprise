@@ -64,11 +64,16 @@ extension CloudLicenseStatusLabel on CloudLicenseStatus {
 
   static CloudLicenseStatus fromApi(String? value) {
     switch ((value ?? '').trim().toLowerCase()) {
+      case '1':
       case 'active':
         return CloudLicenseStatus.active;
+      case '4':
       case 'expired':
         return CloudLicenseStatus.expired;
+      case '2':
+      case '3':
       case 'suspended':
+      case 'revoked':
         return CloudLicenseStatus.suspended;
       case 'trial':
         return CloudLicenseStatus.trial;

@@ -1,6 +1,5 @@
 using Sumpooj.Application.Deliveries;
 using Sumpooj.Application.Interfaces;
-using System.Security.Cryptography;
 
 namespace Sumpooj.Application.UseCases;
 
@@ -37,10 +36,7 @@ public class AssignDeliveryPersonHandler
         // 4. Generate secure tracking token if not already set
         if (string.IsNullOrWhiteSpace(delivery.TrackingToken))
         {
-            var tokenBytes = new byte[16];
-            using var rng = RandomNumberGenerator.Create();
-            rng.GetBytes(tokenBytes);
-            var token = Convert.ToHexString(tokenBytes).ToLowerInvariant();
+            var token = Guid.NewGuid().ToString("N");
             delivery.SetTrackingToken(token);
         }
 

@@ -17,6 +17,7 @@ import {
   Edit, CheckCircle, Cancel, PlayArrow, Navigation, AccessTime
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
+import { apiClient } from '../../core/api/apiClient';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -87,15 +88,12 @@ export default function DeliveryWorkspace() {
     if (!deliveryId) return;
     setLoading(true);
     try {
-      // Fetch delivery data
-      const response = await fetch(`/api/delivery/tracking/by-delivery/${deliveryId}`);
-      if (response.ok) {
-        const trackingData = await response.json();
-        setData(trackingData);
-        setTimeline(trackingData.timeline || []);
-        setLocations(trackingData.route || []);
-        setProof(trackingData.proof || null);
-      }
+      const response = await apiClient.get(`/delivery/tracking/by-delivery/${deliveryId}`);
+      const trackingData = response.data;
+      setData(trackingData);
+      setTimeline(trackingData.timeline || []);
+      setLocations(trackingData.route || []);
+      setProof(trackingData.proof || null);
     } catch (err) {
       console.error('Failed to fetch delivery data:', err);
     } finally {

@@ -14,7 +14,13 @@ public class NotificationApiService
     public async Task<bool> SendNotificationAsync(NotificationRequest request)
     {
         var response = await _http.PostAsJsonAsync("api/v1/notifications/send", request);
-        return response.IsSuccessStatusCode;
+        if (response.IsSuccessStatusCode) return true;
+
+        var details = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(details)
+                ? $"Notification API returned {(int)response.StatusCode} {response.ReasonPhrase}."
+                : $"Notification API returned {(int)response.StatusCode}: {details}");
     }
 }
 

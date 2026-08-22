@@ -1,15 +1,21 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../models/printer_models.dart';
+import '../services/first_use_permission_service.dart';
 import '../services/printer/printer_manager.dart';
+import '../services/printer/printer_service.dart';
 
 class PrinterProvider extends ChangeNotifier {
-  PrinterProvider(this._printerManager);
+  PrinterProvider(
+    this._printerManager, {
+    BuildContext? Function()? contextProvider,
+  }) : _contextProvider = contextProvider;
 
   final PrinterManager _printerManager;
+  final BuildContext? Function()? _contextProvider;
 
   PrinterConfig? _config;
   List<PrinterDeviceInfo> _discoveredPrinters = const [];
@@ -40,7 +46,8 @@ class PrinterProvider extends ChangeNotifier {
       _config = await _printerManager.loadConfig();
       _queue = await _printerManager.listQueue();
       _hasLastReceipt = await _printerManager.hasLastSuccessfulReceipt();
-      if (_config?.autoConnect == true) {
+      final isConnected = await _printerManager.refreshConnectionState();
+      if (!isConnected && _config?.autoConnect == true) {
         await _printerManager.autoConnect();
       }
     } catch (error) {
@@ -58,8 +65,14 @@ class PrinterProvider extends ChangeNotifier {
     try {
       await _ensureBluetoothPermission();
       _discoveredPrinters = await _printerManager.scanBluetoothPrinters();
+      if (_discoveredPrinters.isEmpty) {
+        _error =
+            'No Bluetooth printers found. Make sure the printer is switched on and nearby.';
+      }
     } catch (error) {
-      _error = error.toString();
+      final isConnected = await _printerManager.refreshConnectionState();
+      _error =
+          isConnected ? null : _friendlyPrinterError(error, operation: 'scan');
     } finally {
       _isScanning = false;
       notifyListeners();
@@ -72,12 +85,15 @@ class PrinterProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
+      if (device.address.trim().isEmpty) {
+        throw const PrinterServiceException('Please select a printer first.');
+      }
       await _ensureBluetoothPermission();
       await _printerManager.connect(device);
       _config = await _printerManager.loadConfig();
       _queue = await _printerManager.listQueue();
     } catch (error) {
-      _error = error.toString();
+      _error = _friendlyPrinterError(error, operation: 'connect');
     } finally {
       _isLoading = false;
       _connectingAddress = null;
@@ -130,13 +146,16 @@ class PrinterProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
+      if (_config?.hasPrinter != true) {
+        throw const PrinterServiceException('Please select a printer first.');
+      }
       await _ensureBluetoothPermission();
       await _printerManager.printTestPage();
       await _printerManager.processQueue();
       _queue = await _printerManager.listQueue();
       _hasLastReceipt = await _printerManager.hasLastSuccessfulReceipt();
     } catch (error) {
-      _error = error.toString();
+      _error = _friendlyPrinterError(error, operation: 'print');
       _queue = await _printerManager.listQueue();
       _hasLastReceipt = await _printerManager.hasLastSuccessfulReceipt();
     } finally {
@@ -258,10 +277,55 @@ class PrinterProvider extends ChangeNotifier {
 
   Future<void> _ensureBluetoothPermission() async {
     if (!Platform.isAndroid) return;
+    final permissionContext = _contextProvider?.call();
+    if (permissionContext != null && permissionContext.mounted) {
+      final proceed = await FirstUsePermissionService.ensureExplainedOnce(
+        context: permissionContext,
+        flowKey: 'bluetooth.printer',
+        title: 'Bluetooth is required to print bills.',
+        body: 'Floraprise uses Bluetooth only to connect your printer.',
+      );
+      if (!proceed) {
+        throw Exception('Bluetooth permission was not granted.');
+      }
+    }
+
     final scan = await Permission.bluetoothScan.request();
     final connect = await Permission.bluetoothConnect.request();
     if (!scan.isGranted || !connect.isGranted) {
+      if ((scan.isPermanentlyDenied ||
+              scan.isRestricted ||
+              connect.isPermanentlyDenied ||
+              connect.isRestricted) &&
+          permissionContext != null &&
+          permissionContext.mounted) {
+        await FirstUsePermissionService.showPermanentlyDeniedMessage(
+          permissionContext,
+          'Bluetooth permission is disabled. You can enable it anytime from Settings > Apps > Floraprise > Permissions to print bills.',
+        );
+      }
       throw Exception('Bluetooth permission was not granted.');
     }
+  }
+
+  String _friendlyPrinterError(Object error, {required String operation}) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    final normalized = message.toLowerCase();
+    if (normalized.contains('null check operator') ||
+        normalized.contains('not initialized')) {
+      return 'Bluetooth is unavailable. Please turn on Bluetooth and try again.';
+    }
+    if (normalized.contains('permission')) {
+      return 'Bluetooth permission is required. Allow Nearby devices permission in Android Settings and try again.';
+    }
+    if (normalized.contains('disabled') ||
+        normalized.contains('turned off') ||
+        normalized.contains('unavailable')) {
+      return 'Bluetooth is unavailable. Please turn on Bluetooth and try again.';
+    }
+    if (message.isNotEmpty) return message;
+    return operation == 'scan'
+        ? 'Bluetooth is unavailable. Please turn on Bluetooth and try again.'
+        : 'Could not $operation with the printer. Please try again.';
   }
 }

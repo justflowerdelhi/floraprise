@@ -13,6 +13,7 @@ namespace Sumpooj.API.Controllers;
 
 [ApiController]
 [Route("api/platform/mobile-admin")]
+[Authorize(Policy = PolicyNames.PlatformSupport)]
 public sealed class PlatformMobileAdministrationController : ControllerBase
 {
     private readonly SumpoojDbContext _db;
@@ -732,7 +733,7 @@ public sealed class PlatformMobileAdministrationController : ControllerBase
         var userIds = users.Select(x => x.Id).ToList();
         var deviceStats = await _db.MobileDevices
             .AsNoTracking()
-            .Where(x => userIds.Contains(x.MobileUserId) && !x.IsDeleted)
+            .Where(x => userIds.Contains(x.MobileUserId) && !x.IsDeleted && x.Status == MobileDeviceStatus.Active)
             .GroupBy(x => x.MobileUserId)
             .Select(g => new
             {
@@ -1070,6 +1071,8 @@ public sealed class PlatformMobileAdministrationController : ControllerBase
 
         return Ok(new { message = "License extended.", expiryUtc = license.ExpiryUtc });
     }
+
+    [HttpPost("customers/{mobileUserId:guid}/reset-device")]
     public async Task<IActionResult> ResetDevice([FromRoute] Guid mobileUserId, [FromBody] MobileAdminResetDeviceRequest request, CancellationToken cancellationToken)
     {
         var deviceQuery = _db.MobileDevices.Where(x =>

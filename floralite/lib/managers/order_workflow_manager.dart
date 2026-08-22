@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import '../data/repositories/associate_repository.dart';
 import '../data/repositories/order_workflow_repository.dart';
 import '../models/order_status.dart';
 import '../models/order_workspace_models.dart';
 import '../models/scheduler_task.dart';
+import '../services/delivery_tracking_service.dart';
 import '../services/order_print_service.dart';
 import '../services/order_whatsapp_service.dart';
 import 'order_manager.dart';
@@ -101,6 +104,7 @@ class OrderWorkflowManager {
     required int orderId,
     required int deliveryPartnerId,
     String? notes,
+    bool syncDeliveryInBackground = true,
   }) async {
     await _workflowRepository.assign(
       orderId: orderId,
@@ -108,6 +112,10 @@ class OrderWorkflowManager {
       associateId: deliveryPartnerId,
       notes: notes ?? 'Delivery partner assigned',
     );
+    await _workflowRepository.markDeliverySyncPending(orderId);
+    if (syncDeliveryInBackground) {
+      unawaited(DeliveryTrackingService().syncDeliveryAssignment(orderId));
+    }
   }
 
   /// Starts production/preparing for the order and creates a production task.
@@ -157,6 +165,8 @@ class OrderWorkflowManager {
         associateId: deliveryPartnerId,
         notes: 'Delivery partner assigned',
       );
+      await _workflowRepository.markDeliverySyncPending(orderId);
+      unawaited(DeliveryTrackingService().syncDeliveryAssignment(orderId));
     }
   }
 
@@ -183,6 +193,8 @@ class OrderWorkflowManager {
         associateId: deliveryPartnerId,
         notes: 'Delivery partner assigned for delivery',
       );
+      await _workflowRepository.markDeliverySyncPending(orderId);
+      unawaited(DeliveryTrackingService().syncDeliveryAssignment(orderId));
     }
   }
 

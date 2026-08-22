@@ -243,8 +243,8 @@ public sealed record PaymentVerificationRequest(
     string? PlanCode,
     string? BillingCycle);
 
-public sealed record PaymentCallbackResponse(string TransactionRef, string Status, bool Updated);
-public sealed record PaymentVerificationResponse(string TransactionRef, bool Verified, string Status);
+public sealed record PaymentCallbackResponse(string TransactionRef, string Status, bool Updated, string? Message = null);
+public sealed record PaymentVerificationResponse(string TransactionRef, bool Verified, string Status, string? Message = null);
 
 public sealed record MobilePaymentHistoryItem(
     Guid Id,

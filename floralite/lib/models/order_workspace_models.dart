@@ -65,6 +65,9 @@ class OrderDetailHeader {
   final String cardMessage;
   final int isPaid;
   final int paidAmountPaise;
+  final int rewardPointsEarned;
+  final int rewardPointsRedeemed;
+  final int rewardDiscountAmountPaise;
   final String? designerName;
   final String? deliveryName;
 
@@ -89,6 +92,9 @@ class OrderDetailHeader {
     required this.cardMessage,
     required this.isPaid,
     required this.paidAmountPaise,
+    this.rewardPointsEarned = 0,
+    this.rewardPointsRedeemed = 0,
+    this.rewardDiscountAmountPaise = 0,
     this.designerName,
     this.deliveryName,
   });
@@ -129,6 +135,24 @@ class OrderDetailBundle {
     required this.corporateInfo,
     required this.marketplaceInfo,
   });
+}
+
+class OrderRewardSummary {
+  const OrderRewardSummary({
+    required this.openingBalance,
+    required this.earnedPoints,
+    required this.redeemedPoints,
+    required this.closingBalance,
+    required this.rewardValuePaise,
+  });
+
+  final int openingBalance;
+  final int earnedPoints;
+  final int redeemedPoints;
+  final int closingBalance;
+  final int rewardValuePaise;
+
+  bool get hasActivity => earnedPoints > 0 || redeemedPoints > 0;
 }
 
 class OrderWorkspaceFilters {

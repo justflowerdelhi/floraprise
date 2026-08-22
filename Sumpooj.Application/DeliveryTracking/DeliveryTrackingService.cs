@@ -7,7 +7,7 @@ public class DeliveryTrackingService : IDeliveryTrackingService
 {
     private readonly IDeliveryRepository _deliveryRepo;
     private readonly IDeliveryRouteRepository _routeRepo;
-    private readonly IDeliveryLocationRepository _locationRepo;
+    private readonly IDriverLocationRepository _driverLocationRepo;
     private readonly IDeliveryTimelineRepository _timelineRepo;
     private readonly IDeliveryProofRepository _proofRepo;
     private readonly IStaffRepository _staffRepo;
@@ -18,7 +18,7 @@ public class DeliveryTrackingService : IDeliveryTrackingService
     public DeliveryTrackingService(
         IDeliveryRepository deliveryRepo,
         IDeliveryRouteRepository routeRepo,
-        IDeliveryLocationRepository locationRepo,
+        IDriverLocationRepository driverLocationRepo,
         IDeliveryTimelineRepository timelineRepo,
         IDeliveryProofRepository proofRepo,
         IStaffRepository staffRepo,
@@ -28,7 +28,7 @@ public class DeliveryTrackingService : IDeliveryTrackingService
     {
         _deliveryRepo = deliveryRepo;
         _routeRepo = routeRepo;
-        _locationRepo = locationRepo;
+        _driverLocationRepo = driverLocationRepo;
         _timelineRepo = timelineRepo;
         _proofRepo = proofRepo;
         _staffRepo = staffRepo;
@@ -175,7 +175,9 @@ public class DeliveryTrackingService : IDeliveryTrackingService
 
     private async Task<DeliveryTrackingSnapshot> BuildTrackingSnapshotAsync(Delivery delivery, DeliveryRoute? route = null)
     {
-        var locations = await _locationRepo.GetByDeliveryIdAsync(delivery.Id);
+        var locations = (await _driverLocationRepo.GetLocationsByDeliveryAsync(delivery.Id, 500))
+            .OrderBy(x => x.RecordedAt)
+            .ToList();
         var timeline = await _timelineRepo.GetByDeliveryIdAsync(delivery.Id);
         var proof = await _proofRepo.GetByDeliveryIdAsync(delivery.Id);
 
@@ -211,7 +213,7 @@ public class DeliveryTrackingService : IDeliveryTrackingService
                 Latitude = l.Latitude,
                 Longitude = l.Longitude,
                 RecordedAt = l.RecordedAt,
-                SpeedKph = l.SpeedKph
+                SpeedKph = (l.Speed ?? 0d) * 3.6d
             }).ToList(),
             Timeline = timeline.Select(t => new DeliveryTimelineEvent
             {
@@ -233,7 +235,7 @@ public class DeliveryTrackingService : IDeliveryTrackingService
                     Latitude = x.Latitude,
                     Longitude = x.Longitude,
                     RecordedAt = x.RecordedAt,
-                    SpeedKph = x.SpeedKph
+                    SpeedKph = (x.Speed ?? 0d) * 3.6d
                 })
                 .FirstOrDefault()
         };

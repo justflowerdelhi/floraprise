@@ -89,6 +89,26 @@ public sealed class MobileAuthController : MobileApiControllerBase
                         AppVersion: request.AppVersion,
                         PushToken: request.PushToken,
                         IpAddress: request.IpAddress),
+                    new RegisterMobileCustomerRequest(
+                        CompanyId: existingCompanyId,
+                        BusinessName: request.CompanyName.Trim(),
+                        OwnerName: request.OwnerName.Trim(),
+                        Mobile: mobile,
+                        Email: email,
+                        City: request.City.Trim(),
+                        State: null,
+                        Country: existingCompany?.Region ?? "IN",
+                        FullName: request.OwnerName.Trim(),
+                        DeviceId: request.DeviceId,
+                        Platform: request.Platform,
+                        Manufacturer: request.Manufacturer,
+                        Model: request.Model,
+                        OsVersion: request.OsVersion,
+                        AppVersion: request.AppVersion,
+                        PushToken: request.PushToken,
+                        IpAddress: request.IpAddress,
+                        IdentityUserId: existingUser.Id,
+                        ActorUserId: existingUser.Id),
                     cancellationToken);
 
                 _logger.LogInformation("[Mobile Register] Existing registration restored successfully for email: {Email}", identifier);
@@ -167,6 +187,26 @@ public sealed class MobileAuthController : MobileApiControllerBase
                     AppVersion: request.AppVersion,
                     PushToken: request.PushToken,
                     IpAddress: request.IpAddress),
+                new RegisterMobileCustomerRequest(
+                    CompanyId: companyId,
+                    BusinessName: request.CompanyName.Trim(),
+                    OwnerName: request.OwnerName.Trim(),
+                    Mobile: mobile,
+                    Email: email,
+                    City: request.City.Trim(),
+                    State: null,
+                    Country: "IN",
+                    FullName: request.OwnerName.Trim(),
+                    DeviceId: request.DeviceId,
+                    Platform: request.Platform,
+                    Manufacturer: request.Manufacturer,
+                    Model: request.Model,
+                    OsVersion: request.OsVersion,
+                    AppVersion: request.AppVersion,
+                    PushToken: request.PushToken,
+                    IpAddress: request.IpAddress,
+                    IdentityUserId: user.Id,
+                    ActorUserId: user.Id),
                 cancellationToken);
 
             _logger.LogInformation("[Mobile Register] Registration completed successfully for email: {Email}", email);

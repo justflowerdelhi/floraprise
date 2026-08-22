@@ -416,6 +416,38 @@ public class OrderService
 
         order.AssignDeliveryPerson(driverId);
         await _orderRepository.UpdateAsync(order);
+
+        var delivery = await _deliveryRepository.GetBySalesOrderIdAsync(order.Id);
+        var deliveryAddress = string.IsNullOrWhiteSpace(order.DeliveryAddress)
+            ? "Address not specified"
+            : order.DeliveryAddress;
+        var timeSlot = string.IsNullOrWhiteSpace(order.TimeSlot)
+            ? "Anytime"
+            : order.TimeSlot;
+
+        if (delivery == null)
+        {
+            delivery = new Delivery(
+                companyId,
+                order.Id,
+                order.DeliveryDate,
+                timeSlot,
+                deliveryAddress);
+            if (!string.IsNullOrWhiteSpace(order.DeliveryPincode))
+                delivery.SetPostalCode(order.DeliveryPincode);
+            delivery.SetCustomerContact(order.RecipientPhone, null);
+            delivery.AssignDeliveryPerson(driverId);
+            await _deliveryRepository.AddAsync(delivery);
+            return;
+        }
+
+        if (!string.Equals(delivery.DeliveryAddress, deliveryAddress, StringComparison.Ordinal))
+            delivery.UpdateAddress(deliveryAddress);
+        if (!string.IsNullOrWhiteSpace(order.DeliveryPincode))
+            delivery.SetPostalCode(order.DeliveryPincode);
+        delivery.SetCustomerContact(order.RecipientPhone, null);
+        delivery.AssignDeliveryPerson(driverId);
+        await _deliveryRepository.UpdateAsync(delivery);
     }
 
     public async Task CancelAsync(Guid companyId, Guid id, string? reason)

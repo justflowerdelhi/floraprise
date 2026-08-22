@@ -14,24 +14,24 @@ void main() {
       expect(result, 'http://localhost:5148');
     });
 
-    test('uses Android emulator fallback in debug on Android', () {
+    test('uses production fallback in debug on Android', () {
       final result = resolveFlorapriseApiBaseUrl(
         explicitValue: '',
         isDebug: true,
         platform: TargetPlatform.android,
       );
 
-      expect(result, 'http://10.0.2.2:5148');
+      expect(result, 'https://api.floraprise.com');
     });
 
     test('prefers explicit configuration over fallback values', () {
       final result = resolveFlorapriseApiBaseUrl(
-        explicitValue: 'https://example.test',
+        explicitValue: 'http://192.168.1.8:5148',
         isDebug: true,
         platform: TargetPlatform.android,
       );
 
-      expect(result, 'https://example.test');
+      expect(result, 'http://192.168.1.8:5148');
     });
 
     test('uses production host outside debug mode', () {

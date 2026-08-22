@@ -44,7 +44,7 @@ class AppDatabase {
 
     return openDatabase(
       path,
-      version: 38,
+      version: 41,
       onOpen: (db) async {
         await _ensureOccasionContactColumns(db);
         await _ensureAttendanceTable(db);
@@ -52,6 +52,8 @@ class AppDatabase {
         await _ensureSubscriptionTables(db);
         await _ensurePrinterTables(db);
         await _ensureSchedulerTaskColumns(db);
+        await _ensureDeliveryAssignmentSyncColumns(db);
+        await _ensureRewardColumns(db);
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -64,6 +66,10 @@ class AppDatabase {
             company TEXT,
             department TEXT,
             notes TEXT,
+            reward_points INTEGER NOT NULL DEFAULT 0,
+            lifetime_reward_points INTEGER NOT NULL DEFAULT 0,
+            redeemed_reward_points INTEGER NOT NULL DEFAULT 0,
+            last_reward_activity TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             deleted_at TEXT
@@ -79,6 +85,7 @@ class AppDatabase {
             selling_price_paise INTEGER NOT NULL,
             purchase_price_paise INTEGER,
             gst_percent INTEGER NOT NULL DEFAULT 12,
+            gst_calculation_type TEXT NOT NULL DEFAULT 'inclusive',
             sku TEXT,
             barcode TEXT,
             manufacturer_barcode TEXT,
@@ -228,6 +235,9 @@ class AppDatabase {
             discount_total_paise INTEGER NOT NULL DEFAULT 0,
             bill_discount_type TEXT,
             bill_discount_value INTEGER,
+            reward_points_earned INTEGER NOT NULL DEFAULT 0,
+            reward_points_redeemed INTEGER NOT NULL DEFAULT 0,
+            reward_discount_amount_paise INTEGER NOT NULL DEFAULT 0,
             round_off_paise INTEGER NOT NULL DEFAULT 0,
             grand_total_paise INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
@@ -257,6 +267,11 @@ class AppDatabase {
             associate_id INTEGER NOT NULL,
             notes TEXT,
             assigned_at TEXT NOT NULL,
+            backend_order_id TEXT,
+            backend_delivery_id TEXT,
+            delivery_sync_status TEXT NOT NULL DEFAULT 'pending',
+            delivery_sync_error TEXT,
+            delivery_sync_updated_at TEXT,
             FOREIGN KEY(order_id) REFERENCES orders(id),
             FOREIGN KEY(associate_id) REFERENCES associates(id),
             UNIQUE(order_id, assignment_type)
@@ -1006,6 +1021,19 @@ class AppDatabase {
           );
         }
 
+        if (oldVersion < 40) {
+          await db.execute(
+            "ALTER TABLE products ADD COLUMN gst_calculation_type TEXT NOT NULL DEFAULT 'inclusive'",
+          );
+          await db.execute(
+            "UPDATE products SET gst_calculation_type = 'inclusive' WHERE gst_calculation_type IS NULL OR TRIM(gst_calculation_type) = ''",
+          );
+        }
+
+        if (oldVersion < 41) {
+          await _ensureRewardColumns(db);
+        }
+
         if (oldVersion < 11) {
           await db.execute(
             "ALTER TABLE inventory_transactions ADD COLUMN source TEXT NOT NULL DEFAULT 'Manual'",
@@ -1416,7 +1444,46 @@ class AppDatabase {
         if (oldVersion < 38) {
           await _ensureSchedulerTaskColumns(db);
         }
+
+        if (oldVersion < 39) {
+          await _ensureDeliveryAssignmentSyncColumns(db);
+        }
       },
+    );
+  }
+
+  Future<void> _ensureDeliveryAssignmentSyncColumns(Database db) async {
+    await _ensureColumn(
+      db,
+      'order_workflow_assignments',
+      'backend_order_id',
+      'TEXT',
+    );
+    await _ensureColumn(
+      db,
+      'order_workflow_assignments',
+      'backend_delivery_id',
+      'TEXT',
+    );
+    await _ensureColumn(
+      db,
+      'order_workflow_assignments',
+      'delivery_sync_status',
+      'TEXT',
+      defaultValue: "'pending'",
+      notNull: true,
+    );
+    await _ensureColumn(
+      db,
+      'order_workflow_assignments',
+      'delivery_sync_error',
+      'TEXT',
+    );
+    await _ensureColumn(
+      db,
+      'order_workflow_assignments',
+      'delivery_sync_updated_at',
+      'TEXT',
     );
   }
 
@@ -1629,6 +1696,63 @@ class AppDatabase {
       buffer.write(' DEFAULT $defaultValue');
     }
     await db.execute(buffer.toString());
+  }
+
+  Future<void> _ensureRewardColumns(Database db) async {
+    await _ensureColumn(
+      db,
+      'customers',
+      'reward_points',
+      'INTEGER',
+      defaultValue: '0',
+      notNull: true,
+    );
+    await _ensureColumn(
+      db,
+      'customers',
+      'lifetime_reward_points',
+      'INTEGER',
+      defaultValue: '0',
+      notNull: true,
+    );
+    await _ensureColumn(
+      db,
+      'customers',
+      'redeemed_reward_points',
+      'INTEGER',
+      defaultValue: '0',
+      notNull: true,
+    );
+    await _ensureColumn(
+      db,
+      'customers',
+      'last_reward_activity',
+      'TEXT',
+    );
+    await _ensureColumn(
+      db,
+      'orders',
+      'reward_points_earned',
+      'INTEGER',
+      defaultValue: '0',
+      notNull: true,
+    );
+    await _ensureColumn(
+      db,
+      'orders',
+      'reward_points_redeemed',
+      'INTEGER',
+      defaultValue: '0',
+      notNull: true,
+    );
+    await _ensureColumn(
+      db,
+      'orders',
+      'reward_discount_amount_paise',
+      'INTEGER',
+      defaultValue: '0',
+      notNull: true,
+    );
   }
 
   Future<void> _seedOwnerStaff(Database db) async {
