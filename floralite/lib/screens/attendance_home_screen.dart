@@ -324,6 +324,7 @@ class _AttendanceHomeScreenState extends State<AttendanceHomeScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (context) => AttendanceBottomSheet(
         staff: staff,
         attendance: attendance,
@@ -429,17 +430,22 @@ class _AttendanceBottomSheetState extends State<AttendanceBottomSheet> {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+      ),
       padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Row(
               children: [
                 CircleAvatar(
@@ -639,6 +645,7 @@ class _AttendanceBottomSheetState extends State<AttendanceBottomSheet> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -114,7 +114,7 @@ class OrderWorkflowManager {
     );
     await _workflowRepository.markDeliverySyncPending(orderId);
     if (syncDeliveryInBackground) {
-      unawaited(DeliveryTrackingService().syncDeliveryAssignment(orderId));
+      await DeliveryTrackingService().syncDeliveryAssignment(orderId);
     }
   }
 

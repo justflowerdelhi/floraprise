@@ -7,6 +7,7 @@ import '../../data/repositories/product_repository.dart';
 import '../../managers/onboarding_manager.dart';
 import '../../providers/auth_provider.dart';
 import '../../screens/onboarding_flow_screen.dart';
+import '../../services/scheduler_service.dart';
 import 'floral_background.dart';
 import 'splash_animation.dart';
 import 'animated_loading_dots.dart';
@@ -24,6 +25,8 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
+    // Restore pending schedules after first frame to avoid blocking startup
+    unawaited(SchedulerService.instance.restorePendingSchedules());
     _initializeAndNavigate();
   }
 

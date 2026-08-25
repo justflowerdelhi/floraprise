@@ -895,6 +895,8 @@ class _AddItemDialogState extends State<_AddItemDialog> {
   final _remarksDictationController = VoiceDictationController(
     speechRecognition: SpeechRecognitionService(),
   );
+  final _productSearchController = TextEditingController();
+  String _productSearchQuery = '';
   List<Map<String, dynamic>> _products = [];
   bool _isLoading = true;
 
@@ -909,6 +911,7 @@ class _AddItemDialogState extends State<_AddItemDialog> {
   void dispose() {
     _remarksController.dispose();
     _remarksDictationController.dispose();
+    _productSearchController.dispose();
     super.dispose();
   }
 
@@ -958,42 +961,97 @@ class _AddItemDialogState extends State<_AddItemDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField<int>(
-                  decoration:
-                      const InputDecoration(labelText: 'Select Product'),
-                  initialValue: _selectedProductId,
-                  isExpanded: true,
-                  items: _products.map((product) {
-                    return DropdownMenuItem<int>(
-                      value: product['id'] as int,
-                      child: Text(
-                        '${product['name']} (${product['category']})',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-                  selectedItemBuilder: (context) {
-                    return _products.map((product) {
-                      return Text(
-                        '${product['name']} (${product['category']})',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      );
-                    }).toList();
-                  },
+                TextField(
+                  controller: _productSearchController,
+                  decoration: InputDecoration(
+                    labelText: 'Search Product',
+                    hintText: 'Type product name or category',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _productSearchController.text.isEmpty
+                        ? null
+                        : IconButton(
+                            onPressed: () {
+                              _productSearchController.clear();
+                              setState(() => _productSearchQuery = '');
+                            },
+                            icon: const Icon(Icons.clear),
+                          ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    errorText: _selectedProductId == null ? l10n.selectProduct : null,
+                  ),
                   onChanged: (value) {
-                    setState(() {
-                      _selectedProductId = value;
-                      if (value != null) {
-                        final product =
-                            _products.firstWhere((p) => p['id'] == value);
-                        _unit = product['default_unit'] as String;
-                      }
-                    });
+                    setState(() => _productSearchQuery = value);
                   },
-                  validator: (value) =>
-                      value == null ? l10n.selectProduct : null,
+                ),
+                const SizedBox(height: 8),
+                Builder(
+                  builder: (context) {
+                    final query = _productSearchQuery.trim().toLowerCase();
+                    final filteredProducts = query.isEmpty
+                        ? _products
+                        : _products.where((product) {
+                            final haystack =
+                                '${product['name']} ${product['category']}'
+                                    .toLowerCase();
+                            return haystack.contains(query);
+                          }).toList();
+
+                    return Container(
+                      constraints: const BoxConstraints(maxHeight: 220),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: filteredProducts.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text('No matching products found.'),
+                            )
+                          : ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: filteredProducts.length,
+                              separatorBuilder: (_, __) => const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                final product = filteredProducts[index];
+                                final isSelected =
+                                    product['id'] == _selectedProductId;
+
+                                return ListTile(
+                                  dense: true,
+                                  selected: isSelected,
+                                  leading: Icon(
+                                    isSelected
+                                        ? Icons.check_circle
+                                        : Icons.inventory_2_outlined,
+                                  ),
+                                  title: Text(
+                                    product['name'],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    '${product['category']} • ${product['default_unit']}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedProductId = product['id'] as int;
+                                      _unit = product['default_unit'] as String;
+                                      _productSearchController.text =
+                                          product['name'];
+                                      _productSearchQuery = product['name'];
+                                    });
+                                  },
+                                );
+                              },
+                            ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 _buildQuantityStepper(l10n),

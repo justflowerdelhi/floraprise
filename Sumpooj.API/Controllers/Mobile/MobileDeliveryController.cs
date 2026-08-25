@@ -100,7 +100,6 @@ public sealed class MobileDeliveryController : MobileApiControllerBase
             if (string.IsNullOrWhiteSpace(orderNumber))
                 throw new ArgumentException("Order number is required.", nameof(request.OrderNumber));
 
-            // Phase 1: Find or create Order and Delivery (driver optional)
             var order = await _db.Orders
                 .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.OrderNumber == orderNumber, cancellationToken);
 
@@ -149,9 +148,10 @@ public sealed class MobileDeliveryController : MobileApiControllerBase
 
             var delivery = await _db.Deliveries
                 .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.SalesOrderId == order.Id, cancellationToken);
+
             if (delivery == null)
             {
-                // Create Delivery without driver - driver can be assigned later
+                // Create Delivery without driver - driver can be assigned below.
                 delivery = new Delivery(
                     companyId,
                     order.Id,
@@ -167,8 +167,10 @@ public sealed class MobileDeliveryController : MobileApiControllerBase
                 await _db.SaveChangesAsync(cancellationToken);
             }
 
-            // Phase 2: If driver info is provided, assign driver to Order and Delivery
-            if (!string.IsNullOrWhiteSpace(request.DriverName) || !string.IsNullOrWhiteSpace(request.DriverPhone))
+            // If driver information is supplied, assign the driver to both
+            // the Order and the Delivery. This must also run when the Delivery
+            // record already existed.
+            if (!string.IsNullOrWhiteSpace(request.DriverPhone) || !string.IsNullOrWhiteSpace(request.DriverName))
             {
                 var driverPhone = request.DriverPhone?.Trim();
                 var driverName = string.IsNullOrWhiteSpace(request.DriverName)
@@ -234,6 +236,46 @@ public sealed class MobileDeliveryController : MobileApiControllerBase
                 proof = snapshot.Proof,
                 lastLocation = snapshot.LastLocation
             });
+        }
+        catch (Exception ex)
+        {
+            return ProblemFromException(ex);
+        }
+    }
+
+    [HttpPost("assignments/{deliveryId}/driver")]
+    public async Task<IActionResult> AssignDriverToDelivery(
+        string deliveryId,
+        [FromBody] AssignDriverToDeliveryRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!Guid.TryParse(deliveryId, out var parsedDeliveryId))
+                throw new ArgumentException("Invalid delivery ID.", nameof(deliveryId));
+
+            var companyId = GetCompanyId();
+            var delivery = await _db.Deliveries
+                .FirstOrDefaultAsync(x => x.Id == parsedDeliveryId && x.CompanyId == companyId, cancellationToken)
+                ?? throw new KeyNotFoundException("Delivery not found.");
+
+            var driverPhone = request.DriverPhone?.Trim();
+            var driverName = string.IsNullOrWhiteSpace(request.DriverName)
+                ? driverPhone ?? "Delivery Driver"
+                : request.DriverName.Trim();
+            var driver = await _db.Staff
+                .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Phone == driverPhone, cancellationToken);
+            if (driver == null)
+            {
+                driver = new Staff(companyId, driverName, StaffRole.Driver, null, driverPhone, null);
+                _db.Staff.Add(driver);
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
+            delivery.AssignDeliveryPerson(driver.Id);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            return Ok(new { success = true, status = delivery.Status.ToString() });
         }
         catch (Exception ex)
         {
@@ -412,6 +454,12 @@ public sealed class MobileDeliveryAssignmentSyncRequest
     public string? DeliveryPincode { get; set; }
     public DateTime? DeliveryDate { get; set; }
     public string? DeliverySlot { get; set; }
+    public string? DriverName { get; set; }
+    public string? DriverPhone { get; set; }
+}
+
+public sealed class AssignDriverToDeliveryRequest
+{
     public string? DriverName { get; set; }
     public string? DriverPhone { get; set; }
 }

@@ -20,7 +20,7 @@ import {
   TrendingUp, TrendingDown, ErrorOutline
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '../../core/api/apiClient';
+import mobileAdminApi from '../../mobile-admin/api/mobileAdminAxios';
 
 interface DashboardStats {
   totalDrivers: number;
@@ -128,7 +128,7 @@ export default function DeliveryControlCenter() {
     setLoading(true);
     setError(null);
     try {
-      const response = await apiClient.get<DashboardData>('/delivery/control-center/dashboard', {
+      const response = await mobileAdminApi.get<DashboardData>('/delivery/control-center/dashboard', {
         params: { date: selectedDate },
       });
       setData(response.data);

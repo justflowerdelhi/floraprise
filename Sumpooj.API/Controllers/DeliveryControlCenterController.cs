@@ -9,7 +9,7 @@ namespace Sumpooj.API.Controllers;
 
 [Route("api/delivery/control-center")]
 [ApiController]
-[Authorize(Policy = "CompanyOnly")]
+[Authorize(Policy = "PlatformSupport")]
 public class DeliveryControlCenterController : ControllerBase
 {
     private readonly SumpoojDbContext _db;
@@ -26,8 +26,7 @@ public class DeliveryControlCenterController : ControllerBase
         _tenantContext = tenantContext;
     }
 
-    private Guid CompanyId => _tenantContext.CompanyId
-        ?? throw new UnauthorizedAccessException("Company context required");
+    private Guid? CompanyId => _tenantContext.CompanyId;
 
     /// <summary>
     /// Get delivery control center dashboard data
@@ -184,14 +183,20 @@ public class DeliveryControlCenterController : ControllerBase
 
     private async Task<List<WaitingOrderDto>> GetWaitingOrdersAsync(DateTime date)
     {
+        var deliveriesQuery = _db.Deliveries
+            .Where(d => d.DeliveryDate.Date == date.Date
+                  && d.Status == DeliveryStatus.Scheduled
+                  && d.DeliveryRouteId == null);
+
+        if (CompanyId.HasValue)
+        {
+            deliveriesQuery = deliveriesQuery.Where(d => d.CompanyId == CompanyId.Value);
+        }
+
         return await (
-            from d in _db.Deliveries
+            from d in deliveriesQuery
             join s in _db.Set<SalesOrder>() on d.SalesOrderId equals s.Id
             join c in _db.Customers on s.CustomerId equals c.Id
-            where d.CompanyId == CompanyId
-                  && d.DeliveryDate.Date == date.Date
-                  && d.Status == DeliveryStatus.Scheduled
-                  && d.DeliveryRouteId == null
             select new WaitingOrderDto
             {
                 DeliveryId = d.Id,
@@ -209,15 +214,21 @@ public class DeliveryControlCenterController : ControllerBase
 
     private async Task<List<InProgressDeliveryDto>> GetInProgressDeliveriesAsync(DateTime date)
     {
+        var deliveriesQuery = _db.Deliveries
+            .Where(d => d.DeliveryDate.Date == date.Date
+                  && d.Status == DeliveryStatus.OutForDelivery);
+
+        if (CompanyId.HasValue)
+        {
+            deliveriesQuery = deliveriesQuery.Where(d => d.CompanyId == CompanyId.Value);
+        }
+
         return await (
-            from d in _db.Deliveries
+            from d in deliveriesQuery
             join s in _db.Set<SalesOrder>() on d.SalesOrderId equals s.Id
             join c in _db.Customers on s.CustomerId equals c.Id
             join r in _db.DeliveryRoutes on d.DeliveryRouteId equals r.Id into routeLeft
             from route in routeLeft.DefaultIfEmpty()
-            where d.CompanyId == CompanyId
-                  && d.DeliveryDate.Date == date.Date
-                  && d.Status == DeliveryStatus.OutForDelivery
             select new InProgressDeliveryDto
             {
                 DeliveryId = d.Id,
@@ -241,16 +252,22 @@ public class DeliveryControlCenterController : ControllerBase
         var now = DateTime.UtcNow;
         var delayedThreshold = now.AddMinutes(-30); // Consider delayed if 30+ minutes past time slot
 
+        var deliveriesQuery = _db.Deliveries
+            .Where(d => d.DeliveryDate.Date == date.Date
+                  && d.Status == DeliveryStatus.OutForDelivery
+                  && d.DeliveryDate < delayedThreshold);
+
+        if (CompanyId.HasValue)
+        {
+            deliveriesQuery = deliveriesQuery.Where(d => d.CompanyId == CompanyId.Value);
+        }
+
         return await (
-            from d in _db.Deliveries
+            from d in deliveriesQuery
             join s in _db.Set<SalesOrder>() on d.SalesOrderId equals s.Id
             join c in _db.Customers on s.CustomerId equals c.Id
             join r in _db.DeliveryRoutes on d.DeliveryRouteId equals r.Id into routeLeft
             from route in routeLeft.DefaultIfEmpty()
-            where d.CompanyId == CompanyId
-                  && d.DeliveryDate.Date == date.Date
-                  && d.Status == DeliveryStatus.OutForDelivery
-                  && d.DeliveryDate < delayedThreshold
             select new DelayedDeliveryDto
             {
                 DeliveryId = d.Id,
@@ -272,8 +289,14 @@ public class DeliveryControlCenterController : ControllerBase
 
     private async Task<List<DriverLocationDto>> GetDriverLocationsAsync()
     {
-        var drivers = await _db.Staff
-            .Where(s => s.CompanyId == CompanyId && s.IsActive)
+        var staffQuery = _db.Staff.Where(s => s.IsActive);
+
+        if (CompanyId.HasValue)
+        {
+            staffQuery = staffQuery.Where(s => s.CompanyId == CompanyId.Value);
+        }
+
+        var drivers = await staffQuery
             .Select(s => new DriverLocationDto
             {
                 DriverId = s.Id,
@@ -302,13 +325,19 @@ public class DeliveryControlCenterController : ControllerBase
 
     private async Task<List<CompletedDeliveryDto>> GetCompletedDeliveriesAsync(DateTime date)
     {
+        var deliveriesQuery = _db.Deliveries
+            .Where(d => d.DeliveryDate.Date == date.Date
+                  && d.Status == DeliveryStatus.Delivered);
+
+        if (CompanyId.HasValue)
+        {
+            deliveriesQuery = deliveriesQuery.Where(d => d.CompanyId == CompanyId.Value);
+        }
+
         return await (
-            from d in _db.Deliveries
+            from d in deliveriesQuery
             join s in _db.Set<SalesOrder>() on d.SalesOrderId equals s.Id
             join c in _db.Customers on s.CustomerId equals c.Id
-            where d.CompanyId == CompanyId
-                  && d.DeliveryDate.Date == date.Date
-                  && d.Status == DeliveryStatus.Delivered
             select new CompletedDeliveryDto
             {
                 DeliveryId = d.Id,

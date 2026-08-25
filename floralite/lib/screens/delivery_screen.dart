@@ -2282,20 +2282,22 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
       await showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (dialogContext) => AlertDialog(
           title: const Text('Order Updated'),
           content: const Text('Order updated successfully.'),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
               },
               child: Text(l10n.done),
             ),
           ],
         ),
       );
+
+      if (!mounted) return;
+      Navigator.pop(context, true);
       return;
     }
 

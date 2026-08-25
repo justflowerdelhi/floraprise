@@ -1345,18 +1345,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         await _selectStaff('Select Delivery Person', StaffRole.delivery);
     if (delivery == null || !mounted) return;
 
-    await workflowProvider.assignDeliveryPartner(
-      orderId: header.id,
-      deliveryPartnerId: delivery.id,
-      notes: 'Assigned to ${delivery.name}',
-      syncDeliveryInBackground: false,
-    );
+    // Assign delivery partner and sync to cloud
+    try {
+      await workflowProvider.assignDeliveryPartner(
+        orderId: header.id,
+        deliveryPartnerId: delivery.id,
+        notes: 'Assigned to ${delivery.name}',
+        syncDeliveryInBackground: false,
+      );
+    } catch (error) {
+      debugPrint('[OrderDetail] Delivery assignment failed: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to assign delivery: $error'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+      return;
+    }
     if (!mounted) return;
 
+    // Reload order to confirm cloud Delivery is Assigned
     await orderProvider.loadOrderDetailProgressive(header.id);
     if (!mounted) return;
 
-    // Resolve or create cloud Delivery and generate tracking link
+    // Generate tracking link for WhatsApp
     String? startDeliveryLink;
     try {
       final deliveryId = await _deliveryTrackingService

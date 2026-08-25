@@ -123,7 +123,7 @@ import 'screens/payment_history_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SchedulerService.instance.initialize();
-  await SchedulerService.instance.restorePendingSchedules();
+  // restorePendingSchedules moved to SplashScreen to avoid blocking startup
   runApp(const FlorapriseGoApp());
 }
 

@@ -437,17 +437,17 @@ class DeliveryTrackingService {
 
     // Sync driver info to cloud delivery
     try {
-      await _postJson(
+      final response = await _postJson(
         '/api/v1/mobile/delivery/assignments/$deliveryId/driver',
         {
           'driverName': driverName,
           'driverPhone': driverPhone,
         },
       );
-      debugPrint('[DeliveryService] syncDeliveryAssignment - Driver info synced to cloud delivery');
+      debugPrint('[DeliveryService] syncDeliveryAssignment - Driver info synced to cloud delivery: $response');
     } on Object catch (error) {
       debugPrint('[DeliveryService] syncDeliveryAssignment - Failed to sync driver info: $error');
-      // Don't throw - driver sync is non-critical
+      rethrow; // Throw error to caller so florist can see the failure
     }
   }
 

@@ -17,7 +17,7 @@ import {
   Edit, CheckCircle, Cancel, PlayArrow, Navigation, AccessTime
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
-import { apiClient } from '../../core/api/apiClient';
+import mobileAdminApi from '../../mobile-admin/api/mobileAdminAxios';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -88,7 +88,7 @@ export default function DeliveryWorkspace() {
     if (!deliveryId) return;
     setLoading(true);
     try {
-      const response = await apiClient.get(`/delivery/tracking/by-delivery/${deliveryId}`);
+      const response = await mobileAdminApi.get(`/delivery/tracking/by-delivery/${deliveryId}`);
       const trackingData = response.data;
       setData(trackingData);
       setTimeline(trackingData.timeline || []);

@@ -720,16 +720,32 @@ public class PublicDeliveryTrackingController : ControllerBase
                         return BadRequest(new { error = "Delivery is already completed or cancelled" });
 
             if (delivery.Status == DeliveryStatus.Assigned)
-                return BadRequest(new { error = "Accept delivery first." });
+            {
+                if (!delivery.DeliveryPersonId.HasValue)
+                    return BadRequest(new { error = "Delivery person is not assigned." });
 
-            var driverId = delivery.DeliveryPersonId ?? Guid.NewGuid();
-                if (delivery.Status == DeliveryStatus.Accepted)
-                        delivery.MarkPickedUp();
-                if (delivery.Status == DeliveryStatus.PickedUp)
-                        delivery.MarkOutForDelivery();
-
-            if (delivery.Status != DeliveryStatus.OutForDelivery && delivery.Status != DeliveryStatus.ArrivedNearby)
-                        return BadRequest(new { error = "Delivery cannot be started from the current status" });
+                var driverId = delivery.DeliveryPersonId.Value;
+                delivery.MarkAccepted(driverId);
+                delivery.MarkPickedUp();
+                delivery.MarkOutForDelivery();
+            }
+            else if (delivery.Status == DeliveryStatus.Accepted)
+            {
+                delivery.MarkPickedUp();
+                delivery.MarkOutForDelivery();
+            }
+            else if (delivery.Status == DeliveryStatus.PickedUp)
+            {
+                delivery.MarkOutForDelivery();
+            }
+            else if (delivery.Status == DeliveryStatus.OutForDelivery || delivery.Status == DeliveryStatus.ArrivedNearby)
+            {
+                // Already started, return success
+            }
+            else
+            {
+                return BadRequest(new { error = "Delivery cannot be started from the current status" });
+            }
 
                 await _db.SaveChangesAsync();
                 return Ok(new

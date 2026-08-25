@@ -402,6 +402,8 @@ class _MorningPurchaseListScreenState extends State<MorningPurchaseListScreen> {
         TextEditingController(text: existing?.supplier ?? selected.supplier);
     final remarkController =
         TextEditingController(text: existing?.remarks ?? '');
+    final productSearchController = TextEditingController();
+    String productSearchQuery = '';
 
     int quantity = int.tryParse(qtyController.text) ?? 1;
 
@@ -458,42 +460,141 @@ class _MorningPurchaseListScreenState extends State<MorningPurchaseListScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
-                      initialValue: selected.productId,
-                      decoration: const InputDecoration(labelText: 'Product'),
-                      items: products
-                          .map(
-                            (p) => DropdownMenuItem<int>(
-                              value: p.productId,
-                              child: Text('${p.name} (${p.category})'),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: existing != null
-                          ? null
-                          : (value) {
-                              final next = products.firstWhere(
-                                (p) => p.productId == value,
-                                orElse: () => selected,
-                              );
-                              setLocalState(() {
-                                selected = next;
-                                if ((int.tryParse(qtyController.text) ?? 0) <=
-                                    0) {
-                                  quantity = next.suggestedQty > 0
-                                      ? next.suggestedQty
-                                      : 1;
-                                  qtyController.text = '$quantity';
-                                }
-                                if (unitController.text.trim().isEmpty) {
-                                  unitController.text = next.unit;
-                                }
-                                if (supplierController.text.trim().isEmpty) {
-                                  supplierController.text = next.supplier;
-                                }
-                              });
-                            },
+                    TextField(
+                      controller: productSearchController,
+                      enabled: existing == null,
+                      onChanged: (value) {
+                        setLocalState(() => productSearchQuery = value);
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Search Product',
+                        hintText: 'Type product name or category',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: productSearchController.text.isEmpty
+                            ? null
+                            : IconButton(
+                                onPressed: () {
+                                  productSearchController.clear();
+                                  setLocalState(
+                                    () => productSearchQuery = '',
+                                  );
+                                },
+                                icon: const Icon(Icons.clear),
+                              ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
+                    const SizedBox(height: 8),
+                    if (existing == null) ...[
+                      Builder(
+                        builder: (context) {
+                          final query = productSearchQuery.trim().toLowerCase();
+                          final filteredProducts = query.isEmpty
+                              ? products
+                              : products.where((product) {
+                                  final haystack =
+                                      '${product.name} ${product.category}'
+                                          .toLowerCase();
+                                  return haystack.contains(query);
+                                }).toList();
+
+                          return Container(
+                            constraints: const BoxConstraints(maxHeight: 220),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: filteredProducts.isEmpty
+                                ? const Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: Text('No matching products found.'),
+                                  )
+                                : ListView.separated(
+                                    shrinkWrap: true,
+                                    itemCount: filteredProducts.length,
+                                    separatorBuilder: (_, __) =>
+                                        const Divider(height: 1),
+                                    itemBuilder: (context, index) {
+                                      final product = filteredProducts[index];
+                                      final isSelected =
+                                          product.productId == selected.productId;
+
+                                      return ListTile(
+                                        dense: true,
+                                        selected: isSelected,
+                                        leading: Icon(
+                                          isSelected
+                                              ? Icons.check_circle
+                                              : Icons.inventory_2_outlined,
+                                        ),
+                                        title: Text(
+                                          product.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        subtitle: Text(
+                                          '${product.category} • ${product.unit}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        onTap: () {
+                                          setLocalState(() {
+                                            selected = product;
+                                            productSearchController.text =
+                                                product.name;
+                                            productSearchQuery = product.name;
+                                            if ((int.tryParse(
+                                                      qtyController.text,
+                                                    ) ??
+                                                    0) <=
+                                                0) {
+                                              quantity = product.suggestedQty > 0
+                                                  ? product.suggestedQty
+                                                  : 1;
+                                              qtyController.text =
+                                                  '$quantity';
+                                            }
+                                            if (unitController.text
+                                                .trim()
+                                                .isEmpty) {
+                                              unitController.text =
+                                                  product.unit;
+                                            }
+                                            if (supplierController.text
+                                                .trim()
+                                                .isEmpty) {
+                                              supplierController.text =
+                                                  product.supplier;
+                                            }
+                                          });
+                                        },
+                                      );
+                                    },
+                                  ),
+                          );
+                        },
+                      ),
+                    ] else ...[
+                      InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Product',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          '${selected.name} (${selected.category})',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -546,6 +647,7 @@ class _MorningPurchaseListScreenState extends State<MorningPurchaseListScreen> {
     unitController.dispose();
     supplierController.dispose();
     remarkController.dispose();
+    productSearchController.dispose();
   }
 
   Future<void> _shareOnWhatsApp(MorningPurchaseListProvider provider) async {

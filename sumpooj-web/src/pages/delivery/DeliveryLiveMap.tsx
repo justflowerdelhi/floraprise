@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import { Refresh, DirectionsCar, LocationOn, LocalShipping, PauseCircle, CheckCircle, Error } from '@mui/icons-material';
 import { GoogleMap, LoadScript, Marker, InfoWindow, Polyline } from '@react-google-maps/api';
-import { apiClient } from '../../core/api/apiClient';
+import mobileAdminApi from '../../mobile-admin/api/mobileAdminAxios';
 
 const mapContainerStyle = {
   width: '100%',
@@ -66,10 +66,10 @@ export default function DeliveryLiveMap() {
 
   const fetchDrivers = useCallback(async () => {
     try {
-      const response = await apiClient.get<{ items: DriverLocationResponse[] }>(
+      const response = await mobileAdminApi.get<{ items: DriverLocationResponse[] }>(
         '/delivery/control-center/drivers/locations',
       );
-      const mappedDrivers: Driver[] = (response.data.items || []).map((driver) => ({
+      const mappedDrivers: Driver[] = (response.data.items || []).map((driver: DriverLocationResponse) => ({
         id: driver.driverId,
         name: driver.driverName,
         phone: driver.driverPhone,
