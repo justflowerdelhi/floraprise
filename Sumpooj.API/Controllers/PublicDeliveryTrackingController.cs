@@ -123,6 +123,18 @@ public class PublicDeliveryTrackingController : ControllerBase
         return string.Empty;
     }
 
+    private static bool EnsureDriverAssignedStatus(Delivery delivery)
+    {
+        if (delivery.DeliveryPersonId.HasValue &&
+            delivery.Status is DeliveryStatus.Created or DeliveryStatus.Scheduled)
+        {
+            delivery.AssignDeliveryPerson(delivery.DeliveryPersonId.Value);
+            return true;
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Get public delivery tracking by secure token (Customer view)
     /// No authentication required
@@ -249,6 +261,10 @@ public class PublicDeliveryTrackingController : ControllerBase
             }
 
             var deliveryEntity = delivery.Delivery;
+            if (EnsureDriverAssignedStatus(deliveryEntity))
+            {
+                await _db.SaveChangesAsync();
+            }
 
             // Check if delivery is already completed or cancelled
             if (deliveryEntity.Status == DeliveryStatus.Delivered || 
@@ -299,6 +315,11 @@ public class PublicDeliveryTrackingController : ControllerBase
                         return NotFound(new { error = "Invalid tracking token" });
 
                 var item = delivery.Delivery;
+                if (EnsureDriverAssignedStatus(item))
+                {
+                    await _db.SaveChangesAsync();
+                }
+
                 return Ok(new
                 {
                         deliveryId = item.Id,
@@ -554,7 +575,7 @@ public class PublicDeliveryTrackingController : ControllerBase
             const traveling = s === 'outfordelivery' || s === 'arrivednearby';
 
             hide('acceptCard', !waiting);
-            hide('startCard', !accepted);
+            hide('startCard', !(waiting || accepted));
             hide('travelCard', !traveling);
 
             if (traveling) {{
@@ -1178,6 +1199,7 @@ public class PublicDeliveryTrackingController : ControllerBase
                 ? Guid.NewGuid().ToString("N")
                 : delivery.TrackingToken!;
 
+            EnsureDriverAssignedStatus(delivery);
             delivery.SetTrackingToken(token);
             await _db.SaveChangesAsync();
 

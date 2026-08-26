@@ -1351,7 +1351,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         orderId: header.id,
         deliveryPartnerId: delivery.id,
         notes: 'Assigned to ${delivery.name}',
-        syncDeliveryInBackground: true,
+        syncDeliveryInBackground: false,
       );
     } catch (error) {
       debugPrint('[OrderDetail] Delivery assignment failed: $error');
