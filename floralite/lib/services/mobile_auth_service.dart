@@ -111,11 +111,11 @@ class MobileAuthService {
     required String identifier,
     required String password,
     required bool rememberLogin,
+    String? companyId,
   }) async {
-    final companyId = await _resolveCompanyId();
+    final resolvedCompanyId = await _resolveCompanyId(companyId);
     final device = await _buildDevicePayload();
-    final response = await _postJson('/api/v1/mobile/auth/login', {
-      'companyId': companyId,
+    final payload = <String, Object?>{
       'identifier': identifier.trim(),
       'password': password,
       'deviceId': device['deviceId'],
@@ -126,7 +126,12 @@ class MobileAuthService {
       'appVersion': device['appVersion'],
       'pushToken': device['pushToken'],
       'ipAddress': device['ipAddress'],
-    });
+    };
+    if (resolvedCompanyId != null && resolvedCompanyId.trim().isNotEmpty) {
+      payload['companyId'] = resolvedCompanyId;
+    }
+
+    final response = await _postJson('/api/v1/mobile/auth/login', payload);
 
     return _parseAndPersistAuthPayload(response, rememberLogin: rememberLogin);
   }
@@ -843,7 +848,18 @@ class MobileAuthService {
     return Uri.parse(fullUrl);
   }
 
-  Future<String> _resolveCompanyId() async {
+  Future<String?> _resolveCompanyId([String? explicitCompanyId]) async {
+    final explicit = explicitCompanyId?.trim() ?? '';
+    if (explicit.isNotEmpty) {
+      if (Guid.tryParse(explicit) == null) {
+        throw const MobileAuthServiceException(
+          'invalid_company_id',
+          'Company ID is not valid.',
+        );
+      }
+      return explicit;
+    }
+
     final configured = _defaultCompanyId.trim();
     if (configured.isNotEmpty) {
       if (Guid.tryParse(configured) == null) {
@@ -868,10 +884,7 @@ class MobileAuthService {
       }
     }
 
-    throw const MobileAuthServiceException(
-      'missing_company_id',
-      'Company ID is required for login. Set FLORAPRISE_COMPANY_ID at build time.',
-    );
+    return null;
   }
 
   double _toDouble(Object? value) {

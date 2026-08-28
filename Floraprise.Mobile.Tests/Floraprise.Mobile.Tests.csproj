@@ -18,9 +18,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Sumpooj.API\Sumpooj.API.csproj" />
     <ProjectReference Include="..\Floraprise.Mobile\src\Floraprise.Mobile.Application\Floraprise.Mobile.Application.csproj" />
     <ProjectReference Include="..\Floraprise.Mobile\src\Floraprise.Mobile.Domain\Floraprise.Mobile.Domain.csproj" />
     <ProjectReference Include="..\Floraprise.Mobile\src\Floraprise.Mobile.Infrastructure\Floraprise.Mobile.Infrastructure.csproj" />

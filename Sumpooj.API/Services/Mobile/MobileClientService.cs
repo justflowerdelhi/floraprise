@@ -91,10 +91,16 @@ public sealed class MobileClientService : IMobileClientService
 
         var identifier = request.Identifier.Trim();
         _logger.LogInformation("[Mobile Login] Looking up identity user for identifier: {Identifier}, companyId: {CompanyId}", identifier, request.CompanyId);
-        var identityUser = await _userManager.Users
-            .Where(x => x.CompanyId == request.CompanyId)
-            .Where(x => x.Email == identifier || x.UserName == identifier || x.PhoneNumber == identifier)
-            .FirstOrDefaultAsync(cancellationToken);
+        var identityQuery = _userManager.Users
+            .Where(x => x.Email == identifier || x.UserName == identifier || x.PhoneNumber == identifier);
+
+        if (request.CompanyId.HasValue)
+        {
+            identityQuery = identityQuery.Where(x => x.CompanyId == request.CompanyId.Value);
+        }
+
+        var identityUsers = await identityQuery.Take(2).ToListAsync(cancellationToken);
+        var identityUser = identityUsers.Count == 1 ? identityUsers[0] : null;
 
         if (identityUser == null || !identityUser.IsActive)
         {
@@ -102,6 +108,13 @@ public sealed class MobileClientService : IMobileClientService
             throw new UnauthorizedAccessException("Invalid credentials.");
         }
         _logger.LogInformation("[Mobile Login] Identity user found: {UserId}", identityUser.Id);
+
+        var resolvedCompanyId = request.CompanyId ?? identityUser.CompanyId;
+        if (!resolvedCompanyId.HasValue)
+        {
+            _logger.LogWarning("[Mobile Login] Identity user has no company for mobile login. UserId: {UserId}", identityUser.Id);
+            throw new UnauthorizedAccessException("Mobile access requires a company account.");
+        }
 
         _logger.LogInformation("[Mobile Login] Validating password for user: {UserId}", identityUser.Id);
         var validPassword = await _userManager.CheckPasswordAsync(identityUser, request.Password);
@@ -111,17 +124,18 @@ public sealed class MobileClientService : IMobileClientService
             throw new UnauthorizedAccessException("Invalid credentials.");
         }
 
-        _logger.LogInformation("[Mobile Login] Loading company: {CompanyId}", request.CompanyId);
-        var company = await _db.Companies.FirstOrDefaultAsync(x => x.Id == request.CompanyId, cancellationToken)
+        var companyId = resolvedCompanyId.Value;
+        _logger.LogInformation("[Mobile Login] Loading company: {CompanyId}", companyId);
+        var company = await _db.Companies.FirstOrDefaultAsync(x => x.Id == companyId, cancellationToken)
             ?? throw new KeyNotFoundException("Company not found.");
 
         var mobile = ResolveMobile(identityUser, request.Identifier);
         _logger.LogInformation("[Mobile Login] Resolved mobile number: {Mobile}", mobile);
 
-        _logger.LogInformation("[Mobile Login] Calling RegisterOrStartTrialAsync for companyId: {CompanyId}, deviceId: {DeviceId}", request.CompanyId, request.DeviceId);
+        _logger.LogInformation("[Mobile Login] Calling RegisterOrStartTrialAsync for companyId: {CompanyId}, deviceId: {DeviceId}", companyId, request.DeviceId);
         var registration = await _mobileSubscriptionService.RegisterOrStartTrialAsync(
             registrationRequest ?? new RegisterMobileCustomerRequest(
-                CompanyId: request.CompanyId,
+                CompanyId: companyId,
                 BusinessName: company.Name,
                 OwnerName: identityUser.UserName ?? company.Name,
                 Mobile: mobile,
@@ -144,14 +158,14 @@ public sealed class MobileClientService : IMobileClientService
         _logger.LogInformation("[Mobile Login] RegisterOrStartTrialAsync completed. MobileUserId: {MobileUserId}, MobileDeviceId: {MobileDeviceId}", registration.MobileUserId, registration.MobileDeviceId);
 
         _logger.LogInformation("[Mobile Login] Managing device sessions for device: {MobileDeviceId}", registration.MobileDeviceId);
-        var activeSessions = await _deviceSessions.GetActiveByDeviceAsync(request.CompanyId, registration.MobileDeviceId);
+        var activeSessions = await _deviceSessions.GetActiveByDeviceAsync(companyId, registration.MobileDeviceId);
         foreach (var session in activeSessions)
             session.Logout(identityUser.Id);
 
         _logger.LogInformation("[Mobile Login] Creating new device session");
         var refreshToken = MobileSecurityTokens.NewToken();
         var newSession = new DeviceSession(
-            companyId: request.CompanyId,
+            companyId: companyId,
             mobileDeviceId: registration.MobileDeviceId,
             refreshToken: refreshToken,
             expiresAtUtc: DateTime.UtcNow.AddDays(30));
@@ -161,17 +175,17 @@ public sealed class MobileClientService : IMobileClientService
 
         _logger.LogInformation("[Mobile Login] Generating access token");
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(GetAccessTokenExpiryMinutes());
-        var accessToken = GenerateAccessToken(request.CompanyId, registration.MobileUserId, request.DeviceId, expiresAtUtc);
+        var accessToken = GenerateAccessToken(companyId, registration.MobileUserId, request.DeviceId, expiresAtUtc);
         
         _logger.LogInformation("[Mobile Login] Loading bootstrap data");
-        var bootstrap = await GetBootstrapAsync(request.CompanyId, registration.MobileUserId, request.DeviceId, cancellationToken);
+        var bootstrap = await GetBootstrapAsync(companyId, registration.MobileUserId, request.DeviceId, cancellationToken);
 
         _logger.LogInformation("[Mobile Login] Login completed successfully for user: {UserId}", identityUser.Id);
         return new MobileAuthTokenResponse(
             accessToken,
             refreshToken,
             expiresAtUtc,
-            request.CompanyId,
+            companyId,
             registration.MobileUserId,
             registration.MobileDeviceId,
             bootstrap);
@@ -435,6 +449,27 @@ public sealed class MobileClientService : IMobileClientService
             GeneratedAtUtc: DateTime.UtcNow);
 
         return bootstrapPayload;
+    }
+
+    public async Task<MobileCompanyProfileDto> GetCompanyProfileAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        var company = await _db.Companies.AsNoTracking().FirstOrDefaultAsync(x => x.Id == companyId, cancellationToken)
+            ?? throw new KeyNotFoundException("Company not found.");
+
+        return new MobileCompanyProfileDto(
+            Id: company.Id,
+            Name: company.Name,
+            Email: company.Email,
+            Phone: company.Phone,
+            Address: company.Address,
+            ShortDescription: company.ShortDescription,
+            TimeZone: company.TimeZone,
+            CurrencyCode: company.CurrencyCode,
+            TaxIdentifier: company.TaxIdentifier,
+            Region: company.Region,
+            IsActive: company.IsActive,
+            CreatedAtUtc: company.CreatedAtUtc,
+            UpdatedAtUtc: company.UpdatedAtUtc);
     }
 
     public async Task<MobileSubscriptionStateResponse> GetCurrentSubscriptionAsync(Guid companyId, Guid mobileUserId, CancellationToken cancellationToken = default)

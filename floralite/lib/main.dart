@@ -104,12 +104,14 @@ import 'providers/attendance_provider.dart';
 import 'providers/license_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/subscription_provider.dart';
+import 'providers/storage_mode_provider.dart';
 import 'data/repositories/product_repository.dart';
 import 'services/order_print_service.dart';
 import 'services/order_whatsapp_service.dart';
 import 'services/license_service.dart';
 import 'services/mobile_auth_service.dart';
 import 'services/subscription_service.dart';
+import 'services/storage_mode_service.dart';
 import 'services/app_route_observer.dart';
 import 'services/business_data_event_bus.dart';
 import 'services/printer/printer_manager.dart';
@@ -274,10 +276,13 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
           create: (_) => LanguageProvider(languageManager)..loadSavedLanguage(),
         ),
         ChangeNotifierProvider(
+          create: (_) => StorageModeProvider(StorageModeService())..load(),
+        ),
+        ChangeNotifierProvider(
           create: (_) => VoiceProvider(),
         ),
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(mobileAuthService)..initialize(),
+          create: (_) => AuthProvider(mobileAuthService),
         ),
         ChangeNotifierProvider(
           create: (_) => LicenseProvider(LicenseService())..initialize(),

@@ -14,12 +14,14 @@ class AuthProvider extends ChangeNotifier {
 
   final MobileAuthService _service;
 
-  AuthProviderState _state = AuthProviderState.loading;
+  AuthProviderState _state = AuthProviderState.unauthenticated;
   String? _message;
+  String? _errorCode;
   Map<String, dynamic>? _bootstrap;
 
   AuthProviderState get state => _state;
   String? get message => _message;
+  String? get errorCode => _errorCode;
   bool get isLoading => _state == AuthProviderState.loading;
   bool get isAuthenticated => _state == AuthProviderState.authenticated;
   Map<String, dynamic>? get bootstrap => _bootstrap;
@@ -34,6 +36,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> initialize() async {
     _state = AuthProviderState.loading;
     _message = null;
+    _errorCode = null;
     notifyListeners();
 
     try {
@@ -53,6 +56,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     } on MobileAuthServiceException catch (ex) {
       _state = AuthProviderState.unauthenticated;
+      _errorCode = ex.code;
       _message = _mapErrorMessage(ex.code, ex.message);
       notifyListeners();
     }
@@ -62,9 +66,11 @@ class AuthProvider extends ChangeNotifier {
     required String identifier,
     required String password,
     required bool rememberLogin,
+    String? companyId,
   }) async {
     _state = AuthProviderState.loading;
     _message = null;
+    _errorCode = null;
     notifyListeners();
 
     try {
@@ -72,6 +78,7 @@ class AuthProvider extends ChangeNotifier {
         identifier: identifier,
         password: password,
         rememberLogin: rememberLogin,
+        companyId: companyId,
       );
 
       _bootstrap = payload.bootstrap;
@@ -84,6 +91,7 @@ class AuthProvider extends ChangeNotifier {
       return canAccess;
     } on MobileAuthServiceException catch (ex) {
       _state = AuthProviderState.error;
+      _errorCode = ex.code;
       _message = _mapErrorMessage(ex.code, ex.message);
       notifyListeners();
       return false;
@@ -101,6 +109,7 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     _state = AuthProviderState.loading;
     _message = null;
+    _errorCode = null;
     notifyListeners();
 
     try {
@@ -124,6 +133,7 @@ class AuthProvider extends ChangeNotifier {
       return canAccess;
     } on MobileAuthServiceException catch (ex) {
       _state = AuthProviderState.error;
+      _errorCode = ex.code;
       _message = _mapErrorMessage(ex.code, ex.message);
       notifyListeners();
       return false;
@@ -225,6 +235,8 @@ class AuthProvider extends ChangeNotifier {
         return 'This email is already registered.';
       case 'DUPLICATE_PHONE':
         return 'This mobile number is already registered.';
+      case 'DUPLICATE_COMPANY':
+        return 'This company is already registered with Floraprise.';
       default:
         // Return the actual server error message instead of generic fallback
         if (fallback.trim().isNotEmpty && !fallback.contains('Request failed')) {

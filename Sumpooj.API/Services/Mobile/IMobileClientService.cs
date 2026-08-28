@@ -16,6 +16,7 @@ public interface IMobileClientService
     Task<MobileLicenseCheckResult> HeartbeatAsync(Guid companyId, Guid mobileUserId, MobileDeviceHeartbeatRequest request, CancellationToken cancellationToken = default);
 
     Task<MobileBootstrapResponse> GetBootstrapAsync(Guid companyId, Guid mobileUserId, string deviceId, CancellationToken cancellationToken = default);
+    Task<MobileCompanyProfileDto> GetCompanyProfileAsync(Guid companyId, CancellationToken cancellationToken = default);
 
     Task<MobileSubscriptionStateResponse> GetCurrentSubscriptionAsync(Guid companyId, Guid mobileUserId, CancellationToken cancellationToken = default);
     Task<List<MobileSubscriptionPlanDto>> GetAvailablePlansAsync(CancellationToken cancellationToken = default);

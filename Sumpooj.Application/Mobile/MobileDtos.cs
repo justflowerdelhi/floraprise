@@ -64,7 +64,7 @@ public sealed record MobileHeartbeatRequest(
     Guid? ActorUserId);
 
 public sealed record MobileAuthLoginRequest(
-    Guid CompanyId,
+    Guid? CompanyId,
     string Identifier,
     string Password,
     string DeviceId,

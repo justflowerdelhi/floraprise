@@ -3,8 +3,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../data/repositories/business_profile_repository.dart';
+import '../data/repositories/cloud_company_profile_repository.dart';
 import '../managers/business_settings_manager.dart';
+import '../providers/storage_mode_provider.dart';
+import '../services/mobile_auth_service.dart';
 import '../widgets/common_widgets.dart';
 
 class ShopDetailsScreen extends StatefulWidget {
@@ -19,6 +23,14 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
       BusinessSettingsManager();
   final BusinessProfileRepository _businessProfileRepository =
       BusinessProfileRepository();
+  final CloudCompanyProfileRepository _cloudCompanyProfileRepository =
+      CloudCompanyProfileRepository();
+  final MobileAuthService _mobileAuthService = MobileAuthService();
+  
+  bool _isCloudMode = false;
+  bool _isLoading = true;
+  String? _loadError;
+  
   String _shopName = 'My Flower Shop';
   String _ownerName = '';
   String _businessPhone = '';
@@ -39,6 +51,86 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   }
 
   Future<void> _loadBusinessSettings() async {
+    try {
+      // Determine if we're in Cloud or Local mode
+      final storageProvider = context.read<StorageModeProvider>();
+      final isCloud = storageProvider.isCloud;
+      
+      setState(() {
+        _isCloudMode = isCloud;
+        _isLoading = true;
+        _loadError = null;
+      });
+      
+      if (isCloud) {
+        await _loadCloudCompanyProfile();
+      } else {
+        await _loadLocalBusinessProfile();
+      }
+      
+      final logoPath = await _businessSettingsManager.getLogoPath();
+      if (!mounted) return;
+      setState(() {
+        _logoPath = logoPath;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Failed to load company profile: $e';
+      });
+    }
+  }
+
+  Future<void> _loadCloudCompanyProfile() async {
+    try {
+      // Get the base URL from the auth service
+      final baseUrl = _mobileAuthService.baseUrl;
+      
+      // Get the access token
+      final accessToken = await _mobileAuthService.getStoredAccessToken();
+      if (accessToken == null || accessToken.trim().isEmpty) {
+        setState(() {
+          _loadError = 'Not authenticated. Please log in again.';
+        });
+        return;
+      }
+      
+      // Fetch the company profile from the Cloud API
+      final cloudProfile = await _cloudCompanyProfileRepository.fetchCompanyProfile(
+        baseUrl: baseUrl,
+        accessToken: accessToken,
+      );
+      
+      if (!mounted) return;
+      
+      if (cloudProfile != null) {
+        setState(() {
+          _shopName = cloudProfile.name;
+          _ownerName = ''; // Not available in current API
+          _businessPhone = cloudProfile.phone ?? '';
+          _businessEmail = cloudProfile.email ?? '';
+          _businessAddress = cloudProfile.address ?? '';
+          _city = ''; // Not available in current API
+          _state = ''; // Not available in current API
+          _pinCode = ''; // Not available in current API
+          _gstRegistered = (cloudProfile.taxIdentifier ?? '').isNotEmpty;
+          _gstNumber = cloudProfile.taxIdentifier ?? '';
+        });
+      } else {
+        setState(() {
+          _loadError = 'Could not fetch company profile from Cloud.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _loadError = 'Error loading Cloud profile: $e';
+      });
+    }
+  }
+
+  Future<void> _loadLocalBusinessProfile() async {
     final profile = await _businessProfileRepository.getBusinessProfile();
     
     if (!mounted) return;
@@ -69,10 +161,6 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         _gstNumber = settings.gstNumber;
       });
     }
-
-    final logoPath = await _businessSettingsManager.getLogoPath();
-    if (!mounted) return;
-    setState(() => _logoPath = logoPath);
   }
 
   Future<void> _pickBusinessLogo(ImageSource source) async {
@@ -231,6 +319,13 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Shop Details')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final colorScheme = Theme.of(context).colorScheme;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final hasLogo = _logoPath.trim().isNotEmpty;
@@ -241,248 +336,312 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
       appBar: AppBar(
         title: const Text('Shop Details'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () => _showBusinessLogoSheet(),
-            tooltip: 'Edit Logo',
-          ),
+          if (!_isCloudMode)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () => _showBusinessLogoSheet(),
+              tooltip: 'Edit Logo',
+            ),
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 24 + bottomInset),
-          children: [
-            Center(
-              child: InkWell(
-                onTap: _showBusinessLogoSheet,
-                borderRadius: BorderRadius.circular(16),
-                child: Column(
-                  children: [
-                    SizedBox(
-                      width: 120,
-                      height: 120,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          CircleAvatar(
-                            radius: 60,
-                            backgroundColor: Colors.grey.shade100,
-                            backgroundImage: logoExists ? FileImage(logoFile) : null,
-                            child: logoExists
-                                ? null
-                                : Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Text('🏪', style: TextStyle(fontSize: 36)),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Logo',
-                                        style: TextStyle(
-                                          color: Colors.grey.shade700,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                          Positioned(
-                            right: -2,
-                            bottom: -2,
-                            child: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                              ),
-                              child: const Icon(
-                                Icons.edit,
-                                size: 18,
-                                color: Colors.white,
+        child: _loadError != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Error',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _loadError!,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: () {
+                          setState(() {
+                            _isLoading = true;
+                            _loadError = null;
+                          });
+                          _loadBusinessSettings();
+                        },
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : ListView(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 24 + bottomInset),
+                children: [
+                  if (_isCloudMode)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          border: Border.all(color: Colors.blue.shade200),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.info, color: Colors.blue.shade700),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Cloud company profile is read-only. Editing will be available soon.',
+                                style: TextStyle(
+                                  color: Colors.blue.shade900,
+                                  fontSize: 14,
+                                ),
                               ),
                             ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  Center(
+                    child: InkWell(
+                      onTap: _isCloudMode ? null : _showBusinessLogoSheet,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            width: 120,
+                            height: 120,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                CircleAvatar(
+                                  radius: 60,
+                                  backgroundColor: Colors.grey.shade100,
+                                  backgroundImage: logoExists ? FileImage(logoFile) : null,
+                                  child: logoExists
+                                      ? null
+                                      : Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            const Text('🏪', style: TextStyle(fontSize: 36)),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Logo',
+                                              style: TextStyle(
+                                                color: Colors.grey.shade700,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                                if (!_isCloudMode)
+                                  Positioned(
+                                    right: -2,
+                                    bottom: -2,
+                                    child: Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primary,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.white, width: 2),
+                                      ),
+                                      child: const Icon(
+                                        Icons.edit,
+                                        size: 18,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            hasLogo && logoExists
+                                ? (_shopName.trim().isEmpty ? 'Business Logo' : _shopName)
+                                : 'Add Shop Logo',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      hasLogo && logoExists
-                          ? (_shopName.trim().isEmpty ? 'Business Logo' : _shopName)
-                          : 'Add Shop Logo',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDetailRow(
-                    'Shop Name',
-                    _shopName,
-                    Icons.store,
-                    () => _editBusinessTextField(
-                      title: 'Shop Name',
-                      initialValue: _shopName,
-                      onSave: (value) async {
-                        _shopName = value;
-                        await _saveBusinessProfile();
-                      },
-                    ),
                   ),
-                  const Divider(),
-                  _buildDetailRow(
-                    'Owner Name',
-                    _ownerName.isEmpty ? '-' : _ownerName,
-                    Icons.person,
-                    () => _editBusinessTextField(
-                      title: 'Owner Name',
-                      initialValue: _ownerName,
-                      onSave: (value) async {
-                        _ownerName = value;
-                        await _saveBusinessProfile();
-                      },
-                    ),
-                  ),
-                  const Divider(),
-                  _buildDetailRow(
-                    'Mobile Number',
-                    _businessPhone.isEmpty ? '-' : _businessPhone,
-                    Icons.phone,
-                    () => _editBusinessTextField(
-                      title: 'Mobile Number',
-                      initialValue: _businessPhone,
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(10),
+                  const SizedBox(height: 24),
+                  AppCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildDetailRow(
+                          'Shop Name',
+                          _shopName,
+                          Icons.store,
+                          _isCloudMode ? null : () => _editBusinessTextField(
+                            title: 'Shop Name',
+                            initialValue: _shopName,
+                            onSave: (value) async {
+                              _shopName = value;
+                              await _saveBusinessProfile();
+                            },
+                          ),
+                        ),
+                        const Divider(),
+                        _buildDetailRow(
+                          'Owner Name',
+                          _ownerName.isEmpty ? '-' : _ownerName,
+                          Icons.person,
+                          _isCloudMode ? null : () => _editBusinessTextField(
+                            title: 'Owner Name',
+                            initialValue: _ownerName,
+                            onSave: (value) async {
+                              _ownerName = value;
+                              await _saveBusinessProfile();
+                            },
+                          ),
+                        ),
+                        const Divider(),
+                        _buildDetailRow(
+                          'Mobile Number',
+                          _businessPhone.isEmpty ? '-' : _businessPhone,
+                          Icons.phone,
+                          _isCloudMode ? null : () => _editBusinessTextField(
+                            title: 'Mobile Number',
+                            initialValue: _businessPhone,
+                            keyboardType: TextInputType.phone,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(10),
+                            ],
+                            onSave: (value) async {
+                              _businessPhone = value;
+                              await _saveBusinessProfile();
+                            },
+                          ),
+                        ),
+                        const Divider(),
+                        _buildDetailRow(
+                          'Email',
+                          _businessEmail.isEmpty ? '-' : _businessEmail,
+                          Icons.email,
+                          _isCloudMode ? null : () => _editBusinessTextField(
+                            title: 'Email',
+                            initialValue: _businessEmail,
+                            keyboardType: TextInputType.emailAddress,
+                            onSave: (value) async {
+                              _businessEmail = value;
+                              await _saveBusinessProfile();
+                            },
+                          ),
+                        ),
+                        const Divider(),
+                        _buildDetailRow(
+                          'Address',
+                          _businessAddress.isEmpty ? '-' : _businessAddress,
+                          Icons.location_on,
+                          _isCloudMode ? null : () => _editBusinessTextField(
+                            title: 'Address',
+                            initialValue: _businessAddress,
+                            onSave: (value) async {
+                              _businessAddress = value;
+                              await _saveBusinessProfile();
+                            },
+                          ),
+                        ),
+                        const Divider(),
+                        _buildDetailRow(
+                          'City',
+                          _city.isEmpty ? '-' : _city,
+                          Icons.location_city,
+                          _isCloudMode ? null : () => _editBusinessTextField(
+                            title: 'City',
+                            initialValue: _city,
+                            onSave: (value) async {
+                              _city = value;
+                              await _saveBusinessProfile();
+                            },
+                          ),
+                        ),
+                        const Divider(),
+                        _buildDetailRow(
+                          'State',
+                          _state.isEmpty ? '-' : _state,
+                          Icons.map,
+                          _isCloudMode ? null : () => _editBusinessTextField(
+                            title: 'State',
+                            initialValue: _state,
+                            onSave: (value) async {
+                              _state = value;
+                              await _saveBusinessProfile();
+                            },
+                          ),
+                        ),
+                        const Divider(),
+                        _buildDetailRow(
+                          'PIN Code',
+                          _pinCode.isEmpty ? '-' : _pinCode,
+                          Icons.pin,
+                          _isCloudMode ? null : () => _editBusinessTextField(
+                            title: 'PIN Code',
+                            initialValue: _pinCode,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(6),
+                            ],
+                            onSave: (value) async {
+                              _pinCode = value;
+                              await _saveBusinessProfile();
+                            },
+                          ),
+                        ),
+                        const Divider(),
+                        SwitchListTile(
+                          title: const Text('GST Registered'),
+                          subtitle: Text(_gstRegistered ? 'Yes' : 'No'),
+                          value: _gstRegistered,
+                          onChanged: _isCloudMode ? null : (value) async {
+                            setState(() => _gstRegistered = value);
+                            await _saveBusinessProfile();
+                          },
+                          secondary: const Icon(Icons.receipt_long),
+                        ),
+                        const Divider(),
+                        if (_gstRegistered)
+                          _buildDetailRow(
+                            'GST Number',
+                            _gstNumber.isEmpty ? '-' : _gstNumber,
+                            Icons.confirmation_number,
+                            _isCloudMode ? null : () => _editBusinessTextField(
+                              title: 'GST Number',
+                              initialValue: _gstNumber,
+                              onSave: (value) async {
+                                _gstNumber = value;
+                                await _saveBusinessProfile();
+                              },
+                            ),
+                          ),
+                        const Divider(),
+                        _buildDetailRow(
+                          'Floraprise Shop ID',
+                          'Coming Soon',
+                          Icons.storefront,
+                          null,
+                        ),
                       ],
-                      onSave: (value) async {
-                        _businessPhone = value;
-                        await _saveBusinessProfile();
-                      },
                     ),
-                  ),
-                  const Divider(),
-                  _buildDetailRow(
-                    'Email',
-                    _businessEmail.isEmpty ? '-' : _businessEmail,
-                    Icons.email,
-                    () => _editBusinessTextField(
-                      title: 'Email',
-                      initialValue: _businessEmail,
-                      keyboardType: TextInputType.emailAddress,
-                      onSave: (value) async {
-                        _businessEmail = value;
-                        await _saveBusinessProfile();
-                      },
-                    ),
-                  ),
-                  const Divider(),
-                  _buildDetailRow(
-                    'Address',
-                    _businessAddress.isEmpty ? '-' : _businessAddress,
-                    Icons.location_on,
-                    () => _editBusinessTextField(
-                      title: 'Address',
-                      initialValue: _businessAddress,
-                      onSave: (value) async {
-                        _businessAddress = value;
-                        await _saveBusinessProfile();
-                      },
-                    ),
-                  ),
-                  const Divider(),
-                  _buildDetailRow(
-                    'City',
-                    _city.isEmpty ? '-' : _city,
-                    Icons.location_city,
-                    () => _editBusinessTextField(
-                      title: 'City',
-                      initialValue: _city,
-                      onSave: (value) async {
-                        _city = value;
-                        await _saveBusinessProfile();
-                      },
-                    ),
-                  ),
-                  const Divider(),
-                  _buildDetailRow(
-                    'State',
-                    _state.isEmpty ? '-' : _state,
-                    Icons.map,
-                    () => _editBusinessTextField(
-                      title: 'State',
-                      initialValue: _state,
-                      onSave: (value) async {
-                        _state = value;
-                        await _saveBusinessProfile();
-                      },
-                    ),
-                  ),
-                  const Divider(),
-                  _buildDetailRow(
-                    'PIN Code',
-                    _pinCode.isEmpty ? '-' : _pinCode,
-                    Icons.pin,
-                    () => _editBusinessTextField(
-                      title: 'PIN Code',
-                      initialValue: _pinCode,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(6),
-                      ],
-                      onSave: (value) async {
-                        _pinCode = value;
-                        await _saveBusinessProfile();
-                      },
-                    ),
-                  ),
-                  const Divider(),
-                  SwitchListTile(
-                    title: const Text('GST Registered'),
-                    subtitle: Text(_gstRegistered ? 'Yes' : 'No'),
-                    value: _gstRegistered,
-                    onChanged: (value) async {
-                      setState(() => _gstRegistered = value);
-                      await _saveBusinessProfile();
-                    },
-                    secondary: const Icon(Icons.receipt_long),
-                  ),
-                  const Divider(),
-                  if (_gstRegistered)
-                    _buildDetailRow(
-                      'GST Number',
-                      _gstNumber.isEmpty ? '-' : _gstNumber,
-                      Icons.confirmation_number,
-                      () => _editBusinessTextField(
-                        title: 'GST Number',
-                        initialValue: _gstNumber,
-                        onSave: (value) async {
-                          _gstNumber = value;
-                          await _saveBusinessProfile();
-                        },
-                      ),
-                    ),
-                  const Divider(),
-                  _buildDetailRow(
-                    'Floraprise Shop ID',
-                    'Coming Soon',
-                    Icons.storefront,
-                    null,
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }

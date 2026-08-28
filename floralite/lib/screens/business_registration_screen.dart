@@ -2,13 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../managers/onboarding_manager.dart';
+import '../models/storage_mode.dart';
 import '../presentation/splash/floral_background.dart';
 import '../providers/auth_provider.dart';
+import '../providers/storage_mode_provider.dart';
 import '../widgets/common_widgets.dart';
 import 'onboarding_flow_screen.dart';
 
 class BusinessRegistrationScreen extends StatefulWidget {
-  const BusinessRegistrationScreen({super.key});
+  const BusinessRegistrationScreen({
+    super.key,
+    this.storageModeAfterAuth,
+  });
+
+  final StorageMode? storageModeAfterAuth;
 
   @override
   State<BusinessRegistrationScreen> createState() =>
@@ -26,7 +33,10 @@ class _BusinessRegistrationScreenState
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _loginIdentifierController = TextEditingController();
+  final _loginPasswordController = TextEditingController();
   final _onboardingManager = OnboardingManager();
+  bool _loginMode = true;
 
   @override
   void dispose() {
@@ -38,7 +48,30 @@ class _BusinessRegistrationScreenState
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _loginIdentifierController.dispose();
+    _loginPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final provider = context.read<AuthProvider>();
+    final loggedIn = await provider.login(
+      identifier: _loginIdentifierController.text,
+      password: _loginPasswordController.text,
+      rememberLogin: true,
+    );
+    if (!mounted) return;
+
+    if (!loggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.friendlyMessage)),
+      );
+      return;
+    }
+
+    await _finishAuthenticatedFlow();
   }
 
   Future<void> _register() async {
@@ -57,6 +90,11 @@ class _BusinessRegistrationScreenState
     if (!mounted) return;
 
     if (!registered) {
+      if (provider.errorCode == 'DUPLICATE_COMPANY') {
+        await _showDuplicateCompanyDialog(provider.friendlyMessage);
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(provider.friendlyMessage),
@@ -65,15 +103,75 @@ class _BusinessRegistrationScreenState
       return;
     }
 
-    final completed = await _onboardingManager.isOnboardingCompleted();
-    if (!mounted) return;
-    if (completed) {
-      Navigator.of(context).pushReplacementNamed('/dashboard');
+    await _finishAuthenticatedFlow();
+  }
+
+  Future<void> _finishAuthenticatedFlow() async {
+    final navigator = Navigator.of(context);
+    final storageMode = widget.storageModeAfterAuth;
+    final storageProvider = context.read<StorageModeProvider>();
+
+    if (storageMode != null) {
+      await storageProvider.setMode(storageMode);
+    }
+
+    if (storageProvider.isCloud) {
+      await _onboardingManager.completeOnboarding();
+      if (!mounted) return;
+      navigator.pushReplacementNamed('/dashboard');
       return;
     }
 
-    Navigator.of(context).pushReplacement(
+    final completed = await _onboardingManager.isOnboardingCompleted();
+    if (!mounted) return;
+    if (completed) {
+      navigator.pushReplacementNamed('/dashboard');
+      return;
+    }
+
+    navigator.pushReplacement(
       MaterialPageRoute(builder: (_) => const OnboardingFlowScreen()),
+    );
+  }
+
+  Future<void> _showDuplicateCompanyDialog(String message) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Company already registered'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              setState(() => _loginMode = true);
+            },
+            child: const Text('Sign In'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              _showPasswordRecoveryUnavailable();
+            },
+            child: const Text('Forgot Password'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPasswordRecoveryUnavailable() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Password recovery is not available in the app yet. Please contact your Floraprise administrator.',
+        ),
+        duration: Duration(seconds: 5),
+      ),
     );
   }
 
@@ -106,7 +204,9 @@ class _BusinessRegistrationScreenState
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'Business Registration',
+                            _loginMode
+                                ? 'Floraprise Cloud Store'
+                                : 'Business Registration',
                             textAlign: TextAlign.center,
                             style: Theme.of(context)
                                 .textTheme
@@ -115,80 +215,111 @@ class _BusinessRegistrationScreenState
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Create your Floraprise account.',
+                            _loginMode
+                                ? 'Sign in with your Floraprise account.'
+                                : 'Create your Floraprise account.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.grey.shade700),
                           ),
                           const SizedBox(height: 24),
-                          _TextField(
-                            controller: _businessNameController,
-                            label: 'Business Name',
-                            icon: Icons.local_florist_rounded,
+                          SegmentedButton<bool>(
+                            segments: const [
+                              ButtonSegment(
+                                value: true,
+                                label: Text('Sign In'),
+                                icon: Icon(Icons.login_rounded),
+                              ),
+                              ButtonSegment(
+                                value: false,
+                                label: Text('Create Account'),
+                                icon: Icon(Icons.storefront_rounded),
+                              ),
+                            ],
+                            selected: {_loginMode},
+                            onSelectionChanged: provider.isLoading
+                                ? null
+                                : (value) {
+                                    setState(() => _loginMode = value.first);
+                                  },
                           ),
-                          _TextField(
-                            controller: _ownerNameController,
-                            label: 'Owner Name',
-                            icon: Icons.person_outline_rounded,
-                          ),
-                          _TextField(
-                            controller: _mobileController,
-                            label: 'Mobile',
-                            icon: Icons.phone_android_rounded,
-                            keyboardType: TextInputType.phone,
-                            validator: _mobileValidator,
-                          ),
-                          _TextField(
-                            controller: _addressController,
-                            label: 'Address',
-                            icon: Icons.location_on_outlined,
-                            keyboardType: TextInputType.streetAddress,
-                          ),
-                          _TextField(
-                            controller: _cityController,
-                            label: 'City',
-                            icon: Icons.location_city_outlined,
-                            validator: _requiredValidator,
-                          ),
-                          _TextField(
-                            controller: _emailController,
-                            label: 'Email',
-                            icon: Icons.email_outlined,
-                            keyboardType: TextInputType.emailAddress,
-                            validator: _emailValidator,
-                          ),
-                          _TextField(
-                            controller: _passwordController,
-                            label: 'Password',
-                            icon: Icons.lock_outline,
-                            obscureText: true,
-                            validator: (value) {
-                              final text = value ?? '';
-                              if (text.isEmpty) return 'Password is required';
-                              if (text.length < 8) {
-                                return 'Password must be at least 8 characters';
-                              }
-                              return null;
-                            },
-                          ),
-                          _TextField(
-                            controller: _confirmPasswordController,
-                            label: 'Confirm Password',
-                            icon: Icons.lock_reset_outlined,
-                            obscureText: true,
-                            validator: (value) {
-                              if ((value ?? '').isEmpty) {
-                                return 'Confirm password is required';
-                              }
-                              if (value != _passwordController.text) {
-                                return 'Passwords do not match';
-                              }
-                              return null;
-                            },
-                          ),
+                          const SizedBox(height: 18),
+                          if (_loginMode) ...[
+                            _TextField(
+                              controller: _loginIdentifierController,
+                              label: 'Mobile or Email',
+                              icon: Icons.account_circle_outlined,
+                            ),
+                            _TextField(
+                              controller: _loginPasswordController,
+                              label: 'Password',
+                              icon: Icons.lock_outline,
+                              obscureText: true,
+                              validator: _passwordValidator,
+                            ),
+                          ] else ...[
+                            _TextField(
+                              controller: _businessNameController,
+                              label: 'Business Name',
+                              icon: Icons.local_florist_rounded,
+                            ),
+                            _TextField(
+                              controller: _ownerNameController,
+                              label: 'Owner Name',
+                              icon: Icons.person_outline_rounded,
+                            ),
+                            _TextField(
+                              controller: _mobileController,
+                              label: 'Mobile',
+                              icon: Icons.phone_android_rounded,
+                              keyboardType: TextInputType.phone,
+                              validator: _mobileValidator,
+                            ),
+                            _TextField(
+                              controller: _addressController,
+                              label: 'Address',
+                              icon: Icons.location_on_outlined,
+                              keyboardType: TextInputType.streetAddress,
+                            ),
+                            _TextField(
+                              controller: _cityController,
+                              label: 'City',
+                              icon: Icons.location_city_outlined,
+                              validator: _requiredValidator,
+                            ),
+                            _TextField(
+                              controller: _emailController,
+                              label: 'Email',
+                              icon: Icons.email_outlined,
+                              keyboardType: TextInputType.emailAddress,
+                              validator: _emailValidator,
+                            ),
+                            _TextField(
+                              controller: _passwordController,
+                              label: 'Password',
+                              icon: Icons.lock_outline,
+                              obscureText: true,
+                              validator: _passwordValidator,
+                            ),
+                            _TextField(
+                              controller: _confirmPasswordController,
+                              label: 'Confirm Password',
+                              icon: Icons.lock_reset_outlined,
+                              obscureText: true,
+                              validator: (value) {
+                                if ((value ?? '').isEmpty) {
+                                  return 'Confirm password is required';
+                                }
+                                if (value != _passwordController.text) {
+                                  return 'Passwords do not match';
+                                }
+                                return null;
+                              },
+                            ),
+                          ],
                           const SizedBox(height: 12),
                           FilledButton.icon(
                             onPressed:
-                                provider.isLoading ? null : () => _register(),
+                                provider.isLoading ? null : _submit,
                             icon: provider.isLoading
                                 ? const SizedBox(
                                     width: 18,
@@ -197,8 +328,10 @@ class _BusinessRegistrationScreenState
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Icon(Icons.verified_user_outlined),
-                            label: const Text('Register'),
+                                : Icon(_loginMode
+                                    ? Icons.login_rounded
+                                    : Icons.verified_user_outlined),
+                            label: Text(_loginMode ? 'Sign In' : 'Register'),
                           ),
                         ],
                       ),
@@ -211,6 +344,14 @@ class _BusinessRegistrationScreenState
         ],
       ),
     );
+  }
+
+  void _submit() {
+    if (_loginMode) {
+      _login();
+    } else {
+      _register();
+    }
   }
 
   String? _mobileValidator(String? value) {
@@ -233,6 +374,14 @@ class _BusinessRegistrationScreenState
     if ((value ?? '').trim().isEmpty) return 'City is required';
     return null;
   }
+
+  String? _passwordValidator(String? value) {
+    final text = value ?? '';
+    if (text.isEmpty) return 'Password is required';
+    if (text.length < 8) return 'Password must be at least 8 characters';
+    return null;
+  }
+
 }
 
 class _TextField extends StatelessWidget {

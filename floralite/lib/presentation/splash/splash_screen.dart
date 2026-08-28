@@ -6,6 +6,7 @@ import '../../data/repositories/inventory_repository.dart';
 import '../../data/repositories/product_repository.dart';
 import '../../managers/onboarding_manager.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/storage_mode_provider.dart';
 import '../../screens/onboarding_flow_screen.dart';
 import '../../services/scheduler_service.dart';
 import 'floral_background.dart';
@@ -38,11 +39,39 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _navigateToNextScreen() async {
+    final storageModeProvider = context.read<StorageModeProvider>();
+    final navigator = Navigator.of(context);
+    final authProvider = context.read<AuthProvider>();
+
+    await storageModeProvider.ensureLoaded();
+    if (!mounted) return;
+
+    if (!storageModeProvider.hasSelectedMode) {
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (_) => const OnboardingFlowScreen()),
+      );
+      return;
+    }
+
+    if (storageModeProvider.isCloud) {
+      await authProvider.initialize();
+      if (!mounted) return;
+
+      if (!authProvider.isAuthenticated) {
+        navigator.pushReplacementNamed('/mobile-register');
+        return;
+      }
+
+      await _onboardingManager.completeOnboarding();
+      navigator.pushReplacementNamed('/dashboard');
+      return;
+    }
+
     final completed = await _onboardingManager.isOnboardingCompleted();
     if (!mounted) return;
 
     if (!completed) {
-      Navigator.of(context).pushReplacement(
+      navigator.pushReplacement(
         MaterialPageRoute(builder: (_) => const OnboardingFlowScreen()),
       );
       return;
@@ -51,11 +80,7 @@ class _SplashScreenState extends State<SplashScreen> {
     await _ensureMasterCatalogue();
     if (!mounted) return;
 
-    // Best-effort auth restore for cloud features; never block app entry.
-    await context.read<AuthProvider>().initialize();
-    if (!mounted) return;
-
-    Navigator.of(context).pushReplacementNamed('/dashboard');
+    navigator.pushReplacementNamed('/dashboard');
   }
 
   Future<void> _ensureMasterCatalogue() async {

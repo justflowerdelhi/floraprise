@@ -58,6 +58,20 @@ public sealed class MobileAuthController : MobileApiControllerBase
 
             var email = request.Email.Trim();
             var mobile = request.Mobile.Trim();
+            if (await IsDuplicateCompanyRegistrationAsync(request.CompanyName, mobile, cancellationToken))
+            {
+                const string message = "This company is already registered with Floraprise.";
+                return Conflict(new
+                {
+                    error = new
+                    {
+                        code = "DUPLICATE_COMPANY",
+                        message
+                    },
+                    title = "Company already registered",
+                    detail = $"DUPLICATE_COMPANY: {message}"
+                });
+            }
 
             _logger.LogInformation("[Mobile Register] Checking for existing email: {Email}", email);
             var existingByEmail = await _userManager.FindByEmailAsync(email);
@@ -65,12 +79,11 @@ public sealed class MobileAuthController : MobileApiControllerBase
             _logger.LogInformation("[Mobile Register] Checking for existing phone: {Mobile}", mobile);
             var existingByPhone = await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == mobile, cancellationToken);
 
-            _logger.LogInformation("[Mobile Register] Creating/finding company for: {CompanyName}", request.CompanyName);
-            var existingCompany = await _companyService.FindByEmailOrPhoneAsync(email, mobile);
+            _logger.LogInformation("[Mobile Register] Creating company for: {CompanyName}", request.CompanyName);
             var existingUser = existingByEmail ?? existingByPhone;
             if (existingUser != null)
             {
-                var existingCompanyId = existingUser.CompanyId ?? existingCompany?.Id ?? Guid.Empty;
+                var existingCompanyId = existingUser.CompanyId ?? Guid.Empty;
                 if (existingCompanyId == Guid.Empty)
                     throw new InvalidOperationException("Existing mobile account is missing company information.");
 
@@ -97,7 +110,7 @@ public sealed class MobileAuthController : MobileApiControllerBase
                         Email: email,
                         City: request.City.Trim(),
                         State: null,
-                        Country: existingCompany?.Region ?? "IN",
+                        Country: "IN",
                         FullName: request.OwnerName.Trim(),
                         DeviceId: request.DeviceId,
                         Platform: request.Platform,
@@ -115,32 +128,23 @@ public sealed class MobileAuthController : MobileApiControllerBase
                 return Ok(restoredLoginResponse);
             }
 
-            Guid companyId;
-            if (existingCompany != null)
-            {
-                companyId = existingCompany.Id;
-                _logger.LogInformation("[Mobile Register] Existing company found with ID: {CompanyId}", companyId);
-            }
-            else
-            {
-                _logger.LogInformation("[Mobile Register] Creating new company");
-                var company = new Domain.Entities.Company(
-                    name: request.CompanyName.Trim(),
-                    region: "IN",
-                    email: email,
-                    phone: mobile,
-                    address: string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim(),
-                    shortDescription: "Registered from mobile onboarding",
-                    logoPath: null,
-                    timeZone: "Asia/Kolkata",
-                    currencyCode: "INR",
-                    taxIdentifier: null
-                );
-                _db.Companies.Add(company);
-                await _db.SaveChangesAsync(cancellationToken);
-                companyId = company.Id;
-                _logger.LogInformation("[Mobile Register] New company created with ID: {CompanyId}", companyId);
-            }
+            _logger.LogInformation("[Mobile Register] Creating new company");
+            var company = new Domain.Entities.Company(
+                name: request.CompanyName.Trim(),
+                region: "IN",
+                email: email,
+                phone: mobile,
+                address: string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim(),
+                shortDescription: "Registered from mobile onboarding",
+                logoPath: null,
+                timeZone: "Asia/Kolkata",
+                currencyCode: "INR",
+                taxIdentifier: null
+            );
+            _db.Companies.Add(company);
+            await _db.SaveChangesAsync(cancellationToken);
+            var companyId = company.Id;
+            _logger.LogInformation("[Mobile Register] New company created with ID: {CompanyId}", companyId);
 
             _logger.LogInformation("[Mobile Register] Creating ApplicationUser for email: {Email}", email);
             var user = new ApplicationUser
@@ -219,6 +223,53 @@ public sealed class MobileAuthController : MobileApiControllerBase
         }
     }
 
+    private async Task<bool> IsDuplicateCompanyRegistrationAsync(
+        string companyName,
+        string businessPhone,
+        CancellationToken cancellationToken)
+    {
+        var normalizedName = NormalizeCompanyName(companyName);
+        var normalizedPhone = NormalizeIndianBusinessPhone(businessPhone);
+        if (string.IsNullOrWhiteSpace(normalizedName) || string.IsNullOrWhiteSpace(normalizedPhone))
+            return false;
+
+        var candidates = await _db.Companies
+            .AsNoTracking()
+            .Where(c => c.Phone != null)
+            .Select(c => new { c.Name, c.Phone })
+            .ToListAsync(cancellationToken);
+
+        return candidates.Any(c =>
+            NormalizeCompanyName(c.Name) == normalizedName &&
+            NormalizeIndianBusinessPhone(c.Phone) == normalizedPhone);
+    }
+
+    private static string NormalizeCompanyName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        return new string(value
+            .Trim()
+            .ToLowerInvariant()
+            .Where(char.IsLetterOrDigit)
+            .ToArray());
+    }
+
+    private static string NormalizeIndianBusinessPhone(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        if (digits.Length == 12 && digits.StartsWith("91", StringComparison.Ordinal))
+            return digits[2..];
+        if (digits.Length == 11 && digits.StartsWith("0", StringComparison.Ordinal))
+            return digits[1..];
+
+        return digits;
+    }
+
     [AllowAnonymous]
     [HttpPost("~/api/mobile/auth/register")]
     [ProducesResponseType(typeof(MobileAuthTokenResponse), StatusCodes.Status200OK)]
@@ -230,7 +281,7 @@ public sealed class MobileAuthController : MobileApiControllerBase
     /// </summary>
     /// <remarks>
     /// Request example:
-    /// { "companyId": "00000000-0000-0000-0000-000000000001", "identifier": "+919876543210", "password": "StrongPassword@123", "deviceId": "android-emulator-001", "platform": "android", "appVersion": "2.7.0" }
+    /// { "identifier": "+919876543210", "password": "StrongPassword@123", "deviceId": "android-emulator-001", "platform": "android", "appVersion": "2.7.0" }
     /// Response example:
     /// { "accessToken": "jwt", "refreshToken": "token", "expiresAtUtc": "2026-07-28T10:30:00Z" }
     /// </remarks>

@@ -103,7 +103,7 @@ public sealed class MobileOpenApiOperationTransformer : IOpenApiOperationTransfo
 
         if (operationId.Contains("Login", StringComparison.OrdinalIgnoreCase))
         {
-            lines.Add("Mobile login example: { companyId, identifier, password, deviceId, platform, appVersion }.");
+            lines.Add("Mobile login example: { identifier, password, deviceId, platform, appVersion }. Existing clients may still include companyId.");
         }
         else if (operationId.Contains("Refresh", StringComparison.OrdinalIgnoreCase))
         {

@@ -4,10 +4,13 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../managers/onboarding_manager.dart';
 import '../l10n/app_localizations.dart';
+import '../models/storage_mode.dart';
 import '../presentation/splash/splash_screen.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/storage_mode_provider.dart';
 import '../providers/subscription_provider.dart';
+import '../services/storage_migration_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
 
@@ -85,6 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final l10n = AppLocalizations.of(context)!;
     final subscription = context.watch<SubscriptionProvider>();
+    final storageMode = context.watch<StorageModeProvider>().effectiveMode;
     final subscriptionSummary = _subscriptionSummary(subscription);
 
     return Scaffold(
@@ -218,6 +222,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   _buildSettingTile(
                     context,
+                    'Storage & Data',
+                    'Current storage: ${storageMode.label}',
+                    Icons.storage_rounded,
+                    _showStorageDataDialog,
+                  ),
+                  const Divider(height: 1),
+                  _buildSettingTile(
+                    context,
                     'Backup & Restore',
                     'Manual backup and restore',
                     Icons.backup,
@@ -292,6 +304,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final expiry = DateFormat('dd MMM yyyy').format(record.expiryDate);
     final remaining = access.daysRemaining(DateTime.now());
     return '${record.plan.label} • Expires $expiry • $remaining days left';
+  }
+
+  Future<void> _showStorageDataDialog() async {
+    final mode = context.read<StorageModeProvider>().effectiveMode;
+    const migrationService = StorageMigrationService();
+    final target = mode == StorageMode.local ? StorageMode.cloud : StorageMode.local;
+    final migration = await migrationService.previewModeChange(
+      from: mode,
+      to: target,
+    );
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Storage & Data'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Current storage: ${mode.label}'),
+            const SizedBox(height: 12),
+            Text(migration.message),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSettingTile(

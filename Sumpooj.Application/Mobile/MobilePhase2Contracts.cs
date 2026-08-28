@@ -3,7 +3,7 @@ using Sumpooj.Domain.Entities;
 namespace Sumpooj.Application.Mobile;
 
 public sealed record MobileApiLoginRequest(
-    Guid CompanyId,
+    Guid? CompanyId,
     string Identifier,
     string Password,
     string DeviceId,
@@ -271,3 +271,23 @@ public interface ISubscriptionPaymentGatewayFactory
 {
     ISubscriptionPaymentGateway Resolve(MobilePaymentGatewayType gatewayType);
 }
+
+/// <summary>
+/// Mobile Cloud Company Profile DTO
+/// Returns the company profile for the authenticated company.
+/// Contains all company information needed for Cloud Store Settings → Shop Details screen.
+/// </summary>
+public sealed record MobileCompanyProfileDto(
+    Guid Id,
+    string Name,
+    string? Email,
+    string? Phone,
+    string? Address,
+    string? ShortDescription,
+    string TimeZone,
+    string CurrencyCode,
+    string? TaxIdentifier,
+    string Region,
+    bool IsActive,
+    DateTime CreatedAtUtc,
+    DateTime? UpdatedAtUtc);

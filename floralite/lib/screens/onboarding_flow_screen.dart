@@ -13,9 +13,12 @@ import '../managers/onboarding_setup_manager.dart';
 import '../managers/business_settings_manager.dart';
 import '../l10n/app_localizations.dart';
 import '../models/license.dart';
+import '../models/storage_mode.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/license_provider.dart';
+import '../providers/storage_mode_provider.dart';
+import '../screens/business_registration_screen.dart';
 import '../services/first_use_permission_service.dart';
 import '../services/speech_recognition_service.dart';
 import '../widgets/voice_dictation_field_header.dart';
@@ -41,6 +44,8 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   String _logoPath = '';
   bool _isPreparing = false;
   bool _setupFailed = false;
+  bool _storageModeChecked = false;
+  bool _showStorageChoice = false;
   String? _setupError;
   final Set<SetupStage> _doneStages = <SetupStage>{};
 
@@ -61,6 +66,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     super.initState();
     _addressDictationController.bindController(_addressController);
     _loadPersistedLogo();
+    _loadStorageModeChoice();
   }
 
   @override
@@ -85,6 +91,22 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    if (!_storageModeChecked) {
+      return const Scaffold(
+        body: SafeArea(
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    if (_showStorageChoice) {
+      return Scaffold(
+        body: SafeArea(
+          child: _buildStorageChoiceStep(),
+        ),
+      );
+    }
+
     final body = switch (_stepIndex) {
       0 => _buildLanguageStep(l10n),
       1 => _buildWelcomeStep(l10n),
@@ -102,6 +124,115 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _loadStorageModeChoice() async {
+    final provider = context.read<StorageModeProvider>();
+    await provider.ensureLoaded();
+    if (!mounted) return;
+    setState(() {
+      _storageModeChecked = true;
+      _showStorageChoice = !provider.hasSelectedMode;
+    });
+  }
+
+  Widget _buildStorageChoiceStep() {
+    return Padding(
+      key: const ValueKey<String>('storage-choice'),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Where should your business data be stored?',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Choose how Floraprise Lite should keep your shop data.',
+            style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 24),
+          _storageChoiceCard(
+            title: 'Local Store',
+            subtitle: 'Keep your data on this device. Works without Internet.',
+            icon: Icons.phone_android_rounded,
+            onTap: _selectLocalStore,
+          ),
+          const SizedBox(height: 12),
+          _storageChoiceCard(
+            title: 'Cloud Store',
+            subtitle:
+                'Keep your data securely in Floraprise Cloud. Access it from other authorized devices.',
+            icon: Icons.cloud_done_outlined,
+            onTap: _selectCloudStore,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _storageChoiceCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 30, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: TextStyle(color: Colors.grey.shade700, height: 1.35),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectLocalStore() async {
+    await context.read<StorageModeProvider>().setMode(StorageMode.local);
+    if (!mounted) return;
+    setState(() => _showStorageChoice = false);
+  }
+
+  Future<void> _selectCloudStore() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => const BusinessRegistrationScreen(
+          storageModeAfterAuth: StorageMode.cloud,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _loadStorageModeChoice();
   }
 
   Widget _buildLanguageStep(AppLocalizations l10n) {
@@ -734,15 +865,17 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
 
       if (!mounted) return;
 
-      await _provisionCloudIdentityAndTrial(
-        businessName: shopName,
-        ownerName: ownerName,
-        mobile: mobile,
-        address: _addressController.text.trim(),
-        city: _cityController.text.trim(),
-        email: email,
-        password: password,
-      );
+      if (context.read<StorageModeProvider>().isCloud) {
+        await _provisionCloudIdentityAndTrial(
+          businessName: shopName,
+          ownerName: ownerName,
+          mobile: mobile,
+          address: _addressController.text.trim(),
+          city: _cityController.text.trim(),
+          email: email,
+          password: password,
+        );
+      }
 
       await _onboardingManager.setShopSetupCompleted(true);
       await _onboardingManager.setStarterCatalogueCompleted(true);
