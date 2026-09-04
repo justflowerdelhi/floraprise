@@ -31,6 +31,8 @@ public class OrderDto
     public decimal TotalAmount { get; set; }
     public decimal PaidAmount { get; set; }
     public decimal BalanceDue { get; set; }
+    public int RewardPointsEarned { get; set; }
+    public int RewardPointsRedeemed { get; set; }
 
     // Assignment
     public Guid? AssignedDesignerId { get; set; }
@@ -94,6 +96,8 @@ public class CreateOrderRequest
     public string? PickupTimeSlot { get; set; }
     public decimal DeliveryFee { get; set; }
     public decimal DiscountAmount { get; set; }
+    public int RewardPointsEarned { get; set; }
+    public int RewardPointsRedeemed { get; set; }
     public string? InternalNotes { get; set; }
     public List<OrderItemRequest> Items { get; set; } = new();
     public List<OrderPaymentRequest> Payments { get; set; } = new();

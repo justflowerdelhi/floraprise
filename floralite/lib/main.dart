@@ -9,6 +9,7 @@ import 'data/repositories/customer_repository.dart';
 import 'data/repositories/category_repository.dart';
 import 'data/repositories/design_repository.dart';
 import 'data/repositories/inventory_repository.dart';
+import 'data/repositories/cloud_inventory_repository.dart';
 import 'data/repositories/job_repository.dart';
 import 'data/repositories/order_repository.dart';
 import 'data/repositories/order_workflow_repository.dart';
@@ -105,6 +106,8 @@ import 'providers/license_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/subscription_provider.dart';
 import 'providers/storage_mode_provider.dart';
+import 'providers/cloud_product_provider.dart';
+import 'data/repositories/cloud_product_repository.dart';
 import 'data/repositories/product_repository.dart';
 import 'services/order_print_service.dart';
 import 'services/order_whatsapp_service.dart';
@@ -279,6 +282,11 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
           create: (_) => StorageModeProvider(StorageModeService())..load(),
         ),
         ChangeNotifierProvider(
+          create: (_) => CloudProductProvider(
+            CloudProductRepository(auth: mobileAuthService),
+          ),
+        ),
+        ChangeNotifierProvider(
           create: (_) => VoiceProvider(),
         ),
         ChangeNotifierProvider(
@@ -323,12 +331,15 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
         ChangeNotifierProvider(
           create: (context) => InventoryProvider(
             inventoryManager,
+            context.read<StorageModeProvider>(),
+            CloudInventoryRepository(auth: mobileAuthService),
             context.read<BusinessDataEventBus>(),
           )..loadProducts(),
         ),
         ChangeNotifierProvider(
           create: (context) => CustomerProvider(
             customerManager,
+            context.read<StorageModeProvider>(),
             context.read<BusinessDataEventBus>(),
           ),
         ),
@@ -608,3 +619,4 @@ class _SubscriptionGate extends StatelessWidget {
     );
   }
 }
+

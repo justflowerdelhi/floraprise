@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../data/repositories/category_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../providers/category_provider.dart';
+import '../providers/storage_mode_provider.dart';
+import 'cloud_categories_screen.dart';
 import '../widgets/common_widgets.dart';
 
 class CategoriesScreen extends StatefulWidget {
@@ -92,6 +94,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (context.watch<StorageModeProvider?>()?.isCloud ?? false) {
+      return const CloudCategoriesScreen();
+    }
+
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final provider = context.watch<CategoryProvider>();
 

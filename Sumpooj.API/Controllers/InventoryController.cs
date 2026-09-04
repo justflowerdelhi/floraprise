@@ -110,9 +110,16 @@ public class InventoryController : ControllerBase
     [HttpPost("adjustments")]
     public async Task<IActionResult> CreateAdjustment([FromBody] CreateAdjustmentRequest request)
     {
-        var userId = GetCurrentUserId();
-        var id = await _service.CreateAdjustmentAsync(request, userId);
-        return CreatedAtAction(nameof(SearchAdjustments), new { id }, new { id });
+        try
+        {
+            var userId = GetCurrentUserId();
+            var id = await _service.CreateAdjustmentAsync(request, userId);
+            return CreatedAtAction(nameof(SearchAdjustments), new { id }, new { id });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
     }
 
     #endregion
@@ -122,6 +129,19 @@ public class InventoryController : ControllerBase
     {
         var data = await _repo.GetByProductAsync(CompanyId, productId);
         return Ok(data);
+    }
+
+    [HttpGet("products/{productId:guid}/history")]
+    public async Task<IActionResult> GetProductHistory(Guid productId)
+    {
+        try
+        {
+            return Ok(await _service.GetInventoryHistoryAsync(productId));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
     }
 
     [HttpGet("available-flowers")]
@@ -154,20 +174,29 @@ public class InventoryController : ControllerBase
     [HttpGet("products")]
     public async Task<IActionResult> GetProducts()
     {
-        var products = await _productRepository.GetAllAsync(CompanyId);
-        var result = products
-            .Where(p => p.IsActive)
-            .Select(p => new
-            {
-                id = p.Id,
-                name = p.Name,
-                productType = p.ProductType.ToString(),
-                quantityAvailable = p.StockQuantity,
-                unitCost = p.CostPrice,
-            })
-            .ToList();
+        return Ok(await _service.GetInventoryProductsAsync());
+    }
 
-        return Ok(result);
+    [HttpPost("stock-changes")]
+    public async Task<IActionResult> ApplyStockChange([FromBody] InventoryStockChangeRequest request)
+    {
+        try
+        {
+            var id = await _service.ApplyStockChangeAsync(request, GetCurrentUserId());
+            return CreatedAtAction(nameof(SearchAdjustments), new { id }, new { id });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
     }
 
     [HttpGet("daily-report")]
@@ -196,6 +225,10 @@ public class InventoryController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
         }
     }
 
@@ -241,7 +274,6 @@ public class InventoryController : ControllerBase
 
     private Guid GetCurrentUserId()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        return Guid.TryParse(userIdClaim, out var userId) ? userId : Guid.Empty;
+        return InventoryUserIdentityResolver.Resolve(User);
     }
 }

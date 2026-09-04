@@ -1,5 +1,11 @@
 namespace Sumpooj.Domain.Entities;
 
+public enum BarcodeType
+{
+    Manufacturer,
+    Internal
+}
+
 public enum ProductType
 {
     SingleFlower,

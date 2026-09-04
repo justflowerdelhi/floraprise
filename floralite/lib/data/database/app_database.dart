@@ -44,7 +44,7 @@ class AppDatabase {
 
     return openDatabase(
       path,
-      version: 41,
+      version: 42,
       onOpen: (db) async {
         await _ensureOccasionContactColumns(db);
         await _ensureAttendanceTable(db);
@@ -54,6 +54,7 @@ class AppDatabase {
         await _ensureSchedulerTaskColumns(db);
         await _ensureDeliveryAssignmentSyncColumns(db);
         await _ensureRewardColumns(db);
+        await _ensurePosSyncOutbox(db);
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -325,6 +326,8 @@ class AppDatabase {
             FOREIGN KEY(order_id) REFERENCES orders(id)
           )
         ''');
+
+        await _ensurePosSyncOutbox(db);
 
         await db.execute('''
           CREATE TABLE scheduler_tasks (
@@ -1034,6 +1037,10 @@ class AppDatabase {
           await _ensureRewardColumns(db);
         }
 
+        if (oldVersion < 42) {
+          await _ensurePosSyncOutbox(db);
+        }
+
         if (oldVersion < 11) {
           await db.execute(
             "ALTER TABLE inventory_transactions ADD COLUMN source TEXT NOT NULL DEFAULT 'Manual'",
@@ -1696,6 +1703,33 @@ class AppDatabase {
       buffer.write(' DEFAULT $defaultValue');
     }
     await db.execute(buffer.toString());
+  }
+
+  Future<void> _ensurePosSyncOutbox(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS pos_sync_outbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        operation_type TEXT NOT NULL,
+        client_sync_id TEXT NOT NULL UNIQUE,
+        local_order_id INTEGER NOT NULL UNIQUE,
+        payload_json TEXT NOT NULL,
+        state TEXT NOT NULL DEFAULT 'pending',
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at TEXT,
+        last_attempt_at TEXT,
+        last_error TEXT,
+        cloud_order_id TEXT,
+        cloud_customer_id TEXT,
+        completed_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(local_order_id) REFERENCES orders(id)
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_pos_sync_outbox_order ON pos_sync_outbox(local_order_id)');
+    await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_sync_outbox_local_order_unique ON pos_sync_outbox(local_order_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_pos_sync_outbox_state ON pos_sync_outbox(state)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_pos_sync_outbox_next_attempt ON pos_sync_outbox(next_attempt_at)');
   }
 
   Future<void> _ensureRewardColumns(Database db) async {

@@ -37,6 +37,8 @@ public class Payment : BaseEntity
     public string? ReceiptData { get; private set; }
 
     public Guid? ProcessedByUserId { get; private set; }
+    public string? ClientPaymentId { get; private set; }
+    public string? Reference { get; private set; }
 
     public void Approve(string? transactionId, string? authorizationCode)
     {
@@ -89,6 +91,13 @@ public class Payment : BaseEntity
     public void SetProcessedBy(Guid userId)
     {
         ProcessedByUserId = userId;
+        MarkUpdated();
+    }
+
+    public void SetPosReference(string? clientPaymentId, string? reference)
+    {
+        ClientPaymentId = string.IsNullOrWhiteSpace(clientPaymentId) ? null : clientPaymentId.Trim();
+        Reference = string.IsNullOrWhiteSpace(reference) ? null : reference.Trim();
         MarkUpdated();
     }
 }

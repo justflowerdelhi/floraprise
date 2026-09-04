@@ -221,6 +221,86 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.ToTable("Accounts");
                 });
 
+            modelBuilder.Entity("Sumpooj.Domain.Entities.Associate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AssociateCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("BusinessName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContactPerson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("text");
+
+                    b.Property<string>("GstNumber")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Pincode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("State")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Types")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Website")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Whatsapp")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "AssociateCode")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "BusinessName", "Phone")
+                        .IsUnique();
+
+                    b.ToTable("Associates");
+                });
+
             modelBuilder.Entity("Sumpooj.Domain.Entities.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -295,6 +375,153 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("AuditLogs");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.Barcode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Value")
+                        .IsUnique();
+
+                    b.HasIndex("ProductId", "Type")
+                        .IsUnique();
+
+                    b.ToTable("Barcodes");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.CashBookEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("CashIn")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("CashOut")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("RunningBalance")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("TransactionType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Date", "CreatedAtUtc");
+
+                    b.ToTable("CashBookEntries");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.CloudDesign", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BouquetId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Collection")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Flowers")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImageReference")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsFavorite")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Occasion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("SellingPricePaise")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "BouquetId")
+                        .IsUnique();
+
+                    b.ToTable("CloudDesigns");
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.Company", b =>
@@ -605,13 +832,25 @@ namespace Sumpooj.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AnniversaryMonthDay")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BirthdayMonthDay")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("CompanyName")
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamptz");
 
                     b.Property<string>("DefaultCardMessage")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Department")
                         .HasColumnType("text");
 
                     b.Property<string>("Email")
@@ -623,6 +862,15 @@ namespace Sumpooj.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
+                    b.Property<DateTime?>("LastOrderAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastRewardActivityAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LifetimeRewardPoints")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -631,9 +879,18 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("text");
 
+                    b.Property<decimal>("PendingPaymentAmount")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("Phone")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<int>("RedeemedRewardPoints")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RewardPoints")
+                        .HasColumnType("integer");
 
                     b.Property<int>("TotalOrders")
                         .ValueGeneratedOnAdd()
@@ -733,6 +990,9 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -749,10 +1009,12 @@ namespace Sumpooj.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<double?>("DeliveryAddressLatitude")
-                        .HasColumnType("double precision");
+                        .HasColumnType("double precision")
+                        .HasColumnName("DeliveryLatitude");
 
                     b.Property<double?>("DeliveryAddressLongitude")
-                        .HasColumnType("double precision");
+                        .HasColumnType("double precision")
+                        .HasColumnName("DeliveryLongitude");
 
                     b.Property<DateTime>("DeliveryDate")
                         .HasColumnType("timestamp with time zone")
@@ -764,12 +1026,18 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<Guid?>("DeliveryRouteId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("LastLocationUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("PostalCode")
                         .HasColumnType("text");
 
                     b.Property<Guid>("SalesOrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("OrderId");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -790,7 +1058,12 @@ namespace Sumpooj.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CompanyId");
+
                     b.HasIndex("DeliveryPersonId");
+
+                    b.HasIndex("TrackingToken")
+                        .IsUnique();
 
                     b.ToTable("Deliveries");
                 });
@@ -1328,6 +1601,8 @@ namespace Sumpooj.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedAtUtc");
+
                     b.HasIndex("DeliveryId");
 
                     b.HasIndex("DriverId");
@@ -1450,6 +1725,9 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("ExpenseCategoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("ExpenseDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -1459,12 +1737,53 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<Guid?>("LocationId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("PaymentMode")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.ToTable("Expenses");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.ExpenseCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Emoji")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("GroupName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ExpenseCategories");
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.FeatureEntitlement", b =>
@@ -1998,10 +2317,18 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAtUtc")
                         .HasColumnType("timestamptz");
 
+                    b.Property<string>("DeviceFingerprintHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("DeviceId")
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<string>("DeviceName")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -2018,6 +2345,10 @@ namespace Sumpooj.Infrastructure.Migrations
 
                     b.Property<DateTime?>("LastSyncAtUtc")
                         .HasColumnType("timestamptz");
+
+                    b.Property<Guid>("LegacyUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("UserId");
 
                     b.Property<string>("Manufacturer")
                         .HasMaxLength(80)
@@ -2383,6 +2714,203 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.ToTable("MobileUsers", (string)null);
                 });
 
+            modelBuilder.Entity("Sumpooj.Domain.Entities.MorningPurchaseListItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("InventoryUpdated")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("ListDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Purchased")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Remarks")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Supplier")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "ListDate", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("MorningPurchaseListItems");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.OccasionContact", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Company")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Occasion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("OccasionDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RecipientName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RecipientPhone")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Relationship")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("ReminderEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "CustomerId", "RecipientName", "Occasion")
+                        .IsUnique();
+
+                    b.ToTable("OccasionContacts");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.OccasionFollowUpAction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("OccurrenceDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("SnoozedTo")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "SourceType", "SourceId", "OccurrenceDate")
+                        .IsUnique();
+
+                    b.ToTable("OccasionFollowUpActions");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.OpeningCash", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("OpeningCashEntries");
+                });
+
             modelBuilder.Entity("Sumpooj.Domain.Entities.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2466,11 +2994,27 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("integer");
 
+                    b.Property<decimal>("PosRoundOffAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<string>("RecipientName")
                         .HasColumnType("text");
 
                     b.Property<string>("RecipientPhone")
                         .HasColumnType("text");
+
+                    b.Property<decimal>("RewardDiscountAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<int>("RewardPointsEarned")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RewardPointsRedeemed")
+                        .HasColumnType("integer");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -2494,6 +3038,8 @@ namespace Sumpooj.Infrastructure.Migrations
 
                     b.HasIndex("CustomerId");
 
+                    b.HasIndex("DeliveryPersonId");
+
                     b.HasIndex("LocationId");
 
                     b.HasIndex("CompanyId", "OrderNumber")
@@ -2507,6 +3053,26 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ClientOrderLineId")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<string>("DiscountType")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("DiscountValue")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("LineSubtotal")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("LineTaxAmount")
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid");
@@ -2524,6 +3090,9 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<string>("SpecialInstructions")
                         .HasColumnType("text");
 
+                    b.Property<decimal?>("TaxRatePercent")
+                        .HasColumnType("numeric(8,4)");
+
                     b.Property<decimal>("TotalPrice")
                         .HasColumnType("numeric");
 
@@ -2533,6 +3102,10 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OrderId");
+
+                    b.HasIndex("OrderId", "ClientOrderLineId")
+                        .IsUnique()
+                        .HasFilter("\"ClientOrderLineId\" IS NOT NULL");
 
                     b.ToTable("OrderItems");
                 });
@@ -2550,6 +3123,9 @@ namespace Sumpooj.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("CardBrand")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ClientPaymentId")
                         .HasColumnType("text");
 
                     b.Property<Guid>("CompanyId")
@@ -2576,6 +3152,10 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<string>("ReceiptData")
                         .HasColumnType("text");
 
+                    b.Property<string>("Reference")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -2595,6 +3175,10 @@ namespace Sumpooj.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OrderId", "ClientPaymentId")
+                        .IsUnique()
+                        .HasFilter("\"ClientPaymentId\" IS NOT NULL");
 
                     b.ToTable("Payments");
                 });
@@ -2819,6 +3403,108 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.HasIndex("CompanyId", "Status");
 
                     b.ToTable("PaymentTransactions", (string)null);
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.PosSaleSyncInventoryTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClientInventoryTransactionId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("CloudOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PosSaleSyncReceiptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CloudOrderId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("CompanyId", "ClientInventoryTransactionId")
+                        .IsUnique();
+
+                    b.HasIndex("PosSaleSyncReceiptId", "CreatedAtUtc");
+
+                    b.ToTable("PosSaleSyncInventoryTransactions");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.PosSaleSyncReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClientSyncId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("CloudCustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CloudOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("LocalOrderId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CloudCustomerId");
+
+                    b.HasIndex("CloudOrderId");
+
+                    b.HasIndex("CompanyId", "ClientSyncId")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "DeviceId", "LocalOrderId")
+                        .IsUnique();
+
+                    b.ToTable("PosSaleSyncReceipts");
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.Product", b =>
@@ -3489,6 +4175,113 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.ToTable("PurchaseOrderItems");
                 });
 
+            modelBuilder.Entity("Sumpooj.Domain.Entities.ReadyBouquetRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiryAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FinishedProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("InitialQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("LastRefreshAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ProducedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ProductionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RecipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RefreshAfterDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RemainingQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ShelfLifeDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "FinishedProductId", "ProducedAt");
+
+                    b.ToTable("ReadyBouquetRecords");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.ReadyBouquetRefreshEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("WastageQuantity")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "BatchId", "CreatedAtUtc");
+
+                    b.ToTable("ReadyBouquetRefreshEvents");
+                });
+
             modelBuilder.Entity("Sumpooj.Domain.Entities.RecipeComponent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3736,6 +4529,94 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.ToTable("SalesOrderItems");
                 });
 
+            modelBuilder.Entity("Sumpooj.Domain.Entities.SchedulerRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedStaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeadlineAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LinkedCustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("LinkedOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("NextReminderAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Producer")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("RequiresAlarm")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequiresConfirmation")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("ScheduledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SourceRef")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Producer", "SourceRef")
+                        .IsUnique();
+
+                    b.ToTable("SchedulerRecords");
+                });
+
             modelBuilder.Entity("Sumpooj.Domain.Entities.Shift", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3882,7 +4763,10 @@ namespace Sumpooj.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CheckInUtc")
+                    b.Property<DateTime>("AttendanceDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("CheckInUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("CheckOutUtc")
@@ -3894,6 +4778,12 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<int>("OvertimeHours")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("StaffId")
                         .HasColumnType("uuid");
 
@@ -3904,6 +4794,9 @@ namespace Sumpooj.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "StaffId", "AttendanceDate")
+                        .IsUnique();
 
                     b.ToTable("StaffAttendanceRecords");
                 });
@@ -4028,7 +4921,7 @@ namespace Sumpooj.Infrastructure.Migrations
 
                     b.Property<string>("IncludedModulesJson")
                         .IsRequired()
-                        .HasColumnType("jsonb");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -4284,6 +5177,59 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.ToTable("UserDashboardPreferences");
                 });
 
+            modelBuilder.Entity("Sumpooj.Domain.Entities.WhatsAppAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AccessToken")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("BusinessName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("MemberId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PhoneNumberId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VerifyToken")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("WabaId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId")
+                        .IsUnique();
+
+                    b.HasIndex("PhoneNumberId")
+                        .IsUnique();
+
+                    b.ToTable("WhatsAppAccounts");
+                });
+
             modelBuilder.Entity("Sumpooj.Domain.Entities.WireOrder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4518,6 +5464,17 @@ namespace Sumpooj.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.Barcode", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.CorporateClient", b =>
@@ -4770,6 +5727,12 @@ namespace Sumpooj.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Sumpooj.Domain.Entities.Staff", null)
+                        .WithMany()
+                        .HasForeignKey("DeliveryPersonId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_Orders_DeliveryPerson");
+
                     b.HasOne("Sumpooj.Domain.Entities.Location", "Location")
                         .WithMany()
                         .HasForeignKey("LocationId")
@@ -4823,6 +5786,41 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Navigation("Order");
 
                     b.Navigation("PaymentGatewayConfig");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.PosSaleSyncInventoryTransaction", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("CloudOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.PosSaleSyncReceipt", null)
+                        .WithMany()
+                        .HasForeignKey("PosSaleSyncReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.PosSaleSyncReceipt", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CloudCustomerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Sumpooj.Domain.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("CloudOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.Product", b =>

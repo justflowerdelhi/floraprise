@@ -8,6 +8,8 @@ import '../../models/walk_in_line_item.dart';
 import '../../models/walk_in_session.dart';
 import '../database/app_database.dart';
 import '../../managers/reward_manager.dart';
+import 'inventory_repository.dart';
+import 'pos_sync_outbox_repository.dart';
 
 class OrderTotals {
   final int subtotalPaise;
@@ -476,12 +478,15 @@ class OrderRepository {
     final now = DateTime.now().toIso8601String();
     final rewardManager = RewardManager();
     final rewardSettings = await rewardManager.loadSettings();
+    final inventoryRepository = InventoryRepository();
+    final outboxRepository = PosSyncOutboxRepository();
 
     return db.transaction<ConfirmedOrder>((txn) async {
       final orderNo = 'ORD-${DateTime.now().millisecondsSinceEpoch}';
       final orderRows = await txn.query(
         'orders',
         columns: [
+          'status',
           'customer_id',
           'is_paid',
           'grand_total_paise',
@@ -496,6 +501,9 @@ class OrderRepository {
         throw StateError('Order $orderId not found');
       }
       final order = orderRows.first;
+      if (order['status'] != 'draft') {
+        throw StateError('Only draft orders can be confirmed');
+      }
       final customerId = order['customer_id'] as int?;
       final isPaid = ((order['is_paid'] as int?) ?? 0) == 1;
       final redeemedPoints = (order['reward_points_redeemed'] as int?) ?? 0;
@@ -584,9 +592,71 @@ class OrderRepository {
         });
       }
 
+      final inventoryTransactionIds = <int>[];
+      for (final link in lineProductLinks) {
+        inventoryTransactionIds.add(
+          await inventoryRepository.createConfirmedOrderSaleTransactionInTransaction(
+            transaction: txn,
+            productId: link['productId']!,
+            orderId: orderId,
+            orderLineId: link['orderLineId']!,
+            quantity: link['qty']!,
+            note: 'Walk-in confirmed order deduction',
+          ),
+        );
+      }
+
+      final snapshot = await _buildCompletedSaleSnapshot(
+        txn: txn,
+        orderId: orderId,
+        clientSyncId: outboxRepository.newClientSyncId(),
+        inventoryTransactionIds: inventoryTransactionIds,
+      );
+      await outboxRepository.enqueueInTransaction(
+        transaction: txn,
+        clientSyncId: snapshot['clientSyncId'] as String,
+        localOrderId: orderId,
+        payload: snapshot,
+        completedAt: now,
+      );
+
       return ConfirmedOrder(
           orderId: orderId, lineProductLinks: lineProductLinks);
     });
+  }
+
+  Future<Map<String, dynamic>> _buildCompletedSaleSnapshot({
+    required Transaction txn,
+    required int orderId,
+    required String clientSyncId,
+    required List<int> inventoryTransactionIds,
+  }) async {
+    final orderRows = await txn.rawQuery('''
+      SELECT o.*, c.phone AS customer_phone_master, c.name AS customer_name_master,
+             c.birthday_md, c.anniversary_md, c.company, c.department, c.notes,
+             c.reward_points, c.lifetime_reward_points, c.redeemed_reward_points,
+             c.last_reward_activity
+      FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
+      WHERE o.id = ? LIMIT 1
+    ''', [orderId]);
+    if (orderRows.isEmpty) throw StateError('Order $orderId not found after confirmation');
+    final lines = await txn.query('order_lines', where: 'order_id = ?', whereArgs: [orderId]);
+    final payments = await txn.query('order_payments', where: 'order_id = ?', whereArgs: [orderId]);
+    final inventory = inventoryTransactionIds.isEmpty
+        ? <Map<String, Object?>>[]
+        : await txn.query(
+            'inventory_transactions',
+            where: 'id IN (${List.filled(inventoryTransactionIds.length, '?').join(', ')})',
+            whereArgs: inventoryTransactionIds,
+          );
+    return {
+      'clientSyncId': clientSyncId,
+      'localOrderId': orderId,
+      'order': Map<String, dynamic>.from(orderRows.single),
+      'lines': lines.map((row) => Map<String, dynamic>.from(row)).toList(),
+      'payments': payments.map((row) => Map<String, dynamic>.from(row)).toList(),
+      'inventoryTransactions': inventory.map((row) => Map<String, dynamic>.from(row)).toList(),
+    };
   }
 
   Future<Map<String, Object?>> getOrderSummary(int orderId) async {

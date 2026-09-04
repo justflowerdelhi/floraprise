@@ -1,5 +1,40 @@
 namespace Sumpooj.Application.Inventory;
 
+public class InventoryProductDto
+{
+    public Guid Id { get; set; }
+    public Guid ProductId { get; set; }
+    public string Name { get; set; } = default!;
+    public string ProductType { get; set; } = default!;
+    public string Category { get; set; } = default!;
+    public string Unit { get; set; } = default!;
+    public string Sku { get; set; } = default!;
+    public string? ManufacturerBarcode { get; set; }
+    public string? InternalBarcode { get; set; }
+    public bool TrackInventory { get; set; }
+    public int CurrentQuantity { get; set; }
+    public int QuantityAvailable { get; set; }
+    public int MinimumQuantity { get; set; }
+    public decimal UnitCost { get; set; }
+    public bool IsActive { get; set; }
+}
+
+public class InventoryHistoryDto
+{
+    public Guid Id { get; set; }
+    public Guid ProductId { get; set; }
+    public string Operation { get; set; } = default!;
+    public int Quantity { get; set; }
+    public decimal? CostPerUnit { get; set; }
+    public string Supplier { get; set; } = string.Empty;
+    public string Source { get; set; } = "Cloud Inventory";
+    public string Reason { get; set; } = string.Empty;
+    public string Notes { get; set; } = string.Empty;
+    public int PreviousBalance { get; set; }
+    public int BalanceAfter { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+}
+
 public class ProductBatchDto
 {
     public Guid Id { get; set; }

@@ -1,111 +1,49 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import Image from "next/image"
+import Image from "next/image";
+import Link from "next/link";
+import { useState } from "react";
 
 export default function Header() {
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false);
+  const close = () => setMenuOpen(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <Image
-            src="/logo.png"
-            alt="Floraprise"
-            width={40}
-            height={40}
-            style={{ height: "auto" }}
-          />
-          <span className="text-xl font-semibold">
-            Flora<span className="text-green-700">Prise</span>
-          </span>
+    <header className="site-header">
+      <div className="nav-wrap">
+        <Link href="/" className="brand" onClick={close}>
+          <Image src="/logo.png" alt="Floraprise" width={34} height={34} />
+          <span>Flora<span className="brand-mark">Prise</span></span>
         </Link>
-
-        {/* Desktop Menu */}
-        <nav className="hidden md:flex items-center gap-8 text-gray-700 font-medium">
-
-                    <Link href="/features" className="hover:text-green-700">
-            Features
-          </Link>
-
-          <Link href="/integrations" className="hover:text-green-700">
-            Integrations
-          </Link>
-
-          <Link href="/pricing" className="hover:text-green-700">
-            Pricing
-          </Link>
-
-          <Link href="/contact" className="hover:text-green-700">
-            Contact
-          </Link>
-
-          {/* Login */}
-          <Link href="/login" className="hover:text-green-700">
-            Login
-          </Link>
-
-          {/* CTA */}
-          <Link
-            href="/demo"
-            className="bg-orange-500 text-white px-5 py-2 rounded-lg hover:opacity-90 transition"
-          >
-            Book Demo
-          </Link>
-
+        <nav className="desktop-nav" aria-label="Primary navigation">
+          <div className="product-menu">
+            <Link href="#products">Products <span>⌄</span></Link>
+            <div className="product-menu-panel">
+              <Link href="#erp"><small>01</small><span><b>Floraprise ERP</b>Run the business</span></Link>
+              <Link href="#app"><small>02</small><span><b>Floraprise App</b>Run it anywhere</span></Link>
+              <Link href="#assist"><small>03</small><span><b>Flora Assist</b>Respond faster</span></Link>
+            </div>
+          </div>
+          <Link href="#platform">Platform</Link>
+          <Link href="/features">Features</Link>
+          <Link href="/integrations">Integrations</Link>
+          <Link href="/pricing">Pricing</Link>
+          <Link href="/login" className="nav-login">Login</Link>
+          <Link href="/demo" className="nav-cta">Book a demo</Link>
         </nav>
-
-        {/* Mobile Hamburger */}
-        <button
-          className="md:hidden text-2xl"
-          onClick={() => setMenuOpen(!menuOpen)}
-        >
-          ☰
-        </button>
+        <button className="menu-button" type="button" aria-label="Open menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? "×" : "☰"}</button>
       </div>
-
-      {/* Mobile Menu */}
-      {menuOpen && (
-        <div className="md:hidden border-t bg-white px-6 py-4 space-y-4">
-
-          <Link href="/product" className="block text-gray-700" onClick={() => setMenuOpen(false)}>
-            Product
-          </Link>
-
-          <Link href="/features" className="block text-gray-700" onClick={() => setMenuOpen(false)}>
-            Features
-          </Link>
-
-          <Link href="/integrations" className="block text-gray-700" onClick={() => setMenuOpen(false)}>
-            Integrations
-          </Link>
-
-          <Link href="/pricing" className="block text-gray-700" onClick={() => setMenuOpen(false)}>
-            Pricing
-          </Link>
-
-          <Link href="/contact" className="block text-gray-700" onClick={() => setMenuOpen(false)}>
-            Contact
-          </Link>
-
-          <Link href="/login" className="block text-gray-700" onClick={() => setMenuOpen(false)}>
-            Login
-          </Link>
-
-          <Link
-            href="/demo"
-            className="block bg-orange-500 text-white text-center py-2 rounded-lg"
-            onClick={() => setMenuOpen(false)}
-          >
-            Book Demo
-          </Link>
-
-        </div>
-      )}
+      <nav className={`mobile-nav ${menuOpen ? "open" : ""}`} aria-label="Mobile navigation">
+        <Link href="#erp" onClick={close}>Floraprise ERP</Link>
+        <Link href="#app" onClick={close}>Floraprise App</Link>
+        <Link href="#assist" onClick={close}>Flora Assist</Link>
+        <Link href="#platform" onClick={close}>Platform</Link>
+        <Link href="/features" onClick={close}>Features</Link>
+        <Link href="/integrations" onClick={close}>Integrations</Link>
+        <Link href="/pricing" onClick={close}>Pricing</Link>
+        <Link href="/login" onClick={close}>Login</Link>
+        <Link href="/demo" className="nav-cta" onClick={close}>Book a demo</Link>
+      </nav>
     </header>
-  )
+  );
 }

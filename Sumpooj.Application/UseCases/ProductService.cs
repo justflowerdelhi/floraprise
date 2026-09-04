@@ -12,6 +12,8 @@ public class ProductService
     private readonly IProductCategoryRepository _categoryRepo;
     private readonly ITaxRuleRepository _taxRuleRepo;
     private readonly IProductBatchRepository _batchRepo;
+    private readonly IBarcodeRepository _barcodeRepo;
+    private readonly BarcodeService _barcodeService;
     private readonly ITenantContext _tenant;
     private readonly ILogger<ProductService> _logger;
 
@@ -20,6 +22,8 @@ public class ProductService
         IProductCategoryRepository categoryRepo,
         ITaxRuleRepository taxRuleRepo,
         IProductBatchRepository batchRepo,
+        IBarcodeRepository barcodeRepo,
+        BarcodeService barcodeService,
         ITenantContext tenant,
         ILogger<ProductService> logger)
     {
@@ -27,6 +31,8 @@ public class ProductService
         _categoryRepo = categoryRepo;
         _taxRuleRepo = taxRuleRepo;
         _batchRepo = batchRepo;
+        _barcodeRepo = barcodeRepo;
+        _barcodeService = barcodeService;
         _tenant = tenant;
         _logger = logger;
     }
@@ -55,7 +61,9 @@ public class ProductService
     public async Task<ProductDto?> GetAsync(Guid id)
     {
         var product = await _repo.GetByIdAsync(id);
-        return product == null ? null : ToDto(product);
+        if (product == null) return null;
+        var barcodes = await _barcodeRepo.GetByProductIdAsync(product.Id);
+        return ToDto(product, barcodes);
     }
 
     public async Task<Guid> CreateAsync(CreateProductRequest request)
@@ -152,8 +160,40 @@ public class ProductService
             product.Deactivate();
         }
 
-        await _repo.AddAsync(product);
-        return product.Id;
+        // ── Barcodes: Internal is always generated; Manufacturer is optional ──
+        // request.Barcode has always represented the manufacturer/external
+        // barcode (see BarcodeService.SearchAsync historical ExternalBarcode
+        // mapping), so it is treated as the Manufacturer barcode here.
+        var manufacturerValue = request.Barcode?.Trim();
+        if (!string.IsNullOrEmpty(manufacturerValue) &&
+            await _barcodeRepo.ValueExistsAsync(_tenant.CompanyId.Value, manufacturerValue))
+        {
+            throw new InvalidOperationException($"Barcode '{manufacturerValue}' is already assigned to another product.");
+        }
+
+        const int maxAttempts = 5;
+        for (var attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            var barcodes = new List<Barcode>();
+            var internalValue = await _barcodeService.GenerateUniqueInternalValueAsync(_tenant.CompanyId.Value);
+            barcodes.Add(new Barcode(_tenant.CompanyId.Value, product.Id, BarcodeType.Internal, internalValue));
+            if (!string.IsNullOrEmpty(manufacturerValue))
+            {
+                barcodes.Add(new Barcode(_tenant.CompanyId.Value, product.Id, BarcodeType.Manufacturer, manufacturerValue));
+            }
+
+            try
+            {
+                await _repo.AddAsync(product, barcodes);
+                return product.Id;
+            }
+            catch (ConcurrencyConflictException) when (attempt < maxAttempts - 1)
+            {
+                // Concurrent creation took the generated internal value; retry with a new one.
+            }
+        }
+
+        throw new InvalidOperationException("Unable to create product: could not allocate a unique internal barcode.");
     }
 
     public async Task UpdateAsync(Guid id, UpdateProductRequest request)
@@ -190,6 +230,38 @@ public class ProductService
                 request.Barcode ?? product.Barcode,
                 request.Brand ?? product.Brand,
                 request.Description ?? product.Description);
+        }
+
+        // request.Barcode represents the Manufacturer barcode (see CreateAsync).
+        // Upsert the authoritative Barcode row without touching the Internal one.
+        if (request.Barcode != null)
+        {
+            var companyId = _tenant.CompanyId!.Value;
+            var value = request.Barcode.Trim();
+            var existingManufacturer = (await _barcodeRepo.GetByProductIdAsync(product.Id))
+                .FirstOrDefault(b => b.Type == BarcodeType.Manufacturer);
+
+            if (value.Length == 0)
+            {
+                // Explicitly cleared: leave the row as-is: an empty legacy field
+                // isn't a strong enough signal to delete a persisted barcode.
+            }
+            else if (existingManufacturer != null)
+            {
+                if (existingManufacturer.Value != value)
+                {
+                    if (await _barcodeRepo.ValueExistsAsync(companyId, value, excludeBarcodeId: existingManufacturer.Id))
+                        throw new InvalidOperationException($"Barcode '{value}' is already assigned to another product.");
+                    existingManufacturer.UpdateValue(value);
+                    await _barcodeRepo.UpdateAsync(existingManufacturer);
+                }
+            }
+            else
+            {
+                if (await _barcodeRepo.ValueExistsAsync(companyId, value))
+                    throw new InvalidOperationException($"Barcode '{value}' is already assigned to another product.");
+                await _barcodeRepo.AddAsync(new Barcode(companyId, product.Id, BarcodeType.Manufacturer, value));
+            }
         }
 
         if (request.RetailPrice.HasValue || request.CostPrice.HasValue)
@@ -338,11 +410,13 @@ public class ProductService
         return products.Select(ToListDto).ToList();
     }
 
-    private static ProductDto ToDto(Product p) => new()
+    private static ProductDto ToDto(Product p, List<Barcode>? barcodes = null) => new()
     {
         Id = p.Id,
         Name = p.Name,
         Sku = p.Sku,
+        ManufacturerBarcode = barcodes?.FirstOrDefault(b => b.Type == BarcodeType.Manufacturer)?.Value,
+        InternalBarcode = barcodes?.FirstOrDefault(b => b.Type == BarcodeType.Internal)?.Value,
         Barcode = p.Barcode,
         Brand = p.Brand,
         ProductType = p.ProductType.ToString(),
@@ -401,6 +475,8 @@ public class ProductService
         RetailPrice = p.RetailPrice,
         CostPrice = p.CostPrice,
         StockQuantity = p.StockQuantity,
+        TrackInventory = p.TrackInventory,
+        TrackBatch = p.TrackBatch,
         IsActive = p.IsActive,
         IsLowStock = p.IsLowStock(),
         IsPerishable = p.ProductCategoryRef?.IsPerishable ?? false,

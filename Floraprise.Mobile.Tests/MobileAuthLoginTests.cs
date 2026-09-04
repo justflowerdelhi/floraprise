@@ -1,4 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Sumpooj.API.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -87,6 +89,9 @@ public sealed class MobileAuthLoginTests : IDisposable
         _provider.Dispose();
     }
 
+    private static ClaimsPrincipal Principal(params Claim[] claims) =>
+        new(new ClaimsIdentity(claims, "test"));
+
     [Fact]
     public async Task Login_WithCompanyId_StillWorks()
     {
@@ -119,7 +124,10 @@ public sealed class MobileAuthLoginTests : IDisposable
 
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(response.AccessToken);
         Assert.Equal(seeded.Company.Id.ToString(), jwt.Claims.Single(c => c.Type == "company_id").Value);
+        Assert.Equal(response.MobileUserId.ToString(), jwt.Claims.Single(c => c.Type == JwtRegisteredClaimNames.Sub).Value);
         Assert.Equal(response.MobileUserId.ToString(), jwt.Claims.Single(c => c.Type == "mobile_user_id").Value);
+        Assert.Equal(seeded.User.Id.ToString(), jwt.Claims.Single(c => c.Type == "identity_user_id").Value);
+        Assert.NotEqual(response.MobileUserId, seeded.User.Id);
         Assert.Equal("test-device-001", jwt.Claims.Single(c => c.Type == "device_id").Value);
         Assert.Equal("mobile", jwt.Claims.Single(c => c.Type == "client_type").Value);
     }
@@ -138,6 +146,46 @@ public sealed class MobileAuthLoginTests : IDisposable
         Assert.Equal(login.MobileDeviceId, refresh.MobileDeviceId);
         Assert.False((await _db.DeviceSessions.SingleAsync(x => x.RefreshToken == login.RefreshToken)).IsActive(DateTime.UtcNow));
         Assert.True((await _db.DeviceSessions.SingleAsync(x => x.RefreshToken == refresh.RefreshToken)).IsActive(DateTime.UtcNow));
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(refresh.AccessToken);
+        Assert.Equal(login.MobileUserId.ToString(), jwt.Claims.Single(c => c.Type == JwtRegisteredClaimNames.Sub).Value);
+        Assert.Equal(login.MobileUserId.ToString(), jwt.Claims.Single(c => c.Type == "mobile_user_id").Value);
+        Assert.Equal(seeded.User.Id.ToString(), jwt.Claims.Single(c => c.Type == "identity_user_id").Value);
+    }
+
+    [Fact]
+    public void InventoryIdentityResolution_UsesIdentityUserIdForMobileToken()
+    {
+        var mobileUserId = Guid.NewGuid();
+        var identityUserId = Guid.NewGuid();
+        var principal = Principal(
+            new Claim("client_type", "mobile"),
+            new Claim("mobile_user_id", mobileUserId.ToString()),
+            new Claim("identity_user_id", identityUserId.ToString()),
+            new Claim(JwtRegisteredClaimNames.Sub, mobileUserId.ToString()));
+
+        Assert.Equal(identityUserId, InventoryUserIdentityResolver.Resolve(principal));
+    }
+
+    [Fact]
+    public void InventoryIdentityResolution_RejectsOldMobileTokenWithoutIdentityUserId()
+    {
+        var mobileUserId = Guid.NewGuid();
+        var principal = Principal(
+            new Claim("client_type", "mobile"),
+            new Claim("mobile_user_id", mobileUserId.ToString()),
+            new Claim(JwtRegisteredClaimNames.Sub, mobileUserId.ToString()));
+
+        Assert.Throws<UnauthorizedAccessException>(() => InventoryUserIdentityResolver.Resolve(principal));
+    }
+
+    [Fact]
+    public void InventoryIdentityResolution_UsesNameIdentifierForLegacyToken()
+    {
+        var identityUserId = Guid.NewGuid();
+        var principal = Principal(new Claim(ClaimTypes.NameIdentifier, identityUserId.ToString()));
+
+        Assert.Equal(identityUserId, InventoryUserIdentityResolver.Resolve(principal));
     }
 
     [Fact]

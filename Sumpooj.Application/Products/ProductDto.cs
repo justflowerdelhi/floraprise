@@ -7,7 +7,11 @@ public class ProductDto
     public Guid Id { get; set; }
     public string Name { get; set; } = default!;
     public string Sku { get; set; } = default!;
+    // Legacy field, retained for backward compatibility. New clients should
+    // use ManufacturerBarcode/InternalBarcode below instead.
     public string? Barcode { get; set; }
+    public string? ManufacturerBarcode { get; set; }
+    public string? InternalBarcode { get; set; }
     public string? Brand { get; set; }
     public string ProductType { get; set; } = default!;
     public string Category { get; set; } = default!;
@@ -84,6 +88,8 @@ public class ProductListDto
     public decimal RetailPrice { get; set; }
     public decimal CostPrice { get; set; }
     public int StockQuantity { get; set; }
+    public bool TrackInventory { get; set; }
+    public bool TrackBatch { get; set; }
     public bool IsActive { get; set; }
     public bool IsLowStock { get; set; }
     public bool IsPerishable { get; set; }

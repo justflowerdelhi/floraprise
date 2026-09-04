@@ -62,6 +62,10 @@ public class Order : BaseEntity
     public decimal TaxAmount { get; private set; }
     public decimal DiscountAmount { get; private set; }
     public decimal TotalAmount { get; private set; }
+    public decimal PosRoundOffAmount { get; private set; }
+    public decimal RewardDiscountAmount { get; private set; }
+    public int RewardPointsEarned { get; private set; }
+    public int RewardPointsRedeemed { get; private set; }
 
     // Assignment
     public Guid? AssignedToUserId { get; private set; }
@@ -196,6 +200,21 @@ public class Order : BaseEntity
     {
         DeliveryFee = fee;
         RecalculateTotals();
+    }
+
+    public void SetRewardPoints(int earned, int redeemed)
+    {
+        if (earned < 0 || redeemed < 0) throw new ArgumentOutOfRangeException(nameof(earned));
+        RewardPointsEarned = earned;
+        RewardPointsRedeemed = redeemed;
+        MarkUpdated();
+    }
+
+    public void SetPosFinancialDetails(decimal roundOffAmount, decimal rewardDiscountAmount)
+    {
+        PosRoundOffAmount = roundOffAmount;
+        RewardDiscountAmount = rewardDiscountAmount;
+        MarkUpdated();
     }
 
     public void SetTaxAmount(decimal tax)
@@ -368,9 +387,28 @@ public class OrderItem
     public decimal UnitPrice { get; private set; }
     public decimal TotalPrice { get; private set; }
     public string? SpecialInstructions { get; private set; }
+    public string? ClientOrderLineId { get; private set; }
+    public decimal? TaxRatePercent { get; private set; }
+    public string? DiscountType { get; private set; }
+    public decimal? DiscountValue { get; private set; }
+    public decimal DiscountAmount { get; private set; }
+    public decimal? LineSubtotal { get; private set; }
+    public decimal? LineTaxAmount { get; private set; }
 
     public void SetSpecialInstructions(string? instructions)
     {
         SpecialInstructions = instructions;
+    }
+
+    public void SetPosFinancialDetails(string? clientOrderLineId, decimal? taxRatePercent, string? discountType,
+        decimal? discountValue, decimal discountAmount, decimal? lineSubtotal, decimal? lineTaxAmount)
+    {
+        ClientOrderLineId = string.IsNullOrWhiteSpace(clientOrderLineId) ? null : clientOrderLineId.Trim();
+        TaxRatePercent = taxRatePercent;
+        DiscountType = string.IsNullOrWhiteSpace(discountType) ? null : discountType.Trim();
+        DiscountValue = discountValue;
+        DiscountAmount = discountAmount;
+        LineSubtotal = lineSubtotal;
+        LineTaxAmount = lineTaxAmount;
     }
 }

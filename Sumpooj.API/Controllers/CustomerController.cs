@@ -46,8 +46,8 @@ public class CustomersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create(CreateCustomerRequest request)
     {
-        var id = await _service.CreateAsync(request);
-        return CreatedAtAction(nameof(Get), new { id }, null);
+        var customer = await _service.CreateAsync(request);
+        return CreatedAtAction(nameof(Get), new { id = customer.Id }, customer);
     }
 
     [HttpPut("{id:guid}/contact")]
@@ -55,8 +55,7 @@ public class CustomersController : ControllerBase
         Guid id,
         UpdateCustomerRequest request)
     {
-        await _service.UpdateContactAsync(id, request);
-        return NoContent();
+        return Ok(await _service.UpdateContactAsync(id, request));
     }
 
     [HttpPut("{id:guid}/card-message")]

@@ -7,6 +7,14 @@ public interface IProductRepository
     Task<Product?> GetByIdAsync(Guid id);
     Task<Product?> GetBySkuAsync(string sku);
     Task AddAsync(Product product);
+
+    /// <summary>
+    /// Adds a product together with its initial barcodes in a single
+    /// SaveChanges call, so the product and its barcodes commit atomically
+    /// (either both persist, or neither does).
+    /// </summary>
+    Task AddAsync(Product product, IEnumerable<Barcode> barcodes);
+
     Task UpdateAsync(Product product);
     Task DeleteAsync(Product product);
     Task ForceDeleteWithReferencesAsync(Guid companyId, Guid productId);

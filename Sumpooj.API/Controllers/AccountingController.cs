@@ -147,13 +147,21 @@ public class AccountingController : ControllerBase
     // ─── Expenses ───────────────────────────────────────────
 
     [HttpGet("expenses")]
-    public async Task<IActionResult> GetExpenses()
+    public async Task<IActionResult> GetExpenses([FromQuery] DateTime? date, [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to, [FromQuery] string? paymentMode)
     {
-        var list = await _db.Expenses
-            .Where(e => e.CompanyId == CompanyId).OrderByDescending(e => e.ExpenseDate)
-            .Select(e => new ExpenseDto { Id = e.Id, Category = e.Category, Amount = e.Amount, Description = e.Description, ExpenseDate = e.ExpenseDate.ToString("o"), IsActive = e.IsActive })
-            .ToListAsync();
-        return Ok(list);
+        var query = _db.Expenses.Where(e => e.CompanyId == CompanyId);
+        if (date.HasValue)
+        {
+            var day = date.Value.ToUniversalTime().Date;
+            query = query.Where(e => e.ExpenseDate >= day && e.ExpenseDate < day.AddDays(1));
+        }
+        if (from.HasValue) query = query.Where(e => e.ExpenseDate >= from.Value.ToUniversalTime().Date);
+        if (to.HasValue) query = query.Where(e => e.ExpenseDate < to.Value.ToUniversalTime().Date.AddDays(1));
+        if (!string.IsNullOrWhiteSpace(paymentMode) && Enum.TryParse<ExpensePaymentMode>(paymentMode, true, out var mode))
+            query = query.Where(e => e.PaymentMode == mode);
+        return Ok((await query.OrderByDescending(e => e.ExpenseDate).ThenByDescending(e => e.CreatedAtUtc).ToListAsync())
+            .Select(ToExpenseDto));
     }
 
     [HttpPost("expenses")]
@@ -163,7 +171,18 @@ public class AccountingController : ControllerBase
             return BadRequest(new { message = "Expense amount must be greater than zero." });
 
         var date = string.IsNullOrEmpty(req.ExpenseDate) ? DateTime.UtcNow : DateTime.Parse(req.ExpenseDate).ToUniversalTime();
-        var expense = new Expense(CompanyId, req.Category, req.Amount, req.Description, date);
+        var categoryName = req.Category;
+        ExpenseCategory? category = null;
+        if (req.CategoryId.HasValue)
+        {
+            category = await _db.ExpenseCategories.FirstOrDefaultAsync(c => c.CompanyId == CompanyId && c.Id == req.CategoryId);
+            if (category == null) return BadRequest(new { message = "Expense category was not found." });
+            categoryName = category.Name;
+        }
+        if (!Enum.TryParse<ExpensePaymentMode>(req.PaymentMode, true, out var paymentMode))
+            return BadRequest(new { message = "Payment mode must be Cash, Upi, or Card." });
+        var expense = new Expense(CompanyId, categoryName, req.Amount, req.Description, date);
+        if (category != null) expense.SetLocalDetails(category.Id, paymentMode);
 
         var expenseAccount = await GetOrCreateExpenseAccountAsync(req.Category);
         var cashAccount = await GetOrCreateCashAccountAsync();
@@ -197,7 +216,7 @@ public class AccountingController : ControllerBase
             accountId: cashAccount.Id));
 
         await _db.SaveChangesAsync();
-        return Ok(new ExpenseDto { Id = expense.Id, Category = expense.Category, Amount = expense.Amount, Description = expense.Description, ExpenseDate = expense.ExpenseDate.ToString("o"), IsActive = true });
+        return Ok(ToExpenseDto(expense));
     }
 
     [HttpPut("expenses/{id:guid}")]
@@ -205,9 +224,19 @@ public class AccountingController : ControllerBase
     {
         var expense = await _db.Expenses.FirstOrDefaultAsync(e => e.CompanyId == CompanyId && e.Id == id);
         if (expense == null) return NotFound();
-        expense.Update(req.Category, req.Amount, req.Description);
+        var categoryName = req.Category;
+        if (req.CategoryId.HasValue)
+        {
+            var category = await _db.ExpenseCategories.FirstOrDefaultAsync(c => c.CompanyId == CompanyId && c.Id == req.CategoryId);
+            if (category == null) return BadRequest(new { message = "Expense category was not found." });
+            categoryName = category.Name;
+            if (!Enum.TryParse<ExpensePaymentMode>(req.PaymentMode, true, out var paymentMode))
+                return BadRequest(new { message = "Payment mode must be Cash, Upi, or Card." });
+            expense.SetLocalDetails(category.Id, paymentMode);
+        }
+        expense.Update(categoryName, req.Amount, req.Description);
         await _db.SaveChangesAsync();
-        return NoContent();
+        return Ok(ToExpenseDto(expense));
     }
 
     [HttpPut("expenses/{id:guid}/disable")]
@@ -219,6 +248,28 @@ public class AccountingController : ControllerBase
         await _db.SaveChangesAsync();
         return NoContent();
     }
+
+    [HttpDelete("expenses/{id:guid}")]
+    public async Task<IActionResult> DeleteExpense(Guid id)
+    {
+        var expense = await _db.Expenses.FirstOrDefaultAsync(e => e.CompanyId == CompanyId && e.Id == id);
+        if (expense == null) return NotFound();
+        _db.Expenses.Remove(expense);
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    private static ExpenseDto ToExpenseDto(Expense expense) => new()
+    {
+        Id = expense.Id,
+        CategoryId = expense.ExpenseCategoryId,
+        Category = expense.Category,
+        Amount = expense.Amount,
+        PaymentMode = expense.PaymentMode.ToString(),
+        Description = expense.Description,
+        ExpenseDate = expense.ExpenseDate.ToString("o"),
+        IsActive = expense.IsActive
+    };
 
     // ─── Journal Entries ────────────────────────────────────
 

@@ -56,3 +56,10 @@ public class ProductBarcodeInfo
     public string? InternalBarcode { get; set; }
     public string FoundByType { get; set; } = default!;
 }
+
+public class ProductBarcodesResponse
+{
+    public Guid ProductId { get; set; }
+    public string? ManufacturerBarcode { get; set; }
+    public string? InternalBarcode { get; set; }
+}

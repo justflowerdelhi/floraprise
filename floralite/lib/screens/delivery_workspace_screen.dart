@@ -339,8 +339,9 @@ class _DeliveryWorkspaceDetailScreenState
   }
 
   Future<void> _shareCustomerTrackingLink() async {
-    final trackingLink =
-        (_snapshot?.trackingLink ?? delivery.trackingLink).trim();
+    final trackingLink = (await _service.generateTrackingLinks(
+      delivery.assignmentId,
+    )).customerLink.trim();
     if (trackingLink.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

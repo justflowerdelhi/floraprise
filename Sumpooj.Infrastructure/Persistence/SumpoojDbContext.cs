@@ -31,6 +31,8 @@ public class SumpoojDbContext
     public DbSet<InventoryAdjustment> InventoryAdjustments => Set<InventoryAdjustment>();
     public DbSet<InventoryReservation> InventoryReservations => Set<InventoryReservation>();
     public DbSet<InventoryLedger> InventoryLedgers { get; set; }
+    public DbSet<PosSaleSyncReceipt> PosSaleSyncReceipts => Set<PosSaleSyncReceipt>();
+    public DbSet<PosSaleSyncInventoryTransaction> PosSaleSyncInventoryTransactions => Set<PosSaleSyncInventoryTransaction>();
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
     public DbSet<Order> Orders => Set<Order>();
@@ -53,6 +55,7 @@ public class SumpoojDbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     public DbSet<ProductCategoryEntity> ProductCategories => Set<ProductCategoryEntity>();
+    public DbSet<Barcode> Barcodes => Set<Barcode>();
 
     // New entities
     public DbSet<DeliveryZone> DeliveryZones => Set<DeliveryZone>();
@@ -98,10 +101,23 @@ public class SumpoojDbContext
     // Accounting
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Expense> Expenses => Set<Expense>();
+    public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
+    public DbSet<OpeningCash> OpeningCashEntries => Set<OpeningCash>();
+    public DbSet<CashBookEntry> CashBookEntries => Set<CashBookEntry>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
 
     // Staff Attendance
     public DbSet<StaffAttendanceRecord> StaffAttendanceRecords => Set<StaffAttendanceRecord>();
+
+    // Mobile operational parity
+    public DbSet<MorningPurchaseListItem> MorningPurchaseListItems => Set<MorningPurchaseListItem>();
+    public DbSet<Associate> Associates => Set<Associate>();
+    public DbSet<OccasionContact> OccasionContacts => Set<OccasionContact>();
+    public DbSet<OccasionFollowUpAction> OccasionFollowUpActions => Set<OccasionFollowUpAction>();
+    public DbSet<SchedulerRecord> SchedulerRecords => Set<SchedulerRecord>();
+    public DbSet<CloudDesign> CloudDesigns => Set<CloudDesign>();
+    public DbSet<ReadyBouquetRecord> ReadyBouquetRecords => Set<ReadyBouquetRecord>();
+    public DbSet<ReadyBouquetRefreshEvent> ReadyBouquetRefreshEvents => Set<ReadyBouquetRefreshEvent>();
 
     // Marketing
     public DbSet<DemoRequest> DemoRequests => Set<DemoRequest>();
@@ -280,6 +296,11 @@ public class SumpoojDbContext
                 !_tenantContext.CompanyId.HasValue ||
                 l.CompanyId == _tenantContext.CompanyId);
 
+        modelBuilder.Entity<PosSaleSyncReceipt>()
+            .HasQueryFilter(r => _tenantContext == null || !_tenantContext.CompanyId.HasValue || r.CompanyId == _tenantContext.CompanyId);
+        modelBuilder.Entity<PosSaleSyncInventoryTransaction>()
+            .HasQueryFilter(t => _tenantContext == null || !_tenantContext.CompanyId.HasValue || t.CompanyId == _tenantContext.CompanyId);
+
         modelBuilder.Entity<PurchaseOrder>()
             .HasQueryFilter(po =>
                 _tenantContext == null ||
@@ -309,6 +330,12 @@ public class SumpoojDbContext
                 _tenantContext == null ||
                 !_tenantContext.CompanyId.HasValue ||
                 c.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<Barcode>()
+            .HasQueryFilter(b =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                b.CompanyId == _tenantContext.CompanyId);
 
         modelBuilder.Entity<CorporateClient>()
             .HasQueryFilter(c =>
@@ -399,6 +426,101 @@ public class SumpoojDbContext
                 _tenantContext == null ||
                 !_tenantContext.CompanyId.HasValue ||
                 s.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<StaffAttendanceRecord>()
+            .HasQueryFilter(a =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                a.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<StaffAttendanceRecord>()
+            .HasIndex(a => new { a.CompanyId, a.StaffId, a.AttendanceDate })
+            .IsUnique();
+
+        modelBuilder.Entity<Expense>()
+            .HasQueryFilter(e =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                e.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<ExpenseCategory>()
+            .HasQueryFilter(e =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                e.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<ExpenseCategory>()
+            .HasIndex(e => new { e.CompanyId, e.Name })
+            .IsUnique();
+
+        modelBuilder.Entity<OpeningCash>()
+            .HasQueryFilter(o =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                o.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<OpeningCash>()
+            .HasIndex(o => new { o.CompanyId, o.Date })
+            .IsUnique();
+
+        modelBuilder.Entity<CashBookEntry>()
+            .HasQueryFilter(e =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                e.CompanyId == _tenantContext.CompanyId);
+
+        modelBuilder.Entity<CashBookEntry>()
+            .HasIndex(e => new { e.CompanyId, e.Date, e.CreatedAtUtc });
+
+        modelBuilder.Entity<MorningPurchaseListItem>()
+            .HasQueryFilter(i =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                i.CompanyId == _tenantContext.CompanyId);
+        modelBuilder.Entity<MorningPurchaseListItem>()
+            .HasIndex(i => new { i.CompanyId, i.ListDate, i.ProductId })
+            .IsUnique();
+
+        modelBuilder.Entity<Associate>()
+            .HasQueryFilter(a =>
+                _tenantContext == null ||
+                !_tenantContext.CompanyId.HasValue ||
+                a.CompanyId == _tenantContext.CompanyId);
+        modelBuilder.Entity<Associate>()
+            .HasIndex(a => new { a.CompanyId, a.AssociateCode })
+            .IsUnique();
+        modelBuilder.Entity<Associate>()
+            .HasIndex(a => new { a.CompanyId, a.BusinessName, a.Phone })
+            .IsUnique();
+
+        modelBuilder.Entity<OccasionContact>()
+            .HasQueryFilter(x => _tenantContext == null || !_tenantContext.CompanyId.HasValue || x.CompanyId == _tenantContext.CompanyId);
+        modelBuilder.Entity<OccasionContact>()
+            .HasIndex(x => new { x.CompanyId, x.CustomerId, x.RecipientName, x.Occasion })
+            .IsUnique();
+        modelBuilder.Entity<OccasionFollowUpAction>()
+            .HasQueryFilter(x => _tenantContext == null || !_tenantContext.CompanyId.HasValue || x.CompanyId == _tenantContext.CompanyId);
+        modelBuilder.Entity<OccasionFollowUpAction>()
+            .HasIndex(x => new { x.CompanyId, x.SourceType, x.SourceId, x.OccurrenceDate })
+            .IsUnique();
+        modelBuilder.Entity<SchedulerRecord>()
+            .HasQueryFilter(x => _tenantContext == null || !_tenantContext.CompanyId.HasValue || x.CompanyId == _tenantContext.CompanyId);
+        modelBuilder.Entity<SchedulerRecord>()
+            .HasIndex(x => new { x.CompanyId, x.Producer, x.SourceRef })
+            .IsUnique();
+        modelBuilder.Entity<CloudDesign>()
+            .HasQueryFilter(x => _tenantContext == null || !_tenantContext.CompanyId.HasValue || x.CompanyId == _tenantContext.CompanyId);
+        modelBuilder.Entity<CloudDesign>()
+            .HasIndex(x => new { x.CompanyId, x.BouquetId })
+            .IsUnique();
+        modelBuilder.Entity<ReadyBouquetRecord>()
+            .HasQueryFilter(x => _tenantContext == null || !_tenantContext.CompanyId.HasValue || x.CompanyId == _tenantContext.CompanyId);
+        modelBuilder.Entity<ReadyBouquetRecord>()
+            .HasIndex(x => new { x.CompanyId, x.FinishedProductId, x.ProducedAt });
+        modelBuilder.Entity<ReadyBouquetRefreshEvent>()
+            .HasQueryFilter(x => _tenantContext == null || !_tenantContext.CompanyId.HasValue || x.CompanyId == _tenantContext.CompanyId);
+        modelBuilder.Entity<ReadyBouquetRefreshEvent>()
+            .HasIndex(x => new { x.CompanyId, x.BatchId, x.CreatedAtUtc });
 
         modelBuilder.Entity<TaxRule>()
             .HasQueryFilter(t =>
@@ -498,6 +620,84 @@ public class SumpoojDbContext
             .HasIndex(o => new { o.CompanyId, o.OrderNumber })
             .IsUnique();
 
+        modelBuilder.Entity<Order>()
+            .Property(o => o.PosRoundOffAmount)
+            .HasColumnType("numeric(18,2)")
+            .HasDefaultValue(0m);
+        modelBuilder.Entity<Order>()
+            .Property(o => o.RewardDiscountAmount)
+            .HasColumnType("numeric(18,2)")
+            .HasDefaultValue(0m);
+
+        modelBuilder.Entity<OrderItem>()
+            .Property(i => i.TaxRatePercent)
+            .HasColumnType("numeric(8,4)");
+        modelBuilder.Entity<OrderItem>()
+            .Property(i => i.DiscountValue)
+            .HasColumnType("numeric(18,2)");
+        modelBuilder.Entity<OrderItem>()
+            .Property(i => i.DiscountAmount)
+            .HasColumnType("numeric(18,2)")
+            .HasDefaultValue(0m);
+        modelBuilder.Entity<OrderItem>()
+            .Property(i => i.LineSubtotal)
+            .HasColumnType("numeric(18,2)");
+        modelBuilder.Entity<OrderItem>()
+            .Property(i => i.LineTaxAmount)
+            .HasColumnType("numeric(18,2)");
+        modelBuilder.Entity<OrderItem>()
+            .HasIndex("OrderId");
+        modelBuilder.Entity<OrderItem>()
+            .HasIndex("OrderId", nameof(OrderItem.ClientOrderLineId))
+            .IsUnique()
+            .HasFilter("\"ClientOrderLineId\" IS NOT NULL");
+
+        modelBuilder.Entity<Payment>()
+            .Property(p => p.Reference)
+            .HasMaxLength(256);
+        modelBuilder.Entity<Payment>()
+            .HasIndex(p => new { p.OrderId, p.ClientPaymentId })
+            .IsUnique()
+            .HasFilter("\"ClientPaymentId\" IS NOT NULL");
+
+        modelBuilder.Entity<PosSaleSyncReceipt>()
+            .HasIndex(r => new { r.CompanyId, r.ClientSyncId })
+            .IsUnique();
+        modelBuilder.Entity<PosSaleSyncReceipt>()
+            .HasIndex(r => new { r.CompanyId, r.DeviceId, r.LocalOrderId })
+            .IsUnique();
+        modelBuilder.Entity<PosSaleSyncReceipt>()
+            .HasOne<Order>()
+            .WithMany()
+            .HasForeignKey(r => r.CloudOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PosSaleSyncReceipt>()
+            .HasOne<Customer>()
+            .WithMany()
+            .HasForeignKey(r => r.CloudCustomerId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<PosSaleSyncInventoryTransaction>()
+            .HasIndex(t => new { t.CompanyId, t.ClientInventoryTransactionId })
+            .IsUnique();
+        modelBuilder.Entity<PosSaleSyncInventoryTransaction>()
+            .HasIndex(t => new { t.PosSaleSyncReceiptId, t.CreatedAtUtc });
+        modelBuilder.Entity<PosSaleSyncInventoryTransaction>()
+            .HasOne<PosSaleSyncReceipt>()
+            .WithMany()
+            .HasForeignKey(t => t.PosSaleSyncReceiptId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<PosSaleSyncInventoryTransaction>()
+            .HasOne<Order>()
+            .WithMany()
+            .HasForeignKey(t => t.CloudOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PosSaleSyncInventoryTransaction>()
+            .HasOne<Product>()
+            .WithMany()
+            .HasForeignKey(t => t.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<PurchaseOrder>()
             .HasMany(po => po.Items)
             .WithOne()
@@ -592,6 +792,24 @@ public class SumpoojDbContext
             .WithMany()
             .HasForeignKey(p => p.CategoryId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Barcode: unique per company (Company A + "X" and Company B + "X" may
+        // coexist, but Company A cannot have "X" twice), and at most one
+        // barcode per (Product, Type) - a product can't have two Manufacturer
+        // barcodes or two Internal barcodes simultaneously.
+        modelBuilder.Entity<Barcode>()
+            .HasIndex(b => new { b.CompanyId, b.Value })
+            .IsUnique();
+
+        modelBuilder.Entity<Barcode>()
+            .HasIndex(b => new { b.ProductId, b.Type })
+            .IsUnique();
+
+        modelBuilder.Entity<Barcode>()
+            .HasOne(b => b.Product)
+            .WithMany()
+            .HasForeignKey(b => b.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // Product → TaxRule (optional FK)
         modelBuilder.Entity<Product>()

@@ -23,6 +23,23 @@ public class InventoryAdjustmentRepository : IInventoryAdjustmentRepository
         await _db.SaveChangesAsync();
     }
 
+    public async Task ApplyStockChangeAsync(
+        Product product,
+        InventoryAdjustment adjustment,
+        InventoryLedger ledger)
+    {
+        var executionStrategy = _db.Database.CreateExecutionStrategy();
+        await executionStrategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+            _db.Products.Update(product);
+            _db.InventoryAdjustments.Add(adjustment);
+            _db.InventoryLedgers.Add(ledger);
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        });
+    }
+
     public async Task<(List<InventoryAdjustment> Items, int TotalCount)> SearchAsync(
         Guid? productId,
         Guid? batchId,

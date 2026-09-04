@@ -41,14 +41,12 @@ class WalkInManager {
   })  : _customerManager = customerManager,
         _pricingManager = pricingManager,
         _orderManager = orderManager,
-        _inventoryManager = inventoryManager,
         _schedulerManager = schedulerManager,
         _rewardManager = rewardManager ?? RewardManager();
 
   final CustomerManager _customerManager;
   final PricingManager _pricingManager;
   final OrderManager _orderManager;
-  final InventoryManager _inventoryManager;
   final SchedulerManager _schedulerManager;
   final RewardManager _rewardManager;
 
@@ -159,11 +157,6 @@ class WalkInManager {
     );
 
     final confirmed = await _orderManager.confirmOrderDraft(orderId: draftId);
-
-    await _inventoryManager.recordOrderSales(
-      orderId: confirmed.orderId,
-      lineProductLinks: confirmed.lineProductLinks,
-    );
 
     await _schedulerManager.publishWalkInOrderTask(
       orderId: confirmed.orderId,

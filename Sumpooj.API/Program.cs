@@ -240,6 +240,8 @@ builder.Services.AddScoped<BouquetAIService>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ProductService>();
 
+builder.Services.AddScoped<IBarcodeRepository, BarcodeRepository>();
+
 builder.Services.AddScoped<IProductCategoryRepository, ProductCategoryRepository>();
 builder.Services.AddScoped<ProductCategoryService>();
 

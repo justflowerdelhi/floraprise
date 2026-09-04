@@ -634,7 +634,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
+        builder: (context, setStateDialog) {
+          final isSaving = context.watch<InventoryProvider>().isSaving;
+          return AlertDialog(
           title: Text(title),
           content: SingleChildScrollView(
             child: Column(
@@ -728,11 +730,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
+              onPressed:
+                  isSaving ? null : () => Navigator.pop(dialogContext, false),
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () async {
+              onPressed: isSaving ? null : () async {
                 if (quantity <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -779,10 +782,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   );
                 }
               },
-              child: const Text('Save'),
+              child: isSaving
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Save'),
             ),
           ],
-        ),
+          );
+        },
       ),
     );
 
@@ -806,8 +816,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _lookupBarcodeAndOpenInventoryDetail(String query) async {
-    final matched =
-        await _productRepository.lookupProductBySearchPriority(query);
+    final provider = context.read<InventoryProvider>();
+    if (provider.isCloud) {
+      var inventoryProduct = await provider.lookupCloudProduct(query);
+      if (inventoryProduct == null) {
+        await provider.refresh();
+        if (!mounted) return;
+        inventoryProduct = await provider.lookupCloudProduct(query);
+      }
+      if (inventoryProduct == null) {
+        await _showBarcodeNotFoundDialog();
+        return;
+      }
+      _showProductDetail(inventoryProduct);
+      return;
+    }
+
+    final matched = await _productRepository.lookupProductBySearchPriority(query);
     if (!mounted) {
       return;
     }
@@ -818,8 +843,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
 
     InventoryProductRecord? inventoryProduct;
-    final provider = context.read<InventoryProvider>();
-
     for (final item in provider.products) {
       if (item.productId == matched.id) {
         inventoryProduct = item;
@@ -952,6 +975,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
+                                if (entry.balanceAfter != null) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Stock: ${entry.previousQty ?? 0} to ${entry.balanceAfter} ${_pluralizeUnit(product.unit, entry.balanceAfter!)}',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade700,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                                 if (entry.txnType == 'purchase' &&
                                     entry.purchasePricePaise != null) ...[
                                   const SizedBox(height: 2),
@@ -1061,15 +1094,38 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   String _friendlyInventoryError(Object error) {
-    final message = error.toString();
-    if (message.contains('greater than zero')) {
-      if (message.contains('Purchase price')) {
+    final message = error.toString().replaceFirst('Bad state: ', '').trim();
+    final normalized = message.toLowerCase();
+    if (normalized.contains('greater than zero')) {
+      if (normalized.contains('purchase price')) {
         return 'Purchase Price must be greater than zero.';
       }
       return 'Quantity must be greater than zero.';
     }
-    if (message.contains('Stock cannot go negative')) {
+    if (normalized.contains('stock cannot go negative')) {
       return 'Stock cannot go negative.';
+    }
+    if (normalized.contains('inventory tracking is disabled')) {
+      return 'Inventory tracking is disabled for this product.';
+    }
+    if (normalized.contains('product not found') ||
+        normalized.contains('product is inactive')) {
+      return 'This product is no longer available. Refresh inventory and try again.';
+    }
+    if (normalized.contains('cloud session is not available') ||
+        normalized.contains('http 401') ||
+        normalized.contains('http 403')) {
+      return 'Your Cloud session has expired. Please log in again.';
+    }
+    if (normalized.contains('unable to connect') ||
+        normalized.contains('socketexception')) {
+      return 'Unable to reach Floraprise Cloud. Check your connection and try again.';
+    }
+    if (normalized.contains('timeout')) {
+      return 'The Cloud request timed out. Please try again.';
+    }
+    if (message.isNotEmpty && message.length <= 180) {
+      return message;
     }
     return 'Could not save inventory change. Please try again.';
   }

@@ -10,6 +10,7 @@ public class InventoryService
     private readonly IProductBatchRepository _batchRepo;
     private readonly IInventoryAdjustmentRepository _adjustmentRepo;
     private readonly IProductRepository _productRepo;
+    private readonly IBarcodeRepository _barcodeRepo;
     private readonly ITenantContext _tenant;
     private readonly IInventoryLedgerRepository _ledgerRepo;
 
@@ -17,14 +18,160 @@ public class InventoryService
         IProductBatchRepository batchRepo,
         IInventoryAdjustmentRepository adjustmentRepo,
         IProductRepository productRepo,
+        IBarcodeRepository barcodeRepo,
         ITenantContext tenant,
         IInventoryLedgerRepository ledgerRepo)
     {
         _batchRepo = batchRepo;
         _adjustmentRepo = adjustmentRepo;
         _productRepo = productRepo;
+        _barcodeRepo = barcodeRepo;
         _tenant = tenant;
         _ledgerRepo = ledgerRepo;
+    }
+
+    public async Task<List<InventoryProductDto>> GetInventoryProductsAsync()
+    {
+        var companyId = _tenant.CompanyId
+            ?? throw new InvalidOperationException("Company context required");
+        var products = await _productRepo.GetAllAsync(companyId);
+        var result = new List<InventoryProductDto>();
+
+        foreach (var product in products.Where(p => p.IsActive))
+        {
+            var barcodes = await _barcodeRepo.GetByProductIdAsync(product.Id);
+            result.Add(new InventoryProductDto
+            {
+                Id = product.Id,
+                ProductId = product.Id,
+                Name = product.Name,
+                ProductType = product.ProductType.ToString(),
+                Category = product.ProductCategoryRef?.Name ?? product.Category.ToString(),
+                Unit = product.UnitOfMeasure.ToString(),
+                Sku = product.Sku,
+                ManufacturerBarcode = barcodes.FirstOrDefault(b => b.Type == BarcodeType.Manufacturer)?.Value ?? product.Barcode,
+                InternalBarcode = barcodes.FirstOrDefault(b => b.Type == BarcodeType.Internal)?.Value,
+                TrackInventory = product.TrackInventory,
+                CurrentQuantity = product.StockQuantity,
+                QuantityAvailable = product.StockQuantity,
+                MinimumQuantity = product.MinimumStockLevel,
+                UnitCost = product.CostPrice,
+                IsActive = product.IsActive
+            });
+        }
+
+        return result;
+    }
+
+    public async Task<Guid> ApplyStockChangeAsync(InventoryStockChangeRequest request, Guid userId)
+    {
+        var companyId = _tenant.CompanyId
+            ?? throw new InvalidOperationException("Company context required");
+        if (request.Quantity <= 0)
+            throw new InvalidOperationException("Quantity must be greater than zero.");
+
+        var product = await _productRepo.GetByIdAsync(companyId, request.ProductId)
+            ?? throw new KeyNotFoundException("Product not found.");
+        if (!product.IsActive)
+            throw new InvalidOperationException("Product is inactive.");
+        if (!product.TrackInventory)
+            throw new InvalidOperationException("Inventory tracking is disabled for this product.");
+
+        var operation = request.Operation?.Trim().ToLowerInvariant();
+        var (stockChange, adjustmentType, referenceType, defaultReason) = operation switch
+        {
+            "purchase" => (request.Quantity, AdjustmentType.Found, "PURCHASE", "Purchase"),
+            "sale" => (-request.Quantity, AdjustmentType.Other, "SALE", "Manual sale"),
+            "wastage" => (-request.Quantity, ParseWastageType(request.Reason), "DAMAGED", "Wastage"),
+            "adjustment" when request.Increase == true => (request.Quantity, AdjustmentType.Correction, "ADJUSTMENT", "Increase"),
+            "adjustment" when request.Increase == false => (-request.Quantity, AdjustmentType.Correction, "ADJUSTMENT", "Decrease"),
+            "adjustment" => throw new InvalidOperationException("Adjustment direction is required."),
+            _ => throw new InvalidOperationException("Operation must be purchase, sale, wastage, or adjustment.")
+        };
+
+        if (product.StockQuantity + stockChange < 0)
+            throw new InvalidOperationException("Stock cannot go negative.");
+
+        var reason = string.IsNullOrWhiteSpace(request.Reason) ? defaultReason : request.Reason.Trim();
+        var notes = request.Notes?.Trim();
+        if (!string.IsNullOrWhiteSpace(request.Supplier))
+            notes = string.IsNullOrWhiteSpace(notes) ? $"Supplier: {request.Supplier.Trim()}" : $"Supplier: {request.Supplier.Trim()}\n{notes}";
+
+        var adjustment = new InventoryAdjustment(
+            companyId,
+            product.Id,
+            null,
+            adjustmentType,
+            request.Quantity,
+            request.CostPerUnit ?? product.CostPrice,
+            reason,
+            userId);
+        if (!string.IsNullOrWhiteSpace(notes))
+            adjustment.AddNotes(notes);
+
+        product.AdjustStock(stockChange);
+        var ledger = new InventoryLedger(
+            companyId,
+            product.Id,
+            adjustment.Id.ToString(),
+            referenceType,
+            stockChange,
+            product.StockQuantity,
+            notes ?? reason);
+        await _adjustmentRepo.ApplyStockChangeAsync(product, adjustment, ledger);
+
+        return adjustment.Id;
+    }
+
+    public async Task<List<InventoryHistoryDto>> GetInventoryHistoryAsync(Guid productId)
+    {
+        var companyId = _tenant.CompanyId
+            ?? throw new InvalidOperationException("Company context required");
+        _ = await _productRepo.GetByIdAsync(companyId, productId)
+            ?? throw new KeyNotFoundException("Product not found.");
+
+        var ledger = await _ledgerRepo.GetByProductAsync(companyId, productId);
+        var result = new List<InventoryHistoryDto>();
+        foreach (var entry in ledger)
+        {
+            InventoryAdjustment? adjustment = null;
+            if (Guid.TryParse(entry.Reference, out var adjustmentId))
+                adjustment = await _adjustmentRepo.GetByIdAsync(adjustmentId);
+
+            var notes = adjustment?.Notes ?? entry.Notes ?? string.Empty;
+            var supplier = string.Empty;
+            if (notes.StartsWith("Supplier: ", StringComparison.OrdinalIgnoreCase))
+            {
+                var lineBreak = notes.IndexOf('\n');
+                supplier = notes.Substring(10, lineBreak < 0 ? notes.Length - 10 : lineBreak - 10).Trim();
+                notes = lineBreak < 0 ? string.Empty : notes[(lineBreak + 1)..].Trim();
+            }
+
+            result.Add(new InventoryHistoryDto
+            {
+                Id = entry.Id,
+                ProductId = productId,
+                Operation = entry.ReferenceType switch
+                {
+                    "PURCHASE" => "purchase",
+                    "SALE" => "sale",
+                    "DAMAGED" => "wastage",
+                    _ => "adjustment"
+                },
+                Quantity = Math.Abs(entry.QuantityChange),
+                CostPerUnit = adjustment?.CostPerUnit,
+                Supplier = supplier,
+                Reason = entry.ReferenceType == "ADJUSTMENT"
+                    ? (entry.QuantityChange >= 0 ? "Increase" : "Decrease")
+                    : adjustment?.Reason ?? string.Empty,
+                Notes = notes,
+                PreviousBalance = entry.BalanceAfter - entry.QuantityChange,
+                BalanceAfter = entry.BalanceAfter,
+                CreatedAtUtc = entry.CreatedAtUtc
+            });
+        }
+
+        return result;
     }
 
     #region Batches
@@ -654,6 +801,15 @@ public class InventoryService
             AdjustmentType.TransferOut => true,
             _ => false
         };
+    }
+
+    private static AdjustmentType ParseWastageType(string? reason)
+    {
+        if (reason?.Contains("expired", StringComparison.OrdinalIgnoreCase) == true)
+            return AdjustmentType.Expired;
+        if (reason?.Contains("damage", StringComparison.OrdinalIgnoreCase) == true)
+            return AdjustmentType.Damaged;
+        return AdjustmentType.Spoiled;
     }
 
     #endregion

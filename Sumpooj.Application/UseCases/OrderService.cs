@@ -192,6 +192,8 @@ public class OrderService
         if (request.DiscountAmount > 0)
             order.ApplyDiscount(request.DiscountAmount);
 
+        order.SetRewardPoints(request.RewardPointsEarned, request.RewardPointsRedeemed);
+
         if (!string.IsNullOrEmpty(request.InternalNotes))
             order.AddInternalNote(request.InternalNotes);
 
@@ -1016,6 +1018,8 @@ public class OrderService
         TaxAmount = order.TaxAmount,
         DiscountAmount = order.DiscountAmount,
         TotalAmount = order.TotalAmount,
+        RewardPointsEarned = order.RewardPointsEarned,
+        RewardPointsRedeemed = order.RewardPointsRedeemed,
         AssignedDesignerId = order.AssignedToUserId,
         DeliveryPersonId = order.DeliveryPersonId,
         LocationId = order.LocationId,

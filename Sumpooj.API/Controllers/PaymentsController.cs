@@ -4,7 +4,6 @@ using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Payments;
 using Sumpooj.Application.UseCases;
 using Sumpooj.Domain.Entities;
-using System.Security.Claims;
 
 namespace Sumpooj.API.Controllers;
 
@@ -30,8 +29,7 @@ public class PaymentsController : ControllerBase
     private Guid CompanyId => _tenantContext.CompanyId 
         ?? throw new UnauthorizedAccessException("Company context required");
 
-    private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) 
-        ?? throw new UnauthorizedAccessException("User not found"));
+    private Guid UserId => InventoryUserIdentityResolver.Resolve(User);
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
@@ -50,8 +48,15 @@ public class PaymentsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreatePaymentRequest request)
     {
-        var payment = await _paymentService.CreateAsync(CompanyId, request, UserId);
-        return CreatedAtAction(nameof(GetById), new { id = payment.Id }, payment);
+        try
+        {
+            var payment = await _paymentService.CreateAsync(CompanyId, request, UserId);
+            return CreatedAtAction(nameof(GetById), new { id = payment.Id }, payment);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
     }
 
     [HttpPatch("{id:guid}/approve")]

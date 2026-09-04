@@ -20,19 +20,22 @@ public class PublicDeliveryTrackingController : ControllerBase
     private readonly DriverJourneyService _journeyService;
     private readonly IDeliveryRepository _deliveryRepository;
     private readonly IConfiguration _configuration;
+    private readonly ITenantContext _tenantContext;
 
     public PublicDeliveryTrackingController(
         SumpoojDbContext db,
         IDeliveryTrackingService trackingService,
         DriverJourneyService journeyService,
         IDeliveryRepository deliveryRepository,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ITenantContext tenantContext)
     {
         _db = db;
         _trackingService = trackingService;
         _journeyService = journeyService;
         _deliveryRepository = deliveryRepository;
         _configuration = configuration;
+        _tenantContext = tenantContext;
     }
 
     private sealed record TokenDeliveryContext(
@@ -1129,6 +1132,7 @@ public class PublicDeliveryTrackingController : ControllerBase
     /// Get all live deliveries (for Owner Control Center)
     /// </summary>
     [HttpGet("live")]
+    [Authorize(Policy = "CompanyOnly")]
     public async Task<IActionResult> GetLiveDeliveries()
     {
         try
@@ -1147,7 +1151,8 @@ public class PublicDeliveryTrackingController : ControllerBase
                     .Where(l => l.DeliveryId == d.Id)
                     .OrderByDescending(l => l.RecordedAt)
                     .FirstOrDefault()
-                where activeStatuses.Contains(d.Status)
+                                where activeStatuses.Contains(d.Status)
+                                    && d.CompanyId == _tenantContext.CompanyId
                 select new
                 {
                     DeliveryId    = d.Id,
@@ -1189,7 +1194,10 @@ public class PublicDeliveryTrackingController : ControllerBase
     {
         try
         {
-            var delivery = await _db.Deliveries.FindAsync(request.DeliveryId);
+            var companyId = _tenantContext.CompanyId
+                ?? throw new UnauthorizedAccessException("Company context required");
+            var delivery = await _db.Deliveries
+                .FirstOrDefaultAsync(d => d.Id == request.DeliveryId && d.CompanyId == companyId);
             if (delivery == null)
             {
                 return NotFound(new { error = "Delivery not found" });

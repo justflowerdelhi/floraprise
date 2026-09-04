@@ -1,5 +1,17 @@
 namespace Sumpooj.Application.Inventory;
 
+public class InventoryStockChangeRequest
+{
+    public Guid ProductId { get; set; }
+    public string Operation { get; set; } = default!;
+    public int Quantity { get; set; }
+    public bool? Increase { get; set; }
+    public decimal? CostPerUnit { get; set; }
+    public string? Supplier { get; set; }
+    public string? Reason { get; set; }
+    public string? Notes { get; set; }
+}
+
 public class CreateBatchRequest
 {
     public Guid ProductId { get; set; }

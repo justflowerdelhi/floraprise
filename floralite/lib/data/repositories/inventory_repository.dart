@@ -6,11 +6,14 @@ import '../../models/gst_calculation_type.dart';
 
 class InventoryProductRecord {
   final int productId;
+  final String? cloudProductId;
   final String name;
   final String category;
   final String unit;
   final String sku;
   final String barcode;
+  final String? manufacturerBarcode;
+  final String? internalBarcode;
   final bool trackInventory;
   final int gstPercent;
   final GstCalculationType gstCalculationType;
@@ -19,11 +22,14 @@ class InventoryProductRecord {
 
   const InventoryProductRecord({
     required this.productId,
+    this.cloudProductId,
     required this.name,
     required this.category,
     required this.unit,
     required this.sku,
     required this.barcode,
+    this.manufacturerBarcode,
+    this.internalBarcode,
     required this.trackInventory,
     required this.gstPercent,
     required this.gstCalculationType,
@@ -34,6 +40,7 @@ class InventoryProductRecord {
 
 class InventoryTransactionRecord {
   final int id;
+  final String? cloudId;
   final int productId;
   final String txnType;
   final int qty;
@@ -43,12 +50,15 @@ class InventoryTransactionRecord {
   final String reason;
   final String note;
   final String createdAt;
+  final int? previousQty;
+  final int? balanceAfter;
   final String? productName;
   final String? category;
   final String? unit;
 
   const InventoryTransactionRecord({
     required this.id,
+    this.cloudId,
     required this.productId,
     required this.txnType,
     required this.qty,
@@ -58,6 +68,8 @@ class InventoryTransactionRecord {
     required this.reason,
     required this.note,
     required this.createdAt,
+    this.previousQty,
+    this.balanceAfter,
     this.productName,
     this.category,
     this.unit,
@@ -78,6 +90,30 @@ class InventoryRepository {
     final db = await AppDatabase.instance.database;
     await _applyTransaction(
       db: db,
+      productId: productId,
+      quantity: quantity,
+      delta: -quantity,
+      txnType: 'sale',
+      source: 'Walk-in Sale',
+      note: note,
+      orderId: orderId,
+      orderLineId: orderLineId,
+    );
+  }
+
+  Future<int> createConfirmedOrderSaleTransactionInTransaction({
+    required Transaction transaction,
+    required int productId,
+    required int orderId,
+    required int orderLineId,
+    required int quantity,
+    String? note,
+  }) async {
+    if (quantity <= 0) {
+      throw StateError('Quantity must be greater than zero');
+    }
+    return _applyTransactionInExecutor(
+      db: transaction,
       productId: productId,
       quantity: quantity,
       delta: -quantity,
@@ -423,50 +459,80 @@ class InventoryRepository {
     int? orderId,
     int? orderLineId,
   }) async {
-    final now = DateTime.now().toIso8601String();
-
     await db.transaction((txn) async {
-      final productRows = await txn.query(
+      await _applyTransactionInExecutor(
+        db: txn,
+        productId: productId,
+        quantity: quantity,
+        delta: delta,
+        txnType: txnType,
+        source: source,
+        purchasePricePaise: purchasePricePaise,
+        supplier: supplier,
+        reason: reason,
+        note: note,
+        orderId: orderId,
+        orderLineId: orderLineId,
+      );
+    });
+  }
+
+  Future<int> _applyTransactionInExecutor({
+    required DatabaseExecutor db,
+    required int productId,
+    required int quantity,
+    required int delta,
+    required String txnType,
+    required String source,
+    int? purchasePricePaise,
+    String? supplier,
+    String? reason,
+    String? note,
+    int? orderId,
+    int? orderLineId,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final productRows = await db.query(
         'products',
         columns: ['track_inventory', 'min_stock', 'deleted_at'],
         where: 'id = ?',
         whereArgs: [productId],
         limit: 1,
       );
-      if (productRows.isEmpty || productRows.first['deleted_at'] != null) {
-        throw StateError('Product not found');
-      }
+    if (productRows.isEmpty || productRows.first['deleted_at'] != null) {
+      throw StateError('Product not found');
+    }
 
       final trackInventory =
-          (productRows.first['track_inventory'] as int? ?? 0) == 1;
+        (productRows.first['track_inventory'] as int? ?? 0) == 1;
       final minStock = (productRows.first['min_stock'] as int? ?? 0);
 
-      final items = await txn.query(
+    final items = await db.query(
         'inventory_items',
         where: 'product_id = ?',
         whereArgs: [productId],
         limit: 1,
       );
 
-      int currentQty = 0;
-      if (items.isNotEmpty) {
-        currentQty = items.first['current_qty'] as int? ?? 0;
-      }
+    int currentQty = 0;
+    if (items.isNotEmpty) {
+      currentQty = items.first['current_qty'] as int? ?? 0;
+    }
 
-      final nextQty = currentQty + delta;
-      if (trackInventory && nextQty < 0) {
-        throw StateError('Stock cannot go negative');
-      }
+    final nextQty = currentQty + delta;
+    if (trackInventory && nextQty < 0) {
+      throw StateError('Stock cannot go negative');
+    }
 
-      if (items.isEmpty) {
-        await txn.insert('inventory_items', {
+    if (items.isEmpty) {
+      await db.insert('inventory_items', {
           'product_id': productId,
           'current_qty': nextQty,
           'min_qty': minStock,
           'updated_at': now,
         });
-      } else {
-        await txn.update(
+    } else {
+      await db.update(
           'inventory_items',
           {
             'current_qty': nextQty,
@@ -476,9 +542,9 @@ class InventoryRepository {
           where: 'product_id = ?',
           whereArgs: [productId],
         );
-      }
+    }
 
-      await txn.insert('inventory_transactions', {
+    return db.insert('inventory_transactions', {
         'product_id': productId,
         'order_id': orderId,
         'order_line_id': orderLineId,
@@ -490,7 +556,6 @@ class InventoryRepository {
         'reason': reason,
         'note': note,
         'created_at': now,
-      });
     });
   }
 }

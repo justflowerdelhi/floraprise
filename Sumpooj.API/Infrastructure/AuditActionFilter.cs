@@ -102,9 +102,16 @@ public class AuditActionFilter : IAsyncActionFilter
 
     private static Guid? GetUserId(ClaimsPrincipal user)
     {
-        var sub = user.FindFirstValue(JwtRegisteredClaimNames.Sub)
-                  ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(sub, out var id) ? id : null;
+        var identityUserId = user.FindFirstValue("identity_user_id");
+        if (Guid.TryParse(identityUserId, out var resolvedIdentityUserId))
+            return resolvedIdentityUserId;
+
+        if (user.HasClaim("client_type", "mobile") || user.HasClaim(claim => claim.Type == "mobile_user_id"))
+            return null;
+
+        var legacyUserId = user.FindFirstValue(JwtRegisteredClaimNames.Sub)
+            ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(legacyUserId, out var resolvedLegacyUserId) ? resolvedLegacyUserId : null;
     }
 
     /// <summary>

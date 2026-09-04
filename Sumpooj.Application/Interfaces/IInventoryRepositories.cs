@@ -34,6 +34,10 @@ public interface IInventoryAdjustmentRepository
 {
     Task<InventoryAdjustment?> GetByIdAsync(Guid id);
     Task AddAsync(InventoryAdjustment adjustment);
+    Task ApplyStockChangeAsync(
+        Product product,
+        InventoryAdjustment adjustment,
+        InventoryLedger ledger);
 
     Task<(List<InventoryAdjustment> Items, int TotalCount)> SearchAsync(
         Guid? productId,

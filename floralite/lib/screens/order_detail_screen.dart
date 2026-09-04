@@ -1148,7 +1148,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     try {
       final snapshot =
           await _deliveryTrackingService.getTrackingForLocalOrder(orderId);
-      final link = snapshot.trackingLink.trim();
+      final link = (await _deliveryTrackingService.generateTrackingLinks(
+        snapshot.assignmentId.toString(),
+      )).customerLink.trim();
       if (link.isEmpty) {
         messenger.showSnackBar(
           const SnackBar(content: Text('Tracking link is not available yet.')),

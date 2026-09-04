@@ -23,6 +23,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
     return digits.length >= 10;
   }
 
+  String _displayCustomerId(Object? id) {
+    final value = id?.toString() ?? '';
+    if (value.isEmpty) return '---';
+    return value.length <= 8 ? value.toUpperCase() : value.substring(0, 8).toUpperCase();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -230,7 +236,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                                 BorderRadius.circular(8),
                                           ),
                                           child: Text(
-                                            'C-${(customer['id'] as int).toString().padLeft(3, '0')}',
+                                            'C-${_displayCustomerId(customer['id'])}',
                                             style: TextStyle(
                                               color: colorScheme.primary,
                                               fontSize: 10,
@@ -517,7 +523,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(l10n.addCustomer),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -560,7 +566,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(l10n.cancel),
           ),
           FilledButton(
@@ -589,7 +595,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       );
 
               if (context.mounted) {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(l10n.customerAddedSuccessfully)),
@@ -618,7 +624,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(l10n.editCustomer),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -647,7 +653,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(l10n.cancel),
           ),
           FilledButton(
@@ -669,26 +675,36 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 return;
               }
 
-              final success =
-                  await context.read<CustomerProvider>().updateCustomer(
-                        id: customer['id'] as int,
-                        phone: phone,
-                        name: name,
-                      );
+              final provider = context.read<CustomerProvider>();
+              final messenger = ScaffoldMessenger.of(context);
 
-              if (context.mounted) {
-                Navigator.pop(context);
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.customerUpdatedSuccessfully)),
-                  );
-                } else {
-                  final error = context.read<CustomerProvider>().error;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text(error ?? l10n.failedToUpdateCustomer)),
-                  );
-                }
+              final success = await provider.updateCustomer(
+                id: customer['id'],
+                phone: phone,
+                name: name,
+              );
+
+              if (!dialogContext.mounted) return;
+
+              if (success) {
+                // Close the edit dialog after successful save.
+                Navigator.of(dialogContext).pop();
+
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.customerUpdatedSuccessfully),
+                  ),
+                );
+              } else {
+                final error = provider.error;
+
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      error ?? l10n.failedToUpdateCustomer,
+                    ),
+                  ),
+                );
               }
             },
             child: Text(l10n.save),
@@ -703,23 +719,23 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(l10n.deleteCustomer),
         content: Text('${l10n.deleteCustomerConfirm} ${customer['name']}?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () async {
               final success =
                   await context.read<CustomerProvider>().deleteCustomer(
-                        customer['id'] as int,
+                        customer['id'],
                       );
 
               if (context.mounted) {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(l10n.customerDeletedSuccessfully)),

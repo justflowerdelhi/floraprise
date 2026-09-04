@@ -175,7 +175,7 @@ public sealed class MobileClientService : IMobileClientService
 
         _logger.LogInformation("[Mobile Login] Generating access token");
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(GetAccessTokenExpiryMinutes());
-        var accessToken = GenerateAccessToken(companyId, registration.MobileUserId, request.DeviceId, expiresAtUtc);
+        var accessToken = GenerateAccessToken(companyId, registration.MobileUserId, identityUser.Id, request.DeviceId, expiresAtUtc);
         
         _logger.LogInformation("[Mobile Login] Loading bootstrap data");
         var bootstrap = await GetBootstrapAsync(companyId, registration.MobileUserId, request.DeviceId, cancellationToken);
@@ -218,7 +218,7 @@ public sealed class MobileClientService : IMobileClientService
         await _uow.SaveChangesAsync(cancellationToken);
 
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(GetAccessTokenExpiryMinutes());
-        var accessToken = GenerateAccessToken(existing.CompanyId, device.MobileUserId, device.DeviceId, expiresAtUtc);
+        var accessToken = GenerateAccessToken(existing.CompanyId, device.MobileUserId, device.LegacyUserId, device.DeviceId, expiresAtUtc);
         var bootstrap = await GetBootstrapAsync(existing.CompanyId, device.MobileUserId, device.DeviceId, cancellationToken);
 
         return new MobileAuthTokenResponse(
@@ -1013,7 +1013,7 @@ public sealed class MobileClientService : IMobileClientService
             AllowsAccess: result.AllowsAccess);
     }
 
-    private string GenerateAccessToken(Guid companyId, Guid mobileUserId, string deviceId, DateTime expiresAtUtc)
+    private string GenerateAccessToken(Guid companyId, Guid mobileUserId, Guid identityUserId, string deviceId, DateTime expiresAtUtc)
     {
         var jwtKey = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key is missing.");
         var jwtIssuer = _configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("JWT Issuer is missing.");
@@ -1024,6 +1024,7 @@ public sealed class MobileClientService : IMobileClientService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
             new("company_id", companyId.ToString()),
             new("mobile_user_id", mobileUserId.ToString()),
+            new("identity_user_id", identityUserId.ToString()),
             new("device_id", deviceId),
             new("client_type", "mobile")
         };

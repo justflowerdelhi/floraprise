@@ -9,7 +9,7 @@ namespace Sumpooj.API.Controllers;
 
 [Route("api/delivery/control-center")]
 [ApiController]
-[Authorize(Policy = "PlatformSupport")]
+[Authorize(Policy = "CompanyOnly")]
 public class DeliveryControlCenterController : ControllerBase
 {
     private readonly SumpoojDbContext _db;
@@ -158,6 +158,7 @@ public class DeliveryControlCenterController : ControllerBase
         var drivers = await _db.DeliveryRoutes
             .Where(r => r.RouteDate.Date == date.Date && r.Status == DeliveryRouteStatus.InProgress)
             .Join(_db.Staff, r => r.DeliveryPersonId, s => s.Id, (r, s) => new { r, s })
+            .Where(x => !CompanyId.HasValue || x.s.CompanyId == CompanyId.Value)
             .Select(x => new OnlineDriverDto
             {
                 DriverId = x.r.DeliveryPersonId,

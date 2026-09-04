@@ -70,7 +70,8 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateOrderRequest request)
     {
         var id = await _orderService.CreateAsync(CompanyId, request);
-        return CreatedAtAction(nameof(GetById), new { id }, new { id });
+        var order = await _orderService.GetByIdAsync(CompanyId, id);
+        return CreatedAtAction(nameof(GetById), new { id }, order);
     }
 
     [HttpPatch("{id:guid}/status")]

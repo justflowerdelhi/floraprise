@@ -34,9 +34,20 @@ public class Customer : BaseEntity
 
     // CRM – internal notes
     public string? Notes { get; private set; }
+    public string? BirthdayMonthDay { get; private set; }
+    public string? AnniversaryMonthDay { get; private set; }
+    public string? CompanyName { get; private set; }
+    public string? Department { get; private set; }
+    public DateTime? LastOrderAtUtc { get; private set; }
+    public decimal PendingPaymentAmount { get; private set; }
+    public int RewardPoints { get; private set; }
+    public int LifetimeRewardPoints { get; private set; }
+    public int RedeemedRewardPoints { get; private set; }
+    public DateTime? LastRewardActivityAtUtc { get; private set; }
 
-    public void UpdateContact(string? email, string? phone)
+    public void UpdateContact(string? email, string? phone, string name)
     {
+        Name = name;
         Email = email;
         Phone = phone;
         MarkUpdated();
@@ -53,6 +64,29 @@ public class Customer : BaseEntity
         Notes = notes;
         MarkUpdated();
     }
+
+    public void UpdateMobileCrm(string? birthdayMonthDay, string? anniversaryMonthDay, string? companyName,
+        string? department, string? notes, int totalOrders, DateTime? lastOrderAtUtc, decimal pendingPaymentAmount,
+        int rewardPoints, int lifetimeRewardPoints, int redeemedRewardPoints, DateTime? lastRewardActivityAtUtc)
+    {
+        if (totalOrders < 0 || pendingPaymentAmount < 0 || rewardPoints < 0 || lifetimeRewardPoints < 0 || redeemedRewardPoints < 0)
+            throw new ArgumentOutOfRangeException(nameof(totalOrders), "Customer balances and counts cannot be negative.");
+        BirthdayMonthDay = NormalizeMonthDay(birthdayMonthDay); AnniversaryMonthDay = NormalizeMonthDay(anniversaryMonthDay);
+        CompanyName = NullIfWhiteSpace(companyName); Department = NullIfWhiteSpace(department); Notes = NullIfWhiteSpace(notes);
+        TotalOrders = totalOrders; LastOrderAtUtc = EnsureUtc(lastOrderAtUtc); PendingPaymentAmount = pendingPaymentAmount;
+        RewardPoints = rewardPoints; LifetimeRewardPoints = lifetimeRewardPoints; RedeemedRewardPoints = redeemedRewardPoints;
+        LastRewardActivityAtUtc = EnsureUtc(lastRewardActivityAtUtc); MarkUpdated();
+    }
+
+    private static string? NormalizeMonthDay(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var trimmed = value.Trim();
+        if (trimmed.Length != 5 || trimmed[2] != '-' || !int.TryParse(trimmed[..2], out var month) || !int.TryParse(trimmed[3..], out var day) || month is < 1 or > 12 || day is < 1 or > 31)
+            throw new InvalidOperationException("Birthday and anniversary must use MM-dd.");
+        return trimmed;
+    }
+    private static string? NullIfWhiteSpace(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     // Feature #13 – Soft hide, NOT delete
     public void MarkInactive()

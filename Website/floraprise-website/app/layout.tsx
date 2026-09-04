@@ -2,11 +2,10 @@
 import "./globals.css";
 import Header from "../components/Navbar";
 import Footer from "../components/Footer";
-import { Toaster } from "react-hot-toast";
 
 export const metadata = {
-title: "Floraprise",
-description: "Floraprise Florist POS & ERP Platform",
+title: "Floraprise | The Digital Platform for Florist Businesses",
+description: "Floraprise brings florist business management, mobile access and AI-powered customer assistance together in one platform.",
 };
 
 export default function RootLayout({
@@ -16,11 +15,10 @@ children: React.ReactNode;
 }) {
   return (
     <html lang="en">
-      <body className="antialiased bg-white text-gray-900">
+      <body>
         <Header />
         {children}
         <Footer />
-        <Toaster position="top-right" />
       </body>
     </html>
   );

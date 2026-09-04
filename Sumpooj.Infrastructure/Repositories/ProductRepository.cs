@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using System.Data;
+using Sumpooj.Application.Common;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Domain.Entities;
 using Sumpooj.Infrastructure.Persistence;
@@ -32,6 +33,25 @@ public class ProductRepository : IProductRepository
     {
         _db.Products.Add(product);
         await _db.SaveChangesAsync();
+    }
+
+    public async Task AddAsync(Product product, IEnumerable<Barcode> barcodes)
+    {
+        _db.Products.Add(product);
+        foreach (var barcode in barcodes)
+        {
+            _db.Barcodes.Add(barcode);
+        }
+        try
+        {
+            // Single SaveChanges: EF Core wraps all pending inserts (product +
+            // barcodes) in one transaction, so either both persist or neither does.
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            throw new ConcurrencyConflictException("A barcode value collided with an existing one.", ex);
+        }
     }
 
     public async Task UpdateAsync(Product product)

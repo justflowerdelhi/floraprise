@@ -10,6 +10,8 @@ import 'bouquet_builder_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/printer_provider.dart';
 import '../providers/product_provider.dart';
+import '../providers/storage_mode_provider.dart';
+import 'cloud_products_screen.dart';
 import '../services/speech_recognition_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
@@ -62,6 +64,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (context.watch<StorageModeProvider?>()?.isCloud ?? false) {
+      return const CloudProductsScreen();
+    }
+
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final l10n = AppLocalizations.of(context)!;
     final provider = context.watch<ProductProvider>();

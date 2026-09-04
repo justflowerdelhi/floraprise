@@ -29,7 +29,7 @@ public class BarcodesController : ControllerBase
     /// </summary>
     [HttpPost("generate")]
     public async Task<ActionResult<GenerateBarcodeResponse>> Generate([FromBody] GenerateBarcodeRequest request)
-        => Ok(await _service.GenerateAsync(request));
+        => Ok(await _service.GenerateAsync(CompanyId, request));
 
     /// <summary>
     /// POST /api/barcodes/validate
@@ -44,4 +44,20 @@ public class BarcodesController : ControllerBase
     [HttpPost("search")]
     public async Task<ActionResult<SearchBarcodeResponse>> Search([FromBody] SearchBarcodeRequest request)
         => Ok(await _service.SearchAsync(CompanyId, request));
+
+    /// <summary>
+    /// GET /api/barcodes/product/{productId}
+    /// Returns all persisted barcodes (Manufacturer + Internal) for a product.
+    /// </summary>
+    [HttpGet("product/{productId:guid}")]
+    public async Task<ActionResult<ProductBarcodesResponse>> GetForProduct(Guid productId)
+    {
+        var barcodes = await _service.GetProductBarcodesAsync(CompanyId, productId);
+        return Ok(new ProductBarcodesResponse
+        {
+            ProductId = productId,
+            ManufacturerBarcode = barcodes.FirstOrDefault(b => b.Type == Sumpooj.Domain.Entities.BarcodeType.Manufacturer)?.Value,
+            InternalBarcode = barcodes.FirstOrDefault(b => b.Type == Sumpooj.Domain.Entities.BarcodeType.Internal)?.Value
+        });
+    }
 }

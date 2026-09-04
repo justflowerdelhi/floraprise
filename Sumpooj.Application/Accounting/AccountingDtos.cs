@@ -26,8 +26,10 @@ public class UpdateAccountRequest
 public class ExpenseDto
 {
     public Guid Id { get; set; }
+    public Guid? CategoryId { get; set; }
     public string Category { get; set; } = default!;
     public decimal Amount { get; set; }
+    public string PaymentMode { get; set; } = "Cash";
     public string? Description { get; set; }
     public string ExpenseDate { get; set; } = default!;
     public bool IsActive { get; set; }
@@ -35,17 +37,77 @@ public class ExpenseDto
 
 public class CreateExpenseRequest
 {
+    public Guid? CategoryId { get; set; }
     public string Category { get; set; } = default!;
     public decimal Amount { get; set; }
+    public string PaymentMode { get; set; } = "Cash";
     public string? Description { get; set; }
     public string? ExpenseDate { get; set; }
 }
 
 public class UpdateExpenseRequest
 {
+    public Guid? CategoryId { get; set; }
     public string Category { get; set; } = default!;
     public decimal Amount { get; set; }
+    public string PaymentMode { get; set; } = "Cash";
     public string? Description { get; set; }
+}
+
+public class ExpenseCategoryDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = default!;
+    public string Emoji { get; set; } = string.Empty;
+    public string GroupName { get; set; } = default!;
+    public bool Active { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime? UpdatedAtUtc { get; set; }
+}
+
+public class SaveExpenseCategoryRequest
+{
+    public string Name { get; set; } = default!;
+    public string Emoji { get; set; } = string.Empty;
+    public string GroupName { get; set; } = default!;
+}
+
+public class OpeningCashDto
+{
+    public Guid Id { get; set; }
+    public string Date { get; set; } = default!;
+    public decimal Amount { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime? UpdatedAtUtc { get; set; }
+}
+
+public class SaveOpeningCashRequest
+{
+    public DateTime Date { get; set; }
+    public decimal Amount { get; set; }
+}
+
+public class CashBookEntryDto
+{
+    public Guid Id { get; set; }
+    public string Date { get; set; } = default!;
+    public string TransactionType { get; set; } = default!;
+    public string Description { get; set; } = default!;
+    public decimal Amount { get; set; }
+    public decimal CashIn { get; set; }
+    public decimal CashOut { get; set; }
+    public decimal RunningBalance { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+}
+
+public class CreateCashBookEntryRequest
+{
+    public DateTime Date { get; set; }
+    public string TransactionType { get; set; } = default!;
+    public string Description { get; set; } = default!;
+    public decimal Amount { get; set; }
+    public decimal CashIn { get; set; }
+    public decimal CashOut { get; set; }
 }
 
 public class JournalEntryDto
