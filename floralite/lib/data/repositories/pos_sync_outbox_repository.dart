@@ -3,25 +3,32 @@ import 'dart:math';
 
 import 'package:sqflite/sqflite.dart';
 
+import '../database/app_database.dart';
+
 class PosSyncOutboxRecord {
   const PosSyncOutboxRecord({
     required this.id,
     required this.clientSyncId,
     required this.localOrderId,
     required this.payload,
+    required this.payloadJson,
     required this.state,
+    required this.attemptCount,
   });
 
   final int id;
   final String clientSyncId;
   final int localOrderId;
   final Map<String, dynamic> payload;
+  final String payloadJson;
   final String state;
+  final int attemptCount;
 }
 
 class PosSyncOutboxRepository {
   static const operationTypeCompletedSale = 'completed_pos_sale';
   static const statePending = 'pending';
+  static const stateCompleted = 'completed';
 
   String newClientSyncId() {
     final random = Random.secure();
@@ -54,12 +61,86 @@ class PosSyncOutboxRepository {
 
   Future<List<PosSyncOutboxRecord>> listPending(DatabaseExecutor db) async {
     final rows = await db.query('pos_sync_outbox', where: 'state = ?', whereArgs: [statePending]);
-    return rows.map((row) => PosSyncOutboxRecord(
+    return rows.map(_recordFromRow).toList();
+  }
+
+  Future<List<PosSyncOutboxRecord>> listRetryable(DatabaseExecutor db) async {
+    final now = DateTime.now().toIso8601String();
+    final rows = await db.query(
+      'pos_sync_outbox',
+      where: "state = ? AND (next_attempt_at IS NULL OR next_attempt_at <= ?)",
+      whereArgs: [statePending, now],
+      orderBy: 'created_at ASC, id ASC',
+    );
+    return rows.map(_recordFromRow).toList();
+  }
+
+  Future<void> markCompleted({
+    required int id,
+    required String cloudOrderId,
+    String? cloudCustomerId,
+  }) async {
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      'pos_sync_outbox',
+      {
+        'state': stateCompleted,
+        'cloud_order_id': cloudOrderId,
+        'cloud_customer_id': cloudCustomerId,
+        'completed_at': now,
+        'last_attempt_at': now,
+        'last_error': null,
+        'next_attempt_at': null,
+        'updated_at': now,
+      },
+      where: 'id = ? AND state <> ?',
+      whereArgs: [id, stateCompleted],
+    );
+  }
+
+  Future<void> markRetryableFailure({
+    required int id,
+    required int previousAttemptCount,
+    required Object error,
+  }) async {
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+    final attemptCount = previousAttemptCount + 1;
+    final delayMinutes = attemptCount.clamp(1, 30);
+    await db.update(
+      'pos_sync_outbox',
+      {
+        'state': statePending,
+        'attempt_count': attemptCount,
+        'last_attempt_at': now,
+        'next_attempt_at': DateTime.now()
+            .add(Duration(minutes: delayMinutes))
+            .toIso8601String(),
+        'last_error': error.toString(),
+        'updated_at': now,
+      },
+      where: 'id = ? AND state = ?',
+      whereArgs: [id, statePending],
+    );
+  }
+
+  PosSyncOutboxRecord _recordFromRow(Map<String, Object?> row) {
+    final payloadJson = row['payload_json'] as String;
+    Map<String, dynamic> payload;
+    try {
+      payload = (jsonDecode(payloadJson) as Map).cast<String, dynamic>();
+    } catch (_) {
+      payload = const {};
+    }
+    return PosSyncOutboxRecord(
       id: row['id'] as int,
       clientSyncId: row['client_sync_id'] as String,
       localOrderId: row['local_order_id'] as int,
-      payload: (jsonDecode(row['payload_json'] as String) as Map).cast<String, dynamic>(),
+      payload: payload,
+      payloadJson: payloadJson,
       state: row['state'] as String,
-    )).toList();
+      attemptCount: row['attempt_count'] as int? ?? 0,
+    );
   }
 }

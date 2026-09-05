@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../database/app_database.dart';
 import '../../models/gst_calculation_type.dart';
 import '../../services/barcode_service.dart';
@@ -29,6 +31,8 @@ class ProductRecord {
   final bool active;
   final bool favorite;
   final String? imagePath;
+  final String? cloudProductId;
+  final String? cloudProductCompanyId;
   final String? deletedAt;
   final String createdAt;
   final String updatedAt;
@@ -52,6 +56,8 @@ class ProductRecord {
     required this.active,
     required this.favorite,
     this.imagePath,
+    this.cloudProductId,
+    this.cloudProductCompanyId,
     required this.deletedAt,
     required this.createdAt,
     required this.updatedAt,
@@ -155,6 +161,22 @@ class ProductInventoryRecord {
     required this.favorite,
     required this.currentQty,
     required this.minQty,
+  });
+}
+
+class CloudProductLocalUpsertResult {
+  final int localProductId;
+  final bool created;
+  final bool updated;
+  final bool stockInitialized;
+  final bool skipped;
+
+  const CloudProductLocalUpsertResult({
+    required this.localProductId,
+    required this.created,
+    required this.updated,
+    required this.stockInitialized,
+    required this.skipped,
   });
 }
 
@@ -478,6 +500,180 @@ class ProductRepository {
     );
   }
 
+  Future<String?> getCloudProductId(int localProductId) async {
+    final mapping = await getCloudProductMapping(localProductId);
+    return mapping?.cloudProductId;
+  }
+
+  Future<ProductCloudMapping?> getCloudProductMapping(int localProductId) async {
+    final db = await AppDatabase.instance.database;
+    final rows = await db.query(
+      'products',
+      columns: ['cloud_product_id', 'cloud_product_company_id'],
+      where: 'id = ? AND deleted_at IS NULL',
+      whereArgs: [localProductId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final cloudProductId = (rows.first['cloud_product_id'] as String?)?.trim();
+    final companyId =
+        (rows.first['cloud_product_company_id'] as String?)?.trim();
+    if (cloudProductId == null || cloudProductId.isEmpty) return null;
+    return ProductCloudMapping(
+      cloudProductId: cloudProductId,
+      cloudProductCompanyId:
+          companyId == null || companyId.isEmpty ? null : companyId,
+    );
+  }
+
+  Future<void> setCloudProductId(
+    int localProductId,
+    String cloudProductId,
+    String cloudProductCompanyId,
+  ) async {
+    final normalized = _validateCloudProductId(cloudProductId);
+    final normalizedCompanyId = _validateCloudProductId(cloudProductCompanyId);
+    final db = await AppDatabase.instance.database;
+    final count = await db.update(
+      'products',
+      {
+        'cloud_product_id': normalized,
+        'cloud_product_company_id': normalizedCompanyId,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ? AND deleted_at IS NULL',
+      whereArgs: [localProductId],
+    );
+    if (count == 0) {
+      throw StateError('Local product was not found.');
+    }
+  }
+
+  Future<void> clearCloudProductId(int localProductId) async {
+    final db = await AppDatabase.instance.database;
+    final count = await db.update(
+      'products',
+      {
+        'cloud_product_id': null,
+        'cloud_product_company_id': null,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ? AND deleted_at IS NULL',
+      whereArgs: [localProductId],
+    );
+    if (count == 0) {
+      throw StateError('Local product was not found.');
+    }
+  }
+
+  Future<CloudProductLocalUpsertResult> upsertCloudImportedProduct({
+    required ProductUpsertInput input,
+    required String cloudProductId,
+    required String cloudProductCompanyId,
+    bool updateExisting = true,
+    int? initialCurrentQty,
+    int? initialMinQty,
+  }) async {
+    _validateInput(input);
+    final normalizedProductId = _validateCloudProductId(cloudProductId);
+    final normalizedCompanyId = _validateCloudProductId(cloudProductCompanyId);
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+
+    return db.transaction<CloudProductLocalUpsertResult>((txn) async {
+      final existing = await txn.query(
+        'products',
+        columns: ['id'],
+        where: 'cloud_product_id = ?',
+        whereArgs: [normalizedProductId],
+        limit: 1,
+      );
+
+      if (existing.isNotEmpty) {
+        final id = existing.first['id'] as int;
+        if (!updateExisting) {
+          return CloudProductLocalUpsertResult(
+            localProductId: id,
+            created: false,
+            updated: false,
+            stockInitialized: false,
+            skipped: true,
+          );
+        }
+
+        await txn.update(
+          'products',
+          {
+            ..._productRowFromInput(input, now: now, includeCreatedAt: false),
+            'cloud_product_id': normalizedProductId,
+            'cloud_product_company_id': normalizedCompanyId,
+          },
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+
+        final stockInitialized = await _syncInventoryRow(
+          db: txn,
+          productId: id,
+          trackInventory: input.trackInventory,
+          minStock: initialMinQty ?? input.minStock,
+          initialCurrentQty: initialCurrentQty,
+        );
+
+        return CloudProductLocalUpsertResult(
+          localProductId: id,
+          created: false,
+          updated: true,
+          stockInitialized: stockInitialized,
+          skipped: false,
+        );
+      }
+
+      final id = await txn.insert('products', {
+        ..._productRowFromInput(input, now: now, includeCreatedAt: true),
+        'cloud_product_id': normalizedProductId,
+        'cloud_product_company_id': normalizedCompanyId,
+        'deleted_at': null,
+      });
+
+      await _barcodeService.generateInternalBarcodeForProductInDb(txn, id);
+      final stockInitialized = await _syncInventoryRow(
+        db: txn,
+        productId: id,
+        trackInventory: input.trackInventory,
+        minStock: initialMinQty ?? input.minStock,
+        initialCurrentQty: initialCurrentQty,
+      );
+
+      return CloudProductLocalUpsertResult(
+        localProductId: id,
+        created: true,
+        updated: false,
+        stockInitialized: stockInitialized,
+        skipped: false,
+      );
+    });
+  }
+
+  Future<bool> hasProtectedPosSyncOutboxReference(int localProductId) async {
+    final db = await AppDatabase.instance.database;
+    final rows = await db.query(
+      'pos_sync_outbox',
+      columns: ['payload_json'],
+      where: "state IN ('pending', 'syncing')",
+    );
+
+    for (final row in rows) {
+      final payloadText = row['payload_json'] as String?;
+      if (payloadText == null || payloadText.trim().isEmpty) continue;
+      final decoded = jsonDecode(payloadText);
+      if (_payloadReferencesLocalProduct(decoded, localProductId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<List<ProductInventoryRecord>> listActiveProductsWithInventory() async {
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery('''
@@ -727,10 +923,83 @@ class ProductRepository {
       active: (row['active'] as int? ?? 1) == 1,
       favorite: (row['is_favorite'] as int? ?? 0) == 1,
       imagePath: (row['image_path'] as String?)?.trim(),
+      cloudProductId: (row['cloud_product_id'] as String?)?.trim(),
+      cloudProductCompanyId:
+          (row['cloud_product_company_id'] as String?)?.trim(),
       deletedAt: row['deleted_at'] as String?,
       createdAt: (row['created_at'] as String?) ?? '',
       updatedAt: (row['updated_at'] as String?) ?? '',
     );
+  }
+
+  String _validateCloudProductId(String value) {
+    final trimmed = value.trim();
+    final parsed = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+    );
+    if (!parsed.hasMatch(trimmed)) {
+      throw ArgumentError('Cloud product ID must be a valid UUID.');
+    }
+    return trimmed.toLowerCase();
+  }
+
+  Map<String, Object?> _productRowFromInput(
+    ProductUpsertInput input, {
+    required String now,
+    required bool includeCreatedAt,
+  }) {
+    return {
+      'code': input.sku.trim().isEmpty ? null : input.sku.trim(),
+      'name': input.name.trim(),
+      'category': _categoryOrDefault(input.category.trim()),
+      'default_unit': _unitOrDefault(input.defaultUnit.trim()),
+      'selling_price_paise': input.sellingPricePaise,
+      'purchase_price_paise': input.purchasePricePaise,
+      'gst_percent': input.gstPercent,
+      'gst_calculation_type': input.gstCalculationType.storageValue,
+      'sku': input.sku.trim().isEmpty ? null : input.sku.trim(),
+      'barcode': input.manufacturerBarcode.trim().isEmpty
+          ? null
+          : input.manufacturerBarcode.trim(),
+      'manufacturer_barcode': input.manufacturerBarcode.trim().isEmpty
+          ? null
+          : input.manufacturerBarcode.trim(),
+      'floraprise_barcode': input.florapriseBarcode.trim().isEmpty
+          ? null
+          : input.florapriseBarcode.trim(),
+      'track_inventory': input.trackInventory ? 1 : 0,
+      'min_stock': input.trackInventory ? input.minStock : 0,
+      'supplier': input.supplier.trim().isEmpty ? null : input.supplier.trim(),
+      'notes': input.notes.trim().isEmpty ? null : input.notes.trim(),
+      'is_favorite': input.favorite ? 1 : 0,
+      'active': input.active ? 1 : 0,
+      if (includeCreatedAt) 'created_at': now,
+      'updated_at': now,
+    };
+  }
+
+  bool _payloadReferencesLocalProduct(Object? value, int localProductId) {
+    if (value is List) {
+      return value.any((item) => _payloadReferencesLocalProduct(
+            item,
+            localProductId,
+          ));
+    }
+    if (value is Map) {
+      final productId = value['product_id'] ?? value['productId'];
+      if (_matchesLocalProductId(productId, localProductId)) return true;
+      return value.values.any((item) => _payloadReferencesLocalProduct(
+            item,
+            localProductId,
+          ));
+    }
+    return false;
+  }
+
+  bool _matchesLocalProductId(Object? value, int localProductId) {
+    if (value is int) return value == localProductId;
+    if (value is String) return int.tryParse(value.trim()) == localProductId;
+    return false;
   }
 
   void _validateInput(ProductUpsertInput input) {
@@ -751,11 +1020,12 @@ class ProductRepository {
     }
   }
 
-  Future<void> _syncInventoryRow({
+  Future<bool> _syncInventoryRow({
     required dynamic db,
     required int productId,
     required bool trackInventory,
     required int minStock,
+    int? initialCurrentQty,
   }) async {
     final rows = await db.query(
       'inventory_items',
@@ -769,11 +1039,11 @@ class ProductRepository {
     if (rows.isEmpty) {
       await db.insert('inventory_items', {
         'product_id': productId,
-        'current_qty': 0,
+        'current_qty': initialCurrentQty ?? 0,
         'min_qty': trackInventory ? minStock : 0,
         'updated_at': now,
       });
-      return;
+      return true;
     }
 
     await db.update(
@@ -785,6 +1055,7 @@ class ProductRepository {
       where: 'product_id = ?',
       whereArgs: [productId],
     );
+    return false;
   }
 
   Future<void> _insertLookupAudit(String query, int? productId) async {
@@ -795,4 +1066,14 @@ class ProductRepository {
       'requested_at': DateTime.now().toIso8601String(),
     });
   }
+}
+
+class ProductCloudMapping {
+  const ProductCloudMapping({
+    required this.cloudProductId,
+    required this.cloudProductCompanyId,
+  });
+
+  final String cloudProductId;
+  final String? cloudProductCompanyId;
 }

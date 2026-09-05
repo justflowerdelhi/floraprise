@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../data/repositories/cloud_product_repository.dart';
 import '../providers/cloud_product_provider.dart';
+import '../services/cloud_product_local_catalog_sync_service.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
 
 class CloudProductsScreen extends StatefulWidget {
@@ -14,6 +15,9 @@ class CloudProductsScreen extends StatefulWidget {
 
 class _CloudProductsScreenState extends State<CloudProductsScreen> {
   final _searchController = TextEditingController();
+  final CloudProductLocalCatalogSyncService _catalogSyncService =
+      CloudProductLocalCatalogSyncService();
+  bool _isSyncingPosCatalog = false;
 
   @override
   void initState() {
@@ -63,6 +67,17 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
       appBar: AppBar(
         title: const Text('Cloud Products'),
         actions: [
+          IconButton(
+            tooltip: 'Sync Cloud Products to POS Catalog',
+            onPressed: _isSyncingPosCatalog ? null : _syncPosCatalog,
+            icon: _isSyncingPosCatalog
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync_alt_rounded),
+          ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: provider.isLoading ? null : provider.load,
@@ -137,6 +152,31 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _syncPosCatalog() async {
+    setState(() => _isSyncingPosCatalog = true);
+    try {
+      final result = await _catalogSyncService.syncForCurrentCompany();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.summary)),
+      );
+      if (result.skippedCount > 0 && result.errors.isNotEmpty) {
+        final preview = result.errors.take(3).join('\n');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(preview)),
+        );
+      }
+      await context.read<CloudProductProvider>().load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not sync POS catalog: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSyncingPosCatalog = false);
+    }
   }
 }
 

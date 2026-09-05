@@ -8,6 +8,7 @@ import '../../models/walk_in_line_item.dart';
 import '../../models/walk_in_session.dart';
 import '../database/app_database.dart';
 import '../../managers/reward_manager.dart';
+import '../../services/product_cloud_syncability_service.dart';
 import 'inventory_repository.dart';
 import 'pos_sync_outbox_repository.dart';
 
@@ -105,6 +106,13 @@ class CustomerOrderStatistics {
 }
 
 class OrderRepository {
+  OrderRepository({
+    ProductCloudSyncabilityService? productCloudSyncabilityService,
+  }) : _productCloudSyncabilityService =
+            productCloudSyncabilityService ?? ProductCloudSyncabilityService();
+
+  final ProductCloudSyncabilityService _productCloudSyncabilityService;
+
   static const List<String> customerStatisticsStatuses = [
     'confirmed',
     'preparing',
@@ -504,6 +512,35 @@ class OrderRepository {
       if (order['status'] != 'draft') {
         throw StateError('Only draft orders can be confirmed');
       }
+      final lines = await txn.query(
+        'order_lines',
+        columns: ['id', 'product_id', 'qty'],
+        where: 'order_id = ?',
+        whereArgs: [orderId],
+      );
+
+      final lineProductLinks = <Map<String, int>>[];
+      final cloudProductIdsByLocalProductId = <int, String>{};
+      for (final line in lines) {
+        final productId = line['product_id'] as int?;
+        if (productId == null) {
+          continue;
+        }
+        final mapping = await _productCloudSyncabilityService.evaluate(
+          localProductId: productId,
+          db: txn,
+        );
+        if (!mapping.isSyncable || mapping.cloudProductId == null) {
+          throw StateError('Product is not linked to Cloud inventory.');
+        }
+        cloudProductIdsByLocalProductId[productId] = mapping.cloudProductId!;
+        lineProductLinks.add({
+          'orderLineId': line['id'] as int,
+          'productId': productId,
+          'qty': line['qty'] as int,
+        });
+      }
+
       final customerId = order['customer_id'] as int?;
       final isPaid = ((order['is_paid'] as int?) ?? 0) == 1;
       final redeemedPoints = (order['reward_points_redeemed'] as int?) ?? 0;
@@ -572,26 +609,6 @@ class OrderRepository {
         'created_by': 'walkInManager',
       });
 
-      final lines = await txn.query(
-        'order_lines',
-        columns: ['id', 'product_id', 'qty'],
-        where: 'order_id = ?',
-        whereArgs: [orderId],
-      );
-
-      final lineProductLinks = <Map<String, int>>[];
-      for (final line in lines) {
-        final productId = line['product_id'] as int?;
-        if (productId == null) {
-          continue;
-        }
-        lineProductLinks.add({
-          'orderLineId': line['id'] as int,
-          'productId': productId,
-          'qty': line['qty'] as int,
-        });
-      }
-
       final inventoryTransactionIds = <int>[];
       for (final link in lineProductLinks) {
         inventoryTransactionIds.add(
@@ -606,11 +623,18 @@ class OrderRepository {
         );
       }
 
+      await _validateInventoryTransactionMappings(
+        txn: txn,
+        inventoryTransactionIds: inventoryTransactionIds,
+        cloudProductIdsByLocalProductId: cloudProductIdsByLocalProductId,
+      );
+
       final snapshot = await _buildCompletedSaleSnapshot(
         txn: txn,
         orderId: orderId,
         clientSyncId: outboxRepository.newClientSyncId(),
         inventoryTransactionIds: inventoryTransactionIds,
+        cloudProductIdsByLocalProductId: cloudProductIdsByLocalProductId,
       );
       await outboxRepository.enqueueInTransaction(
         transaction: txn,
@@ -630,6 +654,7 @@ class OrderRepository {
     required int orderId,
     required String clientSyncId,
     required List<int> inventoryTransactionIds,
+    required Map<int, String> cloudProductIdsByLocalProductId,
   }) async {
     final orderRows = await txn.rawQuery('''
       SELECT o.*, c.phone AS customer_phone_master, c.name AS customer_name_master,
@@ -649,14 +674,59 @@ class OrderRepository {
             where: 'id IN (${List.filled(inventoryTransactionIds.length, '?').join(', ')})',
             whereArgs: inventoryTransactionIds,
           );
+    final snapshotLines = lines.map((row) {
+      final line = Map<String, dynamic>.from(row);
+      final productId = line['product_id'] as int?;
+      if (productId != null) {
+        line['localProductId'] = productId;
+        line['cloudProductId'] = cloudProductIdsByLocalProductId[productId];
+      }
+      return line;
+    }).toList();
+    final snapshotInventory = inventory.map((row) {
+      final transaction = Map<String, dynamic>.from(row);
+      final productId = transaction['product_id'] as int?;
+      if (productId != null) {
+        transaction['localProductId'] = productId;
+        transaction['cloudProductId'] = cloudProductIdsByLocalProductId[productId];
+      }
+      return transaction;
+    }).toList();
     return {
       'clientSyncId': clientSyncId,
       'localOrderId': orderId,
       'order': Map<String, dynamic>.from(orderRows.single),
-      'lines': lines.map((row) => Map<String, dynamic>.from(row)).toList(),
+      'lines': snapshotLines,
       'payments': payments.map((row) => Map<String, dynamic>.from(row)).toList(),
-      'inventoryTransactions': inventory.map((row) => Map<String, dynamic>.from(row)).toList(),
+      'inventoryTransactions': snapshotInventory,
     };
+  }
+
+  Future<void> _validateInventoryTransactionMappings({
+    required Transaction txn,
+    required List<int> inventoryTransactionIds,
+    required Map<int, String> cloudProductIdsByLocalProductId,
+  }) async {
+    if (inventoryTransactionIds.isEmpty) return;
+    final rows = await txn.query(
+      'inventory_transactions',
+      columns: ['product_id'],
+      where: 'id IN (${List.filled(inventoryTransactionIds.length, '?').join(', ')})',
+      whereArgs: inventoryTransactionIds,
+    );
+    for (final row in rows) {
+      final productId = row['product_id'] as int?;
+      if (productId == null) continue;
+      final mapping = await _productCloudSyncabilityService.evaluate(
+        localProductId: productId,
+        db: txn,
+      );
+      if (!mapping.isSyncable ||
+          mapping.cloudProductId == null ||
+          cloudProductIdsByLocalProductId[productId] != mapping.cloudProductId) {
+        throw StateError('Product is not linked to Cloud inventory.');
+      }
+    }
   }
 
   Future<Map<String, Object?>> getOrderSummary(int orderId) async {

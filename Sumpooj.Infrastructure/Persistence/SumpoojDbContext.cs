@@ -33,6 +33,7 @@ public class SumpoojDbContext
     public DbSet<InventoryLedger> InventoryLedgers { get; set; }
     public DbSet<PosSaleSyncReceipt> PosSaleSyncReceipts => Set<PosSaleSyncReceipt>();
     public DbSet<PosSaleSyncInventoryTransaction> PosSaleSyncInventoryTransactions => Set<PosSaleSyncInventoryTransaction>();
+    public DbSet<PosSaleSyncOrderLine> PosSaleSyncOrderLines => Set<PosSaleSyncOrderLine>();
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
     public DbSet<Order> Orders => Set<Order>();
@@ -659,6 +660,11 @@ public class SumpoojDbContext
             .HasIndex(p => new { p.OrderId, p.ClientPaymentId })
             .IsUnique()
             .HasFilter("\"ClientPaymentId\" IS NOT NULL");
+        modelBuilder.Entity<Payment>()
+            .HasOne<Order>()
+            .WithMany()
+            .HasForeignKey(p => p.OrderId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<PosSaleSyncReceipt>()
             .HasIndex(r => new { r.CompanyId, r.ClientSyncId })
@@ -696,6 +702,50 @@ public class SumpoojDbContext
             .HasOne<Product>()
             .WithMany()
             .HasForeignKey(t => t.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .Property(l => l.UnitPrice)
+            .HasColumnType("numeric(18,2)");
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .Property(l => l.TaxRatePercent)
+            .HasColumnType("numeric(8,4)");
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .Property(l => l.DiscountValue)
+            .HasColumnType("numeric(18,2)");
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .Property(l => l.DiscountAmount)
+            .HasColumnType("numeric(18,2)");
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .Property(l => l.LineSubtotal)
+            .HasColumnType("numeric(18,2)");
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .Property(l => l.LineTaxAmount)
+            .HasColumnType("numeric(18,2)");
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .Property(l => l.LineTotal)
+            .HasColumnType("numeric(18,2)");
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .HasIndex(l => new { l.PosSaleSyncReceiptId, l.ClientOrderLineId })
+            .IsUnique();
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .HasIndex(l => l.CloudOrderId);
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .HasIndex(l => l.CloudProductId);
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .HasOne<PosSaleSyncReceipt>()
+            .WithMany()
+            .HasForeignKey(l => l.PosSaleSyncReceiptId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .HasOne<Order>()
+            .WithMany()
+            .HasForeignKey(l => l.CloudOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PosSaleSyncOrderLine>()
+            .HasOne<Product>()
+            .WithMany()
+            .HasForeignKey(l => l.CloudProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<PurchaseOrder>()

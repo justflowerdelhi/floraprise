@@ -85,3 +85,70 @@ public class PosSaleSyncInventoryTransaction : BaseEntity
     public int Quantity { get; private set; }
     public DateTime OccurredAtUtc { get; private set; }
 }
+
+public class PosSaleSyncOrderLine : BaseEntity
+{
+    private PosSaleSyncOrderLine() { }
+
+    public PosSaleSyncOrderLine(
+        Guid companyId,
+        Guid receiptId,
+        Guid cloudOrderId,
+        string clientOrderLineId,
+        int localOrderLineId,
+        int? localProductId,
+        Guid? cloudProductId,
+        string? source,
+        string? designRef,
+        string description,
+        int quantity,
+        decimal unitPrice,
+        decimal? taxRatePercent,
+        string? discountType,
+        decimal? discountValue,
+        decimal discountAmount,
+        decimal lineSubtotal,
+        decimal lineTaxAmount,
+        decimal lineTotal)
+    {
+        CompanyId = companyId;
+        PosSaleSyncReceiptId = receiptId;
+        CloudOrderId = cloudOrderId;
+        ClientOrderLineId = clientOrderLineId.Trim();
+        LocalOrderLineId = localOrderLineId;
+        LocalProductId = localProductId;
+        CloudProductId = cloudProductId;
+        Source = string.IsNullOrWhiteSpace(source) ? null : source.Trim();
+        DesignRef = string.IsNullOrWhiteSpace(designRef) ? null : designRef.Trim();
+        Description = description.Trim();
+        Quantity = quantity;
+        UnitPrice = unitPrice;
+        TaxRatePercent = taxRatePercent;
+        DiscountType = string.IsNullOrWhiteSpace(discountType) ? null : discountType.Trim();
+        DiscountValue = discountValue;
+        DiscountAmount = discountAmount;
+        LineSubtotal = lineSubtotal;
+        LineTaxAmount = lineTaxAmount;
+        LineTotal = lineTotal;
+    }
+
+    public Guid CompanyId { get; private set; }
+    public Guid PosSaleSyncReceiptId { get; private set; }
+    public Guid CloudOrderId { get; private set; }
+    public string ClientOrderLineId { get; private set; } = default!;
+    public int LocalOrderLineId { get; private set; }
+    public int? LocalProductId { get; private set; }
+    public Guid? CloudProductId { get; private set; }
+    public string? Source { get; private set; }
+    public string? DesignRef { get; private set; }
+    public string Description { get; private set; } = default!;
+    public int Quantity { get; private set; }
+    public decimal UnitPrice { get; private set; }
+    public decimal? TaxRatePercent { get; private set; }
+    public string? DiscountType { get; private set; }
+    public decimal? DiscountValue { get; private set; }
+    public decimal DiscountAmount { get; private set; }
+    public decimal LineSubtotal { get; private set; }
+    public decimal LineTaxAmount { get; private set; }
+    public decimal LineTotal { get; private set; }
+}

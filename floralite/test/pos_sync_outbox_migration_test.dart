@@ -30,7 +30,7 @@ void main() {
     AppDatabase.useInMemoryForTests = false;
   });
 
-  test('version 41 database upgrades to version 42 without changing existing sales', () async {
+  test('version 41 database upgrades to version 44 without changing existing sales', () async {
     final databasePath = path.join(
       await getDatabasesPath(),
       AppDatabase.testDatabaseName!,
@@ -93,7 +93,7 @@ void main() {
     final outbox = await upgraded.query('pos_sync_outbox', where: 'local_order_id = ?', whereArgs: [orderId]);
 
     expect(File(databasePath).existsSync(), isTrue);
-    expect(version.single['user_version'], 42);
+    expect(version.single['user_version'], 44);
     expect(tables, hasLength(1));
     expect(order.single['order_no'], 'ORD-EXISTING-41');
     expect(order.single['status'], 'confirmed');

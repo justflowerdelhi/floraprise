@@ -3453,6 +3453,89 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.ToTable("PosSaleSyncInventoryTransactions");
                 });
 
+            modelBuilder.Entity("Sumpooj.Domain.Entities.PosSaleSyncOrderLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClientOrderLineId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("CloudOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CloudProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("DesignRef")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("DiscountType")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("DiscountValue")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("LineSubtotal")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("LineTaxAmount")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("LocalOrderLineId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("LocalProductId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PosSaleSyncReceiptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("TaxRatePercent")
+                        .HasColumnType("numeric(8,4)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CloudOrderId");
+
+                    b.HasIndex("CloudProductId");
+
+                    b.HasIndex("PosSaleSyncReceiptId", "ClientOrderLineId")
+                        .IsUnique();
+
+                    b.ToTable("PosSaleSyncOrderLines");
+                });
+
             modelBuilder.Entity("Sumpooj.Domain.Entities.PosSaleSyncReceipt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5806,6 +5889,26 @@ namespace Sumpooj.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.PosSaleSyncOrderLine", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("CloudOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sumpooj.Domain.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("CloudProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Sumpooj.Domain.Entities.PosSaleSyncReceipt", null)
+                        .WithMany()
+                        .HasForeignKey("PosSaleSyncReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

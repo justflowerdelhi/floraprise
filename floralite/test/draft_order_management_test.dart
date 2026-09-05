@@ -17,8 +17,13 @@ import 'package:floraprise/models/walk_in_enums.dart';
 import 'package:floraprise/models/walk_in_line_item.dart';
 import 'package:floraprise/models/walk_in_session.dart';
 import 'package:floraprise/models/payment_split.dart';
+import 'package:floraprise/services/product_cloud_syncability_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+const currentCompanyId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const firstCloudId = '11111111-1111-4111-8111-111111111111';
+const secondCloudId = '22222222-2222-4222-8222-222222222222';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -143,10 +148,12 @@ void main() {
     final db = await AppDatabase.instance.database;
     final firstProductId = await db.insert('products', {
       'name': 'Rose', 'selling_price_paise': 10000, 'track_inventory': 1,
+      'cloud_product_id': firstCloudId, 'cloud_product_company_id': currentCompanyId,
       'created_at': DateTime.now().toIso8601String(), 'updated_at': DateTime.now().toIso8601String(),
     });
     final secondProductId = await db.insert('products', {
       'name': 'Lily', 'selling_price_paise': 20000, 'track_inventory': 1,
+      'cloud_product_id': secondCloudId, 'cloud_product_company_id': currentCompanyId,
       'created_at': DateTime.now().toIso8601String(), 'updated_at': DateTime.now().toIso8601String(),
     });
     await db.insert('inventory_items', {
@@ -157,7 +164,7 @@ void main() {
       'product_id': secondProductId, 'current_qty': 2, 'min_qty': 0,
       'updated_at': DateTime.now().toIso8601String(),
     });
-    final orders = OrderRepository();
+    final orders = _mappedOrderRepository();
     final manager = WalkInManager(
       customerManager: CustomerManager(CustomerRepository()),
       pricingManager: PricingManager(),
@@ -187,6 +194,10 @@ void main() {
     expect(pending.single.payload['lines'], hasLength(2));
     expect(pending.single.payload['payments'], hasLength(2));
     expect(pending.single.payload['inventoryTransactions'], hasLength(2));
+    expect((pending.single.payload['lines'] as List).first['localProductId'], firstProductId);
+    expect((pending.single.payload['lines'] as List).first['cloudProductId'], firstCloudId);
+    expect((pending.single.payload['inventoryTransactions'] as List).first['localProductId'], firstProductId);
+    expect((pending.single.payload['inventoryTransactions'] as List).first['cloudProductId'], firstCloudId);
     expect((pending.single.payload['order'] as Map)['grand_total_paise'], 30000);
     expect(await outbox.listPending(db), hasLength(1));
     expect((await db.query('inventory_items', where: 'product_id = ?', whereArgs: [firstProductId])).single['current_qty'], 1);
@@ -227,7 +238,7 @@ void main() {
     final beforeCustomer = (await db.query('customers', where: 'id = ?', whereArgs: [customer.id])).single;
 
     await expectLater(
-      () => OrderRepository().confirmDraft(orderId: draft.session.draftOrderId!),
+      () => _mappedOrderRepository().confirmDraft(orderId: draft.session.draftOrderId!),
       throwsA(isA<StateError>()),
     );
 
@@ -253,4 +264,13 @@ void main() {
     expect(await db.query('order_payments', where: 'order_id = ?', whereArgs: [draft.session.draftOrderId]), hasLength(1));
     expect(await PosSyncOutboxRepository().listPending(db), isEmpty);
   });
+
+}
+
+OrderRepository _mappedOrderRepository({String? companyId = currentCompanyId}) {
+  return OrderRepository(
+    productCloudSyncabilityService: ProductCloudSyncabilityService(
+      currentCompanyId: () async => companyId,
+    ),
+  );
 }

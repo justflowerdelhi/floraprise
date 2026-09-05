@@ -123,6 +123,131 @@ void main() {
     );
   });
 
+  test('POS product picker shows loaded products regardless of stock quantity',
+      () {
+    final inStock = _inventoryProduct(
+      sku: 'IN-STOCK',
+      currentQty: 5,
+      minQty: 1,
+    );
+    final zeroStock = _inventoryProduct(
+      sku: 'ZERO-STOCK',
+      currentQty: 0,
+      minQty: 1,
+    );
+    final negativeStock = _inventoryProduct(
+      sku: 'NEGATIVE-STOCK',
+      currentQty: -2,
+      minQty: 1,
+    );
+    final nonTracked = _inventoryProduct(
+      sku: 'NON-TRACKED',
+      trackInventory: false,
+      currentQty: 0,
+      minQty: 0,
+    );
+
+    final visible = productPickerVisibleProducts(
+      [inStock, zeroStock, negativeStock, nonTracked],
+      '',
+    );
+
+    expect(visible.map((product) => product.sku), [
+      'IN-STOCK',
+      'ZERO-STOCK',
+      'NEGATIVE-STOCK',
+      'NON-TRACKED',
+    ]);
+  });
+
+  test('POS product picker search keeps zero-stock products visible', () {
+    final zeroStock = _inventoryProduct(
+      sku: 'ZERO-STOCK',
+      currentQty: 0,
+      minQty: 1,
+    );
+
+    final visible = productPickerVisibleProducts([zeroStock], 'zero');
+
+    expect(visible, contains(zeroStock));
+  });
+
+  test('POS product picker still blocks selecting out-of-stock tracked products',
+      () {
+    expect(
+      productPickerCanSelect(_inventoryProduct(currentQty: 5)),
+      isTrue,
+    );
+    expect(
+      productPickerCanSelect(_inventoryProduct(currentQty: 0)),
+      isFalse,
+    );
+    expect(
+      productPickerCanSelect(_inventoryProduct(currentQty: -2)),
+      isFalse,
+    );
+    expect(
+      productPickerCanSelect(
+        _inventoryProduct(trackInventory: false, currentQty: 0),
+      ),
+      isTrue,
+    );
+  });
+
+  test('POS product query excludes inactive and deleted products', () async {
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+    final activeId = await db.insert('products', {
+      'name': 'Active POS Product',
+      'category': 'Flowers',
+      'selling_price_paise': 1000,
+      'gst_percent': 5,
+      'default_unit': 'Stem',
+      'track_inventory': 1,
+      'active': 1,
+      'created_at': now,
+      'updated_at': now,
+    });
+    await db.insert('products', {
+      'name': 'Inactive POS Product',
+      'category': 'Flowers',
+      'selling_price_paise': 1000,
+      'gst_percent': 5,
+      'default_unit': 'Stem',
+      'track_inventory': 1,
+      'active': 0,
+      'created_at': now,
+      'updated_at': now,
+    });
+    await db.insert('products', {
+      'name': 'Deleted POS Product',
+      'category': 'Flowers',
+      'selling_price_paise': 1000,
+      'gst_percent': 5,
+      'default_unit': 'Stem',
+      'track_inventory': 1,
+      'active': 1,
+      'created_at': now,
+      'updated_at': now,
+      'deleted_at': now,
+    });
+    await db.insert('inventory_items', {
+      'product_id': activeId,
+      'current_qty': 0,
+      'min_qty': 1,
+      'updated_at': now,
+    });
+
+    final products = await ProductRepository().listActiveProductsWithInventory();
+
+    expect(products.map((product) => product.name),
+        contains('Active POS Product'));
+    expect(products.map((product) => product.name),
+        isNot(contains('Inactive POS Product')));
+    expect(products.map((product) => product.name),
+        isNot(contains('Deleted POS Product')));
+  });
+
   test('production accepts legacy finished product category for recipes',
       () async {
     final db = await AppDatabase.instance.database;

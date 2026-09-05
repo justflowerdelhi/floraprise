@@ -220,6 +220,7 @@ builder.Services.AddScoped<IMobilePaymentTransactionRepository, MobilePaymentTra
 builder.Services.AddScoped<IMobileUnitOfWork, MobileUnitOfWork>();
 builder.Services.AddScoped<IMobileSubscriptionService, MobileSubscriptionService>();
 builder.Services.AddScoped<IMobileClientService, MobileClientService>();
+builder.Services.AddScoped<IPosSaleSyncService, PosSaleSyncService>();
 builder.Services.AddScoped<ISubscriptionPaymentGateway, RazorpaySubscriptionPaymentGateway>();
 builder.Services.AddScoped<ISubscriptionPaymentGateway, StripeSubscriptionPaymentGateway>();
 builder.Services.AddScoped<ISubscriptionPaymentGatewayFactory, SubscriptionPaymentGatewayFactory>();

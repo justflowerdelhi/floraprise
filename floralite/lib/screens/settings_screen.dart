@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../data/database/app_database.dart';
+import '../data/repositories/pos_sync_outbox_repository.dart';
 import '../managers/onboarding_manager.dart';
 import '../l10n/app_localizations.dart';
 import '../models/storage_mode.dart';
@@ -10,6 +12,7 @@ import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/storage_mode_provider.dart';
 import '../providers/subscription_provider.dart';
+import '../services/pos_sale_sync_service.dart';
 import '../services/storage_migration_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
@@ -23,6 +26,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final OnboardingManager _onboardingManager = OnboardingManager();
+  bool _isSyncingPendingPosSales = false;
 
   @override
   void initState() {
@@ -468,6 +472,139 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _syncPendingPosSalesForDebug() async {
+    if (_isSyncingPendingPosSales) return;
+    setState(() => _isSyncingPendingPosSales = true);
+
+    final outboxRepository = PosSyncOutboxRepository();
+    PosSaleSyncResult? result;
+    List<PosSyncOutboxRecord> beforeRows = const [];
+    List<PosSyncOutboxRecord> remainingRows = const [];
+    List<Map<String, Object?>> syncedRows = const [];
+    Object? failure;
+
+    try {
+      final db = await AppDatabase.instance.database;
+      beforeRows = await outboxRepository.listRetryable(db);
+      result = await PosSaleSyncService(
+        outboxRepository: outboxRepository,
+      ).syncPending();
+      remainingRows = await outboxRepository.listRetryable(db);
+      syncedRows = await _loadPosSyncOutboxRowsByIds(
+        beforeRows.map((row) => row.id).toList(),
+      );
+    } catch (error) {
+      failure = error;
+      try {
+        final db = await AppDatabase.instance.database;
+        remainingRows = await outboxRepository.listRetryable(db);
+        syncedRows = await _loadPosSyncOutboxRowsByIds(
+          beforeRows.map((row) => row.id).toList(),
+        );
+      } catch (_) {}
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncingPendingPosSales = false);
+      }
+    }
+
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sync Pending POS Sales'),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            _buildPosSaleSyncDebugReport(
+              pendingBefore: beforeRows.length,
+              result: result,
+              remainingRetryable: remainingRows.length,
+              syncedRows: syncedRows,
+              failure: failure,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<List<Map<String, Object?>>> _loadPosSyncOutboxRowsByIds(
+    List<int> ids,
+  ) async {
+    if (ids.isEmpty) return const [];
+    final db = await AppDatabase.instance.database;
+    final placeholders = List.filled(ids.length, '?').join(', ');
+    return db.query(
+      'pos_sync_outbox',
+      columns: [
+        'id',
+        'local_order_id',
+        'state',
+        'attempt_count',
+        'cloud_order_id',
+        'last_error',
+        'next_attempt_at',
+        'last_attempt_at',
+      ],
+      where: 'id IN ($placeholders)',
+      whereArgs: ids,
+      orderBy: 'created_at ASC, id ASC',
+    );
+  }
+
+  String _buildPosSaleSyncDebugReport({
+    required int pendingBefore,
+    required PosSaleSyncResult? result,
+    required int remainingRetryable,
+    required List<Map<String, Object?>> syncedRows,
+    required Object? failure,
+  }) {
+    final buffer = StringBuffer()
+      ..writeln('Retryable pending before: $pendingBefore')
+      ..writeln('Attempted: ${result?.processedCount ?? 0}')
+      ..writeln('Completed: ${result?.completedCount ?? 0}')
+      ..writeln('Failed: ${result?.failedCount ?? 0}')
+      ..writeln('Remaining retryable pending: $remainingRetryable');
+
+    final cloudOrderIds = syncedRows
+        .map((row) => row['cloud_order_id']?.toString())
+        .where((value) => value != null && value.trim().isNotEmpty)
+        .cast<String>()
+        .toList();
+    buffer.writeln(
+      'Cloud order IDs: ${cloudOrderIds.isEmpty ? 'none' : cloudOrderIds.join(', ')}',
+    );
+
+    final rowErrors = syncedRows
+        .map((row) => row['last_error']?.toString())
+        .where((value) => value != null && value.trim().isNotEmpty)
+        .cast<String>()
+        .toList();
+    if (failure != null) {
+      buffer.writeln('Sync exception: $failure');
+    }
+    buffer.writeln(
+      'Outbox errors: ${rowErrors.isEmpty ? 'none' : rowErrors.join('\n')}',
+    );
+
+    if (syncedRows.isNotEmpty) {
+      buffer.writeln('Outbox rows:');
+      for (final row in syncedRows) {
+        buffer.writeln(
+          '#${row['id']} order=${row['local_order_id']} state=${row['state']} attempts=${row['attempt_count']} next=${row['next_attempt_at'] ?? 'none'}',
+        );
+      }
+    }
+
+    return buffer.toString().trimRight();
+  }
+
   Widget _buildDeveloperSection(BuildContext context, AppLocalizations l10n) {
     // Only show in debug builds
     if (!kDebugMode) {
@@ -495,6 +632,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 l10n.resetOnboardingSubtitle,
                 Icons.restart_alt,
                 _resetOnboarding,
+              ),
+              const Divider(height: 1),
+              _buildSettingTile(
+                context,
+                'Sync Pending POS Sales',
+                _isSyncingPendingPosSales
+                    ? 'Sync in progress'
+                    : 'Temporary debug action for stored POS sale outbox rows',
+                Icons.cloud_upload_outlined,
+                _isSyncingPendingPosSales ? null : _syncPendingPosSalesForDebug,
               ),
             ],
           ),

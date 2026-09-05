@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/voice_dictation_controller.dart';
+import '../data/repositories/cloud_product_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../models/gst_calculation_type.dart';
 import 'bouquet_builder_screen.dart';
@@ -12,6 +13,7 @@ import '../providers/printer_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/storage_mode_provider.dart';
 import 'cloud_products_screen.dart';
+import '../services/product_cloud_linking_service.dart';
 import '../services/speech_recognition_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
@@ -27,6 +29,7 @@ class ProductsScreen extends StatefulWidget {
 
 class _ProductsScreenState extends State<ProductsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final ProductCloudLinkingService _linkingService = ProductCloudLinkingService();
   static const List<String> _categoryChips = [
     'all',
     'Finished Products',
@@ -45,6 +48,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     'Accessory': 'Accessories',
     'Other': 'Others',
   };
+  bool _linkingMode = false;
 
   @override
   void initState() {
@@ -105,6 +109,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: provider.refresh,
+          ),
+          IconButton(
+            tooltip: 'Product Linking',
+            icon: Icon(
+              _linkingMode ? Icons.link_rounded : Icons.link_outlined,
+            ),
+            onPressed: () => setState(() => _linkingMode = !_linkingMode),
           ),
         ],
       ),
@@ -377,6 +388,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
               ),
               const SizedBox(height: 5),
               _buildBarcodeSummary(product, colorScheme),
+              if (_linkingMode) ...[
+                const SizedBox(height: 4),
+                _buildCloudLinkSummary(product, colorScheme),
+              ],
               const SizedBox(height: 4),
               Row(
                 children: [
@@ -417,6 +432,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       icon: Icons.edit_outlined,
                       onPressed: () => _showEditProduct(product),
                     ),
+                    _buildCloudLinkMenu(product),
                     _buildCompactProductAction(
                       tooltip: l10n.delete,
                       icon: Icons.delete_outline,
@@ -503,6 +519,72 @@ class _ProductsScreenState extends State<ProductsScreen> {
             Text('Manufacturer: $manufacturerBarcode'),
         ],
       ),
+    );
+  }
+
+  Widget _buildCloudLinkSummary(
+    ProductRecord product,
+    ColorScheme colorScheme,
+  ) {
+    final cloudProductId = product.cloudProductId?.trim() ?? '';
+    final unavailable = cloudProductId.isNotEmpty &&
+        (!product.active || product.deletedAt != null);
+    final label = cloudProductId.isEmpty
+        ? 'Not linked to Cloud'
+        : unavailable
+            ? 'Cloud link unavailable'
+            : 'Cloud linked\n${_shortUuid(cloudProductId)}';
+
+    return Row(
+      children: [
+        Icon(
+          cloudProductId.isEmpty
+              ? Icons.link_off_rounded
+              : unavailable
+                  ? Icons.cloud_off_outlined
+                  : Icons.cloud_done_outlined,
+          size: 16,
+          color: unavailable ? Colors.orange.shade700 : colorScheme.primary,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: unavailable ? Colors.orange.shade800 : Colors.grey.shade700,
+              fontSize: 12,
+              height: 1.2,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCloudLinkMenu(ProductRecord product) {
+    final linked = product.cloudProductId?.trim().isNotEmpty == true;
+    return PopupMenuButton<String>(
+      tooltip: 'Cloud Link Menu',
+      icon: const Icon(Icons.more_vert_rounded),
+      onSelected: (value) async {
+        if (value == 'link' || value == 'change') {
+          await _linkOrChangeCloudProduct(product, change: value == 'change');
+        } else if (value == 'unlink') {
+          await _unlinkCloudProduct(product);
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: linked ? 'change' : 'link',
+          child: Text(linked ? 'Change Cloud Link' : 'Link Cloud Product'),
+        ),
+        if (linked)
+          const PopupMenuItem(
+            value: 'unlink',
+            child: Text('Unlink Cloud Product'),
+          ),
+      ],
     );
   }
 
@@ -600,6 +682,89 @@ class _ProductsScreenState extends State<ProductsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _linkOrChangeCloudProduct(
+    ProductRecord product, {
+    required bool change,
+  }) async {
+    final selected = await _showCloudProductSelector(product);
+    if (selected == null) return;
+
+    try {
+      if (change) {
+        await _linkingService.changeCloudProduct(
+          localProductId: product.id,
+          cloudProductId: selected.id,
+        );
+      } else {
+        await _linkingService.linkCloudProduct(
+          localProductId: product.id,
+          cloudProductId: selected.id,
+        );
+      }
+      if (!mounted) return;
+      await context.read<ProductProvider>().refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(change ? 'Cloud link changed.' : 'Cloud product linked.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlyCloudLinkError(error))),
+      );
+    }
+  }
+
+  Future<void> _unlinkCloudProduct(ProductRecord product) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Unlink Cloud Product'),
+        content: Text('Remove the Cloud link from ${product.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Unlink'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await _linkingService.unlinkCloudProduct(localProductId: product.id);
+      if (!mounted) return;
+      await context.read<ProductProvider>().refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cloud product unlinked.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlyCloudLinkError(error))),
+      );
+    }
+  }
+
+  Future<CloudProduct?> _showCloudProductSelector(ProductRecord localProduct) {
+    return showModalBottomSheet<CloudProduct>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _CloudProductSelectorSheet(
+        localProduct: localProduct,
       ),
     );
   }
@@ -1081,6 +1246,38 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return 'Could not save product. Please try again.';
   }
 
+  String _friendlyCloudLinkError(Object error) {
+    final text = error.toString();
+    if (text.contains('HTTP 401')) {
+      return 'Cloud login expired. Please sign in again.';
+    }
+    if (text.contains('HTTP 403')) {
+      return 'You do not have access to this Cloud product.';
+    }
+    if (text.contains('HTTP 404')) {
+      return 'Cloud product was not found.';
+    }
+    if (text.contains('Inactive Cloud products')) {
+      return 'Inactive Cloud products cannot be linked.';
+    }
+    if (text.contains('pending POS sync')) {
+      return 'Cloud link cannot be changed while pending POS sync exists.';
+    }
+    if (text.contains('internet are required')) {
+      return 'Cloud login and internet are required to link products.';
+    }
+    if (text.contains('UNIQUE constraint failed')) {
+      return 'This Cloud product is already linked to another local product on this device.';
+    }
+    return 'Could not update Cloud link. Please try again.';
+  }
+
+  String _shortUuid(String value) {
+    final trimmed = value.trim();
+    if (trimmed.length <= 13) return trimmed;
+    return '${trimmed.substring(0, 8)}...${trimmed.substring(trimmed.length - 4)}';
+  }
+
   String _dropdownCategoryValue(String? value) {
     final trimmed = value?.trim() ?? '';
     final normalized = _legacyCategoryLabels[trimmed] ?? trimmed;
@@ -1108,5 +1305,143 @@ class _ProductsScreenState extends State<ProductsScreen> {
         normalized == 'floral box' ||
         normalized == 'gift hamper' ||
         normalized == 'custom';
+  }
+}
+
+class _CloudProductSelectorSheet extends StatefulWidget {
+  const _CloudProductSelectorSheet({required this.localProduct});
+
+  final ProductRecord localProduct;
+
+  @override
+  State<_CloudProductSelectorSheet> createState() =>
+      _CloudProductSelectorSheetState();
+}
+
+class _CloudProductSelectorSheetState extends State<_CloudProductSelectorSheet> {
+  final CloudProductRepository _repository = CloudProductRepository();
+  final TextEditingController _searchController = TextEditingController();
+  List<CloudProduct> _products = const [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.text = _initialSearchHint(widget.localProduct);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final products = await _repository.listProducts(
+        query: _searchController.text.trim(),
+        showActive: true,
+        showInactive: true,
+      );
+      if (!mounted) return;
+      setState(() => _products = products);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not load Cloud products. Please sign in and try again.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.85,
+      minChildSize: 0.45,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Select Cloud Product',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.localProduct.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _searchController,
+              onSubmitted: (_) => _load(),
+              decoration: InputDecoration(
+                labelText: 'Search Cloud catalog',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: IconButton(
+                  tooltip: 'Search',
+                  onPressed: _load,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                ),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            if (_loading) const LinearProgressIndicator(),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(_error!),
+              ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView.builder(
+                controller: scrollController,
+                itemCount: _products.length,
+                itemBuilder: (context, index) {
+                  final product = _products[index];
+                  return ListTile(
+                    enabled: product.isActive,
+                    title: Text(product.name),
+                    subtitle: Text(
+                      '${product.sku} | ${product.manufacturerBarcode ?? product.barcode ?? 'No barcode'} | ${product.isActive ? 'Active' : 'Inactive'}',
+                    ),
+                    trailing: Text(product.id.substring(0, 8)),
+                    onTap: product.isActive
+                        ? () => Navigator.pop(context, product)
+                        : null,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _initialSearchHint(ProductRecord product) {
+    final sku = product.sku.trim();
+    if (sku.isNotEmpty) return sku;
+    final barcode = product.manufacturerBarcode.trim();
+    if (barcode.isNotEmpty) return barcode;
+    return product.name.trim();
   }
 }

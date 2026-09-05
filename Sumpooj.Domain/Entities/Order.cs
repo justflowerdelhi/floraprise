@@ -217,6 +217,27 @@ public class Order : BaseEntity
         MarkUpdated();
     }
 
+    public void SetImportedPosFinancials(
+        decimal subTotal,
+        decimal taxAmount,
+        decimal discountAmount,
+        decimal totalAmount,
+        decimal roundOffAmount,
+        decimal rewardDiscountAmount,
+        int rewardPointsEarned,
+        int rewardPointsRedeemed)
+    {
+        SubTotal = subTotal;
+        TaxAmount = taxAmount;
+        DiscountAmount = discountAmount;
+        TotalAmount = totalAmount;
+        PosRoundOffAmount = roundOffAmount;
+        RewardDiscountAmount = rewardDiscountAmount;
+        RewardPointsEarned = rewardPointsEarned;
+        RewardPointsRedeemed = rewardPointsRedeemed;
+        MarkUpdated();
+    }
+
     public void SetTaxAmount(decimal tax)
     {
         TaxAmount = tax;

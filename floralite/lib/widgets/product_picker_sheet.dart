@@ -27,7 +27,6 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
   final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
-  bool _showAllProducts = false;
   String? _error;
   List<ProductInventoryRecord> _products = const [];
 
@@ -68,17 +67,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final query = _searchController.text.trim().toLowerCase();
-    final hasSearchQuery = query.isNotEmpty;
-    final filtered = _products.where((p) {
-      final matchesQuery = query.isEmpty ||
-          p.name.toLowerCase().contains(query) ||
-          p.sku.toLowerCase().contains(query) ||
-          p.manufacturerBarcode.toLowerCase().contains(query) ||
-          p.florapriseBarcode.toLowerCase().contains(query);
-      if (!matchesQuery) return false;
-      if (_showAllProducts || hasSearchQuery) return true;
-      return productPickerIsSellable(p);
-    }).toList();
+    final filtered = productPickerVisibleProducts(_products, query);
 
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.85,
@@ -114,24 +103,6 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                         icon: const Icon(Icons.clear),
                       ),
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Row(
-              children: [
-                ChoiceChip(
-                  label: const Text('Available Only'),
-                  selected: !_showAllProducts,
-                  onSelected: (_) => setState(() => _showAllProducts = false),
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: const Text('Show All Products'),
-                  selected: _showAllProducts,
-                  onSelected: (_) => setState(() => _showAllProducts = true),
-                ),
-              ],
             ),
           ),
           Expanded(
@@ -184,9 +155,9 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          onTap: isOutOfStock
-              ? () => _showOutOfStockActions(product)
-              : () => Navigator.pop(context, _toProductRecord(product)),
+          onTap: productPickerCanSelect(product)
+              ? () => Navigator.pop(context, _toProductRecord(product))
+              : () => _showOutOfStockActions(product),
         );
       },
     );
@@ -500,8 +471,23 @@ class _UpdateStockDialogState extends State<_UpdateStockDialog> {
 }
 
 @visibleForTesting
-bool productPickerIsSellable(ProductInventoryRecord product) {
-  return !product.trackInventory || product.currentQty > 0;
+List<ProductInventoryRecord> productPickerVisibleProducts(
+  List<ProductInventoryRecord> products,
+  String query,
+) {
+  final normalizedQuery = query.trim().toLowerCase();
+  return products.where((product) {
+    return normalizedQuery.isEmpty ||
+        product.name.toLowerCase().contains(normalizedQuery) ||
+        product.sku.toLowerCase().contains(normalizedQuery) ||
+        product.manufacturerBarcode.toLowerCase().contains(normalizedQuery) ||
+        product.florapriseBarcode.toLowerCase().contains(normalizedQuery);
+  }).toList();
+}
+
+@visibleForTesting
+bool productPickerCanSelect(ProductInventoryRecord product) {
+  return !productPickerIsOutOfStock(product);
 }
 
 @visibleForTesting

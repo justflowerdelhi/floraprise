@@ -5,6 +5,12 @@ import 'package:flutter/foundation.dart';
 
 import '../../services/mobile_auth_service.dart';
 
+typedef CloudProductHttpSender = Future<dynamic> Function(
+  String method,
+  Uri uri, {
+  Map<String, dynamic>? body,
+});
+
 class CloudProduct {
   const CloudProduct({
     required this.id,
@@ -233,10 +239,14 @@ class CloudCategory {
 }
 
 class CloudProductRepository {
-  CloudProductRepository({MobileAuthService? auth})
-      : _auth = auth ?? MobileAuthService();
+  CloudProductRepository({
+    MobileAuthService? auth,
+    CloudProductHttpSender? send,
+  })  : _auth = auth ?? MobileAuthService(),
+        _sendOverride = send;
 
   final MobileAuthService _auth;
+  final CloudProductHttpSender? _sendOverride;
 
   Future<List<CloudProduct>> listProducts({
     String query = '',
@@ -245,32 +255,43 @@ class CloudProductRepository {
     bool showActive = true,
     bool showInactive = false,
   }) async {
-    final queryParameters = <String, String>{
-      'page': '1',
-      'pageSize': '200',
-    };
-    if (query.trim().isNotEmpty) queryParameters['query'] = query.trim();
-    if (category != null && category.trim().isNotEmpty) {
-      queryParameters['category'] = category.trim();
-    }
-    if (trackInventory != null) {
-      queryParameters['trackInventory'] = '$trackInventory';
-    }
-    if (showActive != showInactive) {
-      queryParameters['isActive'] = '$showActive';
-    }
+    const pageSize = 200;
+    final products = <CloudProduct>[];
+    int? totalCount;
 
-    final response = await _send(
-      'GET',
-      Uri.parse('${_auth.baseUrl}/api/products/search')
-          .replace(queryParameters: queryParameters),
-    );
-    final rawItems = response['items'] ?? response['Items'] ?? [];
-    if (rawItems is! List) return [];
-    return rawItems
-        .whereType<Map>()
-        .map((item) => CloudProduct.fromJson(item.cast<String, dynamic>()))
-        .toList();
+    for (var page = 1;; page++) {
+      final queryParameters = <String, String>{
+        'page': '$page',
+        'pageSize': '$pageSize',
+      };
+      if (query.trim().isNotEmpty) queryParameters['query'] = query.trim();
+      if (category != null && category.trim().isNotEmpty) {
+        queryParameters['category'] = category.trim();
+      }
+      if (trackInventory != null) {
+        queryParameters['trackInventory'] = '$trackInventory';
+      }
+      if (showActive != showInactive) {
+        queryParameters['isActive'] = '$showActive';
+      }
+
+      final response = await _sendRequest(
+        'GET',
+        Uri.parse('${_auth.baseUrl}/api/products/search')
+            .replace(queryParameters: queryParameters),
+      );
+      if (response is! Map) return products;
+      final rawItems = response['items'] ?? response['Items'] ?? [];
+      if (rawItems is! List || rawItems.isEmpty) return products;
+      totalCount ??= _readInt(response, 'totalCount');
+      products.addAll(
+        rawItems
+            .whereType<Map>()
+            .map((item) => CloudProduct.fromJson(item.cast<String, dynamic>())),
+      );
+      if (totalCount != null && products.length >= totalCount) return products;
+      if (rawItems.length < pageSize) return products;
+    }
   }
 
   Future<CloudProduct> createProduct(CloudProductInput input) async {
@@ -416,6 +437,22 @@ class CloudProductRepository {
     throw StateError('Cloud request failed.');
   }
 
+  Future<dynamic> _sendRequest(
+    String method,
+    Uri uri, {
+    Map<String, dynamic>? body,
+  }) {
+    final send = _sendOverride;
+    if (send != null) return send(method, uri, body: body);
+    return _send(method, uri, body: body);
+  }
+
   static String _readString(Map<String, dynamic> json, String key) =>
       json[key]?.toString() ?? json['${key[0].toUpperCase()}${key.substring(1)}']?.toString() ?? '';
+
+  static int? _readInt(Map<dynamic, dynamic> json, String key) {
+    final value = json[key] ?? json['${key[0].toUpperCase()}${key.substring(1)}'];
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
 }
