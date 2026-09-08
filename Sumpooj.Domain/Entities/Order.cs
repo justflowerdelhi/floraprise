@@ -69,6 +69,7 @@ public class Order : BaseEntity
 
     // Assignment
     public Guid? AssignedToUserId { get; private set; }
+    public Guid? AssignedDesignerStaffId { get; private set; }
     public Guid? DeliveryPersonId { get; private set; }
 
     // Notes
@@ -79,6 +80,8 @@ public class Order : BaseEntity
     public bool IsInventoryProcessed { get; private set; }
 
     public IReadOnlyCollection<OrderItem> Items => _items.AsReadOnly();
+
+    public bool IsEditable => Status != OrderStatus.Delivered && Status != OrderStatus.Cancelled;
 
     private static string GenerateOrderNumber()
     {
@@ -117,6 +120,23 @@ public class Order : BaseEntity
         }
     }
 
+    /// <summary>Replaces the full line set for an edit. Allowed for any order that is not delivered or cancelled.</summary>
+    public void ReplaceItems(IEnumerable<OrderItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        EnsureEditable();
+
+        _items.Clear();
+        _items.AddRange(items);
+        RecalculateTotals();
+    }
+
+    public void EnsureEditable()
+    {
+        if (!IsEditable)
+            throw new InvalidOperationException("Delivered and cancelled orders cannot be edited");
+    }
+
     public void UpdateDeliveryDetails(
         DateTime deliveryDate,
         string? deliveryAddress,
@@ -124,7 +144,7 @@ public class Order : BaseEntity
         string? recipientName,
         string? recipientPhone)
     {
-        DeliveryDate = deliveryDate;
+        DeliveryDate = EnsureUtc(deliveryDate);
         DeliveryAddress = deliveryAddress;
         DeliveryPincode = deliveryPincode;
         RecipientName = recipientName;
@@ -276,6 +296,32 @@ public class Order : BaseEntity
 
         Status = OrderStatus.Processing;
         AssignedToUserId = userId;
+        MarkUpdated();
+    }
+
+    /// <summary>Records the designer. Only a confirmed order also advances to Processing.</summary>
+    public void AssignDesigner(Guid designerId)
+    {
+        if (Status is OrderStatus.Delivered or OrderStatus.Cancelled)
+            throw new InvalidOperationException("Delivered and cancelled orders cannot be assigned a designer");
+
+        AssignedToUserId = designerId;
+        if (Status == OrderStatus.Confirmed)
+            Status = OrderStatus.Processing;
+
+        MarkUpdated();
+    }
+
+    /// <summary>Assigns a designer Staff record without changing the legacy Identity-user assignment.</summary>
+    public void AssignDesignerStaff(Guid staffId)
+    {
+        if (Status is OrderStatus.Delivered or OrderStatus.Cancelled)
+            throw new InvalidOperationException("Delivered and cancelled orders cannot be assigned a designer");
+
+        AssignedDesignerStaffId = staffId;
+        if (Status == OrderStatus.Confirmed)
+            Status = OrderStatus.Processing;
+
         MarkUpdated();
     }
 

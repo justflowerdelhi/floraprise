@@ -1,3 +1,5 @@
+using Sumpooj.Domain.Entities;
+
 namespace Sumpooj.Application.Production;
 
 // ─── Floral Recipe DTOs ────────────────────────────────────
@@ -182,6 +184,16 @@ public class CreateWastageRequest
     public string Reason { get; set; } = default!;
     public Guid? RelatedFinishedBatchId { get; set; }
     public string? RelatedBatchCode { get; set; }
+}
+
+/// <summary>Optional filters for wastage log queries. All null means "return everything".</summary>
+public class WastageLogFilter
+{
+    public DateTime? From { get; set; }
+    public DateTime? To { get; set; }
+    public Guid? ProductId { get; set; }
+    public ProductCategory? Category { get; set; }
+    public WastageReason? Reason { get; set; }
 }
 
 // ─── Production Job DTOs ───────────────────────────────────

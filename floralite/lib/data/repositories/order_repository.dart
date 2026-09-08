@@ -9,6 +9,7 @@ import '../../models/walk_in_session.dart';
 import '../database/app_database.dart';
 import '../../managers/reward_manager.dart';
 import '../../services/product_cloud_syncability_service.dart';
+import 'customer_repository.dart';
 import 'inventory_repository.dart';
 import 'pos_sync_outbox_repository.dart';
 
@@ -331,6 +332,7 @@ class OrderRepository {
       deliveryLandmark: (order['delivery_landmark'] as String?) ?? '',
       cardMessage: (order['card_message'] as String?) ?? '',
       specialInstructions: (order['special_instructions'] as String?) ?? '',
+      posClientSyncId: order['pos_client_sync_id'] as String?,
       payments: payments
           .map(
             (row) => PaymentSplit(
@@ -371,17 +373,25 @@ class OrderRepository {
     required WalkInSession session,
     required OrderTotals totals,
     required int? customerId,
+    String? cloudCustomerId,
   }) async {
     final db = await AppDatabase.instance.database;
     final now = DateTime.now().toIso8601String();
     final orderNo = 'DRAFT-${DateTime.now().millisecondsSinceEpoch}';
+    final posClientSyncId = session.posClientSyncId ??
+      (session.draftOrderId == null
+        ? PosSyncOutboxRepository().newClientSyncId()
+        : null);
 
     return db.transaction<int>((txn) async {
       final orderData = {
         'order_no': session.draftOrderId == null ? orderNo : null,
+      'pos_client_sync_id': posClientSyncId,
         'fulfilment_type': _fulfilmentToDb(session.fulfilmentType),
         'status': 'draft',
         'customer_id': customerId,
+        if (cloudCustomerId != null && cloudCustomerId.trim().isNotEmpty)
+          'cloud_customer_id': cloudCustomerId.trim(),
         'customer_phone': session.customerPhone,
         'customer_name': session.customerName,
         'occasion': session.occasion,
@@ -452,6 +462,7 @@ class OrderRepository {
         await txn.insert('order_lines', {
           'order_id': orderId,
           'product_id': line.productId,
+          'cloud_product_id': line.cloudProductId,
           'design_ref': line.designRef,
           'description': line.description,
           'qty': line.quantity,
@@ -478,6 +489,34 @@ class OrderRepository {
       }
 
       return orderId;
+    });
+  }
+
+  Future<String> getOrCreatePosClientSyncId(int orderId) async {
+    final db = await AppDatabase.instance.database;
+    return db.transaction<String>((txn) async {
+      final rows = await txn.query(
+        'orders',
+        columns: ['pos_client_sync_id'],
+        where: 'id = ?',
+        whereArgs: [orderId],
+        limit: 1,
+      );
+      if (rows.isEmpty) throw StateError('Order $orderId not found');
+      final existing = (rows.single['pos_client_sync_id'] as String?)?.trim();
+      if (existing != null && existing.isNotEmpty) return existing;
+
+      final generated = PosSyncOutboxRepository().newClientSyncId();
+      await txn.update(
+        'orders',
+        {
+          'pos_client_sync_id': generated,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [orderId],
+      );
+      return generated;
     });
   }
 
@@ -514,7 +553,7 @@ class OrderRepository {
       }
       final lines = await txn.query(
         'order_lines',
-        columns: ['id', 'product_id', 'qty'],
+        columns: ['id', 'product_id', 'cloud_product_id', 'qty'],
         where: 'order_id = ?',
         whereArgs: [orderId],
       );
@@ -609,6 +648,13 @@ class OrderRepository {
         'created_by': 'walkInManager',
       });
 
+      await _createCashSaleCashBookEntryInTransaction(
+        txn: txn,
+        orderId: orderId,
+        orderNo: orderNo,
+        createdAt: now,
+      );
+
       final inventoryTransactionIds = <int>[];
       for (final link in lineProductLinks) {
         inventoryTransactionIds.add(
@@ -649,31 +695,317 @@ class OrderRepository {
     });
   }
 
+  Future<void> _createCashSaleCashBookEntryInTransaction({
+    required Transaction txn,
+    required int orderId,
+    required String orderNo,
+    required String createdAt,
+  }) async {
+    final cashRows = await txn.rawQuery('''
+      SELECT COALESCE(SUM(amount_paise), 0) AS total
+      FROM order_payments
+      WHERE order_id = ? AND LOWER(COALESCE(method, '')) = 'cash'
+    ''', [orderId]);
+    final cashAmount = (cashRows.first['total'] as int?) ?? 0;
+    if (cashAmount <= 0) return;
+
+    final created = DateTime.parse(createdAt);
+    final dateStr = DateTime(created.year, created.month, created.day)
+        .toIso8601String();
+    final balanceRows = await txn.rawQuery('''
+      SELECT running_balance
+      FROM cash_book
+      WHERE date = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    ''', [dateStr]);
+    final currentBalance = balanceRows.isEmpty
+        ? 0
+        : (balanceRows.first['running_balance'] as int? ?? 0);
+
+    await txn.insert('cash_book', {
+      'date': dateStr,
+      'transaction_type': 'cashSale',
+      'description': 'POS cash sale $orderNo',
+      'amount': cashAmount,
+      'cash_in': cashAmount,
+      'cash_out': 0,
+      'running_balance': currentBalance + cashAmount,
+      'created_at': createdAt,
+    });
+  }
+
+  Future<Map<String, dynamic>> buildCloudPosSalePayload({
+    required int orderId,
+    required String clientSyncId,
+    required String orderNo,
+  }) async {
+    final db = await AppDatabase.instance.database;
+    return db.transaction<Map<String, dynamic>>((txn) async {
+      final lineProductLinks = <Map<String, int>>[];
+      final cloudProductIdsByLocalProductId = <int, String>{};
+      final lines = await txn.query(
+        'order_lines',
+        columns: ['id', 'product_id', 'cloud_product_id', 'qty'],
+        where: 'order_id = ?',
+        whereArgs: [orderId],
+      );
+
+      for (final line in lines) {
+        final productId = line['product_id'] as int?;
+        if (productId == null) continue;
+        final cloudProductId = (line['cloud_product_id'] as String?)?.trim();
+        if (cloudProductId != null && cloudProductId.isNotEmpty) {
+          cloudProductIdsByLocalProductId[productId] = cloudProductId;
+        } else {
+          final mapping = await _productCloudSyncabilityService.evaluate(
+            localProductId: productId,
+            db: txn,
+          );
+          if (!mapping.isSyncable || mapping.cloudProductId == null) {
+            throw StateError('Product is not linked to Cloud inventory.');
+          }
+          cloudProductIdsByLocalProductId[productId] = mapping.cloudProductId!;
+        }
+        lineProductLinks.add({
+          'orderLineId': line['id'] as int,
+          'productId': productId,
+          'qty': line['qty'] as int,
+        });
+      }
+
+      return _buildCompletedSaleSnapshot(
+        txn: txn,
+        orderId: orderId,
+        clientSyncId: clientSyncId,
+        orderNo: orderNo,
+        inventoryRows: lineProductLinks
+            .map((link) => {
+                  'id': link['orderLineId'],
+                  'product_id': link['productId'],
+                  'qty': link['qty'],
+                  'txn_type': 'sale',
+                  'created_at': DateTime.now().toIso8601String(),
+                })
+            .toList(),
+        cloudProductIdsByLocalProductId: cloudProductIdsByLocalProductId,
+      );
+    });
+  }
+
+  /// Persists the Cloud POS sync's returned customer link onto the order and,
+  /// when a Cloud company is available, onto the local customer cache too.
+  /// Safe to call repeatedly (idempotent) for sync retries.
+  Future<void> linkCloudCustomerId({
+    required int orderId,
+    required String cloudCustomerId,
+    String? cloudCompanyId,
+    CustomerRepository? customerRepository,
+  }) async {
+    final trimmedCloudId = cloudCustomerId.trim();
+    if (trimmedCloudId.isEmpty) return;
+
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      'orders',
+      {'cloud_customer_id': trimmedCloudId, 'updated_at': now},
+      where: 'id = ?',
+      whereArgs: [orderId],
+    );
+
+    final trimmedCompanyId = cloudCompanyId?.trim() ?? '';
+    if (trimmedCompanyId.isEmpty) return;
+
+    final rows = await db.query(
+      'orders',
+      columns: ['customer_id'],
+      where: 'id = ?',
+      whereArgs: [orderId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return;
+    final customerId = rows.first['customer_id'] as int?;
+    if (customerId == null) return;
+
+    await (customerRepository ?? CustomerRepository()).setCloudCustomerId(
+      customerId,
+      trimmedCloudId,
+      trimmedCompanyId,
+    );
+  }
+
+  Future<ConfirmedOrder> finalizeCloudConfirmedDraft({
+    required int orderId,
+    required String orderNo,
+    required String cloudOrderId,
+  }) async {
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+    final rewardManager = RewardManager();
+    final rewardSettings = await rewardManager.loadSettings();
+    final inventoryRepository = InventoryRepository();
+
+    return db.transaction<ConfirmedOrder>((txn) async {
+      final orderRows = await txn.query(
+        'orders',
+        columns: [
+          'status',
+          'customer_id',
+          'is_paid',
+          'grand_total_paise',
+          'reward_points_redeemed',
+          'reward_discount_amount_paise',
+        ],
+        where: 'id = ?',
+        whereArgs: [orderId],
+        limit: 1,
+      );
+      if (orderRows.isEmpty) throw StateError('Order $orderId not found');
+      final order = orderRows.first;
+      if (order['status'] != 'draft') {
+        throw StateError('Only draft orders can be confirmed');
+      }
+
+      final lines = await txn.query(
+        'order_lines',
+        columns: ['id', 'product_id', 'cloud_product_id', 'qty'],
+        where: 'order_id = ?',
+        whereArgs: [orderId],
+      );
+      final lineProductLinks = <Map<String, int>>[];
+      for (final line in lines) {
+        final productId = line['product_id'] as int?;
+        final cloudProductId = (line['cloud_product_id'] as String?)?.trim();
+        if (productId == null ||
+            (cloudProductId != null && cloudProductId.isNotEmpty)) {
+          continue;
+        }
+        lineProductLinks.add({
+          'orderLineId': line['id'] as int,
+          'productId': productId,
+          'qty': line['qty'] as int,
+        });
+      }
+
+      final customerId = order['customer_id'] as int?;
+      final isPaid = ((order['is_paid'] as int?) ?? 0) == 1;
+      final redeemedPoints = (order['reward_points_redeemed'] as int?) ?? 0;
+      final rewardDiscountPaise =
+          (order['reward_discount_amount_paise'] as int?) ?? 0;
+      final earnedPoints = customerId == null || !isPaid
+          ? 0
+          : rewardManager.calculateEarnedPoints(
+              paidBillPaise: (order['grand_total_paise'] as int?) ?? 0,
+              settings: rewardSettings,
+            );
+
+      await txn.update(
+        'orders',
+        {
+          'status': 'confirmed',
+          'order_no': orderNo,
+          'reward_points_earned': earnedPoints,
+          'confirmed_at': now,
+          'marketplace_name': 'Floraprise Cloud',
+          'marketplace_order_id': cloudOrderId,
+          'marketplace_status': 'synced',
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [orderId],
+      );
+
+      if (customerId != null &&
+          isPaid &&
+          (earnedPoints > 0 || redeemedPoints > 0)) {
+        await txn.rawUpdate(
+          '''
+          UPDATE customers
+          SET reward_points = MAX(0, reward_points - ?) + ?,
+              lifetime_reward_points = lifetime_reward_points + ?,
+              redeemed_reward_points = redeemed_reward_points + ?,
+              last_reward_activity = ?,
+              updated_at = ?
+          WHERE id = ?
+          ''',
+          [
+            redeemedPoints,
+            earnedPoints,
+            earnedPoints,
+            redeemedPoints,
+            now,
+            now,
+            customerId,
+          ],
+        );
+      } else if (rewardDiscountPaise > 0 && !isPaid) {
+        await txn.update(
+          'orders',
+          {
+            'reward_points_redeemed': 0,
+            'reward_discount_amount_paise': 0,
+          },
+          where: 'id = ?',
+          whereArgs: [orderId],
+        );
+      }
+
+      await txn.insert('order_timeline_events', {
+        'order_id': orderId,
+        'status': 'confirmed',
+        'notes': 'Order confirmed from cloud POS sync',
+        'created_at': now,
+        'created_by': 'walkInManager',
+      });
+
+      for (final link in lineProductLinks) {
+        await inventoryRepository.createConfirmedOrderSaleTransactionInTransaction(
+          transaction: txn,
+          productId: link['productId']!,
+          orderId: orderId,
+          orderLineId: link['orderLineId']!,
+          quantity: link['qty']!,
+          note: 'Cloud-confirmed walk-in deduction',
+        );
+      }
+
+      return ConfirmedOrder(
+        orderId: orderId,
+        lineProductLinks: lineProductLinks,
+      );
+    });
+  }
+
   Future<Map<String, dynamic>> _buildCompletedSaleSnapshot({
     required Transaction txn,
     required int orderId,
     required String clientSyncId,
-    required List<int> inventoryTransactionIds,
+    String? orderNo,
+    List<int>? inventoryTransactionIds,
+    List<Map<String, Object?>>? inventoryRows,
     required Map<int, String> cloudProductIdsByLocalProductId,
   }) async {
     final orderRows = await txn.rawQuery('''
       SELECT o.*, c.phone AS customer_phone_master, c.name AS customer_name_master,
              c.birthday_md, c.anniversary_md, c.company, c.department, c.notes,
              c.reward_points, c.lifetime_reward_points, c.redeemed_reward_points,
-             c.last_reward_activity
+             c.last_reward_activity, c.cloud_customer_id AS customer_cloud_customer_id
       FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
       WHERE o.id = ? LIMIT 1
     ''', [orderId]);
     if (orderRows.isEmpty) throw StateError('Order $orderId not found after confirmation');
     final lines = await txn.query('order_lines', where: 'order_id = ?', whereArgs: [orderId]);
     final payments = await txn.query('order_payments', where: 'order_id = ?', whereArgs: [orderId]);
-    final inventory = inventoryTransactionIds.isEmpty
+    final inventoryIds = inventoryTransactionIds ?? const <int>[];
+    final inventory = inventoryRows ??
+      (inventoryIds.isEmpty
         ? <Map<String, Object?>>[]
         : await txn.query(
-            'inventory_transactions',
-            where: 'id IN (${List.filled(inventoryTransactionIds.length, '?').join(', ')})',
-            whereArgs: inventoryTransactionIds,
-          );
+          'inventory_transactions',
+          where: 'id IN (${List.filled(inventoryIds.length, '?').join(', ')})',
+          whereArgs: inventoryIds,
+          ));
     final snapshotLines = lines.map((row) {
       final line = Map<String, dynamic>.from(row);
       final productId = line['product_id'] as int?;
@@ -692,10 +1024,25 @@ class OrderRepository {
       }
       return transaction;
     }).toList();
+    final orderSnapshot = Map<String, dynamic>.from(orderRows.single);
+    if (orderNo != null) {
+      orderSnapshot['order_no'] = orderNo;
+    }
+    // Prefer the order's own stored link (set at draft time); otherwise fall
+    // back to the linked customer's Cloud ID so the backend can reuse it.
+    final orderCloudCustomerId = (orderSnapshot['cloud_customer_id'] as String?)?.trim();
+    final customerCloudCustomerId = (orderSnapshot['customer_cloud_customer_id'] as String?)?.trim();
+    final resolvedCloudCustomerId = (orderCloudCustomerId != null && orderCloudCustomerId.isNotEmpty)
+        ? orderCloudCustomerId
+        : customerCloudCustomerId;
+    if (resolvedCloudCustomerId != null && resolvedCloudCustomerId.isNotEmpty) {
+      orderSnapshot['cloudCustomerId'] = resolvedCloudCustomerId;
+    }
+
     return {
       'clientSyncId': clientSyncId,
       'localOrderId': orderId,
-      'order': Map<String, dynamic>.from(orderRows.single),
+      'order': orderSnapshot,
       'lines': snapshotLines,
       'payments': payments.map((row) => Map<String, dynamic>.from(row)).toList(),
       'inventoryTransactions': snapshotInventory,
@@ -934,6 +1281,7 @@ class OrderRepository {
     required WalkInSession session,
     required OrderTotals totals,
     required int? customerId,
+    String? cloudCustomerId,
   }) async {
     final db = await AppDatabase.instance.database;
     final now = DateTime.now().toIso8601String();
@@ -959,6 +1307,8 @@ class OrderRepository {
       final updateMap = <String, Object?>{
         'fulfilment_type': _fulfilmentToDb(session.fulfilmentType),
         'customer_id': customerId,
+        if (cloudCustomerId != null && cloudCustomerId.trim().isNotEmpty)
+          'cloud_customer_id': cloudCustomerId.trim(),
         'customer_phone': session.customerPhone,
         'customer_name': session.customerName,
         'occasion': session.occasion,

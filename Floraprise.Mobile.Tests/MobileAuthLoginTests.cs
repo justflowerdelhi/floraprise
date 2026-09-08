@@ -1,9 +1,11 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Sumpooj.API.Controllers;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -29,6 +31,7 @@ public sealed class MobileAuthLoginTests : IDisposable
     private readonly RoleManager<IdentityRole<Guid>> _roleManager;
     private readonly MobileClientService _service;
     private readonly MobileAuthController _controller;
+    private readonly MobileCompanyController _companyController;
 
     public MobileAuthLoginTests()
     {
@@ -46,7 +49,8 @@ public sealed class MobileAuthLoginTests : IDisposable
             })
             .Build());
         services.AddDbContext<SumpoojDbContext>(options =>
-            options.UseInMemoryDatabase($"MobileAuthLogin_{Guid.NewGuid():N}"));
+            options.UseInMemoryDatabase($"MobileAuthLogin_{Guid.NewGuid():N}")
+                .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
         services.AddSingleton<ITenantContext, TestTenantContext>();
         services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
         {
@@ -70,10 +74,12 @@ public sealed class MobileAuthLoginTests : IDisposable
         services.AddScoped<IMobileUnitOfWork, MobileUnitOfWork>();
         services.AddScoped<IMobileSubscriptionService, MobileSubscriptionService>();
         services.AddScoped<ISubscriptionPaymentGatewayFactory, TestPaymentGatewayFactory>();
+        services.AddScoped<ILocationRepository, LocationRepository>();
         services.AddScoped<ICompanyService, CompanyService>();
         services.AddScoped<IMobileClientService, MobileClientService>();
         services.AddScoped<MobileClientService>();
         services.AddScoped<MobileAuthController>();
+        services.AddScoped<MobileCompanyController>();
 
         _provider = services.BuildServiceProvider();
         _db = _provider.GetRequiredService<SumpoojDbContext>();
@@ -81,6 +87,7 @@ public sealed class MobileAuthLoginTests : IDisposable
         _roleManager = _provider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
         _service = _provider.GetRequiredService<MobileClientService>();
         _controller = _provider.GetRequiredService<MobileAuthController>();
+        _companyController = _provider.GetRequiredService<MobileCompanyController>();
     }
 
     public void Dispose()
@@ -250,6 +257,88 @@ public sealed class MobileAuthLoginTests : IDisposable
     }
 
     [Fact]
+    public async Task Register_NewCompany_CreatesDefaultActiveLocation()
+    {
+        await EnsureCompanyAdminRoleAsync();
+
+        await _controller.Register(RegisterRequest(
+            companyName: "Location Florist",
+            mobile: "9876500000",
+            email: "location@example.com"), CancellationToken.None);
+
+        var company = await _db.Companies.SingleAsync(c => c.Name == "Location Florist");
+        var locations = await _db.Locations.Where(l => l.CompanyId == company.Id).ToListAsync();
+
+        var location = Assert.Single(locations);
+        Assert.True(location.IsActive);
+        Assert.True(location.IsDefault);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_UpdatesOwnCompany_AndDoesNotAffectOtherCompany()
+    {
+        var seeded = await SeedCompanyUserAsync();
+        var otherCompany = await SeedCompanyOnlyAsync("Other Florist", "8888888888", "other@example.com");
+
+        AuthenticateAs(_companyController, seeded.Company.Id, "CompanyAdmin");
+
+        var result = await _companyController.UpdateProfile(new UpdateCompanySettingsRequest
+        {
+            Name = "Jai Bajrang Bali",
+            Phone = "9876500000",
+            Email = "shop@example.com",
+            Address = "Main Bazaar",
+            ShortDescription = "Flower shop",
+            TaxIdentifier = "GSTIN123",
+            TimeZone = "Asia/Kolkata",
+            CurrencyCode = "INR",
+        }, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var profile = Assert.IsType<MobileCompanyProfileDto>(ok.Value);
+        Assert.Equal("Jai Bajrang Bali", profile.Name);
+        Assert.Equal("9876500000", profile.Phone);
+        Assert.Equal("shop@example.com", profile.Email);
+        Assert.Equal("GSTIN123", profile.TaxIdentifier);
+
+        // CompanyId isolation: only the authenticated company's row changed.
+        var updatedCompany = await _db.Companies.SingleAsync(c => c.Id == seeded.Company.Id);
+        Assert.Equal("Jai Bajrang Bali", updatedCompany.Name);
+        var untouchedCompany = await _db.Companies.SingleAsync(c => c.Id == otherCompany.Id);
+        Assert.Equal("Other Florist", untouchedCompany.Name);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_RejectsBlankName()
+    {
+        var seeded = await SeedCompanyUserAsync();
+        AuthenticateAs(_companyController, seeded.Company.Id, "CompanyAdmin");
+
+        var result = await _companyController.UpdateProfile(new UpdateCompanySettingsRequest
+        {
+            Name = "   ",
+        }, CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetProfile_ReturnsOnlyTheAuthenticatedCompanysProfile()
+    {
+        var seeded = await SeedCompanyUserAsync();
+        await SeedCompanyOnlyAsync("Other Florist", "8888888888", "other@example.com");
+
+        AuthenticateAs(_companyController, seeded.Company.Id, "CompanyAdmin");
+
+        var result = await _companyController.GetProfile(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var profile = Assert.IsType<MobileCompanyProfileDto>(ok.Value);
+        Assert.Equal(seeded.Company.Id, profile.Id);
+    }
+
+    [Fact]
     public async Task Register_SameCompanyNameAndNormalizedPhone_IsRejected()
     {
         await SeedCompanyOnlyAsync("Rose Palace", "+91 98765 43210", "rose@example.com");
@@ -307,6 +396,72 @@ public sealed class MobileAuthLoginTests : IDisposable
 
         Assert.IsType<ConflictObjectResult>(result);
         Assert.Equal(1, await _db.Companies.CountAsync());
+    }
+
+    [Fact]
+    public async Task Login_ProjectsIdentityRolesAndPreservesMobileClaims()
+    {
+        var seeded = await SeedCompanyUserAsync();
+        await EnsureCompanyAdminRoleAsync();
+        Assert.True((await _userManager.AddToRoleAsync(seeded.User, "CompanyAdmin")).Succeeded);
+
+        var login = await _service.LoginAsync(LoginRequest(seeded.User.Email!, seeded.Password));
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(login.AccessToken);
+        Assert.Equal(["CompanyAdmin"], RoleClaims(jwt));
+
+        // Existing mobile claims must survive alongside the new role claim.
+        Assert.Equal(seeded.Company.Id.ToString(), jwt.Claims.Single(c => c.Type == "company_id").Value);
+        Assert.Equal(login.MobileUserId.ToString(), jwt.Claims.Single(c => c.Type == "mobile_user_id").Value);
+        Assert.Equal(seeded.User.Id.ToString(), jwt.Claims.Single(c => c.Type == "identity_user_id").Value);
+        Assert.Equal("test-device-001", jwt.Claims.Single(c => c.Type == "device_id").Value);
+        Assert.Equal("mobile", jwt.Claims.Single(c => c.Type == "client_type").Value);
+        Assert.Equal(login.MobileUserId.ToString(), jwt.Claims.Single(c => c.Type == JwtRegisteredClaimNames.Sub).Value);
+        Assert.Single(jwt.Claims, c => c.Type == JwtRegisteredClaimNames.Jti);
+    }
+
+    [Fact]
+    public async Task Refresh_KeepsIdentityRolesInAccessToken()
+    {
+        var seeded = await SeedCompanyUserAsync();
+        await EnsureCompanyAdminRoleAsync();
+        Assert.True((await _userManager.AddToRoleAsync(seeded.User, "CompanyAdmin")).Succeeded);
+
+        var login = await _service.LoginAsync(LoginRequest(seeded.User.Email!, seeded.Password));
+        var refresh = await _service.RefreshAsync(new MobileApiRefreshRequest(login.RefreshToken));
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(refresh.AccessToken);
+        Assert.Equal(["CompanyAdmin"], RoleClaims(jwt));
+        Assert.Equal(seeded.User.Id.ToString(), jwt.Claims.Single(c => c.Type == "identity_user_id").Value);
+        Assert.Equal("mobile", jwt.Claims.Single(c => c.Type == "client_type").Value);
+    }
+
+    [Fact]
+    public async Task LoginAndRefresh_GrantNoRolesWhenIdentityUserHasNone()
+    {
+        var seeded = await SeedCompanyUserAsync();
+
+        var login = await _service.LoginAsync(LoginRequest(seeded.User.Email!, seeded.Password));
+        var refresh = await _service.RefreshAsync(new MobileApiRefreshRequest(login.RefreshToken));
+
+        Assert.Empty(RoleClaims(new JwtSecurityTokenHandler().ReadJwtToken(login.AccessToken)));
+        Assert.Empty(RoleClaims(new JwtSecurityTokenHandler().ReadJwtToken(refresh.AccessToken)));
+    }
+
+    private static List<string> RoleClaims(JwtSecurityToken jwt) => jwt.Claims
+        .Where(c => c.Type == ClaimTypes.Role || c.Type == "role")
+        .Select(c => c.Value)
+        .OrderBy(x => x)
+        .ToList();
+
+    private static void AuthenticateAs(ControllerBase controller, Guid companyId, params string[] roles)
+    {
+        var claims = new List<Claim> { new("company_id", companyId.ToString()) };
+        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test")) },
+        };
     }
 
     private async Task<(Company Company, ApplicationUser User, string Password)> SeedCompanyUserAsync(bool isActive = true)

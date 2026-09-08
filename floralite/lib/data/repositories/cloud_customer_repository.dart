@@ -29,6 +29,42 @@ class CloudCustomer {
       );
 }
 
+class CloudCustomerStatistics {
+  const CloudCustomerStatistics({
+    required this.customerId,
+    required this.totalOrders,
+    required this.lastOrderAt,
+    required this.lifetimePurchasePaise,
+    required this.pendingPaymentPaise,
+  });
+
+  final String customerId;
+  final int totalOrders;
+  final String? lastOrderAt;
+  final int lifetimePurchasePaise;
+  final int pendingPaymentPaise;
+
+  factory CloudCustomerStatistics.fromJson(Map<String, dynamic> json) =>
+      CloudCustomerStatistics(
+        customerId: json['customerId']?.toString() ??
+            json['CustomerId']?.toString() ??
+            '',
+        totalOrders: _readInt(json, 'totalOrders'),
+        lastOrderAt: json['lastOrderAt']?.toString() ??
+            json['LastOrderAt']?.toString(),
+        lifetimePurchasePaise: _readInt(json, 'lifetimePurchasePaise'),
+        pendingPaymentPaise: _readInt(json, 'pendingPaymentPaise'),
+      );
+
+  static int _readInt(Map<String, dynamic> json, String key) {
+    final value = json[key] ?? json['${key[0].toUpperCase()}${key.substring(1)}'];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+}
+
+
 class CloudCustomerException implements Exception {
   const CloudCustomerException(this.message);
 
@@ -38,11 +74,22 @@ class CloudCustomerException implements Exception {
   String toString() => message;
 }
 
+typedef CloudCustomerHttpSender = Future<Map<String, dynamic>> Function(
+  String method,
+  Uri uri, {
+  Map<String, dynamic>? body,
+});
+
 class CloudCustomerRepository {
-  CloudCustomerRepository({MobileAuthService? auth})
-      : _auth = auth ?? MobileAuthService();
+  CloudCustomerRepository({
+    MobileAuthService? auth,
+    CloudCustomerHttpSender? sender,
+  })  : _auth = auth ?? MobileAuthService(),
+        _sender = sender;
 
   final MobileAuthService _auth;
+  final CloudCustomerHttpSender? _sender;
+  final Map<String, CloudCustomerStatistics> _statisticsCache = {};
 
   Future<List<CloudCustomer>> getAll({String? query}) async {
     final queryParameters = <String, String>{
@@ -91,6 +138,39 @@ class CloudCustomerRepository {
     }
 
     return CloudCustomer.fromJson(response);
+  }
+
+  Future<CloudCustomerStatistics?> getStatistics(
+    String cloudCustomerId, {
+    String? companyId,
+  }) async {
+    final normalizedCustomerId = cloudCustomerId.trim();
+    if (normalizedCustomerId.isEmpty) return null;
+
+    final cacheKey = _statisticsCacheKey(
+      cloudCustomerId: normalizedCustomerId,
+      companyId: companyId,
+    );
+    final cached = _statisticsCache[cacheKey];
+
+    try {
+      final response = await _send(
+        'GET',
+        Uri.parse(
+          '${_auth.baseUrl}/api/v1/mobile/customers/'
+          '${Uri.encodeComponent(normalizedCustomerId)}/statistics',
+        ),
+      );
+      if (response.isEmpty) {
+        return cached;
+      }
+
+      final stats = CloudCustomerStatistics.fromJson(response);
+      _statisticsCache[cacheKey] = stats;
+      return stats;
+    } catch (_) {
+      return cached;
+    }
   }
 
   Future<String> create({
@@ -150,6 +230,11 @@ class CloudCustomerRepository {
     Uri uri, {
     Map<String, dynamic>? body,
   }) async {
+    final sender = _sender;
+    if (sender != null) {
+      return sender(method, uri, body: body);
+    }
+
     var token = await _auth.getStoredAccessToken();
 
     if (token == null || token.trim().isEmpty) {
@@ -265,5 +350,13 @@ class CloudCustomerRepository {
     return digits.length >= 10
         ? digits.substring(digits.length - 10)
         : digits;
+  }
+
+  static String _statisticsCacheKey({
+    required String cloudCustomerId,
+    String? companyId,
+  }) {
+    final normalizedCompanyId = companyId?.trim().toLowerCase() ?? '';
+    return '$normalizedCompanyId:$cloudCustomerId';
   }
 }

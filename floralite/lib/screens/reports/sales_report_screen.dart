@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../../data/repositories/cloud_dashboard_repository.dart';
 import '../../data/repositories/order_repository.dart';
 import '../../models/order_workspace_models.dart';
 import '../../managers/business_settings_manager.dart';
+import '../../providers/storage_mode_provider.dart';
 import '../../widgets/common_widgets.dart';
 
 class SalesReportScreen extends StatefulWidget {
@@ -17,6 +20,8 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
   final OrderRepository _orderRepository = OrderRepository();
   final BusinessSettingsManager _businessSettingsManager =
       BusinessSettingsManager();
+  final CloudDashboardRepository _cloudDashboardRepository =
+      CloudDashboardRepository();
 
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
@@ -51,6 +56,25 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     setState(() => _isLoading = true);
 
     try {
+      if (context.read<StorageModeProvider>().isCloud) {
+        final summary = await _cloudDashboardRepository.getSummary(
+          fromDate: _startDate,
+          toDate: _endDate,
+        );
+
+        if (!mounted) return;
+        setState(() {
+          _totalSales = summary?.totalSalesPaise ?? 0;
+          _cashSales = summary?.cashPaise ?? 0;
+          _upiSales = summary?.upiPaise ?? 0;
+          _cardSales = summary?.cardPaise ?? 0;
+          _creditSales = summary?.creditPaise ?? 0;
+          _orderCount = summary?.orderCount ?? 0;
+          _isLoading = false;
+        });
+        return;
+      }
+
       final orders = await _orderRepository.getOrdersForWorkspace(
         tab: 'all',
         searchQuery: '',

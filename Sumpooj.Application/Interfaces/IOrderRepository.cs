@@ -14,6 +14,9 @@ public interface IOrderRepository
     Task<List<OrderListDto>> GetByCustomerAsync(Guid companyId, Guid customerId);
     Task AddAsync(Order order);
     Task UpdateAsync(Order order);
+
+    /// <summary>Persists a line-set replacement on an order previously loaded through <see cref="GetByIdAsync"/>.</summary>
+    Task ReplaceItemsAsync(Order order);
     Task<string> GetNextOrderNumberAsync(Guid companyId);
 
     Task<List<Order>> GetByIdsAsync(Guid companyId, List<Guid> ids);

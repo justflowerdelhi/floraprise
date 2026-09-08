@@ -1,10 +1,12 @@
 import 'package:floraprise/data/database/app_database.dart';
 import 'package:floraprise/data/repositories/category_repository.dart';
+import 'package:floraprise/data/repositories/cloud_product_repository.dart';
 import 'package:floraprise/data/repositories/inventory_repository.dart';
 import 'package:floraprise/data/repositories/product_repository.dart';
 import 'package:floraprise/data/repositories/production_repository.dart';
 import 'package:floraprise/l10n/app_localizations.dart';
 import 'package:floraprise/managers/category_manager.dart';
+import 'package:floraprise/models/gst_calculation_type.dart';
 import 'package:floraprise/providers/category_provider.dart';
 import 'package:floraprise/providers/product_provider.dart';
 import 'package:floraprise/screens/categories_screen.dart';
@@ -121,6 +123,148 @@ void main() {
       ),
       isEmpty,
     );
+  });
+
+  test('POS product picker uses current stock without subtracting confirmed sales again', () async {
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+    final productId = await db.insert('products', {
+      'name': 'Red Roses',
+      'category': 'Flowers',
+      'selling_price_paise': 1000,
+      'gst_percent': 0,
+      'default_unit': 'Stem',
+      'track_inventory': 1,
+      'active': 1,
+      'created_at': now,
+      'updated_at': now,
+    });
+    await db.insert('inventory_items', {
+      'product_id': productId,
+      'current_qty': 195,
+      'min_qty': 10,
+      'updated_at': now,
+    });
+    await db.insert('inventory_transactions', {
+      'product_id': productId,
+      'txn_type': 'sale',
+      'qty': 20,
+      'source': 'Walk-in Sale',
+      'created_at': now,
+    });
+
+    final product = (await ProductRepository().listActiveProductsWithInventory())
+        .singleWhere((product) => product.id == productId);
+
+    expect(product.currentQty, 195);
+    expect(productPickerAvailabilityText(product), 'Stock: 195 Stems');
+  });
+
+  test('POS product picker display prefers Inventory stock source over stale product stock row', () {
+    final productRow = _inventoryProduct(
+      unit: 'Stem',
+      cloudProductId: '11111111-1111-4111-8111-111111111111',
+      currentQty: 175,
+      minQty: 10,
+    );
+    final displayed = productPickerApplyInventoryStock(
+      [productRow],
+      const [
+        InventoryProductRecord(
+          productId: 1,
+          cloudProductId: '11111111-1111-4111-8111-111111111111',
+          name: 'Test Product',
+          category: 'Flowers',
+          unit: 'Stem',
+          sku: '',
+          barcode: '',
+          trackInventory: true,
+          gstPercent: 0,
+          gstCalculationType: GstCalculationType.inclusive,
+          currentQty: 195,
+          minQty: 10,
+        ),
+      ],
+    ).single;
+
+    expect(productPickerAvailabilityText(displayed), 'Stock: 195 Stems');
+  });
+
+  test('Cloud POS product picker builds rows from Cloud inventory without SQLite mappings', () {
+    const cloudProductId = '11111111-1111-4111-8111-111111111111';
+    final rows = productPickerRowsFromCloudInventory(const [
+      InventoryProductRecord(
+        productId: -1,
+        cloudProductId: cloudProductId,
+        name: 'Cloud Rose',
+        category: 'Flowers',
+        unit: 'Stem',
+        sku: 'CLOUD-ROSE',
+        barcode: '890000000001',
+        trackInventory: true,
+        gstPercent: 0,
+        gstCalculationType: GstCalculationType.inclusive,
+        currentQty: 12,
+        minQty: 3,
+      ),
+    ]);
+
+    final product = productPickerVisibleProducts(rows, '').single;
+    expect(product.name, 'Cloud Rose');
+    expect(product.cloudProductId, cloudProductId);
+    expect(productPickerAvailabilityText(product), 'Stock: 12 Stems');
+  });
+
+  test('Cloud POS product picker enriches Cloud inventory stock with catalog pricing', () {
+    const cloudProductId = '11111111-1111-4111-8111-111111111111';
+    final rows = productPickerRowsFromCloudInventory(
+      const [
+        InventoryProductRecord(
+          productId: -1,
+          cloudProductId: cloudProductId,
+          name: 'Cloud Rose',
+          category: 'Flowers',
+          unit: 'Stem',
+          sku: 'CLOUD-ROSE',
+          barcode: '',
+          trackInventory: true,
+          gstPercent: 0,
+          gstCalculationType: GstCalculationType.inclusive,
+          currentQty: 12,
+          minQty: 3,
+        ),
+      ],
+      [_cloudPickerProduct(cloudProductId, retailPrice: 125.5, costPrice: 75.25)],
+    );
+
+    final product = rows.single;
+    expect(product.sellingPricePaise, 12550);
+    expect(product.purchasePricePaise, 7525);
+    expect(product.currentQty, 12);
+    expect(product.cloudProductId, cloudProductId);
+  });
+
+  test('Cloud POS product picker keeps zero-stock products visible but non-selectable', () {
+    final rows = productPickerRowsFromCloudInventory(const [
+      InventoryProductRecord(
+        productId: -1,
+        cloudProductId: '11111111-1111-4111-8111-111111111111',
+        name: 'Sold Out Cloud Rose',
+        category: 'Flowers',
+        unit: 'Stem',
+        sku: 'SOLD-OUT',
+        barcode: '',
+        trackInventory: true,
+        gstPercent: 0,
+        gstCalculationType: GstCalculationType.inclusive,
+        currentQty: 0,
+        minQty: 2,
+      ),
+    ]);
+
+    final product = productPickerVisibleProducts(rows, '').single;
+    expect(productPickerIsOutOfStock(product), isTrue);
+    expect(productPickerCanSelect(product), isFalse);
   });
 
   test('POS product picker shows loaded products regardless of stock quantity',
@@ -489,6 +633,7 @@ int _indexOfBytes(List<int> bytes, List<int> pattern) {
 ProductInventoryRecord _inventoryProduct({
   String sku = '',
   String unit = 'Piece',
+  String? cloudProductId,
   bool trackInventory = true,
   int currentQty = 0,
   int minQty = 0,
@@ -503,6 +648,7 @@ ProductInventoryRecord _inventoryProduct({
     barcode: '',
     manufacturerBarcode: '',
     florapriseBarcode: '',
+    cloudProductId: cloudProductId,
     sellingPricePaise: 10000,
     purchasePricePaise: null,
     gstPercent: 0,
@@ -513,6 +659,41 @@ ProductInventoryRecord _inventoryProduct({
     minQty: minQty,
   );
 }
+
+CloudProduct _cloudPickerProduct(
+  String id, {
+  required double retailPrice,
+  required double costPrice,
+}) => CloudProduct(
+  id: id,
+  companyId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  name: 'Catalog Rose',
+  sku: 'CATALOG-ROSE',
+  barcode: null,
+  manufacturerBarcode: null,
+  internalBarcode: null,
+  brand: null,
+  description: null,
+  category: 'Flowers',
+  categoryId: null,
+  unitOfMeasure: 'Stem',
+  retailPrice: retailPrice,
+  costPrice: costPrice,
+  wholesalePrice: null,
+  weddingEventPrice: null,
+  taxCategory: 'Standard',
+  trackInventory: true,
+  trackBatch: false,
+  stockQuantity: 0,
+  minimumStockLevel: 0,
+  reorderLevel: 0,
+  isActive: true,
+  shelfLifeDays: null,
+  expiryAlertDays: null,
+  temperatureNotes: null,
+  createdAtUtc: DateTime.utc(2026, 9, 8),
+  updatedAtUtc: null,
+);
 
 class _TestApp extends StatelessWidget {
   const _TestApp({required this.child});

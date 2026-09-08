@@ -79,14 +79,23 @@ class CloudCompanyProfile {
 /// Repository for fetching company profile from Cloud API
 /// This is used only in Cloud Store mode to display company information
 /// in Settings → Shop Details.
+typedef CloudCompanyProfileSender = Future<dynamic> Function(
+  String method,
+  Uri uri, {
+  Map<String, dynamic>? body,
+});
+
 class CloudCompanyProfileRepository {
   static const _cacheKey = 'cloud_company_profile';
 
   final FlutterSecureStorage _secureStorage;
+  final CloudCompanyProfileSender? _sender;
 
   CloudCompanyProfileRepository({
     FlutterSecureStorage? secureStorage,
-  }) : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+    CloudCompanyProfileSender? sender,
+  })  : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
+        _sender = sender;
 
   /// Fetches the company profile from the Cloud API.
   /// The endpoint uses the authenticated JWT company_id claim,
@@ -189,6 +198,75 @@ class CloudCompanyProfileRepository {
 
       // On error, return cached profile if available
       return await _getCachedProfile();
+    } finally {
+      httpClient.close(force: true);
+    }
+  }
+
+  /// Updates the company profile via the Cloud API.
+  /// Only non-null fields are sent, matching the backend's partial-update contract.
+  /// Requires the caller to hold the CompanyAdmin role.
+  Future<CloudCompanyProfile> updateCompanyProfile({
+    required String baseUrl,
+    required String accessToken,
+    String? name,
+    String? phone,
+    String? email,
+    String? address,
+    String? shortDescription,
+    String? timeZone,
+    String? currencyCode,
+    String? taxIdentifier,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/mobile/company/profile');
+    final override = _sender;
+    if (override != null) {
+      final json = await override('PUT', uri, body: {
+        if (name != null) 'name': name,
+        if (phone != null) 'phone': phone,
+        if (email != null) 'email': email,
+        if (address != null) 'address': address,
+        if (shortDescription != null) 'shortDescription': shortDescription,
+        if (timeZone != null) 'timeZone': timeZone,
+        if (currencyCode != null) 'currencyCode': currencyCode,
+        if (taxIdentifier != null) 'taxIdentifier': taxIdentifier,
+      });
+      final data = json is Map<String, dynamic> ? json['data'] ?? json : json;
+      final profile = CloudCompanyProfile.fromJson(data as Map<String, dynamic>);
+      await _cacheProfile(profile);
+      return profile;
+    }
+
+    final httpClient = HttpClient();
+    try {
+      final request = await httpClient.openUrl('PUT', uri);
+      request.headers.add('Authorization', 'Bearer $accessToken');
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({
+        if (name != null) 'name': name,
+        if (phone != null) 'phone': phone,
+        if (email != null) 'email': email,
+        if (address != null) 'address': address,
+        if (shortDescription != null) 'shortDescription': shortDescription,
+        if (timeZone != null) 'timeZone': timeZone,
+        if (currencyCode != null) 'currencyCode': currencyCode,
+        if (taxIdentifier != null) 'taxIdentifier': taxIdentifier,
+      }));
+
+      final response = await request.close().timeout(
+            const Duration(seconds: 20),
+          );
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError('Cloud company profile update failed (HTTP ${response.statusCode}).');
+      }
+
+      final json = jsonDecode(responseBody);
+      final data = json is Map<String, dynamic> ? json['data'] ?? json : json;
+      final profile = CloudCompanyProfile.fromJson(data as Map<String, dynamic>);
+      await _cacheProfile(profile);
+      return profile;
     } finally {
       httpClient.close(force: true);
     }

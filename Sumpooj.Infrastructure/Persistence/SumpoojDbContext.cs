@@ -157,6 +157,13 @@ public class SumpoojDbContext
         {
             entity.HasOne<Staff>()
                 .WithMany()
+                .HasForeignKey(o => o.AssignedDesignerStaffId)
+                .HasConstraintName("FK_Orders_AssignedDesignerStaff")
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(o => o.AssignedDesignerStaffId);
+
+            entity.HasOne<Staff>()
+                .WithMany()
                 .HasForeignKey(o => o.DeliveryPersonId)
                 .HasConstraintName("FK_Orders_DeliveryPerson")
                 .OnDelete(DeleteBehavior.SetNull);

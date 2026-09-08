@@ -4,6 +4,7 @@ using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Production;
 using Sumpooj.Application.UseCases;
+using Sumpooj.Domain.Entities;
 using System.Security.Claims;
 
 namespace Sumpooj.API.Controllers;
@@ -135,8 +136,36 @@ public class ProductionController : ControllerBase
     // ─── Wastage ────────────────────────────────────────────
 
     [HttpGet("wastage")]
-    public async Task<ActionResult<List<WastageLogDto>>> GetWastageLogs()
-        => Ok(await _service.GetWastageLogsAsync(CompanyId));
+    public async Task<ActionResult<List<WastageLogDto>>> GetWastageLogs(
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] Guid? productId,
+        [FromQuery] string? category,
+        [FromQuery] string? reason)
+    {
+        var filter = new WastageLogFilter
+        {
+            From = from,
+            To = to,
+            ProductId = productId,
+        };
+
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            if (!Enum.TryParse<ProductCategory>(category, true, out var parsedCategory))
+                return BadRequest(new { message = $"Unknown product category: {category}" });
+            filter.Category = parsedCategory;
+        }
+
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            if (!Enum.TryParse<WastageReason>(reason, true, out var parsedReason))
+                return BadRequest(new { message = $"Unknown wastage reason: {reason}" });
+            filter.Reason = parsedReason;
+        }
+
+        return Ok(await _service.GetWastageLogsAsync(CompanyId, filter));
+    }
 
     [HttpPost("wastage")]
     public async Task<ActionResult<WastageLogDto>> CreateWastage([FromBody] CreateWastageRequest request)

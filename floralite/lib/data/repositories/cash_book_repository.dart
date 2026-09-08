@@ -1,5 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+
 import '../database/app_database.dart';
 import '../../models/cash_book.dart';
+import '../../services/mobile_auth_service.dart';
+
+typedef CloudCashBookSender = Future<dynamic> Function(String method, Uri uri);
 
 class CashBookRepository {
   Future<List<CashBook>> getByDate(DateTime date) async {
@@ -109,5 +117,165 @@ class CashBookRepository {
 
   String _dateToIso(DateTime date) {
     return DateTime(date.year, date.month, date.day).toIso8601String();
+  }
+}
+
+class CloudCashBookRepository {
+  CloudCashBookRepository({
+    MobileAuthService? auth,
+    CloudCashBookSender? sender,
+  })  : _auth = auth ?? MobileAuthService(),
+        _sender = sender;
+
+  final MobileAuthService _auth;
+  final CloudCashBookSender? _sender;
+
+  Future<List<CashBook>> getByDate(DateTime date) async {
+    final response = await _send(
+      'GET',
+      Uri.parse('${_auth.baseUrl}/api/accounting/cash-book').replace(
+        queryParameters: {'date': _dateQueryValue(date)},
+      ),
+    );
+    if (response is! List) return const [];
+
+    return response
+        .whereType<Map>()
+        .map((entry) => entry.cast<String, dynamic>())
+        .toList()
+        .asMap()
+        .entries
+        .map((entry) => _fromCloudJson(entry.value, -(entry.key + 1)))
+        .toList();
+  }
+
+  Future<List<CashBook>> search(
+    String query,
+    DateTime? startDate,
+    DateTime? endDate,
+  ) async {
+    final queryParameters = <String, String>{
+      'query': query,
+      if (startDate != null && endDate != null)
+        'from': _dateQueryValue(startDate),
+      if (startDate != null && endDate != null) 'to': _dateQueryValue(endDate),
+    };
+    final response = await _send(
+      'GET',
+      Uri.parse('${_auth.baseUrl}/api/accounting/cash-book').replace(
+        queryParameters: queryParameters,
+      ),
+    );
+    if (response is! List) return const [];
+
+    return response
+        .whereType<Map>()
+        .map((entry) => entry.cast<String, dynamic>())
+        .toList()
+        .asMap()
+        .entries
+        .map((entry) => _fromCloudJson(entry.value, -(entry.key + 1)))
+        .toList();
+  }
+
+  Future<dynamic> _send(String method, Uri uri) async {
+    final override = _sender;
+    if (override != null) {
+      return override(method, uri);
+    }
+
+    var token = await _auth.getStoredAccessToken();
+    if (token == null || token.trim().isEmpty) {
+      throw StateError('Cloud session is not available. Please log in again.');
+    }
+
+    debugPrint('[CASH-BOOK-CLOUD] $method $uri');
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final client = HttpClient();
+      try {
+        final request = await client.openUrl(method, uri).timeout(
+              const Duration(seconds: 12),
+            );
+        request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
+        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+
+        final response =
+            await request.close().timeout(const Duration(seconds: 20));
+        final responseBody = await response.transform(utf8.decoder).join();
+        debugPrint('[CASH-BOOK-CLOUD] HTTP STATUS: ${response.statusCode}');
+
+        if (response.statusCode == 401 && attempt == 0) {
+          final refreshed = await _auth.refreshAndBootstrap();
+          token = refreshed.accessToken;
+          continue;
+        }
+
+        final decoded = responseBody.trim().isEmpty
+            ? <String, dynamic>{}
+            : _decode(responseBody);
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          final message = decoded is Map
+              ? decoded['message'] ??
+                  decoded['detail'] ??
+                  decoded['title'] ??
+                  decoded['error']
+              : null;
+          throw StateError(
+            message?.toString() ??
+                'Cloud cash book request failed (HTTP ${response.statusCode}).',
+          );
+        }
+        return decoded;
+      } on SocketException catch (error) {
+        throw StateError('Unable to connect to Floraprise Cloud: $error');
+      } finally {
+        client.close(force: true);
+      }
+    }
+    throw StateError('Cloud cash book request failed.');
+  }
+
+  CashBook _fromCloudJson(Map<String, dynamic> json, int id) {
+    return CashBook(
+      id: id,
+      date: _date(json, 'date'),
+      transactionType: CashBookTransactionTypeExtension.fromString(
+        _string(json, 'transactionType'),
+      ),
+      description: _string(json, 'description'),
+      amount: _moneyPaise(json, 'amount'),
+      cashIn: _moneyPaise(json, 'cashIn'),
+      cashOut: _moneyPaise(json, 'cashOut'),
+      runningBalance: _moneyPaise(json, 'runningBalance'),
+      createdAt: _date(json, 'createdAtUtc'),
+    );
+  }
+
+  static dynamic _decode(String text) {
+    try {
+      return jsonDecode(text);
+    } catch (_) {
+      return <String, dynamic>{};
+    }
+  }
+
+    static String _dateQueryValue(DateTime date) =>
+      DateTime.utc(date.year, date.month, date.day).toIso8601String();
+
+  static String _key(Map<String, dynamic> json, String key) =>
+      json.containsKey(key) ? key : '${key[0].toUpperCase()}${key.substring(1)}';
+
+  static String _string(Map<String, dynamic> json, String key) =>
+      json[_key(json, key)]?.toString() ?? '';
+
+  static DateTime _date(Map<String, dynamic> json, String key) {
+    return DateTime.tryParse(_string(json, key)) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  static int _moneyPaise(Map<String, dynamic> json, String key) {
+    final value = json[_key(json, key)];
+    if (value is num) return (value * 100).round();
+    return ((double.tryParse(value?.toString() ?? '') ?? 0) * 100).round();
   }
 }

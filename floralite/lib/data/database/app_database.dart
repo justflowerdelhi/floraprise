@@ -55,7 +55,11 @@ class AppDatabase {
         await _ensureDeliveryAssignmentSyncColumns(db);
         await _ensureRewardColumns(db);
         await _ensurePosSyncOutbox(db);
+        await _ensurePosClientSyncColumn(db);
         await _ensureProductCloudLinkColumns(db);
+        await _ensureOrderLineCloudProductColumn(db);
+        await _ensureCustomerCloudLinkColumns(db);
+        await _ensureOrderCloudCustomerColumn(db);
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -72,6 +76,8 @@ class AppDatabase {
             lifetime_reward_points INTEGER NOT NULL DEFAULT 0,
             redeemed_reward_points INTEGER NOT NULL DEFAULT 0,
             last_reward_activity TEXT,
+            cloud_customer_id TEXT,
+            cloud_company_id TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             deleted_at TEXT
@@ -201,6 +207,7 @@ class AppDatabase {
             fulfilment_type TEXT NOT NULL,
             status TEXT NOT NULL,
             customer_id INTEGER,
+            cloud_customer_id TEXT,
             customer_phone TEXT,
             customer_name TEXT,
             occasion TEXT,
@@ -221,6 +228,7 @@ class AppDatabase {
             marketplace_name TEXT,
             marketplace_order_id TEXT,
             marketplace_status TEXT,
+            pos_client_sync_id TEXT,
             relay_partner_name TEXT,
             relay_partner_phone TEXT,
             relay_partner_email TEXT,
@@ -301,6 +309,7 @@ class AppDatabase {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             order_id INTEGER NOT NULL,
             product_id INTEGER,
+            cloud_product_id TEXT,
             design_ref TEXT,
             description TEXT NOT NULL,
             qty INTEGER NOT NULL,
@@ -621,6 +630,15 @@ class AppDatabase {
         );
         await db.execute(
           "CREATE UNIQUE INDEX idx_products_cloud_product_id_unique ON products(cloud_product_id) WHERE cloud_product_id IS NOT NULL AND TRIM(cloud_product_id) <> ''",
+        );
+        await db.execute(
+          "CREATE UNIQUE INDEX idx_customers_cloud_customer_id_unique ON customers(cloud_customer_id) WHERE cloud_customer_id IS NOT NULL AND TRIM(cloud_customer_id) <> ''",
+        );
+        await db.execute(
+          "CREATE INDEX idx_customers_cloud_company_id ON customers(cloud_company_id) WHERE cloud_company_id IS NOT NULL AND TRIM(cloud_company_id) <> ''",
+        );
+        await db.execute(
+          "CREATE INDEX idx_orders_cloud_customer_id ON orders(cloud_customer_id) WHERE cloud_customer_id IS NOT NULL AND TRIM(cloud_customer_id) <> ''",
         );
         await db.execute(
           'CREATE INDEX idx_morning_purchase_list_date_status ON morning_purchase_list_items(list_date, purchased)',
@@ -1049,6 +1067,11 @@ class AppDatabase {
 
         if (oldVersion < 44) {
           await _ensureProductCloudLinkColumns(db);
+        }
+
+        if (oldVersion < 45) {
+          await _ensureCustomerCloudLinkColumns(db);
+          await _ensureOrderCloudCustomerColumn(db);
         }
 
         if (oldVersion < 11) {
@@ -1742,11 +1765,40 @@ class AppDatabase {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_pos_sync_outbox_next_attempt ON pos_sync_outbox(next_attempt_at)');
   }
 
+  Future<void> _ensurePosClientSyncColumn(Database db) async {
+    await _ensureColumn(db, 'orders', 'pos_client_sync_id', 'TEXT');
+    await db.execute(
+      "CREATE INDEX IF NOT EXISTS idx_orders_pos_client_sync_id ON orders(pos_client_sync_id) WHERE pos_client_sync_id IS NOT NULL AND TRIM(pos_client_sync_id) <> ''",
+    );
+  }
+
   Future<void> _ensureProductCloudLinkColumns(Database db) async {
     await _ensureColumn(db, 'products', 'cloud_product_id', 'TEXT');
     await _ensureColumn(db, 'products', 'cloud_product_company_id', 'TEXT');
     await db.execute(
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_products_cloud_product_id_unique ON products(cloud_product_id) WHERE cloud_product_id IS NOT NULL AND TRIM(cloud_product_id) <> ''",
+    );
+  }
+
+  Future<void> _ensureOrderLineCloudProductColumn(Database db) async {
+    await _ensureColumn(db, 'order_lines', 'cloud_product_id', 'TEXT');
+  }
+
+  Future<void> _ensureCustomerCloudLinkColumns(Database db) async {
+    await _ensureColumn(db, 'customers', 'cloud_customer_id', 'TEXT');
+    await _ensureColumn(db, 'customers', 'cloud_company_id', 'TEXT');
+    await db.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_cloud_customer_id_unique ON customers(cloud_customer_id) WHERE cloud_customer_id IS NOT NULL AND TRIM(cloud_customer_id) <> ''",
+    );
+    await db.execute(
+      "CREATE INDEX IF NOT EXISTS idx_customers_cloud_company_id ON customers(cloud_company_id) WHERE cloud_company_id IS NOT NULL AND TRIM(cloud_company_id) <> ''",
+    );
+  }
+
+  Future<void> _ensureOrderCloudCustomerColumn(Database db) async {
+    await _ensureColumn(db, 'orders', 'cloud_customer_id', 'TEXT');
+    await db.execute(
+      "CREATE INDEX IF NOT EXISTS idx_orders_cloud_customer_id ON orders(cloud_customer_id) WHERE cloud_customer_id IS NOT NULL AND TRIM(cloud_customer_id) <> ''",
     );
   }
 

@@ -29,8 +29,8 @@ public interface IProductRepository
         int page,
         int pageSize);
 
-    Task<List<Product>> GetLowStockProductsAsync();
-    Task<List<Product>> GetProductsNeedingReorderAsync();
+    Task<List<Product>> GetLowStockProductsAsync(Guid companyId);
+    Task<List<Product>> GetProductsNeedingReorderAsync(Guid companyId);
     Task<bool> SkuExistsAsync(string sku, Guid? excludeProductId = null);
     Task<int> GetLowStockCountAsync(Guid companyId);
     Task<Product?> GetByIdAsync(Guid companyId, Guid id);

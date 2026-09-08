@@ -402,12 +402,124 @@ public class OrderService
         }
     }
 
+    public async Task UpdateDetailsAsync(Guid companyId, Guid id, UpdateOrderDetailsRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var order = await _orderRepository.GetByIdAsync(companyId, id)
+            ?? throw new KeyNotFoundException("Order not found");
+        order.EnsureEditable();
+
+        order.UpdateDeliveryDetails(
+            request.DeliveryDate ?? order.DeliveryDate,
+            request.DeliveryAddress ?? order.DeliveryAddress,
+            request.DeliveryPincode ?? order.DeliveryPincode,
+            request.RecipientName ?? order.RecipientName,
+            request.RecipientPhone ?? order.RecipientPhone);
+
+        if (request.TimeSlot != null)
+            order.SetTimeSlot(request.TimeSlot);
+
+        if (request.CardMessage != null)
+            order.SetCardMessage(request.CardMessage);
+
+        await _orderRepository.UpdateAsync(order);
+    }
+
+    public async Task ReplaceItemsAsync(Guid companyId, Guid id, ReplaceOrderItemsRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.Items.Count == 0)
+            throw new ArgumentException("At least one order item is required.", nameof(request));
+
+        var order = await _orderRepository.GetByIdAsync(companyId, id)
+            ?? throw new KeyNotFoundException("Order not found");
+        order.EnsureEditable();
+
+        var items = new List<OrderItem>(request.Items.Count);
+        foreach (var line in request.Items)
+        {
+            if (line.Quantity <= 0)
+                throw new ArgumentException("Item quantity must be greater than zero.", nameof(request));
+            if (line.UnitPrice < 0)
+                throw new ArgumentException("Item unit price cannot be negative.", nameof(request));
+
+            var item = new OrderItem(
+                line.ProductId,
+                string.IsNullOrWhiteSpace(line.ProductName) ? "Item" : line.ProductName.Trim(),
+                line.Quantity,
+                line.UnitPrice);
+            item.SetSpecialInstructions(line.SpecialInstructions);
+            item.SetPosFinancialDetails(
+                line.ClientOrderLineId,
+                line.TaxRatePercent,
+                line.DiscountType,
+                line.DiscountValue,
+                line.DiscountAmount,
+                line.LineSubtotal,
+                line.LineTaxAmount);
+            items.Add(item);
+        }
+
+        order.ReplaceItems(items);
+
+        if (request.TaxAmount.HasValue)
+        {
+            if (request.TaxAmount.Value < 0)
+                throw new ArgumentException("Tax amount cannot be negative.", nameof(request));
+            order.SetTaxAmount(request.TaxAmount.Value);
+        }
+
+        await _orderRepository.ReplaceItemsAsync(order);
+    }
+
+    public async Task UpdateFinancialsAsync(Guid companyId, Guid id, UpdateOrderFinancialsRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var order = await _orderRepository.GetByIdAsync(companyId, id)
+            ?? throw new KeyNotFoundException("Order not found");
+        order.EnsureEditable();
+
+        if (request.DeliveryFee.HasValue)
+        {
+            if (request.DeliveryFee.Value < 0)
+                throw new ArgumentException("Delivery fee cannot be negative.", nameof(request));
+            order.SetDeliveryFee(request.DeliveryFee.Value);
+        }
+
+        if (request.DiscountAmount.HasValue)
+            order.ApplyDiscount(request.DiscountAmount.Value);
+
+        if (request.RewardPointsRedeemed.HasValue)
+            order.SetRewardPoints(order.RewardPointsEarned, request.RewardPointsRedeemed.Value);
+
+        if (request.RewardDiscountAmount.HasValue)
+        {
+            if (request.RewardDiscountAmount.Value < 0)
+                throw new ArgumentException("Reward discount cannot be negative.", nameof(request));
+            order.SetPosFinancialDetails(order.PosRoundOffAmount, request.RewardDiscountAmount.Value);
+        }
+
+        await _orderRepository.UpdateAsync(order);
+    }
+
     public async Task AssignDesignerAsync(Guid companyId, Guid orderId, Guid designerId)
     {
         var order = await _orderRepository.GetByIdAsync(companyId, orderId)
             ?? throw new KeyNotFoundException("Order not found");
 
-        order.StartProcessing(designerId);
+        order.AssignDesigner(designerId);
+        await _orderRepository.UpdateAsync(order);
+    }
+
+    public async Task AssignDesignerStaffAsync(Guid companyId, Guid orderId, Guid designerStaffId)
+    {
+        var order = await _orderRepository.GetByIdAsync(companyId, orderId)
+            ?? throw new KeyNotFoundException("Order not found");
+
+        order.AssignDesignerStaff(designerStaffId);
         await _orderRepository.UpdateAsync(order);
     }
 
@@ -1021,6 +1133,7 @@ public class OrderService
         RewardPointsEarned = order.RewardPointsEarned,
         RewardPointsRedeemed = order.RewardPointsRedeemed,
         AssignedDesignerId = order.AssignedToUserId,
+        AssignedDesignerStaffId = order.AssignedDesignerStaffId,
         DeliveryPersonId = order.DeliveryPersonId,
         LocationId = order.LocationId,
         LocationName = order.Location?.Name,

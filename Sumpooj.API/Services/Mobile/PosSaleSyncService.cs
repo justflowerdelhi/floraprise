@@ -147,6 +147,8 @@ public sealed class PosSaleSyncService : IPosSaleSyncService
                     _db.Payments.Add(payment);
                 }
 
+                await AddCashSaleEntryAsync(companyId, order.Id, request, cancellationToken);
+
                 var receipt = new PosSaleSyncReceipt(companyId, request.ClientSyncId, request.LocalOrderId, deviceId, order.Id, customer.ReceiptCustomerId, payloadHash, DateTime.UtcNow);
                 _db.PosSaleSyncReceipts.Add(receipt);
 
@@ -268,6 +270,34 @@ public sealed class PosSaleSyncService : IPosSaleSyncService
         if (!string.IsNullOrWhiteSpace(request.Order.DeliverySlot)) order.SetTimeSlot(request.Order.DeliverySlot);
         order.Confirm();
         return order;
+    }
+
+    private async Task AddCashSaleEntryAsync(Guid companyId, Guid orderId, PosSaleSyncRequest request, CancellationToken cancellationToken)
+    {
+        var cashAmount = request.Payments
+            .Where(p => ParsePaymentMethod(p.Method) == PaymentMethod.Cash)
+            .Sum(p => PaiseToDecimal(p.AmountPaise));
+        if (cashAmount <= 0) return;
+
+        var saleDate = (request.Order.ConfirmedAt ?? DateTime.UtcNow).ToUniversalTime().Date;
+        var currentBalance = await _db.CashBookEntries
+            .Where(e => e.CompanyId == companyId && e.Date == saleDate)
+            .OrderByDescending(e => e.CreatedAtUtc)
+            .Select(e => (decimal?)e.RunningBalance)
+            .FirstOrDefaultAsync(cancellationToken) ?? 0;
+        var orderIdentifier = string.IsNullOrWhiteSpace(request.Order.OrderNo)
+            ? orderId.ToString()
+            : request.Order.OrderNo.Trim();
+
+        _db.CashBookEntries.Add(new CashBookEntry(
+            companyId,
+            saleDate,
+            CashBookTransactionType.CashSale,
+            $"POS cash sale {orderIdentifier}",
+            cashAmount,
+            cashAmount,
+            0,
+            currentBalance + cashAmount));
     }
 
     private static void ValidateEnvelope(PosSaleSyncRequest request, string deviceId, string payloadHash)

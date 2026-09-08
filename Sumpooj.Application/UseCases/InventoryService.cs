@@ -309,8 +309,10 @@ public class InventoryService
 
     public async Task<InventorySummaryDto> GetInventorySummaryAsync()
     {
+        var companyId = _tenant.CompanyId
+            ?? throw new UnauthorizedAccessException("Company context required");
         var (batches, _) = await _batchRepo.SearchAsync(null, null, null, null, true, null, null, 1, int.MaxValue);
-        var lowStockProducts = await _productRepo.GetLowStockProductsAsync();
+        var lowStockProducts = await _productRepo.GetLowStockProductsAsync(companyId);
         var expiringBatches = await _batchRepo.GetExpiringBatchesAsync(7);
         var expiredBatches = await _batchRepo.GetExpiredBatchesAsync();
 

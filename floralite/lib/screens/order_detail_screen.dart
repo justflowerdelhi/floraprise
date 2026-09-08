@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../controllers/voice_dictation_controller.dart';
 import '../data/repositories/associate_repository.dart';
+import '../data/repositories/cloud_order_repository.dart';
 import '../data/repositories/staff_repository.dart';
 import '../data/repositories/third_party_delivery_repository.dart';
 import '../l10n/app_localizations.dart';
@@ -24,19 +25,23 @@ import '../services/delivery_tracking_service.dart';
 import '../services/product_image_service.dart';
 import '../services/speech_recognition_service.dart';
 import 'delivery_screen.dart';
+import 'cloud_order_edit_screen.dart';
 import 'live_delivery_tracking_screen.dart';
 import 'pickup_later_screen.dart';
 import 'take_away_screen.dart';
 import '../utils/whatsapp_phone_utils.dart';
+import '../utils/delivery_message_utils.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/voice_dictation_field_header.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final int orderId;
+  final String? cloudOrderId;
 
   const OrderDetailScreen({
     super.key,
     required this.orderId,
+    this.cloudOrderId,
   });
 
   @override
@@ -55,11 +60,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _deliveryConnectivityLoading = false;
   bool _generatingStartDeliveryLink = false;
 
+  bool get _isCloudOrder => widget.cloudOrderId?.trim().isNotEmpty == true;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<OrderProvider>().loadOrderDetailProgressive(widget.orderId);
+      context.read<OrderProvider>().loadOrderDetailProgressive(
+            widget.orderId,
+            cloudOrderId: widget.cloudOrderId,
+          );
+      if (_isCloudOrder) return;
       final workflowProvider = context.read<OrderWorkflowProvider>();
       workflowProvider.loadWorkflow(widget.orderId);
       workflowProvider.loadAssignableAssociates();
@@ -84,7 +95,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () => _editOrder(),
+            onPressed: _isCloudOrder ? () => _editCloudOrder() : () => _editOrder(),
           ),
         ],
       ),
@@ -112,7 +123,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 children: [
                   _buildOrderHeader(header, colorScheme),
                   const SizedBox(height: 12),
-                  _buildWorkflowQuickActions(header, detail),
+                  if (_isCloudOrder)
+                    _buildCloudQuickActions(header, detail)
+                  else
+                    _buildWorkflowQuickActions(header, detail),
                   const SizedBox(height: 16),
                   AppCard(
                     child: Column(
@@ -440,6 +454,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   void _ensureDeliveryConnectivityPolling(OrderDetailHeader header) {
+    if (_isCloudOrder) {
+      _deliveryConnectivityTimer?.cancel();
+      _deliveryConnectivityTimer = null;
+      _deliveryConnectivityOrderId = null;
+      return;
+    }
     if (!_shouldShowDeliveryConnectivity(header)) {
       _deliveryConnectivityTimer?.cancel();
       _deliveryConnectivityTimer = null;
@@ -980,6 +1000,113 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCloudQuickActions(
+    OrderDetailHeader header,
+    OrderDetailBundle? detail,
+  ) {
+    final canNavigate = header.address.trim().isNotEmpty && header.address != '-';
+    final canCancel = OrderStatus.canCancel(header.status);
+    final actions = [
+      _OrderQuickAction(
+        'View Bill',
+        Icons.receipt_long,
+        () => _showBill(header, detail),
+      ),
+      _OrderQuickAction(
+        'Navigate',
+        Icons.near_me_rounded,
+        canNavigate ? () => _navigateToCustomerAddress(header.address) : null,
+      ),
+      _OrderQuickAction(
+        'Collect Payment',
+        Icons.payments_outlined,
+        header.outstandingAmountPaise > 0
+            ? () => _collectPayment(header)
+            : null,
+      ),
+      _OrderQuickAction(
+        'Assign Designer',
+        Icons.design_services,
+        () => _assignCloudDesigner(header),
+      ),
+      _OrderQuickAction(
+        'Assign Delivery',
+        Icons.delivery_dining,
+        () => _assignCloudDelivery(header),
+      ),
+      _OrderQuickAction(
+        'Change Status',
+        Icons.swap_horiz_rounded,
+        () => _changeCloudStatus(header),
+      ),
+      _OrderQuickAction(
+        'Cancel Order',
+        Icons.cancel_outlined,
+        canCancel ? () => _confirmCancelCloudOrder(header) : null,
+      ),
+    ];
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Cloud Actions',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: actions.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              mainAxisExtent: 56,
+            ),
+            itemBuilder: (context, index) {
+              final action = actions[index];
+              final color = Theme.of(context).colorScheme.primary;
+              return InkWell(
+                onTap: action.onTap,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: color.withValues(alpha: 0.3)),
+                    borderRadius: BorderRadius.circular(10),
+                    color: color.withValues(alpha: 0.07),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(action.icon, color: color, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          action.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -2201,17 +2328,244 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Close'),
           ),
-          FilledButton.icon(
-            onPressed: () {
-              context.read<OrderWorkflowProvider>().printReceipt(header.id);
-              Navigator.pop(dialogContext);
-            },
-            icon: const Icon(Icons.print),
-            label: const Text('Print Bill'),
+          if (!_isCloudOrder)
+            FilledButton.icon(
+              onPressed: () {
+                context.read<OrderWorkflowProvider>().printReceipt(header.id);
+                Navigator.pop(dialogContext);
+              },
+              icon: const Icon(Icons.print),
+              label: const Text('Print Bill'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _changeCloudStatus(OrderDetailHeader header) async {
+    final cloudOrderId = header.cloudOrderId?.trim();
+    if (cloudOrderId == null || cloudOrderId.isEmpty) return;
+    final nextStatuses = OrderStatus.nextStatuses(header.status)
+        .where((status) => status != OrderStatus.cancelled)
+        .toList(growable: false);
+    if (nextStatuses.isEmpty) {
+      _showSnack('No status changes are available for this order.');
+      return;
+    }
+
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Change Status'),
+        children: [
+          for (final status in nextStatuses)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(dialogContext, status),
+              child: Text(OrderStatus.actionLabel(status)),
+            ),
+        ],
+      ),
+    );
+    if (selected == null || !mounted) return;
+
+    try {
+      await context.read<OrderProvider>().updateCloudOrderStatus(
+            cloudOrderId: cloudOrderId,
+            newStatus: selected,
+          );
+      if (!mounted) return;
+      _showSnack('Order status updated.');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnack('Unable to update order status: $error');
+    }
+  }
+
+  Future<void> _assignCloudDesigner(OrderDetailHeader header) async {
+    final cloudOrderId = header.cloudOrderId?.trim();
+    if (cloudOrderId == null || cloudOrderId.isEmpty) return;
+    final provider = context.read<OrderProvider>();
+
+    final selected = await _pickCloudAssignee(
+      title: 'Select Designer',
+      emptyMessage: 'No designers are available in Cloud.',
+      load: provider.loadCloudDesigners,
+    );
+    if (selected == null || !mounted) return;
+
+    try {
+      await provider.assignCloudDesigner(
+        cloudOrderId: cloudOrderId,
+        staffId: selected.staffId,
+      );
+      if (!mounted) return;
+      _showSnack('Designer assigned to ${selected.name}.');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnack('Unable to assign designer: $error');
+      return;
+    }
+
+    final refreshedHeader = provider.detailHeader ?? header;
+    final refreshedDetail = provider.detailBundle;
+
+    final sendWhatsApp = await _showAssignmentChoiceDialog(
+      title: 'Designer Assigned Successfully',
+      header: refreshedHeader,
+      detail: refreshedDetail,
+    );
+    if (sendWhatsApp != true || !mounted) return;
+
+    await _launchWhatsAppMessage(
+      phone: selected.phone ?? '',
+      message: _designerChecklist(
+        refreshedHeader,
+        refreshedDetail,
+        selected.name,
+      ),
+    );
+  }
+
+  Future<void> _assignCloudDelivery(OrderDetailHeader header) async {
+    final cloudOrderId = header.cloudOrderId?.trim();
+    if (cloudOrderId == null || cloudOrderId.isEmpty) return;
+    final provider = context.read<OrderProvider>();
+
+    final selected = await _pickCloudAssignee(
+      title: 'Select Delivery Person',
+      emptyMessage: 'No delivery staff are available in Cloud.',
+      load: provider.loadCloudDrivers,
+    );
+    if (selected == null || !mounted) return;
+
+    try {
+      await provider.assignCloudDriver(
+        cloudOrderId: cloudOrderId,
+        staffId: selected.staffId,
+      );
+      if (!mounted) return;
+      _showSnack('Delivery assigned to ${selected.name}.');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnack('Unable to assign delivery: $error');
+      return;
+    }
+
+    final refreshedHeader = provider.detailHeader ?? header;
+    final startDeliveryLink = await _resolveCloudStartDeliveryLink(
+      refreshedHeader.orderNo,
+    );
+    if (!mounted) return;
+
+    await _launchWhatsAppMessage(
+      phone: selected.phone ?? '',
+      message: _deliveryChecklist(
+        refreshedHeader,
+        provider.detailBundle,
+        selected.name,
+        startDeliveryLink: startDeliveryLink,
+      ),
+    );
+  }
+
+  /// Resolves the Cloud delivery created by assign-driver and mints its driver
+  /// tracking link. A failure here must not undo the completed assignment.
+  Future<String?> _resolveCloudStartDeliveryLink(String orderNo) async {
+    try {
+      final deliveryId =
+          await _deliveryTrackingService.getCloudDeliveryIdForOrder(orderNo);
+      if (deliveryId == null || deliveryId.trim().isEmpty) return null;
+
+      final links =
+          await _deliveryTrackingService.generateTrackingLinks(deliveryId);
+      final driverLink = links.driverLink.trim();
+      return driverLink.isEmpty ? null : driverLink;
+    } catch (error) {
+      debugPrint('[OrderDetail] Cloud tracking link generation failed: $error');
+      if (mounted) {
+        _showSnack(
+          'Delivery assigned but the Start Delivery link could not be generated: $error',
+        );
+      }
+      return null;
+    }
+  }
+
+  Future<CloudAssignee?> _pickCloudAssignee({
+    required String title,
+    required String emptyMessage,
+    required Future<List<CloudAssignee>> Function() load,
+  }) async {
+    List<CloudAssignee> assignees;
+    try {
+      assignees = await load();
+    } catch (error) {
+      if (!mounted) return null;
+      _showSnack('Unable to load Cloud staff: $error');
+      return null;
+    }
+    if (!mounted) return null;
+    if (assignees.isEmpty) {
+      _showSnack(emptyMessage);
+      return null;
+    }
+
+    return showDialog<CloudAssignee>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: Text(title),
+        children: [
+          for (final assignee in assignees)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(dialogContext, assignee),
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(assignee.name),
+                subtitle: assignee.phone == null ? null : Text(assignee.phone!),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmCancelCloudOrder(OrderDetailHeader header) async {
+    final cloudOrderId = header.cloudOrderId?.trim();
+    if (cloudOrderId == null || cloudOrderId.isEmpty) return;
+    if (!OrderStatus.canCancel(header.status)) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel Order'),
+        content: const Text(
+          'The Cloud order will be cancelled and retained for audit history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep Order'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel Order'),
           ),
         ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await context.read<OrderProvider>().cancelCloudOrder(
+            cloudOrderId: cloudOrderId,
+            reason: 'Cancelled from Order Details',
+          );
+      if (!mounted) return;
+      _showSnack('Order cancelled.');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnack('Unable to cancel order: $error');
+    }
   }
 
   Widget _billRow(String label, String value) {
@@ -2233,6 +2587,31 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   bool _canEditOrder(String status) {
     return status != OrderStatus.delivered && status != OrderStatus.cancelled;
+  }
+
+  Future<void> _editCloudOrder() async {
+    final provider = context.read<OrderProvider>();
+    final header = provider.detailHeader;
+    final detail = provider.detailBundle;
+    final cloudOrderId = header?.cloudOrderId?.trim();
+    if (header == null || detail == null) return;
+    if (cloudOrderId == null || cloudOrderId.isEmpty) return;
+
+    if (!_canEditOrder(header.status)) {
+      _showEditOrderMessage();
+      return;
+    }
+
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CloudOrderEditScreen(
+          cloudOrderId: cloudOrderId,
+          header: header,
+          detail: detail,
+        ),
+      ),
+    );
   }
 
   Future<void> _editOrder({
@@ -2385,32 +2764,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     OrderDetailBundle? detail,
     String designerName,
   ) {
-    return [
-      '🌸 NEW DESIGN ORDER',
-      '',
-      'Order : ${header.orderNo}',
-      '',
-      'Recipient',
-      header.recipientName,
-      '',
-      'Customer',
-      header.customerName,
-      '',
-      'Delivery',
-      _formatDate(header.scheduledAt),
-      header.deliverySlot.isEmpty ? '-' : header.deliverySlot,
-      '',
-      'Designer',
-      designerName,
-      '',
-      'Products',
-      _productChecklist(detail, checked: true),
-      '',
-      'Message Card',
-      header.cardMessage.isEmpty ? '-' : header.cardMessage,
-      '',
-      'Please acknowledge after preparation.',
-    ].join('\n');
+    return designerAssignmentMessage(header, detail, designerName);
   }
 
   String _deliveryChecklist(
@@ -2419,55 +2773,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     String deliveryName, {
     String? startDeliveryLink,
   }) {
-    final address = header.address.trim();
-    final mapsLink = address.isNotEmpty
-        ? 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}'
-        : '-';
-    final outstanding = header.outstandingAmountPaise;
-    final lines = [
-      '🚚 DELIVERY ASSIGNMENT',
-      '',
-      'Order : ${header.orderNo}',
-      '',
-      'Recipient',
-      header.recipientName,
-      '',
-      'Customer',
-      header.customerName,
-      '',
-      'Phone',
-      header.recipientPhone.isEmpty ? '-' : header.recipientPhone,
-      '',
-      'Delivery Address',
-      address.isEmpty ? '-' : address,
-      '',
-      'Google Maps URL',
-      mapsLink,
-      '',
-      'Delivery Slot',
-      header.deliverySlot.isEmpty ? '-' : header.deliverySlot,
-      '',
-      'Occasion',
-      header.occasion.isEmpty ? '-' : header.occasion,
-      '',
-      'Message Card Included',
-      header.cardMessage.isEmpty ? 'NO' : 'YES',
-      '',
-      'Outstanding Amount',
-      _formatPaise(outstanding),
-      '',
-      'Products',
-      _productChecklist(detail, checked: false),
-      '',
-      'Delivery Person',
+    return deliveryAssignmentMessage(
+      header,
+      detail,
       deliveryName,
-      if (startDeliveryLink != null && startDeliveryLink.trim().isNotEmpty) ...[
-        '',
-        '▶ START DELIVERY',
-        startDeliveryLink.trim(),
-      ],
-    ];
-    return lines.join('\n');
+      startDeliveryLink: startDeliveryLink,
+    );
   }
 
   String _forwardAssociateMessage(
@@ -2646,13 +2957,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   },
                   decoration: const InputDecoration(labelText: 'Method'),
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: referenceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Reference (optional)',
+                if (!_isCloudOrder) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: referenceController,
+                    decoration: const InputDecoration(
+                      labelText: 'Reference (optional)',
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             actions: [
@@ -2678,17 +2991,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
                         setStateDialog(() => isSaving = true);
                         try {
-                          await context
-                              .read<OrderProvider>()
-                              .collectOrderPayment(
-                                orderId: header.id,
-                                method: method,
-                                amountPaise: amountPaise,
-                                reference:
-                                    referenceController.text.trim().isEmpty
-                                        ? null
-                                        : referenceController.text.trim(),
-                              );
+                          final provider = context.read<OrderProvider>();
+                          if (_isCloudOrder) {
+                            await provider.collectCloudOrderPayment(
+                              cloudOrderId: header.cloudOrderId!.trim(),
+                              method: method,
+                              amountPaise: amountPaise,
+                            );
+                          } else {
+                            await provider.collectOrderPayment(
+                              orderId: header.id,
+                              method: method,
+                              amountPaise: amountPaise,
+                              reference: referenceController.text.trim().isEmpty
+                                  ? null
+                                  : referenceController.text.trim(),
+                            );
+                          }
                           if (!mounted || !dialogContext.mounted) return;
                           Navigator.pop(dialogContext);
                           _showSnack('Payment collected successfully.');

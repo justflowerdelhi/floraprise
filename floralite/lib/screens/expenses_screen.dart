@@ -4,12 +4,14 @@ import 'package:provider/provider.dart';
 
 import '../controllers/voice_dictation_controller.dart';
 import '../data/repositories/cash_book_repository.dart';
+import '../data/repositories/cloud_finance_repository.dart';
 import '../data/repositories/expense_category_repository.dart';
 import '../data/repositories/expense_repository.dart';
 import '../models/cash_book.dart';
 import '../models/expense.dart';
 import '../models/expense_category.dart';
 import '../services/business_data_event_bus.dart';
+import '../providers/storage_mode_provider.dart';
 import '../services/speech_recognition_service.dart';
 import '../widgets/voice_dictation_field_header.dart';
 
@@ -23,6 +25,7 @@ class ExpensesScreen extends StatefulWidget {
 class _ExpensesScreenState extends State<ExpensesScreen> {
   final _expenseRepository = ExpenseRepository();
   final _categoryRepository = ExpenseCategoryRepository();
+  final _cloudExpenseRepository = CloudExpenseRepository();
   DateTime _selectedDate = DateTime.now();
   List<Expense> _expenses = [];
   List<ExpenseCategory> _categories = [];
@@ -38,8 +41,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final expenses = await _expenseRepository.getByDate(_selectedDate);
-      final categories = await _categoryRepository.getAll();
+        final isCloud = context.read<StorageModeProvider>().isCloud;
+        final expenses = isCloud
+          ? await _cloudExpenseRepository.getByDate(_selectedDate)
+          : await _expenseRepository.getByDate(_selectedDate);
+        final categories = isCloud
+          ? await _cloudExpenseRepository.getCategories()
+          : await _categoryRepository.getAll();
       setState(() {
         _expenses = expenses;
         _categories = categories;
@@ -79,6 +87,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       builder: (context) => AddExpenseBottomSheet(
         categories: _categories,
         selectedDate: _selectedDate,
+        isCloud: context.read<StorageModeProvider>().isCloud,
         onSave: () => _loadData(),
       ),
     );
@@ -163,7 +172,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           (c) => c.id == expense.categoryId,
           orElse: () => ExpenseCategory(
             id: 0,
-            name: 'Unknown',
+            name: expense.categoryName ?? 'Unknown',
             emoji: '❓',
             groupName: 'Others',
             active: true,
@@ -267,12 +276,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 class AddExpenseBottomSheet extends StatefulWidget {
   final List<ExpenseCategory> categories;
   final DateTime selectedDate;
+  final bool isCloud;
   final VoidCallback onSave;
 
   const AddExpenseBottomSheet({
     super.key,
     required this.categories,
     required this.selectedDate,
+    required this.isCloud,
     required this.onSave,
   });
 
@@ -289,6 +300,7 @@ class _AddExpenseBottomSheetState extends State<AddExpenseBottomSheet> {
   );
   final _expenseRepository = ExpenseRepository();
   final _cashBookRepository = CashBookRepository();
+  final _cloudExpenseRepository = CloudExpenseRepository();
 
   ExpenseCategory? _selectedCategory;
   PaymentMode _paymentMode = PaymentMode.cash;
@@ -341,9 +353,19 @@ class _AddExpenseBottomSheetState extends State<AddExpenseBottomSheet> {
         updatedAt: now,
       );
 
-      await _expenseRepository.create(expense);
+      if (widget.isCloud) {
+        await _cloudExpenseRepository.create(
+          category: _selectedCategory!,
+          amountPaise: amount,
+          paymentMode: _paymentMode,
+          notes: expense.notes,
+          date: widget.selectedDate,
+        );
+      } else {
+        await _expenseRepository.create(expense);
+      }
 
-      if (_paymentMode == PaymentMode.cash) {
+      if (!widget.isCloud && _paymentMode == PaymentMode.cash) {
         await _cashBookRepository.create(
           date: widget.selectedDate,
           transactionType: CashBookTransactionType.cashExpense,

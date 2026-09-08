@@ -10,17 +10,20 @@ public class DayCloseService
     private readonly IOrderRepository _orderRepository;
     private readonly IPaymentRepository _paymentRepository;
     private readonly ILocationRepository _locationRepository;
+    private readonly ICashDrawerRepository _cashDrawerRepository;
 
     public DayCloseService(
         IDayCloseRepository dayCloseRepository,
         IOrderRepository orderRepository,
         IPaymentRepository paymentRepository,
-        ILocationRepository locationRepository)
+        ILocationRepository locationRepository,
+        ICashDrawerRepository cashDrawerRepository)
     {
         _dayCloseRepository = dayCloseRepository;
         _orderRepository = orderRepository;
         _paymentRepository = paymentRepository;
         _locationRepository = locationRepository;
+        _cashDrawerRepository = cashDrawerRepository;
     }
 
     public async Task<DayCloseDto?> GetByIdAsync(Guid companyId, Guid id)
@@ -65,12 +68,13 @@ public class DayCloseService
 
         var payments = await _paymentRepository.GetByDateAsync(companyId, locationId, date);
 
-        var cashSales = payments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount);
         var cardSales = payments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount);
         var upiSales = payments.Where(p => p.Method == PaymentMethod.Upi).Sum(p => p.Amount);
         var otherPayments = payments
             .Where(p => p.Method != PaymentMethod.Cash && p.Method != PaymentMethod.Card && p.Method != PaymentMethod.Upi)
             .Sum(p => p.Amount);
+
+        var cashDrawer = await _cashDrawerRepository.GetSummaryAsync(companyId, date);
 
         var refundCount = 0;
         var totalRefunds = 0m;
@@ -90,12 +94,14 @@ public class DayCloseService
             phoneOrdersAmount,
             onlineOrdersAmount,
 
-            cashSales,
             cardSales,
             upiSales,
             otherPayments,
 
-            expectedCash = cashSales,
+            openingCash = cashDrawer.OpeningCash,
+            cashSales = cashDrawer.CashSales,
+            cashExpenses = cashDrawer.CashExpenses,
+            expectedCash = cashDrawer.OpeningCash + cashDrawer.CashSales - cashDrawer.CashExpenses,
 
             refundCount,
             totalRefunds,
@@ -134,6 +140,7 @@ public class DayCloseService
         var cardSales = (decimal)(summary.GetType().GetProperty("cardSales")?.GetValue(summary) ?? 0m);
         var upiSales = (decimal)(summary.GetType().GetProperty("upiSales")?.GetValue(summary) ?? 0m);
         var otherPaymentsVal = (decimal)(summary.GetType().GetProperty("otherPayments")?.GetValue(summary) ?? 0m);
+        var expectedCash = (decimal)(summary.GetType().GetProperty("expectedCash")?.GetValue(summary) ?? 0m);
 
         var dayClose = new Domain.Entities.DayClose(
             companyId,
@@ -143,6 +150,7 @@ public class DayCloseService
 
         dayClose.SetSalesSummary(totalOrders, totalSales, totalRefunds);
         dayClose.SetPaymentBreakdown(cashSales, cardSales, upiSales, 0m, otherPaymentsVal);
+        dayClose.SetExpectedCash(expectedCash);
         dayClose.SetCashCount(request.ActualCash);
 
         if (!string.IsNullOrEmpty(request.Notes))

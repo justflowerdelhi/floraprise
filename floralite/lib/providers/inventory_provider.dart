@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 
-import '../data/repositories/inventory_repository.dart';
 import '../data/repositories/cloud_inventory_repository.dart';
+import '../data/repositories/inventory_repository.dart';
 import '../managers/inventory_manager.dart';
+import '../models/gst_calculation_type.dart';
 import '../services/business_data_event_bus.dart';
 import 'storage_mode_provider.dart';
 
@@ -20,6 +21,7 @@ class InventoryProvider extends ChangeNotifier {
   final BusinessDataEventBus? _businessDataEvents;
 
   List<InventoryProductRecord> _products = const [];
+  List<CloudLowStockProduct> _cloudLowStockProducts = const [];
   bool _isLoading = false;
   bool _isSaving = false;
   String? _error;
@@ -27,6 +29,7 @@ class InventoryProvider extends ChangeNotifier {
   String _filter = 'all';
 
   List<InventoryProductRecord> get products => _products;
+  List<CloudLowStockProduct> get cloudLowStockProducts => _cloudLowStockProducts;
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   String? get error => _error;
@@ -40,9 +43,16 @@ class InventoryProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-        _products = isCloud
-          ? await _cloudRepository.listInventoryProducts()
-          : await _inventoryManager.listInventoryProducts();
+      if (isCloud) {
+        final results = await Future.wait([
+          _cloudRepository.listInventoryProducts(),
+          _cloudRepository.listLowStockProducts(),
+        ]);
+        _products = results[0] as List<InventoryProductRecord>;
+        _cloudLowStockProducts = results[1] as List<CloudLowStockProduct>;
+      } else {
+        _products = await _inventoryManager.listInventoryProducts();
+      }
     } catch (e, st) {
       if (kDebugMode) {
         debugPrint('InventoryProvider.loadProducts failed: $e');
@@ -94,10 +104,24 @@ class InventoryProvider extends ChangeNotifier {
           return product.category == 'Finished Products' ||
               product.category == 'Finished Product';
         case 'low_stock':
+          if (isCloud && _cloudLowStockProducts.isNotEmpty) {
+            final cloudLowStockIds = _cloudLowStockProducts
+                .where((p) => p.isLowStock)
+                .map((p) => p.productId)
+                .toSet();
+            return cloudLowStockIds.contains(product.cloudProductId);
+          }
           return product.trackInventory &&
               product.currentQty > 0 &&
               product.currentQty <= product.minQty;
         case 'out_of_stock':
+          if (isCloud && _cloudLowStockProducts.isNotEmpty) {
+            final cloudOutOfStockIds = _cloudLowStockProducts
+                .where((p) => p.isOutOfStock)
+                .map((p) => p.productId)
+                .toSet();
+            return cloudOutOfStockIds.contains(product.cloudProductId);
+          }
           return product.trackInventory && product.currentQty == 0;
         case 'track_inventory':
           return product.trackInventory;
@@ -108,13 +132,80 @@ class InventoryProvider extends ChangeNotifier {
     }).toList();
   }
 
-  int get lowStockCount => _products
-      .where((p) =>
-          p.trackInventory && p.currentQty > 0 && p.currentQty <= p.minQty)
-      .length;
+  int get lowStockCount {
+    if (isCloud && _cloudLowStockProducts.isNotEmpty) {
+      return _cloudLowStockProducts.where((p) => p.isLowStock).length;
+    }
+    return _products
+        .where((p) =>
+            p.trackInventory && p.currentQty > 0 && p.currentQty <= p.minQty)
+        .length;
+  }
 
-  int get outOfStockCount =>
-      _products.where((p) => p.trackInventory && p.currentQty == 0).length;
+  int get outOfStockCount {
+    if (isCloud && _cloudLowStockProducts.isNotEmpty) {
+      return _cloudLowStockProducts.where((p) => p.isOutOfStock).length;
+    }
+    return _products.where((p) => p.trackInventory && p.currentQty == 0).length;
+  }
+
+  Future<List<InventoryProductRecord>> loadLowStockProducts() async {
+    if (!isCloud) {
+      return _products
+          .where(
+            (product) =>
+                product.trackInventory &&
+                ((product.currentQty == 0) ||
+                    (product.currentQty > 0 &&
+                        product.currentQty <= product.minQty)),
+          )
+          .toList();
+    }
+
+    final cloudRows = await _cloudRepository.listLowStockProducts();
+    _cloudLowStockProducts = cloudRows;
+    if (cloudRows.isEmpty) return const [];
+
+    final cloudProducts = <InventoryProductRecord>[];
+    for (final item in cloudRows) {
+      final existing = _products.firstWhere(
+        (product) => product.cloudProductId == item.productId,
+        orElse: () => InventoryProductRecord(
+          productId: -1,
+          cloudProductId: item.productId,
+          name: item.name,
+          category: 'Cloud',
+          unit: 'Piece',
+          sku: item.sku,
+          barcode: '',
+          manufacturerBarcode: null,
+          internalBarcode: null,
+          trackInventory: true,
+          gstPercent: 0,
+          gstCalculationType: GstCalculationType.inclusive,
+          currentQty: item.currentQuantity,
+          minQty: item.minimumQuantity,
+        ),
+      );
+      cloudProducts.add(InventoryProductRecord(
+        productId: existing.productId,
+        cloudProductId: existing.cloudProductId,
+        name: item.name,
+        category: existing.category,
+        unit: existing.unit,
+        sku: item.sku,
+        barcode: existing.barcode,
+        manufacturerBarcode: existing.manufacturerBarcode,
+        internalBarcode: existing.internalBarcode,
+        trackInventory: true,
+        gstPercent: existing.gstPercent,
+        gstCalculationType: existing.gstCalculationType,
+        currentQty: item.currentQuantity,
+        minQty: item.minimumQuantity,
+      ));
+    }
+    return cloudProducts;
+  }
 
   Future<List<InventoryTransactionRecord>> loadHistory(int productId) {
     if (!isCloud) {

@@ -458,9 +458,9 @@ public class ProductionService
 
     // ─── Wastage ────────────────────────────────────────────
 
-    public async Task<List<WastageLogDto>> GetWastageLogsAsync(Guid companyId)
+    public async Task<List<WastageLogDto>> GetWastageLogsAsync(Guid companyId, WastageLogFilter? filter = null)
     {
-        var logs = await _wastageRepo.GetAllAsync(companyId);
+        var logs = await _wastageRepo.GetAllAsync(companyId, filter);
         return logs.Select(l => new WastageLogDto
         {
             Id = l.Id,

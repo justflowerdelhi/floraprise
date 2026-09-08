@@ -4,6 +4,7 @@ import 'walk_in_line_item.dart';
 
 class WalkInSession {
   final int? draftOrderId;
+  final String? posClientSyncId;
   final FulfilmentType fulfilmentType;
   final List<WalkInLineItem> lines;
   final String customerPhone;
@@ -26,6 +27,7 @@ class WalkInSession {
 
   const WalkInSession({
     this.draftOrderId,
+    this.posClientSyncId,
     required this.fulfilmentType,
     this.lines = const [],
     this.customerPhone = '',
@@ -49,6 +51,7 @@ class WalkInSession {
 
   WalkInSession copyWith({
     int? draftOrderId,
+    String? posClientSyncId,
     FulfilmentType? fulfilmentType,
     List<WalkInLineItem>? lines,
     String? customerPhone,
@@ -72,6 +75,7 @@ class WalkInSession {
   }) {
     return WalkInSession(
       draftOrderId: draftOrderId ?? this.draftOrderId,
+      posClientSyncId: posClientSyncId ?? this.posClientSyncId,
       fulfilmentType: fulfilmentType ?? this.fulfilmentType,
       lines: lines ?? this.lines,
       customerPhone: customerPhone ?? this.customerPhone,

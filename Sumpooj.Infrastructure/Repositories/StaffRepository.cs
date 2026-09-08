@@ -94,7 +94,9 @@ public class StaffRepository : IStaffRepository
             return new List<StaffListDto>();
 
         return await _db.Staff
-            .Where(s => s.CompanyId == companyId && s.IsActive && s.Role == staffRole)
+            .Where(s => s.CompanyId == companyId
+                     && s.IsActive
+                     && s.Role == staffRole)
             .OrderBy(s => s.Name)
             .Select(s => new StaffListDto
             {
@@ -132,7 +134,7 @@ public class StaffRepository : IStaffRepository
     {
         try
         {
-            // Return ALL active Driver-role staff — DriverStatus is managed by the route lifecycle,
+            // Return ALL active Driver-role staff with user accounts — DriverStatus is managed by the route lifecycle,
             // not used to gate the dropdown (avoids stuck-Engaged issue from previous ops).
             return await _db.Staff
                 .Where(s => s.CompanyId == companyId

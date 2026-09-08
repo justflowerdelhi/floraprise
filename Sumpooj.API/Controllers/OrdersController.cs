@@ -1,24 +1,29 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sumpooj.Application.Accounting;
+using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Orders;
 using Sumpooj.Application.UseCases;
+using Sumpooj.Domain.Entities;
+using Sumpooj.Infrastructure.Persistence;
 
 namespace Sumpooj.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "CompanyOnly")]
+[Authorize(Policy = PolicyNames.CompanyOperations)]
 public class OrdersController : ControllerBase
 {
     private readonly OrderService _orderService;
     private readonly ITenantContext _tenantContext;
+    private readonly SumpoojDbContext _db;
 
-    public OrdersController(OrderService orderService, ITenantContext tenantContext)
+    public OrdersController(OrderService orderService, ITenantContext tenantContext, SumpoojDbContext db)
     {
         _orderService = orderService;
         _tenantContext = tenantContext;
+        _db = db;
     }
 
     private Guid CompanyId => _tenantContext.CompanyId 
@@ -88,11 +93,92 @@ public class OrdersController : ControllerBase
         return NoContent();
     }
 
+    [HttpPatch("{id:guid}/details")]
+    public async Task<IActionResult> UpdateDetails(Guid id, [FromBody] UpdateOrderDetailsRequest request)
+    {
+        try
+        {
+            await _orderService.UpdateDetailsAsync(CompanyId, id, request);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{id:guid}/items")]
+    public async Task<IActionResult> ReplaceItems(Guid id, [FromBody] ReplaceOrderItemsRequest request)
+    {
+        try
+        {
+            await _orderService.ReplaceItemsAsync(CompanyId, id, request);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("{id:guid}/financials")]
+    public async Task<IActionResult> UpdateFinancials(Guid id, [FromBody] UpdateOrderFinancialsRequest request)
+    {
+        try
+        {
+            await _orderService.UpdateFinancialsAsync(CompanyId, id, request);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("{id:guid}/assign-designer")]
     public async Task<IActionResult> AssignDesigner(Guid id, [FromBody] AssignStaffRequest request)
     {
-        await _orderService.AssignDesignerAsync(CompanyId, id, request.StaffId);
-        return NoContent();
+        try
+        {
+            var designer = await _db.Staff.FindAsync(request.StaffId);
+            if (designer == null || designer.CompanyId != CompanyId || !designer.IsActive || designer.Role != StaffRole.Designer)
+                return NotFound(new { message = "Active designer staff member not found." });
+
+            await _orderService.AssignDesignerStaffAsync(CompanyId, id, designer.Id);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     [HttpPost("{id:guid}/assign-driver")]

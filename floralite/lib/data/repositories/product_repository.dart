@@ -132,6 +132,7 @@ class ProductInventoryRecord {
   final String barcode;
   final String manufacturerBarcode;
   final String florapriseBarcode;
+  final String? cloudProductId;
   final int sellingPricePaise;
   final int? purchasePricePaise;
   final int gstPercent;
@@ -152,6 +153,7 @@ class ProductInventoryRecord {
     required this.barcode,
     required this.manufacturerBarcode,
     required this.florapriseBarcode,
+    this.cloudProductId,
     required this.sellingPricePaise,
     required this.purchasePricePaise,
     required this.gstPercent,
@@ -687,6 +689,7 @@ class ProductRepository {
         p.barcode,
         p.manufacturer_barcode,
         p.floraprise_barcode,
+        p.cloud_product_id,
         p.selling_price_paise,
         (
           SELECT purchase_price_paise
@@ -727,6 +730,7 @@ class ProductRepository {
         barcode: manufacturer,
         manufacturerBarcode: manufacturer,
         florapriseBarcode: floraprise,
+        cloudProductId: (row['cloud_product_id'] as String?)?.trim(),
         sellingPricePaise: row['selling_price_paise'] as int,
         purchasePricePaise: row['latest_purchase_price_paise'] as int?,
         gstPercent: row['gst_percent'] as int,
@@ -783,6 +787,7 @@ class ProductRepository {
         p.barcode,
         p.manufacturer_barcode,
         p.floraprise_barcode,
+        p.cloud_product_id,
         p.selling_price_paise,
         p.purchase_price_paise,
         p.gst_percent,
@@ -856,6 +861,7 @@ class ProductRepository {
       barcode: manufacturer,
       manufacturerBarcode: manufacturer,
       florapriseBarcode: floraprise,
+      cloudProductId: (row['cloud_product_id'] as String?)?.trim(),
       sellingPricePaise: row['selling_price_paise'] as int,
       purchasePricePaise: row['purchase_price_paise'] as int?,
       gstPercent: row['gst_percent'] as int,

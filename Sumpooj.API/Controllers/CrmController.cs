@@ -31,10 +31,11 @@ public class CrmController : ControllerBase
     {
         var page = request.Page <= 0 ? 1 : request.Page;
         var pageSize = request.PageSize <= 0 ? 50 : Math.Min(request.PageSize, 500);
+        var companyId = CompanyId;
 
         var query = _db.Customers
             .AsNoTracking()
-            .Where(c => c.CompanyId == CompanyId && c.IsActive);
+            .Where(c => c.CompanyId == companyId && c.IsActive);
 
         if (!string.IsNullOrWhiteSpace(request.Query))
         {
@@ -47,8 +48,16 @@ public class CrmController : ControllerBase
 
         var totalCount = await query.CountAsync();
 
-        var customers = await query
-            .OrderByDescending(c => c.CreatedAtUtc)
+        // Lifetime value is ordered in SQL so paging returns the true top customers.
+        var ordered = string.Equals(request.SortBy, "lifetimeValue", StringComparison.OrdinalIgnoreCase)
+            ? query
+                .OrderByDescending(c => _db.Orders
+                    .Where(o => o.CompanyId == companyId && o.IsActive && o.CustomerId == c.Id)
+                    .Sum(o => (decimal?)o.TotalAmount) ?? 0m)
+                .ThenBy(c => c.Name)
+            : query.OrderByDescending(c => c.CreatedAtUtc);
+
+        var customers = await ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(c => new CustomerListProjection(
@@ -407,7 +416,7 @@ public class CrmController : ControllerBase
         };
 }
 
-public sealed record CrmCustomerListRequest(string? Query, int Page = 1, int PageSize = 50);
+public sealed record CrmCustomerListRequest(string? Query, int Page = 1, int PageSize = 50, string? SortBy = null);
 
 public sealed record CrmCustomer360Response(
     CrmCustomerDto Customer,

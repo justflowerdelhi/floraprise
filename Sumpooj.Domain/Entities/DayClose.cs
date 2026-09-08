@@ -73,6 +73,13 @@ public class DayClose : BaseEntity
         MarkUpdated();
     }
 
+    public void SetExpectedCash(decimal expectedCash)
+    {
+        ExpectedCash = expectedCash;
+        CashVariance = ActualCash - ExpectedCash;
+        MarkUpdated();
+    }
+
     public void AddNotes(string notes)
     {
         Notes = string.IsNullOrEmpty(Notes) ? notes : $"{Notes}\n{notes}";

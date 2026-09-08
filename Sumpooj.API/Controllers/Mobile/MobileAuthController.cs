@@ -141,8 +141,17 @@ public sealed class MobileAuthController : MobileApiControllerBase
                 currencyCode: "INR",
                 taxIdentifier: null
             );
-            _db.Companies.Add(company);
-            await _db.SaveChangesAsync(cancellationToken);
+
+            // Company + its default Location must be created atomically.
+            var companyCreationStrategy = _db.Database.CreateExecutionStrategy();
+            await companyCreationStrategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+                _db.Companies.Add(company);
+                await _db.SaveChangesAsync(cancellationToken);
+                await _companyService.CreateDefaultLocationAsync(company.Id);
+                await transaction.CommitAsync(cancellationToken);
+            });
             var companyId = company.Id;
             _logger.LogInformation("[Mobile Register] New company created with ID: {CompanyId}", companyId);
 

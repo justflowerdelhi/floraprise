@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../../data/repositories/cloud_order_status_repository.dart';
 import '../../data/repositories/order_repository.dart';
 import '../../models/order_workspace_models.dart';
 import '../../managers/business_settings_manager.dart';
+import '../../providers/storage_mode_provider.dart';
 import '../../widgets/common_widgets.dart';
 
 class OrderStatusReportScreen extends StatefulWidget {
@@ -16,6 +19,8 @@ class OrderStatusReportScreen extends StatefulWidget {
 
 class _OrderStatusReportScreenState extends State<OrderStatusReportScreen> {
   final OrderRepository _orderRepository = OrderRepository();
+  final CloudOrderStatusRepository _cloudOrderStatusRepository =
+      CloudOrderStatusRepository();
   final BusinessSettingsManager _businessSettingsManager =
       BusinessSettingsManager();
 
@@ -23,6 +28,7 @@ class _OrderStatusReportScreenState extends State<OrderStatusReportScreen> {
   DateTime _endDate = DateTime.now();
   bool _isLoading = true;
   String _shopName = 'My Flower Shop';
+  bool _isCloud = false;
 
   int _pendingCount = 0;
   int _inProgressCount = 0;
@@ -30,6 +36,10 @@ class _OrderStatusReportScreenState extends State<OrderStatusReportScreen> {
   int _completedCount = 0;
   int _cancelledCount = 0;
   int _totalCount = 0;
+
+  int _deliveryCount = 0;
+  int _pickupCount = 0;
+  int _takeAwayCount = 0;
 
   @override
   void initState() {
@@ -52,6 +62,34 @@ class _OrderStatusReportScreenState extends State<OrderStatusReportScreen> {
     setState(() => _isLoading = true);
 
     try {
+      bool isCloud = false;
+      try {
+        isCloud = context.read<StorageModeProvider>().isCloud;
+      } catch (_) {}
+
+      if (isCloud) {
+        final report = await _cloudOrderStatusRepository.getOrderStatusReport(
+          fromDate: _startDate,
+          toDate: _endDate,
+        );
+
+        if (!mounted) return;
+        setState(() {
+          _isCloud = true;
+          _pendingCount = report.pending;
+          _inProgressCount = report.inProgress;
+          _readyCount = report.ready;
+          _completedCount = report.completed;
+          _cancelledCount = report.cancelled;
+          _totalCount = report.total;
+          _deliveryCount = report.fulfillment.delivery;
+          _pickupCount = report.fulfillment.pickup;
+          _takeAwayCount = report.fulfillment.takeAway;
+          _isLoading = false;
+        });
+        return;
+      }
+
       final orders = await _orderRepository.getOrdersForWorkspace(
         tab: 'all',
         searchQuery: '',
@@ -88,6 +126,7 @@ class _OrderStatusReportScreenState extends State<OrderStatusReportScreen> {
 
       if (!mounted) return;
       setState(() {
+        _isCloud = false;
         _pendingCount = pendingCount;
         _inProgressCount = inProgressCount;
         _readyCount = readyCount;
@@ -134,6 +173,11 @@ class _OrderStatusReportScreenState extends State<OrderStatusReportScreen> {
                 _buildSummaryCard(),
                 const SizedBox(height: 16),
                 _buildStatusBreakdown(),
+                if (_isCloud ||
+                    _deliveryCount + _pickupCount + _takeAwayCount > 0) ...[
+                  const SizedBox(height: 16),
+                  _buildFulfillmentBreakdown(),
+                ],
                 const SizedBox(height: 16),
                 _buildReportFooter(),
               ],
@@ -255,6 +299,45 @@ class _OrderStatusReportScreenState extends State<OrderStatusReportScreen> {
             count: _cancelledCount,
             color: Colors.red,
             icon: Icons.cancel_rounded,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFulfillmentBreakdown() {
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Fulfillment Breakdown',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _StatusRow(
+            label: 'Delivery',
+            count: _deliveryCount,
+            color: Colors.blue,
+            icon: Icons.local_shipping_rounded,
+          ),
+          const SizedBox(height: 12),
+          _StatusRow(
+            label: 'Pickup',
+            count: _pickupCount,
+            color: Colors.orange,
+            icon: Icons.storefront_rounded,
+          ),
+          const SizedBox(height: 12),
+          _StatusRow(
+            label: 'Take Away',
+            count: _takeAwayCount,
+            color: Colors.teal,
+            icon: Icons.shopping_bag_rounded,
           ),
         ],
       ),

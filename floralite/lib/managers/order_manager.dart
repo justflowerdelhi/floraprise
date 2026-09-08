@@ -39,11 +39,13 @@ class OrderManager {
     required WalkInSession session,
     required OrderTotals totals,
     required int? customerId,
+    String? cloudCustomerId,
   }) {
     return _orderRepository.upsertDraft(
       session: session,
       totals: totals,
       customerId: customerId,
+      cloudCustomerId: cloudCustomerId,
     );
   }
 
@@ -52,17 +54,59 @@ class OrderManager {
     required WalkInSession session,
     required OrderTotals totals,
     required int? customerId,
+    String? cloudCustomerId,
   }) {
     return _orderRepository.updateOrderFromSession(
       orderId: orderId,
       session: session,
       totals: totals,
       customerId: customerId,
+      cloudCustomerId: cloudCustomerId,
+    );
+  }
+
+  Future<void> linkCloudCustomerId({
+    required int orderId,
+    required String cloudCustomerId,
+    String? cloudCompanyId,
+  }) {
+    return _orderRepository.linkCloudCustomerId(
+      orderId: orderId,
+      cloudCustomerId: cloudCustomerId,
+      cloudCompanyId: cloudCompanyId,
     );
   }
 
   Future<ConfirmedOrder> confirmOrderDraft({required int orderId}) {
     return _orderRepository.confirmDraft(orderId: orderId);
+  }
+
+  Future<String> getOrCreatePosClientSyncId(int orderId) {
+    return _orderRepository.getOrCreatePosClientSyncId(orderId);
+  }
+
+  Future<Map<String, dynamic>> buildCloudPosSalePayload({
+    required int orderId,
+    required String clientSyncId,
+    required String orderNo,
+  }) {
+    return _orderRepository.buildCloudPosSalePayload(
+      orderId: orderId,
+      clientSyncId: clientSyncId,
+      orderNo: orderNo,
+    );
+  }
+
+  Future<ConfirmedOrder> finalizeCloudConfirmedDraft({
+    required int orderId,
+    required String orderNo,
+    required String cloudOrderId,
+  }) {
+    return _orderRepository.finalizeCloudConfirmedDraft(
+      orderId: orderId,
+      orderNo: orderNo,
+      cloudOrderId: cloudOrderId,
+    );
   }
 
   Future<Map<String, dynamic>> getCustomerStatistics(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../data/database/app_database.dart';
+import '../data/repositories/cloud_inventory_repository.dart';
 import '../data/repositories/pos_sync_outbox_repository.dart';
 import '../managers/onboarding_manager.dart';
 import '../l10n/app_localizations.dart';
@@ -605,6 +606,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return buffer.toString().trimRight();
   }
 
+  Future<void> _showCloudRedRosesStockForDebug() async {
+    const cloudProductId = '0952579a-dc73-4b94-ae56-dc7d6b0ecfcf';
+    Object? failure;
+    String message;
+
+    try {
+      final products = await CloudInventoryRepository().listInventoryProducts();
+      final matches = products.where(
+        (product) => product.cloudProductId?.toLowerCase() == cloudProductId,
+      );
+      if (matches.isEmpty) {
+        message = 'Red Roses cloud product was not returned by inventory API.';
+      } else {
+        final product = matches.single;
+        message = '${product.name}: currentQty=${product.currentQty}, minQty=${product.minQty}, cloudProductId=${product.cloudProductId}';
+      }
+    } catch (error) {
+      failure = error;
+      message = 'Cloud inventory diagnostic failed: $error';
+    }
+
+    debugPrint('[CLOUD-INVENTORY-DIAG] $message');
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cloud Red Roses Stock'),
+        content: SelectableText(failure == null ? message : message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDeveloperSection(BuildContext context, AppLocalizations l10n) {
     // Only show in debug builds
     if (!kDebugMode) {
@@ -642,6 +681,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : 'Temporary debug action for stored POS sale outbox rows',
                 Icons.cloud_upload_outlined,
                 _isSyncingPendingPosSales ? null : _syncPendingPosSalesForDebug,
+              ),
+              const Divider(height: 1),
+              _buildSettingTile(
+                context,
+                'Check Cloud Red Roses Stock',
+                'Temporary debug read-only Cloud inventory check',
+                Icons.cloud_queue,
+                _showCloudRedRosesStockForDebug,
               ),
             ],
           ),

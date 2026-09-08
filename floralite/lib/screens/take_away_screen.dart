@@ -20,6 +20,7 @@ import '../models/walk_in_line_item.dart';
 import '../models/walk_in_session.dart';
 import '../providers/design_provider.dart';
 import '../providers/printer_provider.dart';
+import '../providers/customer_provider.dart';
 import '../providers/walk_in_session_provider.dart';
 import '../services/discount_service.dart';
 import '../services/reward_summary_formatter.dart';
@@ -49,7 +50,7 @@ class TakeAwayScreen extends StatefulWidget {
     this.editingOrderId,
   });
 
-  final int? prefillCustomerId;
+  final String? prefillCustomerId;
   final String? prefillCustomerName;
   final String? prefillCustomerPhone;
   final String? prefillRecipientName;
@@ -59,6 +60,14 @@ class TakeAwayScreen extends StatefulWidget {
 
   @override
   State<TakeAwayScreen> createState() => _TakeAwayScreenState();
+}
+
+@visibleForTesting
+int? takeAwayDraftOrderIdForSessionSync({
+  required int? currentDraftOrderId,
+  required bool isOrderSaved,
+}) {
+  return isOrderSaved ? null : currentDraftOrderId;
 }
 
 class _TakeAwayScreenState extends State<TakeAwayScreen> {
@@ -156,6 +165,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
       .map(
         (product) => WalkInLineItem(
           productId: product.trackInventory ? product.productId : null,
+          cloudProductId: product.cloudProductId,
           description: product.designId,
           quantity: product.quantity,
           unitPricePaise: _parseCurrencyToPaise(product.price),
@@ -1070,6 +1080,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
     setState(() {
       _addOrIncrementCatalogProduct(
         productId: selected.id,
+        cloudProductId: selected.cloudProductId,
         trackInventory: selected.trackInventory,
         name: selected.name,
         pricePaise: selected.sellingPricePaise,
@@ -1116,6 +1127,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
 
   void _addOrIncrementCatalogProduct({
     required int productId,
+    String? cloudProductId,
     required bool trackInventory,
     required String name,
     required int pricePaise,
@@ -1137,6 +1149,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
     _products.add(
       _ProductItem(
         productId: productId,
+        cloudProductId: cloudProductId,
         trackInventory: trackInventory,
         designId: name,
         quantity: 1,
@@ -1524,8 +1537,12 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
 
   Future<void> _lookupCustomer(String phone) async {
     final provider = context.read<WalkInSessionProvider>();
+    final customerProvider = context.read<CustomerProvider>();
     final customerName = await provider.lookupCustomerName(phone);
-    final customerStats = await provider.lookupCustomerStatistics(phone);
+    final customer = await customerProvider.lookupByPhone(phone);
+    final customerStats = customer == null
+        ? null
+        : await customerProvider.lookupCustomerStatistics(customer);
 
     // Debug logging
     debugPrint('=== Customer Lookup Debug ===');
@@ -1856,7 +1873,11 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
 
     provider.patchSession(
       WalkInSession(
-        draftOrderId: current.draftOrderId,
+        draftOrderId: takeAwayDraftOrderIdForSessionSync(
+          currentDraftOrderId: current.draftOrderId,
+          isOrderSaved: _isOrderSaved,
+        ),
+        posClientSyncId: _isOrderSaved ? null : current.posClientSyncId,
         fulfilmentType: _fulfilmentType,
         lines: _walkInLines,
         customerPhone: _phoneController.text.trim(),
@@ -2167,6 +2188,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
 
 class _ProductItem {
   final int? productId;
+  final String? cloudProductId;
   final bool trackInventory;
   final String designId;
   final int quantity;
@@ -2183,6 +2205,7 @@ class _ProductItem {
 
   _ProductItem({
     this.productId,
+    this.cloudProductId,
     this.trackInventory = false,
     required this.designId,
     required this.quantity,
@@ -2206,6 +2229,7 @@ class _ProductItem {
   }) {
     return _ProductItem(
       productId: productId,
+      cloudProductId: cloudProductId,
       trackInventory: trackInventory,
       designId: designId,
       quantity: quantity ?? this.quantity,

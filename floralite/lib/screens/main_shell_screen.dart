@@ -50,7 +50,7 @@ import 'scheduler_screen.dart';
 import 'settings_screen.dart';
 import 'share_branding_settings_screen.dart';
 import 'shop_details_screen.dart';
-import 'staff_management_screen.dart';
+import 'cloud_staff_screen.dart';
 import 'subscription_screen.dart';
 import 'walkin_sales_screen.dart';
 
@@ -273,7 +273,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
         '/orders' => const OrdersScreen(),
         '/delivery-workspace' => const DeliveryWorkspaceScreen(),
         '/customers' => const CustomersScreen(),
-        '/staff' => const StaffManagementScreen(),
+        '/staff' => const StaffModeScreen(),
         '/reminders' => const RemindersScreen(),
         '/products' => const ProductsScreen(),
         '/categories' => const CategoriesScreen(),

@@ -174,6 +174,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (context) => CustomerProfileScreen(
+                                  customerId: customer['id']?.toString() ?? '',
                                   name: customer['name'] as String,
                                   phone: customer['phone'] as String,
                                   lastOrder: customer['lastOrder'] as String,

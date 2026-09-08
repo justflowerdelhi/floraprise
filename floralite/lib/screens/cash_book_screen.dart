@@ -1,18 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../data/repositories/cash_book_repository.dart';
 import '../models/cash_book.dart';
+import '../providers/storage_mode_provider.dart';
 
 class CashBookScreen extends StatefulWidget {
-  const CashBookScreen({super.key});
+  const CashBookScreen({
+    super.key,
+    CashBookRepository? repository,
+    CloudCashBookRepository? cloudRepository,
+    DateTime? initialDate,
+  })  : _repository = repository,
+        _cloudRepository = cloudRepository,
+        _initialDate = initialDate;
+
+  final CashBookRepository? _repository;
+  final CloudCashBookRepository? _cloudRepository;
+  final DateTime? _initialDate;
 
   @override
   State<CashBookScreen> createState() => _CashBookScreenState();
 }
 
+@visibleForTesting
+Future<List<CashBook>> loadCashBookTransactionsForMode({
+  required bool isCloud,
+  required DateTime date,
+  required CashBookRepository localRepository,
+  required CloudCashBookRepository cloudRepository,
+}) {
+  return isCloud
+      ? cloudRepository.getByDate(date)
+      : localRepository.getByDate(date);
+}
+
 class _CashBookScreenState extends State<CashBookScreen> {
-  final _repository = CashBookRepository();
-  DateTime _selectedDate = DateTime.now();
+  late final CashBookRepository _repository;
+  late final CloudCashBookRepository _cloudRepository;
+  late DateTime _selectedDate;
   List<CashBook> _transactions = [];
   bool _isLoading = true;
   String _searchQuery = '';
@@ -21,6 +47,9 @@ class _CashBookScreenState extends State<CashBookScreen> {
   @override
   void initState() {
     super.initState();
+    _repository = widget._repository ?? CashBookRepository();
+    _cloudRepository = widget._cloudRepository ?? CloudCashBookRepository();
+    _selectedDate = widget._initialDate ?? DateTime.now();
     _loadTransactions();
   }
 
@@ -34,7 +63,13 @@ class _CashBookScreenState extends State<CashBookScreen> {
     setState(() => _isLoading = true);
     
     try {
-      final transactions = await _repository.getByDate(_selectedDate);
+      final storageMode = context.read<StorageModeProvider>();
+      final transactions = await loadCashBookTransactionsForMode(
+        isCloud: storageMode.isCloud,
+        date: _selectedDate,
+        localRepository: _repository,
+        cloudRepository: _cloudRepository,
+      );
       setState(() {
         _transactions = transactions;
         _isLoading = false;
@@ -72,7 +107,14 @@ class _CashBookScreenState extends State<CashBookScreen> {
     
     setState(() => _isLoading = true);
     try {
-      final results = await _repository.search(_searchQuery, _selectedDate, _selectedDate);
+      final storageMode = context.read<StorageModeProvider>();
+      final results = storageMode.isCloud
+          ? await _cloudRepository.search(
+              _searchQuery,
+              _selectedDate,
+              _selectedDate,
+            )
+          : await _repository.search(_searchQuery, _selectedDate, _selectedDate);
       setState(() {
         _transactions = results;
         _isLoading = false;

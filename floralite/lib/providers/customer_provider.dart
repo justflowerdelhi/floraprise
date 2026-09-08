@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../data/repositories/customer_repository.dart';
 import '../managers/customer_manager.dart';
 import '../services/business_data_event_bus.dart';
 import 'storage_mode_provider.dart';
@@ -217,6 +218,50 @@ class CustomerProvider extends ChangeNotifier {
     _filterPendingPayment = 'all';
     _filterTotalOrders = 'all';
     notifyListeners();
+  }
+
+  Future<CustomerRecord?> lookupByPhone(String phone) {
+    return _customerManager.lookupByPhone(phone);
+  }
+
+  Future<Map<String, dynamic>?> lookupCustomerStatistics(
+    CustomerRecord customer,
+  ) async {
+    if (!_cloud) {
+      final stats = await _customerManager.lookupCustomerStatistics(customer);
+      if (stats == null) return null;
+      return stats;
+    }
+
+    final cloudCustomerId = customer.cloudCustomerId?.trim() ?? '';
+    if (cloudCustomerId.isEmpty) {
+      return {
+        'previousOrders': 0,
+        'lifetimePurchasePaise': 0,
+        'lastOrderDate': null,
+        'pendingPaymentPaise': 0,
+      };
+    }
+
+    final stats = await _cloudRepository.getStatistics(
+      cloudCustomerId,
+      companyId: customer.cloudCompanyId,
+    );
+    if (stats == null) {
+      return {
+        'previousOrders': 0,
+        'lifetimePurchasePaise': 0,
+        'lastOrderDate': null,
+        'pendingPaymentPaise': 0,
+      };
+    }
+
+    return {
+      'previousOrders': stats.totalOrders,
+      'lifetimePurchasePaise': stats.lifetimePurchasePaise,
+      'lastOrderDate': stats.lastOrderAt,
+      'pendingPaymentPaise': stats.pendingPaymentPaise,
+    };
   }
 
   Future<void> refresh() => loadCustomers();

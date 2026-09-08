@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../../data/repositories/cloud_inventory_repository.dart';
 import '../../data/repositories/inventory_repository.dart';
 import '../../managers/business_settings_manager.dart';
+import '../../providers/storage_mode_provider.dart';
 import '../../widgets/common_widgets.dart';
 
 class LowStockReportScreen extends StatefulWidget {
@@ -14,6 +17,8 @@ class LowStockReportScreen extends StatefulWidget {
 
 class _LowStockReportScreenState extends State<LowStockReportScreen> {
   final InventoryRepository _inventoryRepository = InventoryRepository();
+  final CloudInventoryRepository _cloudInventoryRepository =
+      CloudInventoryRepository();
   final BusinessSettingsManager _businessSettingsManager =
       BusinessSettingsManager();
 
@@ -43,6 +48,28 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final isCloud = context.read<StorageModeProvider>().isCloud;
+      if (isCloud) {
+        final cloudItems =
+            await _cloudInventoryRepository.listLowStockProducts();
+        if (!mounted) return;
+        setState(() {
+          _lowStockItems = cloudItems
+              .map((p) => {
+                    'id': p.productId,
+                    'name': p.name,
+                    'sku': p.sku,
+                    'current_stock': p.currentQuantity,
+                    'min_stock': p.minimumQuantity,
+                    'unit': 'pcs',
+                    'status': p.status,
+                  })
+              .toList();
+          _isLoading = false;
+        });
+        return;
+      }
+
       final inventoryItems = await _inventoryRepository.getLowStockItems();
 
       if (!mounted) return;
@@ -196,12 +223,17 @@ class _StockRow extends StatelessWidget {
     final currentStock = item['current_stock'] as int? ?? 0;
     final minStock = item['min_stock'] as int? ?? 0;
     final unit = item['unit'] as String? ?? 'pcs';
+    final sku = item['sku'] as String?;
+    final status = item['status'] as String?;
 
     final stockLevel = currentStock / (minStock > 0 ? minStock : 1);
     Color statusColor;
     String statusText;
 
-    if (stockLevel <= 0.25) {
+    if (currentStock <= 0 || status == 'outOfStock') {
+      statusColor = Colors.red;
+      statusText = 'Out of Stock';
+    } else if (stockLevel <= 0.25) {
       statusColor = Colors.red;
       statusText = 'Critical';
     } else if (stockLevel <= 0.5) {
@@ -243,7 +275,9 @@ class _StockRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Min: $minStock $unit',
+                  sku != null && sku.isNotEmpty
+                      ? '$sku • Min: $minStock $unit'
+                      : 'Min: $minStock $unit',
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,

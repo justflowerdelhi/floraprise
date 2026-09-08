@@ -9,4 +9,5 @@ public static class PolicyNames
     public const string CompanyAdmin = "CompanyAdmin";
 
     public const string StaffAccess = "StaffAccess";
+    public const string CompanyOperations = "CompanyOperations";
 }

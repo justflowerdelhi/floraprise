@@ -20,6 +20,7 @@ import '../models/walk_in_line_item.dart';
 import '../models/walk_in_session.dart';
 import '../providers/design_provider.dart';
 import '../providers/printer_provider.dart';
+import '../providers/customer_provider.dart';
 import '../providers/walk_in_session_provider.dart';
 import '../services/discount_service.dart';
 import '../services/reward_summary_formatter.dart';
@@ -49,7 +50,7 @@ class PickupLaterScreen extends StatefulWidget {
     this.editingOrderId,
   });
 
-  final int? prefillCustomerId;
+  final String? prefillCustomerId;
   final String? prefillCustomerName;
   final String? prefillCustomerPhone;
   final String? prefillRecipientName;
@@ -59,6 +60,14 @@ class PickupLaterScreen extends StatefulWidget {
 
   @override
   State<PickupLaterScreen> createState() => _PickupLaterScreenState();
+}
+
+@visibleForTesting
+T? pickupLaterSessionValueForSync<T>({
+  required T? currentValue,
+  required bool isOrderSaved,
+}) {
+  return isOrderSaved ? null : currentValue;
 }
 
 class _PickupLaterScreenState extends State<PickupLaterScreen> {
@@ -158,6 +167,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
       .map(
         (product) => WalkInLineItem(
           productId: product.trackInventory ? product.productId : null,
+          cloudProductId: product.cloudProductId,
           description: product.designId,
           quantity: product.quantity,
           unitPricePaise: _parseCurrencyToPaise(product.price),
@@ -1131,6 +1141,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
     setState(() {
       _addOrIncrementCatalogProduct(
         productId: selected.id,
+        cloudProductId: selected.cloudProductId,
         trackInventory: selected.trackInventory,
         name: selected.name,
         pricePaise: selected.sellingPricePaise,
@@ -1177,6 +1188,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
 
   void _addOrIncrementCatalogProduct({
     required int productId,
+    String? cloudProductId,
     required bool trackInventory,
     required String name,
     required int pricePaise,
@@ -1198,6 +1210,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
     _products.add(
       _ProductItem(
         productId: productId,
+        cloudProductId: cloudProductId,
         trackInventory: trackInventory,
         designId: name,
         quantity: 1,
@@ -1574,8 +1587,12 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
 
   Future<void> _lookupCustomer(String phone) async {
     final provider = context.read<WalkInSessionProvider>();
+    final customerProvider = context.read<CustomerProvider>();
     final customerName = await provider.lookupCustomerName(phone);
-    final customerStats = await provider.lookupCustomerStatistics(phone);
+    final customer = await customerProvider.lookupByPhone(phone);
+    final customerStats = customer == null
+        ? null
+        : await customerProvider.lookupCustomerStatistics(customer);
 
     // Debug logging
     debugPrint('=== Customer Lookup Debug ===');
@@ -1922,7 +1939,14 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
 
     provider.patchSession(
       WalkInSession(
-        draftOrderId: current.draftOrderId,
+        draftOrderId: pickupLaterSessionValueForSync<int>(
+          currentValue: current.draftOrderId,
+          isOrderSaved: _isOrderSaved,
+        ),
+        posClientSyncId: pickupLaterSessionValueForSync<String>(
+          currentValue: current.posClientSyncId,
+          isOrderSaved: _isOrderSaved,
+        ),
         fulfilmentType: _fulfilmentType,
         lines: _walkInLines,
         customerPhone: _phoneController.text.trim(),
@@ -2263,6 +2287,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
 
 class _ProductItem {
   final int? productId;
+  final String? cloudProductId;
   final bool trackInventory;
   final String designId;
   final int quantity;
@@ -2279,6 +2304,7 @@ class _ProductItem {
 
   _ProductItem({
     this.productId,
+    this.cloudProductId,
     this.trackInventory = false,
     required this.designId,
     required this.quantity,
@@ -2302,6 +2328,7 @@ class _ProductItem {
   }) {
     return _ProductItem(
       productId: productId,
+      cloudProductId: cloudProductId,
       trackInventory: trackInventory,
       designId: designId,
       quantity: quantity ?? this.quantity,

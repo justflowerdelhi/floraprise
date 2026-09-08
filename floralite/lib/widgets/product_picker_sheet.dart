@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../data/repositories/inventory_repository.dart';
+import '../data/repositories/cloud_product_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../providers/inventory_provider.dart';
 import '../screens/purchase_list_screen.dart';
@@ -24,6 +26,7 @@ class _ProductPickerSheet extends StatefulWidget {
 
 class _ProductPickerSheetState extends State<_ProductPickerSheet> {
   final ProductRepository _repository = ProductRepository();
+  final CloudProductRepository _cloudProductRepository = CloudProductRepository();
   final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
@@ -49,10 +52,16 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
     });
 
     try {
-      final rows = await _repository.listActiveProductsWithInventory();
+      final inventoryProvider = context.read<InventoryProvider>();
+      final products = inventoryProvider.isCloud
+          ? productPickerRowsFromCloudInventory(
+              await _loadCloudInventoryProducts(inventoryProvider),
+              await _cloudProductRepository.listProducts(),
+            )
+          : await _repository.listActiveProductsWithInventory();
       if (!mounted) return;
       setState(() {
-        _products = rows;
+        _products = products;
         _isLoading = false;
       });
     } catch (_) {
@@ -62,6 +71,13 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<List<InventoryProductRecord>> _loadCloudInventoryProducts(
+    InventoryProvider inventoryProvider,
+  ) async {
+    await inventoryProvider.loadProducts();
+    return inventoryProvider.products;
   }
 
   @override
@@ -319,6 +335,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
       sku: product.sku,
       manufacturerBarcode: product.manufacturerBarcode,
       florapriseBarcode: product.florapriseBarcode,
+      cloudProductId: product.cloudProductId,
       trackInventory: product.trackInventory,
       minStock: product.minQty,
       supplier: '',
@@ -468,6 +485,94 @@ class _UpdateStockDialogState extends State<_UpdateStockDialog> {
       );
     }
   }
+}
+
+@visibleForTesting
+List<ProductInventoryRecord> productPickerRowsFromCloudInventory(
+  List<InventoryProductRecord> inventoryProducts,
+  [List<CloudProduct> cloudProducts = const <CloudProduct>[]]
+) {
+  final productById = {
+    for (final product in cloudProducts) product.id.trim().toLowerCase(): product,
+  };
+  return inventoryProducts
+      .where((product) => product.cloudProductId?.trim().isNotEmpty == true)
+      .map(
+        (product) {
+          final cloudProduct = productById[product.cloudProductId!.trim().toLowerCase()];
+          return ProductInventoryRecord(
+          id: product.productId,
+          code: product.sku,
+          name: product.name.isEmpty ? cloudProduct?.name ?? '' : product.name,
+          category: product.category.isEmpty ? cloudProduct?.category ?? 'Other' : product.category,
+          defaultUnit: product.unit.isEmpty ? cloudProduct?.unitOfMeasure ?? 'Piece' : product.unit,
+          sku: product.sku.isEmpty ? cloudProduct?.sku ?? '' : product.sku,
+          barcode: product.barcode,
+          manufacturerBarcode: product.manufacturerBarcode ?? product.barcode,
+          florapriseBarcode: product.internalBarcode ?? '',
+          cloudProductId: product.cloudProductId,
+          sellingPricePaise: ((cloudProduct?.retailPrice ?? 0) * 100).round(),
+          purchasePricePaise: cloudProduct == null
+              ? null
+              : (cloudProduct.costPrice * 100).round(),
+          gstPercent: product.gstPercent,
+          gstCalculationType: product.gstCalculationType,
+          trackInventory: product.trackInventory,
+          active: true,
+          favorite: false,
+          currentQty: product.currentQty,
+          minQty: product.minQty,
+          );
+        },
+      )
+      .toList();
+}
+
+@visibleForTesting
+List<ProductInventoryRecord> productPickerApplyInventoryStock(
+  List<ProductInventoryRecord> products,
+  List<InventoryProductRecord> inventoryProducts,
+  {bool requireCloudMatch = false}
+) {
+  if (inventoryProducts.isEmpty) return products;
+  final inventoryByCloudProductId = {
+    for (final product in inventoryProducts)
+      if (product.cloudProductId?.trim().isNotEmpty == true)
+        product.cloudProductId!.trim().toLowerCase(): product,
+  };
+  final inventoryByProductId = {
+    for (final product in inventoryProducts) product.productId: product,
+  };
+
+  return products.map((product) {
+    final cloudProductId = product.cloudProductId?.trim().toLowerCase();
+    final inventory = cloudProductId == null || cloudProductId.isEmpty
+        ? inventoryByProductId[product.id]
+        : inventoryByCloudProductId[cloudProductId] ??
+            (requireCloudMatch ? null : inventoryByProductId[product.id]);
+    if (inventory == null && !requireCloudMatch) return product;
+    return ProductInventoryRecord(
+      id: product.id,
+      code: product.code,
+      name: product.name,
+      category: product.category,
+      defaultUnit: product.defaultUnit,
+      sku: product.sku,
+      barcode: product.barcode,
+      manufacturerBarcode: product.manufacturerBarcode,
+      florapriseBarcode: product.florapriseBarcode,
+      cloudProductId: product.cloudProductId,
+      sellingPricePaise: product.sellingPricePaise,
+      purchasePricePaise: product.purchasePricePaise,
+      gstPercent: product.gstPercent,
+      gstCalculationType: product.gstCalculationType,
+      trackInventory: product.trackInventory,
+      active: product.active,
+      favorite: product.favorite,
+      currentQty: inventory?.currentQty ?? 0,
+      minQty: inventory?.minQty ?? product.minQty,
+    );
+  }).toList();
 }
 
 @visibleForTesting

@@ -61,11 +61,7 @@ public static class DataSeeder
             "PlatformSuperAdmin",
             "PlatformSupport",
             "CompanyAdmin",
-            "Manager",
-            "Designer",
-            "Accountant",
-            "Staff",
-            "Delivery"
+            "Staff"
         };
 
         foreach (var role in roles)
@@ -146,26 +142,6 @@ public static class DataSeeder
             if (result.Succeeded)
             {
                 await userManager.AddToRoleAsync(admin, "CompanyAdmin");
-            }
-        }
-
-        // Manager
-        const string managerEmail = "manager@demoflorist.com";
-        if (await userManager.FindByEmailAsync(managerEmail) == null)
-        {
-            var manager = new ApplicationUser
-            {
-                UserName = managerEmail,
-                Email = managerEmail,
-                CompanyId = company.Id,
-                EmailConfirmed = true,
-                IsActive = true
-            };
-
-            var result = await userManager.CreateAsync(manager, "Manager@123");
-            if (result.Succeeded)
-            {
-                await userManager.AddToRoleAsync(manager, "Manager");
             }
         }
 

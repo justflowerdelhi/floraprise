@@ -80,6 +80,8 @@ public class AccountingController : ControllerBase
 
         var totalPayments = await _db.Payments.Where(p => p.CompanyId == cid).SumAsync(p => p.Amount);
         var totalExpenses = await _db.Expenses.Where(e => e.CompanyId == cid && e.IsActive).SumAsync(e => e.Amount);
+        var rewardPointsEarned = await _db.Orders.Where(o => o.CompanyId == cid).SumAsync(o => o.RewardPointsEarned);
+        var rewardPointsRedeemed = await _db.Orders.Where(o => o.CompanyId == cid).SumAsync(o => o.RewardPointsRedeemed);
 
         return Ok(new AccountingDashboardDto
         {
@@ -87,6 +89,8 @@ public class AccountingController : ControllerBase
             ExpensesToday = expensesToday,
             ProfitToday = revenueToday - expensesToday,
             CashBalance = totalPayments - totalExpenses,
+            RewardPointsEarned = rewardPointsEarned,
+            RewardPointsRedeemed = rewardPointsRedeemed,
             RevenueTrend = revenueTrend,
             ExpenseTrend = expenseTrend,
             TopExpenseCategories = topCategories,
@@ -182,7 +186,10 @@ public class AccountingController : ControllerBase
         if (!Enum.TryParse<ExpensePaymentMode>(req.PaymentMode, true, out var paymentMode))
             return BadRequest(new { message = "Payment mode must be Cash, Upi, or Card." });
         var expense = new Expense(CompanyId, categoryName, req.Amount, req.Description, date);
-        if (category != null) expense.SetLocalDetails(category.Id, paymentMode);
+        if (category != null)
+            expense.SetLocalDetails(category.Id, paymentMode);
+        else
+            expense.SetPaymentMode(paymentMode);
 
         var expenseAccount = await GetOrCreateExpenseAccountAsync(req.Category);
         var cashAccount = await GetOrCreateCashAccountAsync();
@@ -214,6 +221,25 @@ public class AccountingController : ControllerBase
             debit: 0,
             credit: req.Amount,
             accountId: cashAccount.Id));
+
+        if (paymentMode == ExpensePaymentMode.Cash)
+        {
+            var day = date.Date;
+            var balance = await _db.CashBookEntries
+                .Where(e => e.CompanyId == CompanyId && e.Date == day)
+                .OrderByDescending(e => e.CreatedAtUtc)
+                .Select(e => (decimal?)e.RunningBalance)
+                .FirstOrDefaultAsync() ?? 0m;
+            _db.CashBookEntries.Add(new CashBookEntry(
+                CompanyId,
+                day,
+                CashBookTransactionType.CashExpense,
+                description,
+                req.Amount,
+                0m,
+                req.Amount,
+                balance - req.Amount));
+        }
 
         await _db.SaveChangesAsync();
         return Ok(ToExpenseDto(expense));
@@ -274,12 +300,11 @@ public class AccountingController : ControllerBase
     // ─── Journal Entries ────────────────────────────────────
 
     [HttpGet("journal")]
-    public async Task<IActionResult> GetJournalEntries()
+    public async Task<IActionResult> GetJournalEntries([FromQuery] DateTime? from, [FromQuery] DateTime? to)
     {
         // Materialize entities first — EF Core / Npgsql cannot translate
         // DateTime.ToString("yyyy-MM-dd") inside a SQL SELECT projection.
-        var entities = await _db.JournalEntries
-            .Where(j => j.CompanyId == CompanyId)
+        var entities = await JournalInRange(from, to)
             .OrderByDescending(j => j.EntryDate)
             .ToListAsync();
 
@@ -311,11 +336,9 @@ public class AccountingController : ControllerBase
     // ─── Reports ────────────────────────────────────────────
 
     [HttpGet("profit-loss")]
-    public async Task<IActionResult> GetProfitLoss()
+    public async Task<IActionResult> GetProfitLoss([FromQuery] DateTime? from, [FromQuery] DateTime? to)
     {
-        var entries = await _db.JournalEntries
-            .Where(j => j.CompanyId == CompanyId)
-            .ToListAsync();
+        var entries = await JournalInRange(from, to).ToListAsync();
 
         var accounts = await _db.Accounts
             .Where(a => a.CompanyId == CompanyId)
@@ -363,24 +386,55 @@ public class AccountingController : ControllerBase
     }
 
     [HttpGet("tax-summary")]
-    public async Task<IActionResult> GetTaxSummary()
+    public async Task<IActionResult> GetTaxSummary([FromQuery] DateTime? from, [FromQuery] DateTime? to)
     {
         var cid = CompanyId;
-        var totalTax = await _db.Orders.Where(o => o.CompanyId == cid).SumAsync(o => o.TaxAmount);
-        var totalTaxable = await _db.Orders.Where(o => o.CompanyId == cid).SumAsync(o => o.SubTotal);
+        var orders = _db.Orders.Where(o => o.CompanyId == cid);
+        if (from.HasValue) orders = orders.Where(o => o.OrderDate >= NormalizeFrom(from.Value));
+        if (to.HasValue) orders = orders.Where(o => o.OrderDate < NormalizeToExclusive(to.Value));
+        var totalTax = await orders.SumAsync(o => o.TaxAmount);
+        var totalTaxable = await orders.SumAsync(o => o.SubTotal);
         var rate = totalTaxable > 0 ? Math.Round(totalTax / totalTaxable * 100, 2) : 0;
         return Ok(new List<TaxSummaryDto> { new() { TaxType = "Sales Tax", Rate = rate, TaxableAmount = totalTaxable, TaxAmount = totalTax } });
     }
 
     [HttpGet("ledger")]
-    public async Task<IActionResult> GetLedger([FromQuery] Guid? accountId)
+    public async Task<IActionResult> GetLedger(
+        [FromQuery] Guid? accountId,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to)
     {
         var query = _db.JournalEntries.Where(j => j.CompanyId == CompanyId);
         if (accountId.HasValue) query = query.Where(j => j.AccountId == accountId.Value);
-        var entries = await query.OrderBy(j => j.EntryDate).ToListAsync();
+
         decimal balance = 0;
+        if (from.HasValue)
+        {
+            // Carry the balance forward so a ranged ledger still opens at the correct figure.
+            var fromUtc = NormalizeFrom(from.Value);
+            balance = await query.Where(j => j.EntryDate < fromUtc)
+                .SumAsync(j => j.Debit - j.Credit);
+        }
+
+        var entries = await JournalInRange(from, to, accountId)
+            .OrderBy(j => j.EntryDate)
+            .ToListAsync();
         var result = entries.Select(j => { balance += j.Debit - j.Credit; return new LedgerEntryDto { Date = j.EntryDate.ToString("yyyy-MM-dd"), Reference = j.Reference, Description = j.Description, Debit = j.Debit, Credit = j.Credit, Balance = balance }; }).ToList();
         return Ok(result);
+    }
+
+    private static DateTime NormalizeFrom(DateTime value) => value.ToUniversalTime().Date;
+
+    private static DateTime NormalizeToExclusive(DateTime value) =>
+        value.ToUniversalTime().Date.AddDays(1);
+
+    private IQueryable<JournalEntry> JournalInRange(DateTime? from, DateTime? to, Guid? accountId = null)
+    {
+        var query = _db.JournalEntries.Where(j => j.CompanyId == CompanyId);
+        if (accountId.HasValue) query = query.Where(j => j.AccountId == accountId.Value);
+        if (from.HasValue) query = query.Where(j => j.EntryDate >= NormalizeFrom(from.Value));
+        if (to.HasValue) query = query.Where(j => j.EntryDate < NormalizeToExclusive(to.Value));
+        return query;
     }
 
     // ─── Trial Balance ──────────────────────────────────────

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Sumpooj.Application.Interfaces;
+using Sumpooj.Application.Production;
 using Sumpooj.Domain.Entities;
 using Sumpooj.Infrastructure.Persistence;
 
@@ -154,10 +155,38 @@ public class ProductionWastageLogRepository : IProductionWastageLogRepository
 
     public ProductionWastageLogRepository(SumpoojDbContext db) => _db = db;
 
-    public async Task<List<ProductionWastageLog>> GetAllAsync(Guid companyId)
+    public async Task<List<ProductionWastageLog>> GetAllAsync(Guid companyId, WastageLogFilter? filter = null)
     {
-        return await _db.ProductionWastageLogs
-            .Where(l => l.CompanyId == companyId)
+        var query = _db.ProductionWastageLogs.Where(l => l.CompanyId == companyId);
+
+        if (filter != null)
+        {
+            if (filter.From.HasValue)
+            {
+                var fromUtc = filter.From.Value.ToUniversalTime().Date;
+                query = query.Where(l => l.CreatedAtUtc >= fromUtc);
+            }
+            if (filter.To.HasValue)
+            {
+                var toUtc = filter.To.Value.ToUniversalTime().Date.AddDays(1);
+                query = query.Where(l => l.CreatedAtUtc < toUtc);
+            }
+            if (filter.ProductId.HasValue)
+                query = query.Where(l => l.ProductId == filter.ProductId.Value);
+            if (filter.Reason.HasValue)
+                query = query.Where(l => l.Reason == filter.Reason.Value);
+            if (filter.Category.HasValue)
+            {
+                // Category lives on Product, so resolve it through the product table.
+                var category = filter.Category.Value;
+                var productIds = _db.Products
+                    .Where(p => p.CompanyId == companyId && p.Category == category)
+                    .Select(p => p.Id);
+                query = query.Where(l => productIds.Contains(l.ProductId));
+            }
+        }
+
+        return await query
             .OrderByDescending(l => l.CreatedAtUtc)
             .ToListAsync();
     }

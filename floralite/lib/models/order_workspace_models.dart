@@ -1,5 +1,6 @@
 class OrderListItem {
   final int id;
+  final String? cloudOrderId;
   final String orderNo;
   final String customerName;
   final String customerPhone;
@@ -16,6 +17,7 @@ class OrderListItem {
 
   const OrderListItem({
     required this.id,
+    this.cloudOrderId,
     required this.orderNo,
     required this.customerName,
     required this.customerPhone,
@@ -46,6 +48,7 @@ class OrderTimelineItem {
 
 class OrderDetailHeader {
   final int id;
+  final String? cloudOrderId;
   final String orderNo;
   final String status;
   final String customerName;
@@ -73,6 +76,7 @@ class OrderDetailHeader {
 
   const OrderDetailHeader({
     required this.id,
+    this.cloudOrderId,
     required this.orderNo,
     required this.status,
     required this.customerName,

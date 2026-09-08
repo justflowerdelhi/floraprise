@@ -1,3 +1,4 @@
+using Sumpooj.Application.Production;
 using Sumpooj.Domain.Entities;
 
 namespace Sumpooj.Application.Interfaces;
@@ -40,6 +41,6 @@ public interface IProductionMaintenanceLogRepository
 
 public interface IProductionWastageLogRepository
 {
-    Task<List<ProductionWastageLog>> GetAllAsync(Guid companyId);
+    Task<List<ProductionWastageLog>> GetAllAsync(Guid companyId, WastageLogFilter? filter = null);
     Task AddAsync(ProductionWastageLog log);
 }

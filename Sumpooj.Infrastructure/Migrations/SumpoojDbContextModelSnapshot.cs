@@ -2917,6 +2917,9 @@ namespace Sumpooj.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("AssignedDesignerStaffId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("AssignedToUserId")
                         .HasColumnType("uuid");
 
@@ -3035,6 +3038,8 @@ namespace Sumpooj.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AssignedDesignerStaffId");
 
                     b.HasIndex("CustomerId");
 
@@ -5804,6 +5809,12 @@ namespace Sumpooj.Infrastructure.Migrations
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.Order", b =>
                 {
+                    b.HasOne("Sumpooj.Domain.Entities.Staff", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedDesignerStaffId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_Orders_AssignedDesignerStaff");
+
                     b.HasOne("Sumpooj.Domain.Entities.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
@@ -5832,6 +5843,15 @@ namespace Sumpooj.Infrastructure.Migrations
                         .WithMany("Items")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade);
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.Payment", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.PaymentGatewayConfig", b =>

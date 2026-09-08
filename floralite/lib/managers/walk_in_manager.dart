@@ -3,6 +3,7 @@ import '../models/order_workspace_models.dart';
 import '../models/walk_in_enums.dart';
 import '../models/walk_in_line_item.dart';
 import '../models/walk_in_session.dart';
+import '../services/pos_sale_sync_service.dart';
 import 'customer_manager.dart';
 import 'inventory_manager.dart';
 import 'order_manager.dart';
@@ -30,6 +31,14 @@ class ConfirmOrderResult {
   });
 }
 
+String cloudPosOrderNumber(String clientSyncId) {
+  final normalized = clientSyncId.trim();
+  if (normalized.isEmpty) {
+    throw ArgumentError.value(clientSyncId, 'clientSyncId', 'must not be empty');
+  }
+  return 'ORD-POS-$normalized';
+}
+
 class WalkInManager {
   WalkInManager({
     required CustomerManager customerManager,
@@ -37,17 +46,20 @@ class WalkInManager {
     required OrderManager orderManager,
     required InventoryManager inventoryManager,
     required SchedulerManager schedulerManager,
+    PosSaleSyncService? posSaleSyncService,
     RewardManager? rewardManager,
   })  : _customerManager = customerManager,
         _pricingManager = pricingManager,
         _orderManager = orderManager,
         _schedulerManager = schedulerManager,
+      _posSaleSyncService = posSaleSyncService,
         _rewardManager = rewardManager ?? RewardManager();
 
   final CustomerManager _customerManager;
   final PricingManager _pricingManager;
   final OrderManager _orderManager;
   final SchedulerManager _schedulerManager;
+  final PosSaleSyncService? _posSaleSyncService;
   final RewardManager _rewardManager;
 
   Future<WalkInSession> startOrResume(FulfilmentType type) async {
@@ -88,14 +100,19 @@ class WalkInManager {
       billDiscountValue: session.billDiscountValue,
       rewardDiscountPaise: session.rewardDiscountAmountPaise,
     );
-    final draftId = await _orderManager.saveDraft(
-      session: session,
-      totals: totals,
-      customerId: ensuredCustomer?.id,
-    );
+    final draftId = session.draftOrderId ??
+        await _orderManager.saveDraft(
+          session: session,
+          totals: totals,
+          customerId: ensuredCustomer?.id,
+          cloudCustomerId: ensuredCustomer?.cloudCustomerId,
+        );
 
     return SaveDraftResult(
-      session: session.copyWith(draftOrderId: draftId),
+      session: session.copyWith(
+        draftOrderId: draftId,
+        posClientSyncId: await _orderManager.getOrCreatePosClientSyncId(draftId),
+      ),
       grandTotalPaise: totals.grandTotalPaise,
     );
   }
@@ -121,6 +138,7 @@ class WalkInManager {
       session: session,
       totals: totals,
       customerId: ensuredCustomer?.id,
+      cloudCustomerId: ensuredCustomer?.cloudCustomerId,
     );
   }
 
@@ -154,9 +172,75 @@ class WalkInManager {
       session: session,
       totals: totals,
       customerId: ensuredCustomer?.id,
+      cloudCustomerId: ensuredCustomer?.cloudCustomerId,
     );
 
     final confirmed = await _orderManager.confirmOrderDraft(orderId: draftId);
+
+    await _schedulerManager.publishWalkInOrderTask(
+      orderId: confirmed.orderId,
+      fulfilmentType: session.fulfilmentType,
+      scheduledAt: session.scheduledAt,
+      deliverySlotLabel: session.deliverySlot,
+    );
+
+    await _orderManager.enqueueReceiptAndWhatsappJobs(confirmed.orderId);
+
+    return ConfirmOrderResult(
+      orderId: confirmed.orderId,
+      grandTotalPaise: totals.grandTotalPaise,
+    );
+  }
+
+  Future<ConfirmOrderResult> confirmOnlineOrder(WalkInSession session) async {
+    final syncService = _posSaleSyncService;
+    if (syncService == null) {
+      throw StateError('Cloud POS sync service is not available.');
+    }
+    if (session.lines.isEmpty) {
+      throw StateError('Please add at least one product');
+    }
+
+    final ensuredCustomer = await _customerManager.ensureCustomer(
+      phone: session.customerPhone,
+      name: session.customerName,
+    );
+
+    final totals = _pricingManager.computeTotals(
+      lines: session.lines,
+      billDiscountType: session.billDiscountType,
+      billDiscountValue: session.billDiscountValue,
+      rewardDiscountPaise: session.rewardDiscountAmountPaise,
+    );
+    final paymentValidation = _pricingManager.validatePayments(
+      grandTotalPaise: totals.grandTotalPaise,
+      payments: session.payments,
+    );
+
+    if (!paymentValidation.isValid) {
+      throw StateError(
+          paymentValidation.message ?? 'Payment validation failed');
+    }
+
+    final draftId = await _orderManager.saveDraft(
+      session: session,
+      totals: totals,
+      customerId: ensuredCustomer?.id,
+      cloudCustomerId: ensuredCustomer?.cloudCustomerId,
+    );
+    final clientSyncId = await _orderManager.getOrCreatePosClientSyncId(draftId);
+    final orderNo = cloudPosOrderNumber(clientSyncId);
+    final payload = await _orderManager.buildCloudPosSalePayload(
+      orderId: draftId,
+      clientSyncId: clientSyncId,
+      orderNo: orderNo,
+    );
+    final syncResult = await syncService.submitPayload(payload);
+    final confirmed = await _orderManager.finalizeCloudConfirmedDraft(
+      orderId: draftId,
+      orderNo: orderNo,
+      cloudOrderId: syncResult.cloudOrderId,
+    );
 
     await _schedulerManager.publishWalkInOrderTask(
       orderId: confirmed.orderId,

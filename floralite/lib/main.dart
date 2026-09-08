@@ -24,7 +24,7 @@ import 'screens/walkin_sales_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/customers_screen.dart';
 import 'screens/categories_screen.dart';
-import 'screens/staff_management_screen.dart';
+import 'screens/cloud_staff_screen.dart';
 import 'screens/reminders_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/reports/sales_report_screen.dart';
@@ -70,6 +70,7 @@ import 'screens/attendance_monthly_summary_screen.dart';
 import 'presentation/splash/splash_screen.dart';
 import 'l10n/app_localizations.dart';
 import 'managers/customer_manager.dart';
+import 'services/customer_cloud_lookup_service.dart';
 import 'managers/category_manager.dart';
 import 'managers/dashboard_manager.dart';
 import 'managers/inventory_manager.dart';
@@ -101,6 +102,7 @@ import 'providers/purchase_provider.dart';
 import 'providers/printer_provider.dart';
 import 'providers/associate_provider.dart';
 import 'providers/staff_provider.dart';
+import 'providers/cloud_staff_provider.dart';
 import 'providers/attendance_provider.dart';
 import 'providers/license_provider.dart';
 import 'providers/auth_provider.dart';
@@ -113,6 +115,7 @@ import 'services/order_print_service.dart';
 import 'services/order_whatsapp_service.dart';
 import 'services/license_service.dart';
 import 'services/mobile_auth_service.dart';
+import 'services/pos_sale_sync_service.dart';
 import 'services/subscription_service.dart';
 import 'services/storage_mode_service.dart';
 import 'services/app_route_observer.dart';
@@ -241,7 +244,10 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
         printerManager: printerManager,
       ),
     );
-    final customerManager = CustomerManager(customerRepository);
+    final customerManager = CustomerManager(
+      customerRepository,
+      cloudLookup: CustomerCloudLookupService(auth: mobileAuthService),
+    );
     final categoryManager = CategoryManager(categoryRepository);
     final inventoryManager = InventoryManager(inventoryRepository);
     final occasionManager = OccasionManager(occasionRepository);
@@ -265,6 +271,7 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
       orderManager: orderManager,
       inventoryManager: inventoryManager,
       schedulerManager: schedulerManager,
+      posSaleSyncService: PosSaleSyncService(auth: mobileAuthService),
     );
 
     return MultiProvider(
@@ -304,10 +311,14 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
           create: (context) => WalkInSessionProvider(
             walkInManager,
             context.read<BusinessDataEventBus>(),
+            context.read<StorageModeProvider>(),
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) => OrderProvider(orderManager),
+          create: (context) => OrderProvider(
+            orderManager,
+            context.read<StorageModeProvider>(),
+          ),
         ),
         ChangeNotifierProvider(
           create: (_) => OrderWorkflowProvider(orderWorkflowManager),
@@ -322,6 +333,7 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
           create: (context) => DashboardProvider(
             dashboardManager,
             context.read<BusinessDataEventBus>(),
+            context.read<StorageModeProvider>(),
           ),
         ),
         ChangeNotifierProvider(
@@ -372,6 +384,11 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
         ),
         ChangeNotifierProvider(
           create: (_) => StaffProvider(staffManager),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => CloudStaffProvider(
+            context.read<StorageModeProvider>(),
+          ),
         ),
         ChangeNotifierProvider(
           create: (_) => AttendanceProvider(AttendanceRepository()),
@@ -517,7 +534,7 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
               '/customers': (context) =>
                   const _SubscriptionGate(child: CustomersScreen()),
               '/staff': (context) =>
-                  const _SubscriptionGate(child: StaffManagementScreen()),
+                  const _SubscriptionGate(child: StaffModeScreen()),
               '/reminders': (context) =>
                   const _SubscriptionGate(child: RemindersScreen()),
               '/products': (context) =>

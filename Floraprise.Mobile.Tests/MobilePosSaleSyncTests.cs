@@ -59,9 +59,93 @@ public sealed class MobilePosSaleSyncTests : IDisposable
         var ledger = await db.InventoryLedgers.SingleAsync();
         Assert.Equal(product.Id, ledger.ProductId);
         Assert.Equal("SALE", ledger.ReferenceType);
+        Assert.Equal(order.Id.ToString(), ledger.Reference);
         Assert.Equal(-1, ledger.QuantityChange);
         Assert.Equal(9, ledger.BalanceAfter);
         Assert.Single(db.PosSaleSyncInventoryTransactions);
+    }
+
+    [Fact]
+    public async Task CashSale_CreatesOneCloudCashBookCashInEntry()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db);
+        await db.SaveChangesAsync();
+        var request = Request(product);
+        request.Order.OrderNo = "POS-CASH-600";
+        request.Order.SubtotalPaise = 60000;
+        request.Order.GrandTotalPaise = 60000;
+        request.Lines.Single().UnitPricePaise = 60000;
+        request.Lines.Single().LineSubtotalPaise = 60000;
+        request.Lines.Single().LineTotalPaise = 60000;
+        request.Payments.Single().AmountPaise = 60000;
+
+        await Service(db).SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "cash-600-hash");
+
+        var cashBook = await db.CashBookEntries.SingleAsync();
+        Assert.Equal(CashBookTransactionType.CashSale, cashBook.TransactionType);
+        Assert.Equal(600m, cashBook.Amount);
+        Assert.Equal(600m, cashBook.CashIn);
+        Assert.Equal(0m, cashBook.CashOut);
+        Assert.Equal(600m, cashBook.RunningBalance);
+        Assert.Contains("POS-CASH-600", cashBook.Description);
+    }
+
+    [Fact]
+    public async Task NonCashSale_CreatesNoCloudCashBookEntry()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db);
+        await db.SaveChangesAsync();
+        var request = Request(product, clientSyncId: "sync-upi");
+        request.Payments.Single().Method = "upi";
+
+        await Service(db).SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "upi-hash");
+
+        Assert.Empty(db.CashBookEntries);
+    }
+
+    [Fact]
+    public async Task MultiPaymentSale_PostsOnlyCashPortionToCloudCashBook()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db);
+        await db.SaveChangesAsync();
+        var request = Request(product, clientSyncId: "sync-mixed-payment");
+        request.Order.SubtotalPaise = 60000;
+        request.Order.GrandTotalPaise = 60000;
+        request.Lines.Single().UnitPricePaise = 60000;
+        request.Lines.Single().LineSubtotalPaise = 60000;
+        request.Lines.Single().LineTotalPaise = 60000;
+        request.Payments =
+        [
+            new PosSalePaymentSnapshot { Id = 1, Method = "cash", AmountPaise = 20000, Reference = "CASH-1" },
+            new PosSalePaymentSnapshot { Id = 2, Method = "upi", AmountPaise = 40000, Reference = "UPI-1" }
+        ];
+
+        await Service(db).SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "mixed-payment-hash");
+
+        var cashBook = await db.CashBookEntries.SingleAsync();
+        Assert.Equal(CashBookTransactionType.CashSale, cashBook.TransactionType);
+        Assert.Equal(200m, cashBook.Amount);
+        Assert.Equal(200m, cashBook.CashIn);
+        Assert.Equal(0m, cashBook.CashOut);
+    }
+
+    [Fact]
+    public async Task SameClientSyncIdRetry_DoesNotDuplicateCloudCashBookEntry()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db);
+        await db.SaveChangesAsync();
+        var request = Request(product, clientSyncId: "sync-cash-retry");
+        var service = Service(db);
+
+        await service.SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "retry-cash-hash");
+        await service.SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "retry-cash-hash");
+
+        Assert.Single(db.PosSaleSyncReceipts);
+        Assert.Single(db.CashBookEntries);
     }
 
     [Fact]
@@ -84,6 +168,9 @@ public sealed class MobilePosSaleSyncTests : IDisposable
         Assert.Equal(2, order.Items.Count);
         Assert.Equal(2, await db.PosSaleSyncOrderLines.CountAsync());
         Assert.Equal(2, await db.PosSaleSyncInventoryTransactions.CountAsync());
+        Assert.Equal(9, (await db.Products.SingleAsync(p => p.Id == first.Id)).StockQuantity);
+        Assert.Equal(9, (await db.Products.SingleAsync(p => p.Id == second.Id)).StockQuantity);
+        Assert.Equal(2, await db.InventoryLedgers.CountAsync());
     }
 
     [Fact]
@@ -368,6 +455,8 @@ public sealed class MobilePosSaleSyncTests : IDisposable
         Assert.Single(verify.Payments);
         Assert.Single(verify.PosSaleSyncOrderLines);
         Assert.Single(verify.PosSaleSyncInventoryTransactions);
+        Assert.Equal(9, (await verify.Products.SingleAsync()).StockQuantity);
+        Assert.Single(verify.InventoryLedgers);
     }
 
     [Fact]
@@ -386,6 +475,25 @@ public sealed class MobilePosSaleSyncTests : IDisposable
         Assert.Empty(db.PosSaleSyncReceipts);
         Assert.Empty(db.PosSaleSyncOrderLines);
         Assert.Empty(db.PosSaleSyncInventoryTransactions);
+    }
+
+    [Fact]
+    public async Task InsufficientCloudStock_RollsBackOrderPaymentInventoryAndLedger()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db, startingStock: 0);
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Service(db).SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", Request(product), "insufficient-stock"));
+
+        Assert.Empty(db.Orders);
+        Assert.Empty(db.Payments);
+        Assert.Empty(db.PosSaleSyncReceipts);
+        Assert.Empty(db.PosSaleSyncOrderLines);
+        Assert.Empty(db.PosSaleSyncInventoryTransactions);
+        Assert.Empty(db.InventoryLedgers);
+        Assert.Equal(0, (await db.Products.SingleAsync()).StockQuantity);
     }
 
     [Fact]
@@ -532,10 +640,10 @@ public sealed class MobilePosSaleSyncTests : IDisposable
 
     private ClaimsPrincipal Principal(params Claim[] claims) => new(new ClaimsIdentity(claims, "test"));
 
-    private Product SeedProduct(SumpoojDbContext db, Guid? companyId = null, string sku = "ROSE", string name = "Rose")
+    private Product SeedProduct(SumpoojDbContext db, Guid? companyId = null, string sku = "ROSE", string name = "Rose", int startingStock = 10)
     {
         var product = new Product(companyId ?? _companyId, name, sku, ProductType.SingleFlower, ProductCategory.Roses, 10m, 5m, null);
-        product.AdjustStock(10);
+        product.AdjustStock(startingStock);
         db.Products.Add(product);
         return product;
     }

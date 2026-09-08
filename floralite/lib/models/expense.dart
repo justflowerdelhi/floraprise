@@ -23,6 +23,7 @@ class Expense {
   final int id;
   final int amount;
   final int categoryId;
+  final String? categoryName;
   final PaymentMode paymentMode;
   final String? notes;
   final DateTime expenseDate;
@@ -33,6 +34,7 @@ class Expense {
     required this.id,
     required this.amount,
     required this.categoryId,
+    this.categoryName,
     required this.paymentMode,
     this.notes,
     required this.expenseDate,
@@ -45,6 +47,7 @@ class Expense {
       id: map['id'] as int,
       amount: map['amount'] as int,
       categoryId: map['category_id'] as int,
+      categoryName: null,
       paymentMode: PaymentModeExtension.fromString(map['payment_mode'] as String),
       notes: map['notes'] as String?,
       expenseDate: DateTime.parse(map['expense_date'] as String),
@@ -70,6 +73,7 @@ class Expense {
     int? id,
     int? amount,
     int? categoryId,
+    String? categoryName,
     PaymentMode? paymentMode,
     String? notes,
     DateTime? expenseDate,
@@ -80,6 +84,7 @@ class Expense {
       id: id ?? this.id,
       amount: amount ?? this.amount,
       categoryId: categoryId ?? this.categoryId,
+      categoryName: categoryName ?? this.categoryName,
       paymentMode: paymentMode ?? this.paymentMode,
       notes: notes ?? this.notes,
       expenseDate: expenseDate ?? this.expenseDate,

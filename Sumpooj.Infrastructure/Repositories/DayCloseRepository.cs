@@ -5,7 +5,7 @@ using Sumpooj.Infrastructure.Persistence;
 
 namespace Sumpooj.Infrastructure.Repositories;
 
-public class DayCloseRepository : IDayCloseRepository
+public class DayCloseRepository : IDayCloseRepository, ICashDrawerRepository
 {
     private readonly SumpoojDbContext _db;
 
@@ -18,6 +18,22 @@ public class DayCloseRepository : IDayCloseRepository
     {
         return await _db.DayCloses
             .FirstOrDefaultAsync(d => d.CompanyId == companyId && d.Id == id);
+    }
+
+    public async Task<CashDrawerSummary> GetSummaryAsync(Guid companyId, DateTime date)
+    {
+        var day = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+        var openingCash = await _db.OpeningCashEntries
+            .Where(entry => entry.CompanyId == companyId && entry.Date == day)
+            .Select(entry => (decimal?)entry.Amount)
+            .FirstOrDefaultAsync() ?? 0m;
+        var entries = await _db.CashBookEntries
+            .Where(entry => entry.CompanyId == companyId && entry.Date == day)
+            .ToListAsync();
+        return new CashDrawerSummary(
+            openingCash,
+            entries.Where(entry => entry.TransactionType == Domain.Entities.CashBookTransactionType.CashSale).Sum(entry => entry.CashIn),
+            entries.Where(entry => entry.TransactionType == Domain.Entities.CashBookTransactionType.CashExpense).Sum(entry => entry.CashOut));
     }
 
     public async Task<Domain.Entities.DayClose?> GetByDateAsync(Guid companyId, Guid locationId, DateTime date)

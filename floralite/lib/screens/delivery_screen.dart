@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,12 +9,13 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../controllers/voice_dictation_controller.dart';
-import '../l10n/app_localizations.dart';
-import '../managers/business_settings_manager.dart';
-import '../managers/pricing_manager.dart';
+import '../data/repositories/cloud_customer_repository.dart';
 import '../data/repositories/customer_repository.dart';
 import '../data/repositories/order_repository.dart';
 import '../data/repositories/product_repository.dart';
+import '../l10n/app_localizations.dart';
+import '../managers/business_settings_manager.dart';
+import '../managers/pricing_manager.dart';
 import '../models/gst_calculation_type.dart';
 import '../models/order_workspace_models.dart';
 import '../models/payment_split.dart';
@@ -22,8 +24,12 @@ import '../models/walk_in_line_item.dart';
 import '../models/walk_in_session.dart';
 import '../providers/design_provider.dart';
 import '../providers/printer_provider.dart';
+import '../providers/storage_mode_provider.dart';
+import '../providers/customer_provider.dart';
 import '../providers/walk_in_session_provider.dart';
 import '../services/discount_service.dart';
+import '../services/mobile_auth_service.dart';
+import '../services/product_cloud_syncability_service.dart';
 import '../services/reward_summary_formatter.dart';
 import '../services/speech_recognition_service.dart';
 import '../utils/delivery_slot_utils.dart';
@@ -53,7 +59,7 @@ class DeliveryScreen extends StatefulWidget {
     this.editingOrderId,
   });
 
-  final int? prefillCustomerId;
+  final String? prefillCustomerId;
   final String? prefillCustomerName;
   final String? prefillCustomerPhone;
   final String? prefillRecipientName;
@@ -63,6 +69,14 @@ class DeliveryScreen extends StatefulWidget {
 
   @override
   State<DeliveryScreen> createState() => _DeliveryScreenState();
+}
+
+@visibleForTesting
+T? deliverySessionValueForSync<T>({
+  required T? currentValue,
+  required bool isOrderSaved,
+}) {
+  return isOrderSaved ? null : currentValue;
 }
 
 class _DeliveryScreenState extends State<DeliveryScreen> {
@@ -238,6 +252,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       .map(
         (product) => WalkInLineItem(
           productId: product.trackInventory ? product.productId : null,
+          cloudProductId: product.cloudProductId,
           description: product.designId,
           quantity: product.quantity,
           unitPricePaise: _parseCurrencyToPaise(product.price),
@@ -1527,6 +1542,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     setState(() {
       _addOrIncrementCatalogProduct(
         productId: selected.id,
+        cloudProductId: selected.cloudProductId,
         trackInventory: selected.trackInventory,
         name: selected.name,
         pricePaise: selected.sellingPricePaise,
@@ -1573,6 +1589,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   void _addOrIncrementCatalogProduct({
     required int productId,
+    String? cloudProductId,
     required bool trackInventory,
     required String name,
     required int pricePaise,
@@ -1594,6 +1611,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     _products.add(
       _ProductItem(
         productId: productId,
+        cloudProductId: cloudProductId,
         trackInventory: trackInventory,
         designId: name,
         quantity: 1,
@@ -2058,8 +2076,12 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   Future<void> _lookupCustomer(String phone) async {
     final provider = context.read<WalkInSessionProvider>();
+    final customerProvider = context.read<CustomerProvider>();
     final customerName = await provider.lookupCustomerName(phone);
-    final customerStats = await provider.lookupCustomerStatistics(phone);
+    final customer = await customerProvider.lookupByPhone(phone);
+    final customerStats = customer == null
+        ? null
+        : await customerProvider.lookupCustomerStatistics(customer);
 
     if (!mounted) return;
 
@@ -2464,7 +2486,14 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
     provider.patchSession(
       WalkInSession(
-        draftOrderId: current.draftOrderId,
+        draftOrderId: deliverySessionValueForSync<int>(
+          currentValue: current.draftOrderId,
+          isOrderSaved: _isOrderSaved,
+        ),
+        posClientSyncId: deliverySessionValueForSync<String>(
+          currentValue: current.posClientSyncId,
+          isOrderSaved: _isOrderSaved,
+        ),
         fulfilmentType: _fulfilmentType,
         lines: _walkInLines,
         customerPhone: _customerPhoneController.text.trim(),
@@ -2847,6 +2876,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
 class _ProductItem {
   final int? productId;
+  final String? cloudProductId;
   final bool trackInventory;
   final String designId;
   final int quantity;
@@ -2863,6 +2893,7 @@ class _ProductItem {
 
   _ProductItem({
     this.productId,
+    this.cloudProductId,
     this.trackInventory = false,
     required this.designId,
     required this.quantity,
@@ -2886,6 +2917,7 @@ class _ProductItem {
   }) {
     return _ProductItem(
       productId: productId,
+      cloudProductId: cloudProductId,
       trackInventory: trackInventory,
       designId: designId,
       quantity: quantity ?? this.quantity,
@@ -2900,6 +2932,95 @@ class _ProductItem {
       attachmentPath: attachmentPath,
       note: note,
     );
+  }
+}
+
+typedef DeliveryCloudCustomerSearcher = Future<List<CloudCustomer>> Function({String? query});
+
+typedef DeliveryCompanyIdReader = Future<String?> Function();
+typedef DeliveryOnlineChecker = Future<bool> Function();
+
+class DeliveryCustomerSearchService {
+  DeliveryCustomerSearchService({
+    CustomerRepository? repository,
+    DeliveryCloudCustomerSearcher? cloudSearcher,
+    DeliveryCompanyIdReader? currentCompanyId,
+    DeliveryOnlineChecker? isOnline,
+  })  : _repository = repository ?? CustomerRepository(),
+        _cloudSearcher = cloudSearcher ??
+            (({String? query}) => CloudCustomerRepository().getAll(query: query)),
+        _currentCompanyId = currentCompanyId ??
+            (() => ProductCloudSyncabilityService.currentCompanyIdFromAuth(
+                  MobileAuthService(),
+                )),
+        _isOnline = isOnline ?? _defaultOnlineCheck;
+
+  final CustomerRepository _repository;
+  final DeliveryCloudCustomerSearcher _cloudSearcher;
+  final DeliveryCompanyIdReader _currentCompanyId;
+  final DeliveryOnlineChecker _isOnline;
+
+  Future<List<CustomerRecord>> search(
+    String query, {
+    required bool isCloud,
+  }) async {
+    final trimmedQuery = query.trim();
+
+    if (!isCloud) {
+      return trimmedQuery.isEmpty
+          ? _repository.getAll()
+          : _repository.search(trimmedQuery);
+    }
+
+    final companyId = ProductCloudSyncabilityService.normalizeUuid(
+      await _currentCompanyId(),
+    );
+
+    final cached = companyId == null
+        ? (trimmedQuery.isEmpty
+            ? await _repository.getAll()
+            : await _repository.search(trimmedQuery))
+        : await _repository.search(trimmedQuery, companyId: companyId);
+
+    if (companyId == null) {
+      return cached;
+    }
+
+    if (!await _isOnline()) {
+      return cached;
+    }
+
+    final cloudResults = await _cloudSearcher(query: trimmedQuery.isEmpty ? null : trimmedQuery);
+    if (cloudResults.isEmpty) {
+      return cached;
+    }
+
+    for (final cloudCustomer in cloudResults) {
+      if (cloudCustomer.id.trim().isEmpty) {
+        continue;
+      }
+
+      final trimmedPhone = (cloudCustomer.phone ?? '').trim();
+      try {
+        await _repository.upsertFromCloud(
+          cloudCustomerId: cloudCustomer.id,
+          cloudCompanyId: companyId,
+          phone: trimmedPhone.isEmpty ? '' : trimmedPhone,
+          name: cloudCustomer.name,
+          notes: cloudCustomer.notes ?? '',
+        );
+      } on ArgumentError {
+        // Ignore Cloud rows that conflict with a different tenant's cached phone.
+        continue;
+      }
+    }
+
+    return await _repository.search(trimmedQuery, companyId: companyId);
+  }
+
+  static Future<bool> _defaultOnlineCheck() async {
+    final results = await Connectivity().checkConnectivity();
+    return results.any((result) => result != ConnectivityResult.none);
   }
 }
 
@@ -2931,14 +3052,25 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
 
   Future<void> _search(String query) async {
     setState(() => _isLoading = true);
-    final rows = query.trim().isEmpty
-        ? await widget.repository.getAll()
-        : await widget.repository.search(query.trim());
-    if (!mounted) return;
-    setState(() {
-      _results = rows;
-      _isLoading = false;
-    });
+
+    try {
+      final isCloud = context.read<StorageModeProvider>().isCloud;
+      final rows = await DeliveryCustomerSearchService(
+        repository: widget.repository,
+      ).search(query, isCloud: isCloud);
+
+      if (!mounted) return;
+      setState(() {
+        _results = rows;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _results = const [];
+        _isLoading = false;
+      });
+    }
   }
 
   @override

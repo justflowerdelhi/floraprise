@@ -129,6 +129,8 @@ public sealed class MobileClientService : IMobileClientService
         var company = await _db.Companies.FirstOrDefaultAsync(x => x.Id == companyId, cancellationToken)
             ?? throw new KeyNotFoundException("Company not found.");
 
+        var roles = await _userManager.GetRolesAsync(identityUser);
+
         var mobile = ResolveMobile(identityUser, request.Identifier);
         _logger.LogInformation("[Mobile Login] Resolved mobile number: {Mobile}", mobile);
 
@@ -175,7 +177,7 @@ public sealed class MobileClientService : IMobileClientService
 
         _logger.LogInformation("[Mobile Login] Generating access token");
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(GetAccessTokenExpiryMinutes());
-        var accessToken = GenerateAccessToken(companyId, registration.MobileUserId, identityUser.Id, request.DeviceId, expiresAtUtc);
+        var accessToken = GenerateAccessToken(companyId, registration.MobileUserId, identityUser.Id, request.DeviceId, expiresAtUtc, roles);
         
         _logger.LogInformation("[Mobile Login] Loading bootstrap data");
         var bootstrap = await GetBootstrapAsync(companyId, registration.MobileUserId, request.DeviceId, cancellationToken);
@@ -190,6 +192,7 @@ public sealed class MobileClientService : IMobileClientService
             registration.MobileDeviceId,
             bootstrap);
     }
+
 
     public async Task<MobileAuthTokenResponse> RefreshAsync(MobileApiRefreshRequest request, CancellationToken cancellationToken = default)
     {
@@ -218,7 +221,8 @@ public sealed class MobileClientService : IMobileClientService
         await _uow.SaveChangesAsync(cancellationToken);
 
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(GetAccessTokenExpiryMinutes());
-        var accessToken = GenerateAccessToken(existing.CompanyId, device.MobileUserId, device.LegacyUserId, device.DeviceId, expiresAtUtc);
+        var roles = await GetIdentityRolesAsync(device.LegacyUserId, cancellationToken);
+        var accessToken = GenerateAccessToken(existing.CompanyId, device.MobileUserId, device.LegacyUserId, device.DeviceId, expiresAtUtc, roles);
         var bootstrap = await GetBootstrapAsync(existing.CompanyId, device.MobileUserId, device.DeviceId, cancellationToken);
 
         return new MobileAuthTokenResponse(
@@ -1013,7 +1017,26 @@ public sealed class MobileClientService : IMobileClientService
             AllowsAccess: result.AllowsAccess);
     }
 
-    private string GenerateAccessToken(Guid companyId, Guid mobileUserId, Guid identityUserId, string deviceId, DateTime expiresAtUtc)
+    private async Task<IList<string>> GetIdentityRolesAsync(Guid identityUserId, CancellationToken cancellationToken)
+    {
+        if (identityUserId == Guid.Empty)
+            return [];
+
+        var identityUser = await _userManager.Users
+            .FirstOrDefaultAsync(x => x.Id == identityUserId, cancellationToken);
+
+        return identityUser == null || !identityUser.IsActive
+            ? []
+            : await _userManager.GetRolesAsync(identityUser);
+    }
+
+    private string GenerateAccessToken(
+        Guid companyId,
+        Guid mobileUserId,
+        Guid identityUserId,
+        string deviceId,
+        DateTime expiresAtUtc,
+        IEnumerable<string>? identityRoles = null)
     {
         var jwtKey = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key is missing.");
         var jwtIssuer = _configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("JWT Issuer is missing.");
@@ -1028,6 +1051,13 @@ public sealed class MobileClientService : IMobileClientService
             new("device_id", deviceId),
             new("client_type", "mobile")
         };
+
+        // Mirrors the roles already held by the linked ApplicationUser; nothing is granted here.
+        foreach (var role in identityRoles ?? [])
+        {
+            if (!string.IsNullOrWhiteSpace(role))
+                claims.Add(new Claim(ClaimTypes.Role, role));
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

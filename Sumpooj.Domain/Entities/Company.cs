@@ -61,6 +61,16 @@ public class Company : BaseEntity
         MarkUpdated();
     }
 
+    public void UpdateProfile(string name, string? phone, string? email, string? address, string? shortDescription)
+    {
+        Name = name;
+        Phone = phone;
+        Email = email;
+        Address = address;
+        ShortDescription = shortDescription;
+        MarkUpdated();
+    }
+
     public void UpdateLocalization(string timeZone, string currencyCode)
     {
         TimeZone = timeZone;

@@ -2,16 +2,71 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../models/gst_calculation_type.dart';
 import '../../services/mobile_auth_service.dart';
 import 'inventory_repository.dart';
 
+class CloudLowStockProduct {
+  const CloudLowStockProduct({
+    required this.productId,
+    required this.name,
+    required this.sku,
+    required this.currentQuantity,
+    required this.minimumQuantity,
+    required this.status,
+  });
+
+  final String productId;
+  final String name;
+  final String sku;
+  final int currentQuantity;
+  final int minimumQuantity;
+  final String status;
+
+  bool get isOutOfStock => status == 'outOfStock' || currentQuantity <= 0;
+  bool get isLowStock =>
+      status == 'lowStock' ||
+      (currentQuantity > 0 && currentQuantity <= minimumQuantity);
+
+  factory CloudLowStockProduct.fromJson(Map<String, dynamic> json) {
+    return CloudLowStockProduct(
+      productId: _string(json, 'productId'),
+      name: _string(json, 'name'),
+      sku: _string(json, 'sku'),
+      currentQuantity: _int(json, 'currentQuantity'),
+      minimumQuantity: _int(json, 'minimumQuantity'),
+      status: _string(json, 'status'),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'productId': productId,
+        'name': name,
+        'sku': sku,
+        'currentQuantity': currentQuantity,
+        'minimumQuantity': minimumQuantity,
+        'status': status,
+      };
+}
+
+typedef CloudLowStockSender = Future<dynamic> Function(Uri uri);
+
 class CloudInventoryRepository {
-  CloudInventoryRepository({MobileAuthService? auth})
-      : _auth = auth ?? MobileAuthService();
+  CloudInventoryRepository({
+    MobileAuthService? auth,
+    CloudLowStockSender? lowStockSender,
+    FlutterSecureStorage? secureStorage,
+  })  : _auth = auth ?? MobileAuthService(),
+        _lowStockSender = lowStockSender,
+        _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   final MobileAuthService _auth;
+  final CloudLowStockSender? _lowStockSender;
+  final FlutterSecureStorage? _secureStorage;
+  final Map<String, List<CloudLowStockProduct>> _lowStockCache = {};
+  static const String _lowStockStorageKey = 'cloud_low_stock_cache';
 
   Future<List<InventoryProductRecord>> listInventoryProducts() async {
     final response = await _send(
@@ -51,6 +106,71 @@ class CloudInventoryRepository {
       );
     }
     return products;
+  }
+
+  Future<List<CloudLowStockProduct>> listLowStockProducts() async {
+    const cacheKey = 'low-stock';
+    final sender = _lowStockSender;
+
+    try {
+      final response = sender != null
+          ? await sender(
+              Uri.parse('${_auth.baseUrl}/api/v1/mobile/inventory/low-stock'))
+          : await _send(
+              'GET',
+              Uri.parse('${_auth.baseUrl}/api/v1/mobile/inventory/low-stock'),
+            );
+      if (response is! List) {
+        return await _readLowStockCache(cacheKey);
+      }
+
+      final items = response
+          .whereType<Map>()
+          .map((row) =>
+              CloudLowStockProduct.fromJson(row.cast<String, dynamic>()))
+          .toList(growable: false);
+      _lowStockCache[cacheKey] = items;
+      await _writeLowStockCache(items);
+      return items;
+    } catch (_) {
+      return await _readLowStockCache(cacheKey);
+    }
+  }
+
+  Future<List<CloudLowStockProduct>> _readLowStockCache(String key) async {
+    final memory = _lowStockCache[key];
+    if (memory != null && memory.isNotEmpty) {
+      return memory;
+    }
+    try {
+      final cached = await _secureStorage?.read(key: _lowStockStorageKey);
+      if (cached != null && cached.trim().isNotEmpty) {
+        final decoded = jsonDecode(cached);
+        if (decoded is List) {
+          final items = decoded
+              .whereType<Map>()
+              .map((row) =>
+                  CloudLowStockProduct.fromJson(row.cast<String, dynamic>()))
+              .toList(growable: false);
+          _lowStockCache[key] = items;
+          return items;
+        }
+      }
+    } catch (_) {
+      // Ignore storage read errors in test/unsupported environments
+    }
+    return _lowStockCache[key] ?? const [];
+  }
+
+  Future<void> _writeLowStockCache(List<CloudLowStockProduct> items) async {
+    try {
+      await _secureStorage?.write(
+        key: _lowStockStorageKey,
+        value: jsonEncode(items.map((i) => i.toJson()).toList()),
+      );
+    } catch (_) {
+      // Ignore storage write errors in test/unsupported environments
+    }
   }
 
   Future<List<InventoryTransactionRecord>> loadHistory({
@@ -192,39 +312,50 @@ class CloudInventoryRepository {
     }
     throw StateError('Cloud inventory request failed.');
   }
-
-  static dynamic _decode(String text) {
-    try {
-      return jsonDecode(text);
-    } catch (_) {
-      return <String, dynamic>{};
-    }
-  }
-
-  static String _key(Map<String, dynamic> json, String key) =>
-      json.containsKey(key) ? key : '${key[0].toUpperCase()}${key.substring(1)}';
-
-  static String _string(
-    Map<String, dynamic> json,
-    String key, {
-    String fallback = '',
-  }) =>
-      json[_key(json, key)]?.toString() ?? fallback;
-
-  static String? _nullableString(Map<String, dynamic> json, String key) {
-    final value = json[_key(json, key)]?.toString().trim();
-    return value == null || value.isEmpty ? null : value;
-  }
-
-  static int _int(Map<String, dynamic> json, String key) =>
-      (json[_key(json, key)] as num?)?.toInt() ?? 0;
-
-    static int? _nullableInt(Map<String, dynamic> json, String key) =>
-      (json[_key(json, key)] as num?)?.toInt();
-
-  static double? _nullableNumber(Map<String, dynamic> json, String key) =>
-      (json[_key(json, key)] as num?)?.toDouble();
-
-  static bool _bool(Map<String, dynamic> json, String key) =>
-      json[_key(json, key)] is bool && json[_key(json, key)] as bool;
 }
+
+class CloudLowStockRepository {
+  CloudLowStockRepository({
+    CloudInventoryRepository? inventoryRepository,
+  }) : _inventoryRepository = inventoryRepository ?? CloudInventoryRepository();
+
+  final CloudInventoryRepository _inventoryRepository;
+
+  Future<List<CloudLowStockProduct>> listLowStockProducts() =>
+      _inventoryRepository.listLowStockProducts();
+}
+
+dynamic _decode(String text) {
+  try {
+    return jsonDecode(text);
+  } catch (_) {
+    return <String, dynamic>{};
+  }
+}
+
+String _key(Map<String, dynamic> json, String key) =>
+    json.containsKey(key) ? key : '${key[0].toUpperCase()}${key.substring(1)}';
+
+String _string(
+  Map<String, dynamic> json,
+  String key, {
+  String fallback = '',
+}) =>
+    json[_key(json, key)]?.toString() ?? fallback;
+
+String? _nullableString(Map<String, dynamic> json, String key) {
+  final value = json[_key(json, key)]?.toString().trim();
+  return value == null || value.isEmpty ? null : value;
+}
+
+int _int(Map<String, dynamic> json, String key) =>
+    (json[_key(json, key)] as num?)?.toInt() ?? 0;
+
+int? _nullableInt(Map<String, dynamic> json, String key) =>
+    (json[_key(json, key)] as num?)?.toInt();
+
+double? _nullableNumber(Map<String, dynamic> json, String key) =>
+    (json[_key(json, key)] as num?)?.toDouble();
+
+bool _bool(Map<String, dynamic> json, String key) =>
+    json[_key(json, key)] is bool && json[_key(json, key)] as bool;

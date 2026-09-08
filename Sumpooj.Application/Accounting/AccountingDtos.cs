@@ -139,6 +139,8 @@ public class AccountingDashboardDto
     public decimal ExpensesToday { get; set; }
     public decimal ProfitToday { get; set; }
     public decimal CashBalance { get; set; }
+    public int RewardPointsEarned { get; set; }
+    public int RewardPointsRedeemed { get; set; }
     public List<TrendPoint> RevenueTrend { get; set; } = [];
     public List<TrendPoint> ExpenseTrend { get; set; } = [];
     public List<CategoryAmount> TopExpenseCategories { get; set; } = [];

@@ -204,7 +204,10 @@ class _OrdersScreenState extends State<OrdersScreen>
                             context,
                             MaterialPageRoute(
                               builder: (context) =>
-                                  OrderDetailScreen(orderId: order.id),
+                                  OrderDetailScreen(
+                                orderId: order.id,
+                                cloudOrderId: order.cloudOrderId,
+                              ),
                             ),
                           );
                         },

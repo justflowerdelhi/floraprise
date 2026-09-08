@@ -5,13 +5,19 @@ import '../models/walk_in_enums.dart';
 import '../models/walk_in_line_item.dart';
 import '../models/walk_in_session.dart';
 import '../managers/walk_in_manager.dart';
+import '../providers/storage_mode_provider.dart';
 import '../services/business_data_event_bus.dart';
 
 class WalkInSessionProvider extends ChangeNotifier {
-  WalkInSessionProvider(this._walkInManager, [this._businessDataEvents]);
+  WalkInSessionProvider(
+    this._walkInManager, [
+    this._businessDataEvents,
+    this._storageModeProvider,
+  ]);
 
   final WalkInManager _walkInManager;
   final BusinessDataEventBus? _businessDataEvents;
+  final StorageModeProvider? _storageModeProvider;
 
   WalkInSession _session = WalkInSession.empty(FulfilmentType.takeAway);
   bool _isBusy = false;
@@ -167,7 +173,13 @@ class WalkInSessionProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      final result = await _walkInManager.confirmOrder(_session);
+      if (_storageModeProvider?.isCloud == true && _session.draftOrderId == null) {
+        final draft = await _walkInManager.saveDraft(_session);
+        _session = draft.session;
+      }
+      final result = _storageModeProvider?.isCloud == true
+          ? await _walkInManager.confirmOnlineOrder(_session)
+          : await _walkInManager.confirmOrder(_session);
       _session = WalkInSession.empty(_session.fulfilmentType);
       _businessDataEvents?.publish(source: BusinessDataChangeSource.sale);
       return result.orderId;

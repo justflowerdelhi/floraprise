@@ -3,6 +3,7 @@ import '../l10n/app_localizations.dart';
 import '../widgets/common_widgets.dart';
 
 class CustomerProfileScreen extends StatelessWidget {
+  final String customerId;
   final String name;
   final String phone;
   final String lastOrder;
@@ -16,6 +17,7 @@ class CustomerProfileScreen extends StatelessWidget {
 
   const CustomerProfileScreen({
     super.key,
+    required this.customerId,
     required this.name,
     required this.phone,
     required this.lastOrder,
@@ -157,7 +159,15 @@ class CustomerProfileScreen extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pushNamed(context, '/walkin-sales');
+                    Navigator.pushNamed(
+                      context,
+                      '/walkin-sales',
+                      arguments: {
+                        'prefillCustomerId': customerId,
+                        'prefillCustomerName': name,
+                        'prefillCustomerPhone': phone,
+                      },
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),

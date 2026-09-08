@@ -35,6 +35,12 @@ public class Expense : BaseEntity
         MarkUpdated();
     }
 
+    public void SetPaymentMode(ExpensePaymentMode paymentMode)
+    {
+        PaymentMode = paymentMode;
+        MarkUpdated();
+    }
+
     public void Update(string category, decimal amount, string? description)
     {
         Category = category;

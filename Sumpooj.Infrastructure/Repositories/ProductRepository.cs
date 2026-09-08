@@ -250,20 +250,20 @@ GROUP BY c.table_name";
         return (items, total);
     }
 
-    public async Task<List<Product>> GetLowStockProductsAsync()
+    public async Task<List<Product>> GetLowStockProductsAsync(Guid companyId)
     {
         return await _db.Products
             .AsNoTracking()
-            .Where(p => p.IsActive && p.TrackInventory && p.StockQuantity <= p.MinimumStockLevel)
+            .Where(p => p.CompanyId == companyId && p.IsActive && p.TrackInventory && p.StockQuantity <= p.MinimumStockLevel)
             .OrderBy(p => p.StockQuantity)
             .ToListAsync();
     }
 
-    public async Task<List<Product>> GetProductsNeedingReorderAsync()
+    public async Task<List<Product>> GetProductsNeedingReorderAsync(Guid companyId)
     {
         return await _db.Products
             .AsNoTracking()
-            .Where(p => p.IsActive && p.TrackInventory && p.StockQuantity <= p.ReorderLevel)
+            .Where(p => p.CompanyId == companyId && p.IsActive && p.TrackInventory && p.StockQuantity <= p.ReorderLevel)
             .OrderBy(p => p.StockQuantity)
             .ToListAsync();
     }

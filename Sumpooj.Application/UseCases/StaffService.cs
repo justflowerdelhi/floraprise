@@ -44,7 +44,9 @@ public class StaffService
 
     public async Task<CreateStaffResult> CreateAsync(Guid companyId, CreateStaffRequest request)
     {
-        var role = Enum.TryParse<StaffRole>(request.Role, true, out var r) ? r : StaffRole.Staff;
+        var role = Enum.TryParse<StaffRole>(request.Role, true, out var parsedRole)
+            ? parsedRole
+            : StaffRole.Staff;
         
         var staff = new Domain.Entities.Staff(
             companyId,
@@ -86,9 +88,6 @@ public class StaffService
             if (string.IsNullOrWhiteSpace(request.LoginIdentifier))
                 throw new ArgumentException("LoginIdentifier (email or phone) is required when EnableLogin is true.");
 
-            if (string.IsNullOrWhiteSpace(request.LoginRole))
-                throw new ArgumentException("LoginRole is required when EnableLogin is true.");
-
             if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 6)
                 throw new ArgumentException("Password is required and must be at least 6 characters when EnableLogin is true.");
 
@@ -104,7 +103,7 @@ public class StaffService
                 email: isEmail ? request.LoginIdentifier : null,
                 phoneNumber: request.LoginIdentifier,
                 companyId: companyId,
-                role: request.LoginRole);
+                role: "Staff");
 
             identityUserId = userId;
 
@@ -147,9 +146,7 @@ public class StaffService
         }
 
         if (request.Role != null && Enum.TryParse<StaffRole>(request.Role, true, out var role))
-        {
             staff.SetRole(role);
-        }
 
         if (request.CommissionType != null || request.CommissionRate != null)
         {
@@ -205,8 +202,6 @@ public class StaffService
 
         if (string.IsNullOrWhiteSpace(request.LoginIdentifier))
             throw new ArgumentException("LoginIdentifier is required.");
-        if (string.IsNullOrWhiteSpace(request.LoginRole))
-            throw new ArgumentException("LoginRole is required.");
         if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 6)
             throw new ArgumentException("Password is required and must be at least 6 characters.");
 
@@ -220,7 +215,7 @@ public class StaffService
             email: isEmail ? request.LoginIdentifier : null,
             phoneNumber: request.LoginIdentifier,
             companyId: companyId,
-            role: request.LoginRole);
+            role: "Staff");
 
         staff.LinkIdentityUser(userId);
 

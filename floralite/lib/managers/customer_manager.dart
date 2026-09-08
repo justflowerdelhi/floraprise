@@ -1,9 +1,12 @@
 import '../data/repositories/customer_repository.dart';
+import '../services/customer_cloud_lookup_service.dart';
 
 class CustomerManager {
-  CustomerManager(this._customerRepository);
+  CustomerManager(this._customerRepository, {CustomerCloudLookupService? cloudLookup})
+      : _cloudLookup = cloudLookup;
 
   final CustomerRepository _customerRepository;
+  final CustomerCloudLookupService? _cloudLookup;
 
   String normalizePhone(String raw) {
     final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
@@ -17,6 +20,10 @@ class CustomerManager {
     final normalized = normalizePhone(phone);
     if (normalized.length != 10) {
       return null;
+    }
+    final cloudLookup = _cloudLookup;
+    if (cloudLookup != null) {
+      return cloudLookup.lookupByPhone(normalized);
     }
     return _customerRepository.findByPhone(normalized);
   }
@@ -95,5 +102,11 @@ class CustomerManager {
 
   Future<void> deleteCustomer(int id) async {
     await _customerRepository.softDelete(id);
+  }
+
+  Future<Map<String, dynamic>?> lookupCustomerStatistics(
+    CustomerRecord customer,
+  ) async {
+    return _customerRepository.getStatisticsByCustomer(customer);
   }
 }

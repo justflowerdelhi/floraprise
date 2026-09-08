@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Sumpooj.Application.Companies;
+using Sumpooj.Application.Interfaces;
 using Sumpooj.Domain.Entities;
 using Sumpooj.Infrastructure.Persistence;
 
@@ -8,10 +9,12 @@ namespace Sumpooj.Infrastructure.Companies;
 public class CompanyService : ICompanyService
 {
     private readonly SumpoojDbContext _db;
+    private readonly ILocationRepository _locationRepository;
 
-    public CompanyService(SumpoojDbContext db)
+    public CompanyService(SumpoojDbContext db, ILocationRepository locationRepository)
     {
         _db = db;
+        _locationRepository = locationRepository;
     }
 
     public async Task<Guid> CreateAsync(CreateCompanyRequest request)
@@ -29,10 +32,29 @@ public class CompanyService : ICompanyService
             taxIdentifier: request.TaxIdentifier
         );
 
-        _db.Companies.Add(company);
-        await _db.SaveChangesAsync();
+        // Company + its default Location must be created atomically.
+        var strategy = _db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+            _db.Companies.Add(company);
+            await _db.SaveChangesAsync();
+            await CreateDefaultLocationAsync(company.Id);
+            await transaction.CommitAsync();
+        });
 
         return company.Id;
+    }
+
+    public async Task CreateDefaultLocationAsync(Guid companyId)
+    {
+        var existingDefault = await _locationRepository.GetDefaultAsync(companyId);
+        if (existingDefault != null)
+            return;
+
+        var location = new Location(companyId, "Main Location", "MAIN-01", LocationType.Store, null);
+        location.SetAsDefault();
+        await _locationRepository.AddAsync(location);
     }
 
     public async Task<CompanyDto?> FindByEmailOrPhoneAsync(string email, string phone)
@@ -79,6 +101,20 @@ public class CompanyService : ICompanyService
     {
         var company = await _db.Companies.FindAsync(companyId)
             ?? throw new InvalidOperationException("Company not found");
+
+        if (request.Name != null || request.Phone != null || request.Email != null || request.Address != null || request.ShortDescription != null)
+        {
+            var name = request.Name ?? company.Name;
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Company name cannot be empty.");
+
+            company.UpdateProfile(
+                name: name,
+                phone: request.Phone ?? company.Phone,
+                email: request.Email ?? company.Email,
+                address: request.Address ?? company.Address,
+                shortDescription: request.ShortDescription ?? company.ShortDescription);
+        }
 
         if (request.TimeZone != null || request.CurrencyCode != null)
         {

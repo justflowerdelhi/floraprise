@@ -204,6 +204,50 @@ public class OrderRepository : IOrderRepository
         await _db.SaveChangesAsync();
     }
 
+    public async Task ReplaceItemsAsync(Order order)
+    {
+        // Relies on the tracked aggregate from GetByIdAsync.
+        if (_db.Entry(order).State == EntityState.Detached)
+            throw new InvalidOperationException("Order must be loaded through GetByIdAsync before replacing items.");
+
+        var replacements = order.Items.ToList();
+
+        // The OrderItems.OrderId shadow FK is mapped optional but is NOT NULL in the database,
+        // so severed rows must be deleted outright rather than left for EF to null out.
+        var existing = await _db.Set<OrderItem>()
+            .Where(i => EF.Property<Guid?>(i, "OrderId") == order.Id)
+            .ToListAsync();
+
+        foreach (var stale in existing)
+        {
+            if (replacements.Contains(stale)) continue;
+            _db.Entry(stale).State = EntityState.Deleted;
+        }
+
+        // Replacement lines carry client-generated keys, so they must be forced to Added.
+        foreach (var item in replacements)
+        {
+            var entry = _db.Entry(item);
+            if (entry.State != EntityState.Added)
+                entry.State = EntityState.Added;
+            entry.Property("OrderId").CurrentValue = order.Id;
+        }
+
+        if (!_db.Database.IsRelational())
+        {
+            await _db.SaveChangesAsync();
+            return;
+        }
+
+        var strategy = _db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        });
+    }
+
     public async Task<string> GetNextOrderNumberAsync(Guid companyId)
     {
         var today = DateTime.UtcNow.Date;
@@ -303,7 +347,8 @@ public class OrderRepository : IOrderRepository
         return await _db.Orders
             .CountAsync(o => o.CompanyId == companyId &&
                             o.IsActive &&
-                            o.AssignedToUserId == staffId &&
+                            (o.AssignedDesignerStaffId == staffId ||
+                             (o.AssignedDesignerStaffId == null && o.AssignedToUserId == staffId)) &&
                             o.OrderDate >= from && o.OrderDate <= to);
     }
 
@@ -312,7 +357,8 @@ public class OrderRepository : IOrderRepository
         return await _db.Orders
             .Where(o => o.CompanyId == companyId &&
                         o.IsActive &&
-                        o.AssignedToUserId == staffId &&
+                        (o.AssignedDesignerStaffId == staffId ||
+                         (o.AssignedDesignerStaffId == null && o.AssignedToUserId == staffId)) &&
                         o.OrderDate >= from && o.OrderDate <= to &&
                         o.Status != OrderStatus.Cancelled)
             .SumAsync(o => o.TotalAmount);

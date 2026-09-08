@@ -400,15 +400,18 @@ public class ProductService
 
     public async Task<List<ProductListDto>> GetLowStockProductsAsync()
     {
-        var products = await _repo.GetLowStockProductsAsync();
+        var products = await _repo.GetLowStockProductsAsync(RequireCompanyId());
         return products.Select(ToListDto).ToList();
     }
 
     public async Task<List<ProductListDto>> GetReorderProductsAsync()
     {
-        var products = await _repo.GetProductsNeedingReorderAsync();
+        var products = await _repo.GetProductsNeedingReorderAsync(RequireCompanyId());
         return products.Select(ToListDto).ToList();
     }
+
+    private Guid RequireCompanyId() => _tenant.CompanyId
+        ?? throw new UnauthorizedAccessException("Company context required");
 
     private static ProductDto ToDto(Product p, List<Barcode>? barcodes = null) => new()
     {

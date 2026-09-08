@@ -33,6 +33,7 @@ void main() {
                     builder: (_) => AddExpenseBottomSheet(
                       categories: categories,
                       selectedDate: DateTime(2026, 7, 19),
+                      isCloud: false,
                       onSave: () {},
                     ),
                   );

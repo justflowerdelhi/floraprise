@@ -35,6 +35,16 @@ class PosSaleSyncResult {
   final int failedCount;
 }
 
+class PosSaleSyncSubmissionResult {
+  const PosSaleSyncSubmissionResult({
+    required this.cloudOrderId,
+    this.cloudCustomerId,
+  });
+
+  final String cloudOrderId;
+  final String? cloudCustomerId;
+}
+
 class PosSaleSyncService {
   PosSaleSyncService({
     MobileAuthService? auth,
@@ -53,6 +63,23 @@ class PosSaleSyncService {
   final PosSaleSyncSender? _sender;
   final PosSaleAccessTokenReader? _readAccessToken;
   final PosSaleAccessTokenRefresher? _refreshAccessToken;
+
+  Future<PosSaleSyncSubmissionResult> submitPayload(
+    Map<String, dynamic> payload,
+  ) async {
+    final response = await _sendWithAuth(jsonEncode(payload));
+    final decoded = response.body.trim().isEmpty
+        ? <String, dynamic>{}
+        : (jsonDecode(response.body) as Map).cast<String, dynamic>();
+    final cloudOrderId = _readString(decoded, 'cloudOrderId');
+    if (cloudOrderId == null || cloudOrderId.trim().isEmpty) {
+      throw StateError('POS sale sync response did not include cloudOrderId.');
+    }
+    return PosSaleSyncSubmissionResult(
+      cloudOrderId: cloudOrderId,
+      cloudCustomerId: _readString(decoded, 'cloudCustomerId'),
+    );
+  }
 
   Future<PosSaleSyncResult> syncPending() async {
     final db = await AppDatabase.instance.database;
@@ -82,22 +109,7 @@ class PosSaleSyncService {
   }
 
   Future<void> _syncRow(PosSyncOutboxRecord row) async {
-    var token = await (_readAccessToken ?? _auth.getStoredAccessToken)();
-    if (token == null || token.trim().isEmpty) {
-      throw StateError('Cloud session is not available. Please log in again.');
-    }
-
-    var response = await _send(row.payloadJson, token);
-    if (response.statusCode == HttpStatus.unauthorized) {
-      token = await _refreshToken();
-      response = await _send(row.payloadJson, token);
-    }
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(
-        'POS sale sync failed (HTTP ${response.statusCode}). Body: ${response.body}',
-      );
-    }
+    final response = await _sendWithAuth(row.payloadJson);
 
     final decoded = response.body.trim().isEmpty
         ? <String, dynamic>{}
@@ -111,6 +123,26 @@ class PosSaleSyncService {
       cloudOrderId: cloudOrderId,
       cloudCustomerId: _readString(decoded, 'cloudCustomerId'),
     );
+  }
+
+  Future<PosSaleSyncHttpResponse> _sendWithAuth(String payloadJson) async {
+    var token = await (_readAccessToken ?? _auth.getStoredAccessToken)();
+    if (token == null || token.trim().isEmpty) {
+      throw StateError('Cloud session is not available. Please log in again.');
+    }
+
+    var response = await _send(payloadJson, token);
+    if (response.statusCode == HttpStatus.unauthorized) {
+      token = await _refreshToken();
+      response = await _send(payloadJson, token);
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        'POS sale sync failed (HTTP ${response.statusCode}). Body: ${response.body}',
+      );
+    }
+    return response;
   }
 
   Future<String> _refreshToken() async {

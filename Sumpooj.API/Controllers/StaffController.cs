@@ -8,7 +8,7 @@ namespace Sumpooj.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "CompanyOnly")]
+[Authorize(Policy = "CompanyAdmin")]
 public class StaffController : ControllerBase
 {
     private readonly ILogger<StaffController> _logger;
@@ -80,7 +80,7 @@ public class StaffController : ControllerBase
     public async Task<IActionResult> GetAvailableDrivers()
     {
         var drivers = await _staffService.GetAvailableDriversAsync(CompanyId);
-        return Ok(drivers.Select(s => new { id = s.Id, name = s.Name, driverStatus = s.DriverStatus }));
+        return Ok(drivers.Select(s => new { id = s.Id, name = s.Name, role = s.Role, phone = s.Phone, driverStatus = s.DriverStatus }));
     }
 
     [HttpPost]

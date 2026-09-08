@@ -317,6 +317,66 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     }
   }
 
+  /// Dispatches to the Cloud or Local save path depending on the active storage mode.
+  Future<void> _saveProfile() =>
+      _isCloudMode ? _saveCloudCompanyProfile() : _saveBusinessProfile();
+
+  Future<void> _saveCloudCompanyProfile() async {
+    if (_shopName.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Shop Name is required')),
+      );
+      return;
+    }
+    if (_businessPhone.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mobile Number is required')),
+      );
+      return;
+    }
+    if (_gstRegistered && _gstNumber.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('GST Number is required when GST Registered')),
+      );
+      return;
+    }
+
+    try {
+      final baseUrl = _mobileAuthService.baseUrl;
+      final accessToken = await _mobileAuthService.getStoredAccessToken();
+      if (accessToken == null || accessToken.trim().isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Not authenticated. Please log in again.')),
+        );
+        return;
+      }
+
+      await _cloudCompanyProfileRepository.updateCompanyProfile(
+        baseUrl: baseUrl,
+        accessToken: accessToken,
+        name: _shopName.trim(),
+        phone: _businessPhone.trim(),
+        email: _businessEmail.trim().isEmpty ? null : _businessEmail.trim(),
+        address: _businessAddress.trim().isEmpty ? null : _businessAddress.trim(),
+        taxIdentifier: _gstRegistered ? _gstNumber.trim() : null,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Shop Details saved successfully')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -399,7 +459,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                'Cloud company profile is read-only. Editing will be available soon.',
+                                'Shop Name, Mobile Number, Email, Address and GST details can be edited here. Owner Name, Logo, City, State and PIN Code are read-only in Cloud mode.',
                                 style: TextStyle(
                                   color: Colors.blue.shade900,
                                   fontSize: 14,
@@ -486,12 +546,12 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           'Shop Name',
                           _shopName,
                           Icons.store,
-                          _isCloudMode ? null : () => _editBusinessTextField(
+                          () => _editBusinessTextField(
                             title: 'Shop Name',
                             initialValue: _shopName,
                             onSave: (value) async {
                               _shopName = value;
-                              await _saveBusinessProfile();
+                              await _saveProfile();
                             },
                           ),
                         ),
@@ -514,7 +574,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           'Mobile Number',
                           _businessPhone.isEmpty ? '-' : _businessPhone,
                           Icons.phone,
-                          _isCloudMode ? null : () => _editBusinessTextField(
+                          () => _editBusinessTextField(
                             title: 'Mobile Number',
                             initialValue: _businessPhone,
                             keyboardType: TextInputType.phone,
@@ -524,7 +584,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                             ],
                             onSave: (value) async {
                               _businessPhone = value;
-                              await _saveBusinessProfile();
+                              await _saveProfile();
                             },
                           ),
                         ),
@@ -533,13 +593,13 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           'Email',
                           _businessEmail.isEmpty ? '-' : _businessEmail,
                           Icons.email,
-                          _isCloudMode ? null : () => _editBusinessTextField(
+                          () => _editBusinessTextField(
                             title: 'Email',
                             initialValue: _businessEmail,
                             keyboardType: TextInputType.emailAddress,
                             onSave: (value) async {
                               _businessEmail = value;
-                              await _saveBusinessProfile();
+                              await _saveProfile();
                             },
                           ),
                         ),
@@ -548,12 +608,12 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           'Address',
                           _businessAddress.isEmpty ? '-' : _businessAddress,
                           Icons.location_on,
-                          _isCloudMode ? null : () => _editBusinessTextField(
+                          () => _editBusinessTextField(
                             title: 'Address',
                             initialValue: _businessAddress,
                             onSave: (value) async {
                               _businessAddress = value;
-                              await _saveBusinessProfile();
+                              await _saveProfile();
                             },
                           ),
                         ),
@@ -609,9 +669,9 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           title: const Text('GST Registered'),
                           subtitle: Text(_gstRegistered ? 'Yes' : 'No'),
                           value: _gstRegistered,
-                          onChanged: _isCloudMode ? null : (value) async {
+                          onChanged: (value) async {
                             setState(() => _gstRegistered = value);
-                            await _saveBusinessProfile();
+                            await _saveProfile();
                           },
                           secondary: const Icon(Icons.receipt_long),
                         ),
@@ -621,12 +681,12 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                             'GST Number',
                             _gstNumber.isEmpty ? '-' : _gstNumber,
                             Icons.confirmation_number,
-                            _isCloudMode ? null : () => _editBusinessTextField(
+                            () => _editBusinessTextField(
                               title: 'GST Number',
                               initialValue: _gstNumber,
                               onSave: (value) async {
                                 _gstNumber = value;
-                                await _saveBusinessProfile();
+                                await _saveProfile();
                               },
                             ),
                           ),

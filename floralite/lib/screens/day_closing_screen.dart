@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../controllers/voice_dictation_controller.dart';
 import '../data/repositories/cash_book_repository.dart';
+import '../data/repositories/cloud_finance_repository.dart';
 import '../data/repositories/day_closing_repository.dart';
 import '../data/repositories/expense_repository.dart';
 import '../data/repositories/opening_cash_repository.dart';
@@ -10,14 +12,79 @@ import '../models/cash_book.dart';
 import '../models/day_closing.dart';
 import '../models/expense.dart';
 import '../models/opening_cash.dart';
+import '../providers/storage_mode_provider.dart';
 import '../services/speech_recognition_service.dart';
 import '../widgets/voice_dictation_field_header.dart';
 
 class DayClosingScreen extends StatefulWidget {
-  const DayClosingScreen({super.key});
+  const DayClosingScreen({
+    super.key,
+    CloudCashBookRepository? cloudCashBookRepository,
+    CloudDayCloseRepository? cloudDayCloseRepository,
+    DateTime? initialDate,
+  })  : _cloudCashBookRepository = cloudCashBookRepository,
+      _cloudDayCloseRepository = cloudDayCloseRepository,
+        _initialDate = initialDate;
+
+  final CloudCashBookRepository? _cloudCashBookRepository;
+  final CloudDayCloseRepository? _cloudDayCloseRepository;
+  final DateTime? _initialDate;
 
   @override
   State<DayClosingScreen> createState() => _DayClosingScreenState();
+}
+
+@visibleForTesting
+class DayCloseCashBookTotals {
+  const DayCloseCashBookTotals({
+    required this.cashSales,
+    required this.cashExpenses,
+    required this.cashReceived,
+    required this.cashPaid,
+  });
+
+  final int cashSales;
+  final int cashExpenses;
+  final int cashReceived;
+  final int cashPaid;
+}
+
+@visibleForTesting
+DayCloseCashBookTotals dayCloseCashBookTotalsFromTransactions(
+  List<CashBook> transactions, {
+  required bool includeCashSales,
+  required bool includeCashExpenses,
+}) {
+  var cashSales = 0;
+  var cashExpenses = 0;
+  var cashReceived = 0;
+  var cashPaid = 0;
+
+  for (final tx in transactions) {
+    switch (tx.transactionType) {
+      case CashBookTransactionType.cashSale:
+        if (includeCashSales) cashSales += tx.cashIn;
+        break;
+      case CashBookTransactionType.cashExpense:
+        if (includeCashExpenses) cashExpenses += tx.cashOut;
+        break;
+      case CashBookTransactionType.cashReceived:
+        cashReceived += tx.cashIn;
+        break;
+      case CashBookTransactionType.cashPaid:
+        cashPaid += tx.cashOut;
+        break;
+      case CashBookTransactionType.cashRefund:
+        break;
+    }
+  }
+
+  return DayCloseCashBookTotals(
+    cashSales: cashSales,
+    cashExpenses: cashExpenses,
+    cashReceived: cashReceived,
+    cashPaid: cashPaid,
+  );
 }
 
 class _DayClosingScreenState extends State<DayClosingScreen> {
@@ -25,8 +92,10 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
   final _expenseRepository = ExpenseRepository();
   final _dayClosingRepository = DayClosingRepository();
   final _cashBookRepository = CashBookRepository();
+  late final CloudCashBookRepository _cloudCashBookRepository;
+  late final CloudDayCloseRepository _cloudDayCloseRepository;
 
-  DateTime _selectedDate = DateTime.now();
+  late DateTime _selectedDate;
   OpeningCash? _openingCash;
 
   int _cashSales = 0;
@@ -51,6 +120,11 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedDate = widget._initialDate ?? DateTime.now();
+    _cloudCashBookRepository =
+        widget._cloudCashBookRepository ?? CloudCashBookRepository();
+    _cloudDayCloseRepository =
+      widget._cloudDayCloseRepository ?? CloudDayCloseRepository();
     _notesDictationController.bindController(_notesController);
     _loadData();
   }
@@ -67,28 +141,58 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final storageMode = context.read<StorageModeProvider>();
+      final isCloud = storageMode.isCloud;
+      if (isCloud) {
+        final summary = await _cloudDayCloseRepository.summary(_selectedDate);
+        final openingCash = _moneyPaise(summary, 'openingCash');
+        setState(() {
+          _openingCash = OpeningCash(
+            id: -1,
+            date: _selectedDate,
+            amount: openingCash,
+            createdAt: _selectedDate,
+            updatedAt: _selectedDate,
+          );
+          _isClosed = false;
+          _cashSales = _moneyPaise(summary, 'cashSales');
+          _cardSales = _moneyPaise(summary, 'cardSales');
+          _upiSales = _moneyPaise(summary, 'upiSales');
+          _cashExpenses = _moneyPaise(summary, 'cashExpenses');
+          _upiExpenses = 0;
+          _cardExpenses = 0;
+          _cashReceived = 0;
+          _cashPaid = 0;
+          _isLoading = false;
+        });
+        return;
+      }
       final openingCash = await _openingCashRepository.getByDate(_selectedDate);
       final existingClosing =
           await _dayClosingRepository.getByDate(_selectedDate);
 
-      final cashExpenses = await _expenseRepository.getTotalByPaymentMode(
-          PaymentMode.cash, _selectedDate);
+      final cashBookTransactions = isCloud
+          ? await _cloudCashBookRepository.getByDate(_selectedDate)
+          : await _cashBookRepository.getByDate(_selectedDate);
+
+      final cashExpenses = isCloud
+          ? cashBookTransactions
+              .where((tx) =>
+                  tx.transactionType == CashBookTransactionType.cashExpense)
+              .fold<int>(0, (sum, tx) => sum + tx.cashOut)
+          : await _expenseRepository.getTotalByPaymentMode(
+              PaymentMode.cash, _selectedDate,
+            );
       final upiExpenses = await _expenseRepository.getTotalByPaymentMode(
           PaymentMode.upi, _selectedDate);
       final cardExpenses = await _expenseRepository.getTotalByPaymentMode(
           PaymentMode.card, _selectedDate);
 
-      final cashBookTransactions =
-          await _cashBookRepository.getByDate(_selectedDate);
-      int cashReceived = 0;
-      int cashPaid = 0;
-      for (final tx in cashBookTransactions) {
-        if (tx.transactionType == CashBookTransactionType.cashReceived) {
-          cashReceived += tx.cashIn;
-        } else if (tx.transactionType == CashBookTransactionType.cashPaid) {
-          cashPaid += tx.cashOut;
-        }
-      }
+      final cashBookTotals = dayCloseCashBookTotalsFromTransactions(
+        cashBookTransactions,
+        includeCashSales: isCloud,
+        includeCashExpenses: isCloud,
+      );
 
       setState(() {
         _openingCash = openingCash;
@@ -96,8 +200,11 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
         _cashExpenses = cashExpenses;
         _upiExpenses = upiExpenses;
         _cardExpenses = cardExpenses;
-        _cashReceived = cashReceived;
-        _cashPaid = cashPaid;
+        _cashReceived = cashBookTotals.cashReceived;
+        _cashPaid = cashBookTotals.cashPaid;
+        if (isCloud) {
+          _cashSales = cashBookTotals.cashSales;
+        }
 
         if (existingClosing != null) {
           _cashSales = existingClosing.cashSales;
@@ -171,6 +278,19 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
     final difference = countedCash - _expectedCash;
 
     try {
+      if (context.read<StorageModeProvider>().isCloud) {
+        await _cloudDayCloseRepository.close(
+          _selectedDate,
+          countedCash,
+          _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Day closed successfully')),
+        );
+        await _loadData();
+        return;
+      }
       final dayClosing = DayClosing(
         id: 0,
         date: _selectedDate,
@@ -206,6 +326,12 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
         );
       }
     }
+  }
+
+  static int _moneyPaise(Map<String, dynamic> json, String key) {
+    final value = json[json.containsKey(key) ? key : '${key[0].toUpperCase()}${key.substring(1)}'];
+    if (value is num) return (value * 100).round();
+    return ((double.tryParse(value?.toString() ?? '') ?? 0) * 100).round();
   }
 
   @override

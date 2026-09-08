@@ -36,6 +36,7 @@ public class OrderDto
 
     // Assignment
     public Guid? AssignedDesignerId { get; set; }
+    public Guid? AssignedDesignerStaffId { get; set; }
     public string? AssignedDesignerName { get; set; }
     public Guid? DeliveryPersonId { get; set; }
     public string? DeliveryPersonName { get; set; }
@@ -116,6 +117,49 @@ public class OrderItemRequest
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public string? SpecialInstructions { get; set; }
+}
+
+/// <summary>Partial update of order header details. A null property leaves the current value unchanged.</summary>
+public class UpdateOrderDetailsRequest
+{
+    public DateTime? DeliveryDate { get; set; }
+    public string? TimeSlot { get; set; }
+    public string? DeliveryAddress { get; set; }
+    public string? DeliveryPincode { get; set; }
+    public string? RecipientName { get; set; }
+    public string? RecipientPhone { get; set; }
+    public string? CardMessage { get; set; }
+}
+
+public class ReplaceOrderItemsRequest
+{
+    public List<ReplaceOrderItemRequest> Items { get; set; } = new();
+    public decimal? TaxAmount { get; set; }
+}
+
+public class ReplaceOrderItemRequest
+{
+    public Guid ProductId { get; set; }
+    public string ProductName { get; set; } = default!;
+    public int Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public string? SpecialInstructions { get; set; }
+    public string? ClientOrderLineId { get; set; }
+    public decimal? TaxRatePercent { get; set; }
+    public string? DiscountType { get; set; }
+    public decimal? DiscountValue { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public decimal? LineSubtotal { get; set; }
+    public decimal? LineTaxAmount { get; set; }
+}
+
+/// <summary>Partial update of order financials. A null property leaves the current value unchanged.</summary>
+public class UpdateOrderFinancialsRequest
+{
+    public decimal? DiscountAmount { get; set; }
+    public decimal? DeliveryFee { get; set; }
+    public int? RewardPointsRedeemed { get; set; }
+    public decimal? RewardDiscountAmount { get; set; }
 }
 
 public class OrderSearchRequest

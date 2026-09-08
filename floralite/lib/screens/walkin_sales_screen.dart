@@ -17,7 +17,7 @@ class WalkinSalesScreen extends StatelessWidget {
     this.prefillOccasion,
   });
 
-  final int? prefillCustomerId;
+  final String? prefillCustomerId;
   final String? prefillCustomerName;
   final String? prefillCustomerPhone;
   final String? prefillRecipientName;

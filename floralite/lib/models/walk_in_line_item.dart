@@ -2,6 +2,7 @@ import 'gst_calculation_type.dart';
 
 class WalkInLineItem {
   final int? productId;
+  final String? cloudProductId;
   final String? designRef;
   final String description;
   final int quantity;
@@ -15,6 +16,7 @@ class WalkInLineItem {
 
   const WalkInLineItem({
     this.productId,
+    this.cloudProductId,
     this.designRef,
     required this.description,
     required this.quantity,
@@ -36,6 +38,7 @@ class WalkInLineItem {
   }) {
     return WalkInLineItem(
       productId: productId,
+      cloudProductId: cloudProductId,
       designRef: designRef,
       description: description,
       quantity: quantity ?? this.quantity,

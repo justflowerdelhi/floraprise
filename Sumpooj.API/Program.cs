@@ -183,7 +183,13 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy(PolicyNames.StaffAccess, policy =>
     {
-        policy.RequireRole("CompanyAdmin", "Manager", "Staff");
+        policy.RequireRole("CompanyAdmin", "Staff");
+        policy.AddRequirements(new CompanyUserRequirement());
+    });
+
+    options.AddPolicy(PolicyNames.CompanyOperations, policy =>
+    {
+        policy.RequireRole("CompanyAdmin", "Staff");
         policy.AddRequirements(new CompanyUserRequirement());
     });
 });
@@ -299,6 +305,7 @@ builder.Services.AddScoped<IRefundRepository, RefundRepository>();
 builder.Services.AddScoped<RefundService>();
 
 builder.Services.AddScoped<IDayCloseRepository, DayCloseRepository>();
+builder.Services.AddScoped<ICashDrawerRepository, DayCloseRepository>();
 builder.Services.AddScoped<DayCloseService>();
 
 builder.Services.AddScoped<IJournalEntryRepository, JournalEntryRepository>();
