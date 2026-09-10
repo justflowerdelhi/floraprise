@@ -854,6 +854,119 @@ public sealed class MobilePosSaleSyncTests : IDisposable
     }
 
     [Fact]
+    public async Task TwoDevices_SameCompany_BothLocalInventoryTransactionId1_BothSyncSuccessfully()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db, startingStock: 10);
+        await db.SaveChangesAsync();
+        var service = Service(db);
+
+        // Device 1 performs sale with local inventory transaction id=1
+        var dev1Request = Request(product, clientSyncId: "dev1-sync-1");
+        dev1Request.LocalOrderId = 1;
+        dev1Request.InventoryTransactions.Single().Id = 1;
+        var dev1Result = await service.SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", dev1Request, "hash-dev1-1");
+        Assert.Equal("completed", dev1Result.SyncStatus);
+
+        // Device 2 performs sale for SAME company with local inventory transaction id=1
+        var dev2Request = Request(product, clientSyncId: "dev2-sync-1");
+        dev2Request.LocalOrderId = 1;
+        dev2Request.InventoryTransactions.Single().Id = 1;
+        var dev2Result = await service.SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-2", dev2Request, "hash-dev2-1");
+        Assert.Equal("completed", dev2Result.SyncStatus);
+
+        // Verify both inventory audit records exist with namespaced IDs and do not collide
+        var inventoryTxns = await db.PosSaleSyncInventoryTransactions.ToListAsync();
+        Assert.Equal(2, inventoryTxns.Count);
+        Assert.Contains(inventoryTxns, t => t.ClientInventoryTransactionId == "dev1-sync-1:1");
+        Assert.Contains(inventoryTxns, t => t.ClientInventoryTransactionId == "dev2-sync-1:1");
+        Assert.Equal(2, inventoryTxns.Select(t => t.ClientInventoryTransactionId).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task FreshInstallOrSequenceReset_SaleWithId1_Succeeds()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db, startingStock: 10);
+        await db.SaveChangesAsync();
+        var service = Service(db);
+
+        // Existing sale before reinstall with local id=1
+        var initialRequest = Request(product, clientSyncId: "old-install-sync-1");
+        initialRequest.LocalOrderId = 1;
+        initialRequest.InventoryTransactions.Single().Id = 1;
+        await service.SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-original", initialRequest, "hash-old-1");
+
+        // Fresh install: device wiped, local SQLite sequence reset, new device ID & new clientSyncId, but local id is again 1
+        var freshInstallRequest = Request(product, clientSyncId: "fresh-install-sync-1");
+        freshInstallRequest.LocalOrderId = 1;
+        freshInstallRequest.InventoryTransactions.Single().Id = 1;
+        var freshResult = await service.SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-reinstalled", freshInstallRequest, "hash-fresh-1");
+
+        Assert.Equal("completed", freshResult.SyncStatus);
+        var inventoryTxns = await db.PosSaleSyncInventoryTransactions.ToListAsync();
+        Assert.Equal(2, inventoryTxns.Count);
+        Assert.Contains(inventoryTxns, t => t.ClientInventoryTransactionId == "fresh-install-sync-1:1");
+        Assert.Contains(inventoryTxns, t => t.ClientInventoryTransactionId == "old-install-sync-1:1");
+        Assert.Equal(2, inventoryTxns.Select(t => t.ClientInventoryTransactionId).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task ExactRetry_WithSameClientSyncId_RemainsIdempotent()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db, startingStock: 10);
+        await db.SaveChangesAsync();
+        var service = Service(db);
+
+        var request = Request(product, clientSyncId: "retry-test-sync");
+        request.LocalOrderId = 10;
+        request.InventoryTransactions.Single().Id = 1;
+
+        // First attempt
+        var firstResponse = await service.SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "hash-exact-match");
+        Assert.Equal("completed", firstResponse.SyncStatus);
+
+        // Second attempt with exact same ClientSyncId and payload hash
+        var secondResponse = await service.SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "hash-exact-match");
+        Assert.Equal("completed", secondResponse.SyncStatus);
+        Assert.Equal(firstResponse.CloudOrderId, secondResponse.CloudOrderId);
+
+        // Ensure no duplicate records were created
+        Assert.Single(db.Orders);
+        Assert.Single(db.PosSaleSyncReceipts);
+        Assert.Single(db.PosSaleSyncInventoryTransactions);
+        Assert.Equal(9, (await db.Products.SingleAsync()).StockQuantity);
+    }
+
+    [Fact]
+    public async Task SameClientSyncId_WithModifiedPayload_RemainsRejected()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db, startingStock: 10);
+        await db.SaveChangesAsync();
+        var service = Service(db);
+
+        var request = Request(product, clientSyncId: "conflict-test-sync");
+        request.LocalOrderId = 15;
+        request.InventoryTransactions.Single().Id = 1;
+
+        // First attempt succeeds
+        var firstResponse = await service.SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "hash-original");
+        Assert.Equal("completed", firstResponse.SyncStatus);
+
+        // Modified payload with same ClientSyncId
+        var modifiedRequest = Request(product, clientSyncId: "conflict-test-sync");
+        modifiedRequest.LocalOrderId = 15;
+        modifiedRequest.InventoryTransactions.Single().Id = 1;
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", modifiedRequest, "hash-different"));
+
+        Assert.Contains("ClientSyncId was already used with a different payload", ex.Message);
+    }
+
+    [Fact]
     public async Task FinancialMismatch_ReturnsBadRequestFromController()
     {
         await using var db = CreateDb();

@@ -203,7 +203,7 @@ public sealed class PosSaleSyncService : IPosSaleSyncService
                     _db.PosSaleSyncInventoryTransactions.Add(new PosSaleSyncInventoryTransaction(
                         companyId,
                         receipt.Id,
-                        ClientInventoryTransactionId(auditSnapshot),
+                        ClientInventoryTransactionId(request.ClientSyncId, auditSnapshot),
                         order.Id,
                         cloudProductId,
                         auditSnapshot.Qty,
@@ -351,7 +351,7 @@ public sealed class PosSaleSyncService : IPosSaleSyncService
         if (duplicateLine) throw new ArgumentException("Duplicate ClientOrderLineId is not allowed.");
         var duplicatePayment = request.Payments.Where(p => p.Id.HasValue).GroupBy(ClientPaymentId).Any(g => g.Count() > 1);
         if (duplicatePayment) throw new ArgumentException("Duplicate ClientPaymentId is not allowed.");
-        var duplicateInventory = request.InventoryTransactions.Where(t => t.Id.HasValue).GroupBy(ClientInventoryTransactionId).Any(g => g.Count() > 1);
+        var duplicateInventory = request.InventoryTransactions.Where(t => t.Id.HasValue).GroupBy(t => ClientInventoryTransactionId(request.ClientSyncId, t)).Any(g => g.Count() > 1);
         if (duplicateInventory) throw new ArgumentException("Duplicate ClientInventoryTransactionId is not allowed.");
         foreach (var line in request.Lines.Where(l => l.ProductId.HasValue))
         {
@@ -427,7 +427,7 @@ public sealed class PosSaleSyncService : IPosSaleSyncService
     private static string Digits(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : new string(value.Where(char.IsDigit).ToArray());
     private static string ClientLineId(PosSaleLineSnapshot line) => (line.Id?.ToString() ?? string.Empty).Trim();
     private static string ClientPaymentId(PosSalePaymentSnapshot payment) => (payment.Id?.ToString() ?? payment.Reference ?? string.Empty).Trim();
-    private static string ClientInventoryTransactionId(PosSaleInventoryTransactionSnapshot transaction) => (transaction.Id?.ToString() ?? string.Empty).Trim();
+    private static string ClientInventoryTransactionId(string clientSyncId, PosSaleInventoryTransactionSnapshot transaction) => $"{clientSyncId}:{transaction.Id}".Trim();
     private static PaymentMethod ParsePaymentMethod(string? value) => Enum.TryParse<PaymentMethod>(NormalizeMethod(value), true, out var method) ? method : PaymentMethod.Cash;
     private static string NormalizeMethod(string? value) => (value ?? string.Empty).Trim().Replace("_", string.Empty).Replace("-", string.Empty) switch
     {
