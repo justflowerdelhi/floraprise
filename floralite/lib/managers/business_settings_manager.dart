@@ -1,6 +1,14 @@
+import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
+
 import '../data/database/app_database.dart';
 import '../data/repositories/business_profile_repository.dart';
-import 'package:sqflite/sqflite.dart';
+import '../data/repositories/cloud_company_profile_repository.dart';
+import '../services/storage_mode_service.dart';
+
+class SettingsChangeNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
+}
 
 class BusinessSettings {
   const BusinessSettings({
@@ -25,8 +33,27 @@ class BusinessSettings {
 }
 
 class BusinessSettingsManager {
-  final BusinessProfileRepository _businessProfileRepository = BusinessProfileRepository();
-  
+  final BusinessProfileRepository _businessProfileRepository;
+  final CloudCompanyProfileRepository _cloudCompanyProfileRepository;
+  final StorageModeService _storageModeService;
+
+  BusinessSettingsManager({
+    BusinessProfileRepository? businessProfileRepository,
+    CloudCompanyProfileRepository? cloudCompanyProfileRepository,
+    StorageModeService? storageModeService,
+  })  : _businessProfileRepository =
+            businessProfileRepository ?? BusinessProfileRepository(),
+        _cloudCompanyProfileRepository =
+            cloudCompanyProfileRepository ?? CloudCompanyProfileRepository(),
+        _storageModeService = storageModeService ?? StorageModeService();
+
+  static final SettingsChangeNotifier changeNotifier =
+      SettingsChangeNotifier();
+
+  static void notifySettingsChanged() {
+    changeNotifier.notify();
+  }
+
   static const String _shopNameKey = 'business.shop_name';
   static const String _ownerNameKey = 'business.owner_name';
   static const String _phoneKey = 'business.phone';
@@ -42,9 +69,28 @@ class BusinessSettingsManager {
   static const String _samePhoneWhatsappKey = 'business.same_phone_whatsapp';
 
   Future<BusinessSettings> load() async {
-    // Try to load from business_profile table first
+    // In Cloud mode, resolve from the authenticated Cloud company profile.
+    if (await _storageModeService.isCloud()) {
+      final cloudProfile =
+          await _cloudCompanyProfileRepository.getCachedProfile();
+      if (cloudProfile != null && cloudProfile.name.trim().isNotEmpty) {
+        final taxId = cloudProfile.taxIdentifier?.trim() ?? '';
+        return BusinessSettings(
+          shopName: cloudProfile.name.trim(),
+          ownerName: '',
+          phone: cloudProfile.phone?.trim() ?? '',
+          address: cloudProfile.address?.trim() ?? '',
+          gstRegistered: taxId.isNotEmpty,
+          gstNumber: taxId,
+          defaultDeliveryChargePaise: await _loadDeliveryCharge(),
+          minimumPreparationBufferMinutes: await _loadPreparationBuffer(),
+        );
+      }
+    }
+
+    // Try to load from business_profile table first (Local mode)
     final profile = await _businessProfileRepository.getBusinessProfile();
-    
+
     if (profile != null) {
       return BusinessSettings(
         shopName: profile.shopName,
@@ -57,8 +103,8 @@ class BusinessSettingsManager {
         minimumPreparationBufferMinutes: await _loadPreparationBuffer(),
       );
     }
-    
-    // Fallback to settings table for backward compatibility
+
+    // Fallback to settings table for backward compatibility (Local mode)
     final db = await AppDatabase.instance.database;
     final shopName = await _readValue(db, _shopNameKey);
     final ownerName = await _readValue(db, _ownerNameKey);
@@ -104,36 +150,42 @@ class BusinessSettingsManager {
     await _saveToBusinessProfile();
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _shopNameKey, value.trim());
+    notifySettingsChanged();
   }
 
   Future<void> setOwnerName(String value) async {
     await _saveToBusinessProfile();
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _ownerNameKey, value.trim());
+    notifySettingsChanged();
   }
 
   Future<void> setPhone(String value) async {
     await _saveToBusinessProfile();
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _phoneKey, value.trim());
+    notifySettingsChanged();
   }
 
   Future<void> setAddress(String value) async {
     await _saveToBusinessProfile();
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _addressKey, value.trim());
+    notifySettingsChanged();
   }
 
   Future<void> setGstRegistered(bool value) async {
     await _saveToBusinessProfile();
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _gstRegisteredKey, value ? '1' : '0');
+    notifySettingsChanged();
   }
 
   Future<void> setGstNumber(String value) async {
     await _saveToBusinessProfile();
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _gstNumberKey, value.trim());
+    notifySettingsChanged();
   }
   
   Future<void> saveBusinessProfile({
@@ -160,6 +212,18 @@ class BusinessSettingsManager {
       gstRegistered: gstRegistered,
       gstNumber: gstNumber,
     );
+    final db = await AppDatabase.instance.database;
+    await _writeValue(db, _shopNameKey, shopName.trim());
+    await _writeValue(db, _ownerNameKey, ownerName.trim());
+    await _writeValue(db, _phoneKey, mobileNumber.trim());
+    if (address != null) {
+      await _writeValue(db, _addressKey, address.trim());
+    }
+    await _writeValue(db, _gstRegisteredKey, gstRegistered ? '1' : '0');
+    if (gstNumber != null) {
+      await _writeValue(db, _gstNumberKey, gstNumber.trim());
+    }
+    notifySettingsChanged();
   }
   
   Future<void> _saveToBusinessProfile() async {

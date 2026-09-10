@@ -117,23 +117,27 @@ class CustomerProvider extends ChangeNotifier {
         '${m.toString().padLeft(2, '0')}';
   }
 
-  Map<String, dynamic> _cloudMap(CloudCustomer c) => {
+  Map<String, dynamic> _cloudMap(
+    CloudCustomer c, {
+    CloudCustomerStatistics? stats,
+  }) =>
+      {
         'id': c.id,
         'name': c.name,
         'phone': c.phone ?? '',
         'email': c.email ?? '',
         'createdAt': '',
-        'lastOrder': '-',
+        'lastOrder': _formatLastOrder(stats?.lastOrderAt),
         'birthday': '-',
         'birthdayMd': '',
         'anniversaryMd': '',
         'company': '',
         'department': '',
         'notes': c.notes ?? '',
-        'pendingPaymentPaise': 0,
-        'pendingPayment': '₹0',
-        'totalOrders': 0,
-        'rewardPoints': 0,
+        'pendingPaymentPaise': stats?.pendingPaymentPaise ?? 0,
+        'pendingPayment': _formatPaise(stats?.pendingPaymentPaise ?? 0),
+        'totalOrders': stats?.totalOrders ?? 0,
+        'rewardPoints': 0, // Intentionally local/Primary Device
         'lifetimeRewardPoints': 0,
         'redeemedRewardPoints': 0,
         'lastRewardActivity': '-',
@@ -150,7 +154,13 @@ class CustomerProvider extends ChangeNotifier {
         final rows = await _cloudRepository.getAll(
           query: _searchQuery,
         );
-        _customers = rows.map(_cloudMap).toList();
+        final statsList = await Future.wait(
+          rows.map((c) => _cloudRepository.getStatistics(c.id)),
+        );
+        _customers = List.generate(
+          rows.length,
+          (i) => _cloudMap(rows[i], stats: statsList[i]),
+        );
       } else {
         final rows = await _customerManager.getAllCustomers();
 

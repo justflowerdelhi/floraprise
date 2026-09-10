@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../../data/repositories/order_repository.dart';
 import '../../data/repositories/product_repository.dart';
 import '../../models/order_workspace_models.dart';
 import '../../managers/business_settings_manager.dart';
+import '../../providers/storage_mode_provider.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/non_cloud_report_banner.dart';
 
 class TopProductsReportScreen extends StatefulWidget {
   const TopProductsReportScreen({super.key});
@@ -116,13 +119,17 @@ class _TopProductsReportScreenState extends State<TopProductsReportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isCloud = context.watch<StorageModeProvider?>()?.isCloud ?? false;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Top Products'),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
+      body: isCloud
+          ? const NonCloudReportBanner(reportTitle: 'Top Products Report')
+          : _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 _buildDateRangeSelector(),

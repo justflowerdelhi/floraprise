@@ -1,0 +1,15 @@
+<svg width="1600" height="533" viewBox="0 0 1600 533" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .brand-title {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-weight: 800;
+      font-size: 320px;
+      letter-spacing: -6px;
+    }
+    .flora { fill: #124E2C; }
+    .prise { fill: #25784A; }
+  </style>
+  <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" class="brand-title">
+    <tspan class="flora">Flora</tspan><tspan class="prise">Prise</tspan>
+  </text>
+</svg>

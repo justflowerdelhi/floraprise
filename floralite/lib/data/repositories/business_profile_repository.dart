@@ -1,4 +1,6 @@
 import '../database/app_database.dart';
+import 'cloud_company_profile_repository.dart';
+import '../../services/storage_mode_service.dart';
 
 class BusinessProfile {
   final int? id;
@@ -101,7 +103,40 @@ class BusinessProfile {
 }
 
 class BusinessProfileRepository {
+  final StorageModeService _storageModeService;
+  final CloudCompanyProfileRepository _cloudCompanyProfileRepository;
+
+  BusinessProfileRepository({
+    StorageModeService? storageModeService,
+    CloudCompanyProfileRepository? cloudCompanyProfileRepository,
+  })  : _storageModeService = storageModeService ?? StorageModeService(),
+        _cloudCompanyProfileRepository =
+            cloudCompanyProfileRepository ?? CloudCompanyProfileRepository();
+
   Future<BusinessProfile?> getBusinessProfile() async {
+    if (await _storageModeService.isCloud()) {
+      final cloudProfile =
+          await _cloudCompanyProfileRepository.getCachedProfile();
+      if (cloudProfile != null && cloudProfile.name.trim().isNotEmpty) {
+        return BusinessProfile(
+          shopName: cloudProfile.name.trim(),
+          ownerName: '',
+          mobileNumber: cloudProfile.phone?.trim() ?? '',
+          email: cloudProfile.email?.trim(),
+          address: cloudProfile.address?.trim(),
+          city: '',
+          state: '',
+          pinCode: '',
+          gstRegistered: (cloudProfile.taxIdentifier ?? '').trim().isNotEmpty,
+          gstNumber: cloudProfile.taxIdentifier?.trim(),
+          createdAt: cloudProfile.createdAtUtc.toIso8601String(),
+          updatedAt: (cloudProfile.updatedAtUtc ?? cloudProfile.createdAtUtc)
+              .toIso8601String(),
+        );
+      }
+      return null;
+    }
+
     final db = await AppDatabase.instance.database;
     final rows = await db.query(
       'business_profile',

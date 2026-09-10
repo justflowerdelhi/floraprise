@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../data/database/app_database.dart';
+import '../../providers/storage_mode_provider.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/non_cloud_report_banner.dart';
 
 class RewardsReportScreen extends StatefulWidget {
   const RewardsReportScreen({super.key});
@@ -58,9 +61,13 @@ class _RewardsReportScreenState extends State<RewardsReportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isCloud = context.watch<StorageModeProvider?>()?.isCloud ?? false;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Rewards Report')),
-      body: FutureBuilder<_RewardsReportData>(
+      body: isCloud
+          ? const NonCloudReportBanner(reportTitle: 'Rewards Report')
+          : FutureBuilder<_RewardsReportData>(
         future: _future,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {

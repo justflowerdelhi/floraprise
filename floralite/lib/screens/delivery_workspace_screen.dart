@@ -204,7 +204,7 @@ class _DeliveryCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      delivery.orderNo,
+                      delivery.displayOrderNo,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
@@ -352,7 +352,7 @@ class _DeliveryWorkspaceDetailScreenState
     }
 
     await Share.share(
-      'Track your delivery live for ${delivery.orderNo}:\n$trackingLink',
+      'Track your delivery live for ${delivery.displayOrderNo}:\n$trackingLink',
       subject: 'Floraprise customer tracking link',
     );
   }
@@ -406,7 +406,7 @@ class _DeliveryWorkspaceDetailScreenState
     final showSendDeliveryLink = !driverAccepted && !_isWaitingToSync;
     final showMonitoringActions = driverAccepted;
     return Scaffold(
-      appBar: AppBar(title: Text(delivery.orderNo)),
+      appBar: AppBar(title: Text(delivery.displayOrderNo)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -658,7 +658,7 @@ class _DeliveryWorkspaceDetailScreenState
     final lines = [
       'FLORAPRISE DELIVERY',
       '',
-      'Order: ${delivery.orderNo}',
+      'Order: ${delivery.displayOrderNo}',
       '',
       'Recipient',
       delivery.recipientName.trim().isEmpty ? '-' : delivery.recipientName,

@@ -188,7 +188,7 @@ class CloudCompanyProfileRepository {
       debugPrint('[SHOP-CLOUD-DIAGNOSTIC] RESPONSE: $responseBody');
 
       // If API call fails, try to use cached profile
-      return await _getCachedProfile();
+      return await getCachedProfile();
     } on Object catch (error, stackTrace) {
       debugPrint(
         '[SHOP-CLOUD-DIAGNOSTIC] EXCEPTION TYPE: ${error.runtimeType}',
@@ -197,7 +197,7 @@ class CloudCompanyProfileRepository {
       debugPrint('[SHOP-CLOUD-DIAGNOSTIC] STACK TRACE: $stackTrace');
 
       // On error, return cached profile if available
-      return await _getCachedProfile();
+      return await getCachedProfile();
     } finally {
       httpClient.close(force: true);
     }
@@ -273,15 +273,67 @@ class CloudCompanyProfileRepository {
   }
 
   /// Gets the cached company profile from secure storage.
-  Future<CloudCompanyProfile?> _getCachedProfile() async {
+  /// Checks 'cloud_company_profile' first, and falls back to 'mobile_auth_company'
+  /// saved during login/bootstrap.
+  Future<CloudCompanyProfile?> getCachedProfile() async {
     try {
       final cached = await _secureStorage.read(key: _cacheKey);
-      if (cached == null || cached.trim().isEmpty) {
-        return null;
+      if (cached != null && cached.trim().isNotEmpty) {
+        final json = jsonDecode(cached) as Map<String, dynamic>;
+        return CloudCompanyProfile.fromJson(json);
       }
 
-      final json = jsonDecode(cached) as Map<String, dynamic>;
-      return CloudCompanyProfile.fromJson(json);
+      final companyRaw = await _secureStorage.read(key: 'mobile_auth_company');
+      if (companyRaw != null && companyRaw.trim().isNotEmpty) {
+        final companyMap = jsonDecode(companyRaw) as Map<String, dynamic>;
+        final name =
+            (companyMap['name'] ?? companyMap['Name'] ?? '').toString().trim();
+        if (name.isNotEmpty) {
+          final id =
+              (companyMap['id'] ?? companyMap['Id'] ?? '').toString().trim();
+          final taxIdentifier =
+              (companyMap['taxIdentifier'] ?? companyMap['TaxIdentifier'])
+                  ?.toString()
+                  .trim();
+          final phone = (companyMap['phone'] ?? companyMap['Phone'])
+              ?.toString()
+              .trim();
+          final email = (companyMap['email'] ?? companyMap['Email'])
+              ?.toString()
+              .trim();
+          final address = (companyMap['address'] ?? companyMap['Address'])
+              ?.toString()
+              .trim();
+          final timeZone =
+              (companyMap['timeZone'] ?? companyMap['TimeZone'] ?? 'UTC')
+                  .toString();
+          final currencyCode = (companyMap['currency'] ??
+                  companyMap['currencyCode'] ??
+                  companyMap['CurrencyCode'] ??
+                  'INR')
+              .toString();
+          final region =
+              (companyMap['region'] ?? companyMap['Region'] ?? '').toString();
+
+          return CloudCompanyProfile(
+            id: id,
+            name: name,
+            email: email != null && email.isNotEmpty ? email : null,
+            phone: phone != null && phone.isNotEmpty ? phone : null,
+            address: address != null && address.isNotEmpty ? address : null,
+            shortDescription: null,
+            timeZone: timeZone,
+            currencyCode: currencyCode,
+            taxIdentifier: taxIdentifier != null && taxIdentifier.isNotEmpty
+                ? taxIdentifier
+                : null,
+            region: region,
+            isActive: true,
+            createdAtUtc: DateTime.now(),
+          );
+        }
+      }
+      return null;
     } on Object {
       return null;
     }
@@ -294,6 +346,31 @@ class CloudCompanyProfileRepository {
         key: _cacheKey,
         value: jsonEncode(profile.toJson()),
       );
+
+      // Keep mobile_auth_company in sync with updated company name and tax identifier
+      final companyRaw = await _secureStorage.read(key: 'mobile_auth_company');
+      if (companyRaw != null && companyRaw.trim().isNotEmpty) {
+        final map = Map<String, dynamic>.from(
+          jsonDecode(companyRaw) as Map<String, dynamic>,
+        );
+        map['name'] = profile.name;
+        if (profile.taxIdentifier != null) {
+          map['taxIdentifier'] = profile.taxIdentifier;
+        }
+        if (profile.phone != null) {
+          map['phone'] = profile.phone;
+        }
+        if (profile.address != null) {
+          map['address'] = profile.address;
+        }
+        if (profile.email != null) {
+          map['email'] = profile.email;
+        }
+        await _secureStorage.write(
+          key: 'mobile_auth_company',
+          value: jsonEncode(map),
+        );
+      }
     } on Object {
       // Ignore cache write errors
     }

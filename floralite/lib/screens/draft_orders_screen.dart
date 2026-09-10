@@ -269,7 +269,7 @@ class _DraftOrderCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    draft.orderNo,
+                    draft.displayOrderNo,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),

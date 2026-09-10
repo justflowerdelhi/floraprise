@@ -1,6 +1,7 @@
 import 'package:intl/intl.dart';
 
 import '../data/repositories/job_repository.dart';
+import '../managers/business_settings_manager.dart';
 import '../managers/onboarding_manager.dart';
 import '../managers/order_manager.dart';
 import '../models/order_status.dart';
@@ -115,8 +116,11 @@ class OrderPrintService {
       throw StateError('Order $orderId not found');
     }
 
+    final settings = await BusinessSettingsManager().load();
+    final shop = settings.shopName.trim();
+
     final buffer = StringBuffer();
-    buffer.writeln('FLORAPRISE');
+    buffer.writeln(shop.isNotEmpty ? shop : 'FLORAPRISE');
     buffer.writeln('Order: ${header.orderNo}');
     buffer.writeln('Status: ${OrderStatus.label(header.status)}');
     buffer.writeln('Customer: ${header.customerName}');

@@ -148,6 +148,19 @@ class CloudDayCloseRepository {
     return (response as Map).cast<String, dynamic>();
   }
 
+  Future<bool> isClosed(DateTime date) async {
+    try {
+      final locationId = await _locationId();
+      final response = await _send('GET', Uri.parse('${_auth.baseUrl}/api/day-close/is-closed').replace(queryParameters: {'locationId': locationId, 'date': _dateQuery(date)}));
+      if (response is Map) {
+        return response['isClosed'] == true || response['IsClosed'] == true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> close(DateTime date, int countedCashPaise, String? notes) async {
     final locationId = await _locationId();
     await _send('POST', Uri.parse('${_auth.baseUrl}/api/day-close'), body: {

@@ -27,6 +27,7 @@ import '../providers/printer_provider.dart';
 import '../providers/storage_mode_provider.dart';
 import '../providers/customer_provider.dart';
 import '../providers/walk_in_session_provider.dart';
+import '../widgets/customer_search_sheet.dart';
 import '../services/discount_service.dart';
 import '../services/mobile_auth_service.dart';
 import '../services/product_cloud_syncability_service.dart';
@@ -133,7 +134,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   bool _gstRegistered = true;
   int _defaultDeliveryChargePaise = 0;
   int _minimumPreparationBufferMinutes = 60;
-  String _shopName = 'My Flower Shop';
+  String _shopName = '';
   String _businessPhone = '';
   String _businessAddress = '';
   String? _billDiscountType;
@@ -146,6 +147,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   @override
   void initState() {
     super.initState();
+    BusinessSettingsManager.changeNotifier.addListener(_loadBusinessSettings);
 
     _addressDictationController.bindController(
       _addressController,
@@ -194,9 +196,9 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       _defaultDeliveryChargePaise = settings.defaultDeliveryChargePaise;
       _minimumPreparationBufferMinutes =
           settings.minimumPreparationBufferMinutes;
-      _shopName = settings.shopName;
-      _businessPhone = settings.phone;
-      _businessAddress = settings.address;
+      _shopName = settings.shopName.trim();
+      _businessPhone = settings.phone.trim();
+      _businessAddress = settings.address.trim();
       if (_deliveryChargeController.text.trim().isEmpty) {
         _deliveryChargeController.text =
             (_defaultDeliveryChargePaise / 100).toStringAsFixed(0);
@@ -207,6 +209,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   @override
   void dispose() {
+    BusinessSettingsManager.changeNotifier.removeListener(_loadBusinessSettings);
     _recipientPhoneController.dispose();
     _recipientNameController.dispose();
     _addressFocusNode.dispose();
@@ -2048,7 +2051,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => _CustomerSearchSheet(repository: _customerRepository),
+      builder: (_) => CustomerSearchSheet(repository: _customerRepository),
     );
     if (selected == null || !mounted) return;
     setState(() {
@@ -2613,6 +2616,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   Future<void> _shareWhatsApp(BuildContext context, int orderId) async {
     final messenger = ScaffoldMessenger.of(context);
+    final sessionProvider = context.read<WalkInSessionProvider>();
     final phone = _normalizedWhatsAppPhone(_customerPhoneController.text);
     if (phone == null) {
       messenger.showSnackBar(
@@ -2623,9 +2627,11 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       return;
     }
 
-    final rewardSummary = await context
-        .read<WalkInSessionProvider>()
-        .getOrderRewardSummary(orderId);
+    await _loadBusinessSettings();
+    if (!mounted) return;
+
+    final rewardSummary =
+        await sessionProvider.getOrderRewardSummary(orderId);
     final message = _buildReceiptMessage(orderId, rewardSummary);
     final waUri = Uri.parse(
       'https://wa.me/$phone?text=${Uri.encodeComponent(message)}',
@@ -2658,7 +2664,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   String _buildReceiptMessage(int orderId, OrderRewardSummary? rewardSummary) {
     final l10n = AppLocalizations.of(context)!;
     final lines = <String>[
-      _shopName,
+      if (_shopName.isNotEmpty) _shopName,
       if (_businessPhone.isNotEmpty) '${l10n.phone}: $_businessPhone',
       if (_businessAddress.isNotEmpty) _businessAddress,
       l10n.receipt,

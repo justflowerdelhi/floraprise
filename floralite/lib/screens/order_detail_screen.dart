@@ -281,7 +281,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             children: [
               Expanded(
                 child: Text(
-                  header.orderNo,
+                  header.displayOrderNo,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1009,6 +1009,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   ) {
     final canNavigate = header.address.trim().isNotEmpty && header.address != '-';
     final canCancel = OrderStatus.canCancel(header.status);
+    final deliveryAssigned = (header.deliveryName ?? '').trim().isNotEmpty ||
+        header.status == 'out_for_delivery' ||
+        header.status == 'delivered';
+
     final actions = [
       _OrderQuickAction(
         'View Bill',
@@ -1016,17 +1020,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         () => _showBill(header, detail),
       ),
       _OrderQuickAction(
+        'Print',
+        Icons.print,
+        () => _showPrintMenu(header, detail),
+      ),
+      _OrderQuickAction(
         'Navigate',
         Icons.near_me_rounded,
         canNavigate ? () => _navigateToCustomerAddress(header.address) : null,
       ),
-      _OrderQuickAction(
-        'Collect Payment',
-        Icons.payments_outlined,
-        header.outstandingAmountPaise > 0
-            ? () => _collectPayment(header)
-            : null,
-      ),
+      if (header.outstandingAmountPaise > 0)
+        _OrderQuickAction(
+          'Collect Payment',
+          Icons.payments_outlined,
+          () => _collectPayment(header),
+        ),
+      if (header.paidAmountPaise > 0)
+        _OrderQuickAction(
+          'Adjust Payment',
+          Icons.tune_rounded,
+          () => _startPaymentAdjustment(header),
+        ),
       _OrderQuickAction(
         'Assign Designer',
         Icons.design_services,
@@ -1036,6 +1050,36 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         'Assign Delivery',
         Icons.delivery_dining,
         () => _assignCloudDelivery(header),
+      ),
+      _OrderQuickAction(
+        _generatingStartDeliveryLink
+            ? 'Generating Link...'
+            : 'Generate Start Delivery Link',
+        Icons.local_shipping_outlined,
+        _generatingStartDeliveryLink
+            ? null
+            : () => _generateStartDeliveryLink(header),
+        isLoading: _generatingStartDeliveryLink,
+      ),
+      _OrderQuickAction(
+        'Call Driver',
+        Icons.call_rounded,
+        deliveryAssigned ? () => _callDriver(header.id) : null,
+      ),
+      _OrderQuickAction(
+        'Track Driver',
+        Icons.location_searching_rounded,
+        deliveryAssigned ? () => _openLiveTracking(header.id) : null,
+      ),
+      _OrderQuickAction(
+        'Share Tracking Link',
+        Icons.share_rounded,
+        deliveryAssigned ? () => _shareTrackingLinkViaWhatsApp(header.id) : null,
+      ),
+      _OrderQuickAction(
+        'Forward Associate',
+        Icons.forward_to_inbox,
+        () => _forwardAssociate(header, detail),
       ),
       _OrderQuickAction(
         'Change Status',
@@ -2300,7 +2344,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Bill ${header.orderNo}'),
+        title: Text('Bill ${header.displayOrderNo}'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../../data/repositories/production_repository.dart';
+import '../../providers/storage_mode_provider.dart';
 import '../production_detail_screen.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/non_cloud_report_banner.dart';
 
 class ProductionReportScreen extends StatefulWidget {
   const ProductionReportScreen({super.key});
@@ -57,12 +60,15 @@ class _ProductionReportScreenState extends State<ProductionReportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isCloud = context.watch<StorageModeProvider?>()?.isCloud ?? false;
     final producedQuantity = _records.fold<int>(0, (total, record) => total + record.quantity);
     final producedCost = _records.fold<int>(0, (total, record) => total + record.productionCostPaise);
     return Scaffold(
       appBar: AppBar(title: const Text('Production Report')),
-      body: SafeArea(
-        child: RefreshIndicator(
+      body: isCloud
+          ? const NonCloudReportBanner(reportTitle: 'Production Report')
+          : SafeArea(
+              child: RefreshIndicator(
           onRefresh: _load,
           child: ListView(
             padding: const EdgeInsets.all(16),

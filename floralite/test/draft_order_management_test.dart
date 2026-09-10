@@ -13,6 +13,7 @@ import 'package:floraprise/data/repositories/inventory_repository.dart';
 import 'package:floraprise/data/repositories/job_repository.dart';
 import 'package:floraprise/data/repositories/scheduler_repository.dart';
 import 'package:floraprise/data/repositories/pos_sync_outbox_repository.dart';
+import 'package:floraprise/models/storage_mode.dart';
 import 'package:floraprise/models/walk_in_enums.dart';
 import 'package:floraprise/models/walk_in_line_item.dart';
 import 'package:floraprise/models/walk_in_session.dart';
@@ -22,6 +23,7 @@ import 'package:floraprise/screens/pickup_later_screen.dart';
 import 'package:floraprise/screens/take_away_screen.dart';
 import 'package:floraprise/services/pos_sale_sync_service.dart';
 import 'package:floraprise/services/product_cloud_syncability_service.dart';
+import 'package:floraprise/services/storage_mode_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -152,6 +154,7 @@ void main() {
   });
 
   test('confirmed sale atomically stores one immutable outbox snapshot', () async {
+    await StorageModeService().setMode(StorageMode.cloud);
     final db = await AppDatabase.instance.database;
     final firstProductId = await db.insert('products', {
       'name': 'Rose', 'selling_price_paise': 10000, 'track_inventory': 1,
@@ -217,6 +220,74 @@ void main() {
       }),
       throwsA(isA<DatabaseException>()),
     );
+  });
+
+  test('local storage Take Away sale succeeds without cloud product mapping', () async {
+    await StorageModeService().setMode(StorageMode.local);
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+    final productId = await db.insert('products', {
+      'name': 'Local Rose',
+      'selling_price_paise': 10000,
+      'track_inventory': 1,
+      'active': 1,
+      'created_at': now,
+      'updated_at': now,
+    });
+    await db.insert('inventory_items', {
+      'product_id': productId,
+      'current_qty': 3,
+      'min_qty': 0,
+      'updated_at': now,
+    });
+    final manager = WalkInManager(
+      customerManager: CustomerManager(CustomerRepository()),
+      pricingManager: PricingManager(),
+      orderManager: OrderManager(OrderRepository(), JobRepository()),
+      inventoryManager: InventoryManager(InventoryRepository()),
+      schedulerManager: SchedulerManager(SchedulerRepository()),
+    );
+
+    final confirmed = await manager.confirmOrder(WalkInSession(
+      fulfilmentType: FulfilmentType.takeAway,
+      customerName: 'Local Storage Customer',
+      lines: [
+        WalkInLineItem(
+          productId: productId,
+          description: 'Local Rose',
+          quantity: 1,
+          unitPricePaise: 10000,
+          gstPercent: 0,
+          source: 'product',
+        ),
+      ],
+      payments: const [
+        PaymentSplit(
+          method: PaymentMethod.cash,
+          amountPaise: 10000,
+          methodCode: 'cash',
+        ),
+      ],
+    ));
+
+    final order = (await db.query(
+      'orders',
+      where: 'id = ?',
+      whereArgs: [confirmed.orderId],
+    ))
+        .single;
+    final inventory = (await db.query(
+      'inventory_items',
+      where: 'product_id = ?',
+      whereArgs: [productId],
+    ))
+        .single;
+
+    expect(order['status'], 'confirmed');
+    expect(order['fulfilment_type'], 'take_away');
+    expect(inventory['current_qty'], 2);
+    expect(await db.query('inventory_transactions', where: 'order_id = ?', whereArgs: [confirmed.orderId]), hasLength(1));
+    expect(await PosSyncOutboxRepository().listPending(db), isEmpty);
   });
 
   test('local storage cash sale creates one local cash book cash-in entry', () async {

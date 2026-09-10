@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/cloud_product_repository.dart';
+import '../data/repositories/product_repository.dart';
 import '../providers/cloud_product_provider.dart';
+import '../providers/printer_provider.dart';
 import '../services/cloud_product_local_catalog_sync_service.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
+import '../widgets/common_widgets.dart';
+import 'bouquet_builder_screen.dart';
 
 class CloudProductsScreen extends StatefulWidget {
   const CloudProductsScreen({super.key});
@@ -17,7 +21,19 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
   final _searchController = TextEditingController();
   final CloudProductLocalCatalogSyncService _catalogSyncService =
       CloudProductLocalCatalogSyncService();
+  final ProductRepository _productRepository = ProductRepository();
   bool _isSyncingPosCatalog = false;
+
+  static const List<String> _categoryChips = [
+    'all',
+    'Finished Products',
+    'Flowers',
+    'Fillers',
+    'Foliage',
+    'Packing',
+    'Accessories',
+    'Others',
+  ];
 
   @override
   void initState() {
@@ -54,6 +70,111 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
     }
   }
 
+  Future<void> _printBarcode(CloudProduct product) async {
+    final barcode = (product.barcode?.trim().isNotEmpty == true
+            ? product.barcode
+            : product.internalBarcode?.trim().isNotEmpty == true
+                ? product.internalBarcode
+                : product.sku)
+        ?.trim();
+
+    if (barcode == null || barcode.isEmpty) {
+      _showError('No barcode or SKU available for this product.');
+      return;
+    }
+
+    final quantity = await _askPrintQuantity(product.name);
+    if (quantity == null || quantity <= 0 || !mounted) return;
+
+    final printer = context.read<PrinterProvider>();
+    await printer.enqueueBarcodeLabel(
+      productName: product.name,
+      barcode: barcode,
+      quantity: quantity,
+      sellingPricePaise: (product.retailPrice * 100).round(),
+    );
+    if (!mounted) return;
+    final message = printer.error ?? 'Barcode label sent to printer queue.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<int?> _askPrintQuantity(String productName) {
+    var quantity = 1;
+    return showDialog<int>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: const Text('Print Labels'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(productName, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton.outlined(
+                    onPressed: quantity <= 1
+                        ? null
+                        : () => setStateDialog(() => quantity--),
+                    icon: const Icon(Icons.remove),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      quantity.toString(),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton.outlined(
+                    onPressed: () => setStateDialog(() => quantity++),
+                    icon: const Icon(Icons.add),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, quantity),
+              child: const Text('Print'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openRecipe(CloudProduct product) async {
+    int? localProductId =
+        await _productRepository.getLocalProductIdByCloudProductId(product.id);
+
+    if (localProductId == null) {
+      await _catalogSyncService.syncForCurrentCompany();
+      localProductId = await _productRepository
+          .getLocalProductIdByCloudProductId(product.id);
+    }
+
+    if (!mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BouquetBuilderScreen(
+          existingProductId: localProductId,
+        ),
+      ),
+    );
+  }
+
   void _showError(Object error) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(error.toString())),
@@ -67,6 +188,32 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
       appBar: AppBar(
         title: const Text('Cloud Products'),
         actions: [
+          PopupMenuButton<ProductSort>(
+            icon: const Icon(Icons.sort),
+            onSelected: provider.setSort,
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: ProductSort.nameAsc,
+                child: Text('Name A-Z'),
+              ),
+              PopupMenuItem(
+                value: ProductSort.nameDesc,
+                child: Text('Name Z-A'),
+              ),
+              PopupMenuItem(
+                value: ProductSort.latestUpdated,
+                child: Text('Recently Updated'),
+              ),
+              PopupMenuItem(
+                value: ProductSort.priceLowToHigh,
+                child: Text('Price Low to High'),
+              ),
+              PopupMenuItem(
+                value: ProductSort.priceHighToLow,
+                child: Text('Price High to Low'),
+              ),
+            ],
+          ),
           IconButton(
             tooltip: 'Sync Cloud Products to POS Catalog',
             onPressed: _isSyncingPosCatalog ? null : _syncPosCatalog,
@@ -92,17 +239,48 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: TextField(
               controller: _searchController,
-              onSubmitted: provider.search,
-              decoration: const InputDecoration(
+              onChanged: (value) {
+                provider.search(value);
+              },
+              decoration: InputDecoration(
                 labelText: 'Search cloud products',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          provider.search('');
+                        },
+                      )
+                    : null,
+                border: const OutlineInputBorder(),
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _categoryChips.map((cat) {
+                  final isSelected = provider.category == cat;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: AppChip(
+                      label: cat == 'all' ? 'All' : cat,
+                      isSelected: isSelected,
+                      onTap: () => provider.setCategory(cat),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           if (provider.isLoading) const LinearProgressIndicator(),
           if (provider.error != null)
             Padding(
@@ -117,29 +295,105 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
                 itemCount: provider.products.length,
                 itemBuilder: (_, index) {
                   final product = provider.products[index];
+                  final isFav = provider.isFavorite(product.id);
                   return Card(
-                    child: ListTile(
-                      title: Text(product.name),
-                      subtitle: Text(
-                        '${product.sku}  |  ${product.unitOfMeasure}  |  ${product.retailPrice.toStringAsFixed(2)}  |  '
-                        '${product.isActive ? 'Active' : 'Inactive'}',
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
-                      trailing: PopupMenuButton<String>(
-                        onSelected: (value) async {
-                          if (value == 'edit') await _editProduct(product: product);
-                          if (value == 'toggle') {
-                            try {
-                              await provider.setProductActive(product.id, !product.isActive);
-                            } catch (error) {
-                              if (mounted) _showError(error);
-                            }
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                          PopupMenuItem(
-                            value: 'toggle',
-                            child: Text(product.isActive ? 'Deactivate' : 'Activate'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      product.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${product.sku}  |  ${product.category}  |  ${product.unitOfMeasure}  |  '
+                                      '${product.isActive ? 'Active' : 'Inactive'}',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                '₹${product.retailPrice.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2E7D32),
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              IconButton(
+                                tooltip: isFav ? 'Unfavourite' : 'Favourite',
+                                icon: Icon(
+                                  isFav ? Icons.star : Icons.star_border,
+                                  color: isFav ? Colors.amber : null,
+                                ),
+                                onPressed: () =>
+                                    provider.toggleFavorite(product.id),
+                              ),
+                              const Spacer(),
+                              IconButton(
+                                tooltip: 'Recipe',
+                                icon: const Icon(Icons.menu_book_outlined),
+                                onPressed: () => _openRecipe(product),
+                              ),
+                              IconButton(
+                                tooltip: 'Print Barcode',
+                                icon: const Icon(Icons.print_outlined),
+                                onPressed: () => _printBarcode(product),
+                              ),
+                              IconButton(
+                                tooltip: 'Edit',
+                                icon: const Icon(Icons.edit_outlined),
+                                onPressed: () => _editProduct(product: product),
+                              ),
+                              PopupMenuButton<String>(
+                                onSelected: (value) async {
+                                  if (value == 'toggle') {
+                                    try {
+                                      await provider.setProductActive(
+                                        product.id,
+                                        !product.isActive,
+                                      );
+                                    } catch (error) {
+                                      if (mounted) _showError(error);
+                                    }
+                                  }
+                                },
+                                itemBuilder: (_) => [
+                                  PopupMenuItem(
+                                    value: 'toggle',
+                                    child: Text(
+                                      product.isActive
+                                          ? 'Deactivate'
+                                          : 'Activate',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ],
                       ),

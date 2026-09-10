@@ -145,6 +145,17 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
       final isCloud = storageMode.isCloud;
       if (isCloud) {
         final summary = await _cloudDayCloseRepository.summary(_selectedDate);
+        final isClosed = await _cloudDayCloseRepository.isClosed(_selectedDate);
+        final cloudExpenses =
+            await CloudExpenseRepository().getByDate(_selectedDate);
+
+        final upiExpenses = cloudExpenses
+            .where((e) => e.paymentMode == PaymentMode.upi)
+            .fold<int>(0, (sum, e) => sum + e.amount);
+        final cardExpenses = cloudExpenses
+            .where((e) => e.paymentMode == PaymentMode.card)
+            .fold<int>(0, (sum, e) => sum + e.amount);
+
         final openingCash = _moneyPaise(summary, 'openingCash');
         setState(() {
           _openingCash = OpeningCash(
@@ -154,13 +165,13 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
             createdAt: _selectedDate,
             updatedAt: _selectedDate,
           );
-          _isClosed = false;
+          _isClosed = isClosed;
           _cashSales = _moneyPaise(summary, 'cashSales');
           _cardSales = _moneyPaise(summary, 'cardSales');
           _upiSales = _moneyPaise(summary, 'upiSales');
           _cashExpenses = _moneyPaise(summary, 'cashExpenses');
-          _upiExpenses = 0;
-          _cardExpenses = 0;
+          _upiExpenses = upiExpenses;
+          _cardExpenses = cardExpenses;
           _cashReceived = _moneyPaise(summary, 'cashReceived');
           _cashPaid = _moneyPaise(summary, 'cashPaid');
           _isLoading = false;

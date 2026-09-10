@@ -9,6 +9,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_base_url.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../data/repositories/cloud_company_profile_repository.dart';
+import '../managers/business_settings_manager.dart';
+
 class MobileAuthServiceException implements Exception {
   const MobileAuthServiceException(this.code, this.message);
 
@@ -216,6 +219,8 @@ class MobileAuthService {
     await _secureStorage.delete(key: _permissionsKey);
     await _secureStorage.delete(key: _appConfigKey);
     await _secureStorage.delete(key: _featureFlagsKey);
+    await _secureStorage.delete(key: 'cloud_company_profile');
+    BusinessSettingsManager.notifySettingsChanged();
   }
 
   /// Returns the stored access token without triggering a network refresh.
@@ -543,6 +548,19 @@ class MobileAuthService {
       key: _featureFlagsKey,
       value: jsonEncode(featureFlags),
     );
+
+    BusinessSettingsManager.notifySettingsChanged();
+    if (payload.accessToken.isNotEmpty) {
+      unawaited(
+        CloudCompanyProfileRepository(secureStorage: _secureStorage)
+            .fetchCompanyProfile(
+              baseUrl: _baseUrl,
+              accessToken: payload.accessToken,
+            )
+            .then((_) => BusinessSettingsManager.notifySettingsChanged())
+            .catchError((_) => null),
+      );
+    }
   }
 
   Map<String, dynamic> _normalizeBootstrapPayload(

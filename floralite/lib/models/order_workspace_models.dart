@@ -1,3 +1,5 @@
+import '../utils/order_display_utils.dart';
+
 class OrderListItem {
   final int id;
   final String? cloudOrderId;
@@ -32,6 +34,8 @@ class OrderListItem {
     required this.scheduledAt,
     required this.isPaid,
   });
+
+  String get displayOrderNo => formatDisplayOrderNo(orderNo, orderId: id);
 }
 
 class OrderTimelineItem {
@@ -102,6 +106,8 @@ class OrderDetailHeader {
     this.designerName,
     this.deliveryName,
   });
+
+  String get displayOrderNo => formatDisplayOrderNo(orderNo, orderId: id);
 
   int get outstandingAmountPaise =>
       (grandTotalPaise - paidAmountPaise).clamp(0, grandTotalPaise);

@@ -3,15 +3,18 @@ import 'package:sqflite/sqflite.dart';
 import '../../models/payment_split.dart';
 import '../../models/gst_calculation_type.dart';
 import '../../models/order_workspace_models.dart';
+import '../../models/storage_mode.dart';
 import '../../models/walk_in_enums.dart';
 import '../../models/walk_in_line_item.dart';
 import '../../models/walk_in_session.dart';
 import '../database/app_database.dart';
 import '../../managers/reward_manager.dart';
 import '../../services/product_cloud_syncability_service.dart';
+import '../../services/storage_mode_service.dart';
 import 'customer_repository.dart';
 import 'inventory_repository.dart';
 import 'pos_sync_outbox_repository.dart';
+import '../../utils/order_display_utils.dart';
 
 class OrderTotals {
   final int subtotalPaise;
@@ -63,6 +66,8 @@ class DraftOrderSummary {
     required this.createdAt,
     required this.updatedAt,
   });
+
+  String get displayOrderNo => formatDisplayOrderNo(orderNo, orderId: id);
 }
 
 class CustomerOrderStatistics {
@@ -109,10 +114,13 @@ class CustomerOrderStatistics {
 class OrderRepository {
   OrderRepository({
     ProductCloudSyncabilityService? productCloudSyncabilityService,
+    StorageModeService? storageModeService,
   }) : _productCloudSyncabilityService =
-            productCloudSyncabilityService ?? ProductCloudSyncabilityService();
+            productCloudSyncabilityService ?? ProductCloudSyncabilityService(),
+        _storageModeService = storageModeService ?? StorageModeService();
 
   final ProductCloudSyncabilityService _productCloudSyncabilityService;
+  final StorageModeService _storageModeService;
 
   static const List<String> customerStatisticsStatuses = [
     'confirmed',
@@ -527,6 +535,8 @@ class OrderRepository {
     final rewardSettings = await rewardManager.loadSettings();
     final inventoryRepository = InventoryRepository();
     final outboxRepository = PosSyncOutboxRepository();
+    final storageMode = await _storageModeService.getCurrentMode();
+    final requireCloudInventory = storageMode == StorageMode.cloud;
 
     return db.transaction<ConfirmedOrder>((txn) async {
       final orderNo = 'ORD-${DateTime.now().millisecondsSinceEpoch}';
@@ -565,14 +575,16 @@ class OrderRepository {
         if (productId == null) {
           continue;
         }
-        final mapping = await _productCloudSyncabilityService.evaluate(
-          localProductId: productId,
-          db: txn,
-        );
-        if (!mapping.isSyncable || mapping.cloudProductId == null) {
-          throw StateError('Product is not linked to Cloud inventory.');
+        if (requireCloudInventory) {
+          final mapping = await _productCloudSyncabilityService.evaluate(
+            localProductId: productId,
+            db: txn,
+          );
+          if (!mapping.isSyncable || mapping.cloudProductId == null) {
+            throw StateError('Product is not linked to Cloud inventory.');
+          }
+          cloudProductIdsByLocalProductId[productId] = mapping.cloudProductId!;
         }
-        cloudProductIdsByLocalProductId[productId] = mapping.cloudProductId!;
         lineProductLinks.add({
           'orderLineId': line['id'] as int,
           'productId': productId,
@@ -669,26 +681,28 @@ class OrderRepository {
         );
       }
 
-      await _validateInventoryTransactionMappings(
-        txn: txn,
-        inventoryTransactionIds: inventoryTransactionIds,
-        cloudProductIdsByLocalProductId: cloudProductIdsByLocalProductId,
-      );
+      if (requireCloudInventory) {
+        await _validateInventoryTransactionMappings(
+          txn: txn,
+          inventoryTransactionIds: inventoryTransactionIds,
+          cloudProductIdsByLocalProductId: cloudProductIdsByLocalProductId,
+        );
 
-      final snapshot = await _buildCompletedSaleSnapshot(
-        txn: txn,
-        orderId: orderId,
-        clientSyncId: outboxRepository.newClientSyncId(),
-        inventoryTransactionIds: inventoryTransactionIds,
-        cloudProductIdsByLocalProductId: cloudProductIdsByLocalProductId,
-      );
-      await outboxRepository.enqueueInTransaction(
-        transaction: txn,
-        clientSyncId: snapshot['clientSyncId'] as String,
-        localOrderId: orderId,
-        payload: snapshot,
-        completedAt: now,
-      );
+        final snapshot = await _buildCompletedSaleSnapshot(
+          txn: txn,
+          orderId: orderId,
+          clientSyncId: outboxRepository.newClientSyncId(),
+          inventoryTransactionIds: inventoryTransactionIds,
+          cloudProductIdsByLocalProductId: cloudProductIdsByLocalProductId,
+        );
+        await outboxRepository.enqueueInTransaction(
+          transaction: txn,
+          clientSyncId: snapshot['clientSyncId'] as String,
+          localOrderId: orderId,
+          payload: snapshot,
+          completedAt: now,
+        );
+      }
 
       return ConfirmedOrder(
           orderId: orderId, lineProductLinks: lineProductLinks);

@@ -507,6 +507,21 @@ class ProductRepository {
     return mapping?.cloudProductId;
   }
 
+  Future<int?> getLocalProductIdByCloudProductId(String cloudProductId) async {
+    final normalized = cloudProductId.trim();
+    if (normalized.isEmpty) return null;
+    final db = await AppDatabase.instance.database;
+    final rows = await db.query(
+      'products',
+      columns: ['id'],
+      where: 'cloud_product_id = ? AND deleted_at IS NULL',
+      whereArgs: [normalized],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['id'] as int?;
+  }
+
   Future<ProductCloudMapping?> getCloudProductMapping(int localProductId) async {
     final db = await AppDatabase.instance.database;
     final rows = await db.query(

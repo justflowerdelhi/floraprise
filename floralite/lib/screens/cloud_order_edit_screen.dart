@@ -104,7 +104,7 @@ class _CloudOrderEditScreenState extends State<CloudOrderEditScreen> {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Edit ${widget.header.orderNo}')),
+      appBar: AppBar(title: Text('Edit ${widget.header.displayOrderNo}')),
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(

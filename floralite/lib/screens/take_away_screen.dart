@@ -20,8 +20,10 @@ import '../models/walk_in_line_item.dart';
 import '../models/walk_in_session.dart';
 import '../providers/design_provider.dart';
 import '../providers/printer_provider.dart';
+import '../data/repositories/customer_repository.dart';
 import '../providers/customer_provider.dart';
 import '../providers/walk_in_session_provider.dart';
+import '../widgets/customer_search_sheet.dart';
 import '../services/discount_service.dart';
 import '../services/reward_summary_formatter.dart';
 import '../utils/locale_formatter.dart';
@@ -86,7 +88,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
   Map<String, int> _splitPaymentAllocationsPaise = <String, int>{};
   _CustomerInfo? _customerInfo;
   bool _gstRegistered = true;
-  String _shopName = 'My Flower Shop';
+  String _shopName = '';
   String _businessPhone = '';
   String _businessAddress = '';
   String? _billDiscountType;
@@ -99,6 +101,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
   @override
   void initState() {
     super.initState();
+    BusinessSettingsManager.changeNotifier.addListener(_loadBusinessSettings);
 
     // Prefill data if provided
     if (widget.prefillCustomerPhone != null) {
@@ -127,14 +130,15 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
     if (!mounted) return;
     setState(() {
       _gstRegistered = settings.gstRegistered;
-      _shopName = settings.shopName;
-      _businessPhone = settings.phone;
-      _businessAddress = settings.address;
+      _shopName = settings.shopName.trim();
+      _businessPhone = settings.phone.trim();
+      _businessAddress = settings.address.trim();
     });
   }
 
   @override
   void dispose() {
+    BusinessSettingsManager.changeNotifier.removeListener(_loadBusinessSettings);
     _phoneController.dispose();
     _customerNameController.dispose();
     _occasionController.dispose();
@@ -579,12 +583,22 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          l10n.customer,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              l10n.customer,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _showCustomerSearch,
+              icon: const Icon(Icons.search, size: 18),
+              label: Text(l10n.searchCustomer),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         AppCard(
@@ -1535,11 +1549,28 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
     );
   }
 
+  Future<void> _showCustomerSearch() async {
+    final selected = await showModalBottomSheet<CustomerRecord>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => CustomerSearchSheet(repository: CustomerRepository()),
+    );
+
+    if (selected == null || !mounted) return;
+
+    setState(() {
+      _phoneController.text = selected.phone;
+      _customerNameController.text = selected.name;
+    });
+
+    await _lookupCustomer(selected.phone);
+  }
+
   Future<void> _lookupCustomer(String phone) async {
     final provider = context.read<WalkInSessionProvider>();
     final customerProvider = context.read<CustomerProvider>();
-    final customerName = await provider.lookupCustomerName(phone);
     final customer = await customerProvider.lookupByPhone(phone);
+    final customerName = customer?.name ?? await provider.lookupCustomerName(phone);
     final customerStats = customer == null
         ? null
         : await customerProvider.lookupCustomerStatistics(customer);
@@ -1563,7 +1594,8 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
     if (!mounted) return;
 
     setState(() {
-      if (customerName == null || customerName.isEmpty) {
+      final resolvedName = customerName ?? customer?.name;
+      if ((resolvedName == null || resolvedName.isEmpty) && customer == null) {
         _customerInfo = null;
         _rewardPointsRedeemed = 0;
         _rewardDiscountAmountPaise = 0;
@@ -1585,7 +1617,9 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
         favouriteDesign: favouriteDesign ?? 'N/A',
         rewardPoints: rewardPoints,
       );
-      _customerNameController.text = customerName;
+      if (resolvedName != null && resolvedName.isNotEmpty) {
+        _customerNameController.text = resolvedName;
+      }
     });
   }
 
@@ -2107,6 +2141,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
 
   Future<void> _shareWhatsApp(BuildContext context, int orderId) async {
     final messenger = ScaffoldMessenger.of(context);
+    final sessionProvider = context.read<WalkInSessionProvider>();
     final phone = _normalizedWhatsAppPhone(_phoneController.text);
     if (phone == null) {
       messenger.showSnackBar(
@@ -2117,9 +2152,11 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
       return;
     }
 
-    final rewardSummary = await context
-        .read<WalkInSessionProvider>()
-        .getOrderRewardSummary(orderId);
+    await _loadBusinessSettings();
+    if (!mounted) return;
+
+    final rewardSummary =
+        await sessionProvider.getOrderRewardSummary(orderId);
     final message = _buildReceiptMessage(orderId, rewardSummary);
     final waUri = Uri.parse(
       'https://wa.me/$phone?text=${Uri.encodeComponent(message)}',
@@ -2156,7 +2193,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
   String _buildReceiptMessage(int orderId, OrderRewardSummary? rewardSummary) {
     final l10n = AppLocalizations.of(context)!;
     final lines = <String>[
-      _shopName,
+      if (_shopName.isNotEmpty) _shopName,
       if (_businessPhone.isNotEmpty) '${l10n.phone}: $_businessPhone',
       if (_businessAddress.isNotEmpty) _businessAddress,
       l10n.receipt,

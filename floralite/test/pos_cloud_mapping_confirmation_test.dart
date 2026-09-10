@@ -4,11 +4,13 @@ import 'package:floraprise/data/database/app_database.dart';
 import 'package:floraprise/data/repositories/customer_repository.dart';
 import 'package:floraprise/data/repositories/order_repository.dart';
 import 'package:floraprise/data/repositories/pos_sync_outbox_repository.dart';
+import 'package:floraprise/models/storage_mode.dart';
 import 'package:floraprise/models/payment_split.dart';
 import 'package:floraprise/models/walk_in_enums.dart';
 import 'package:floraprise/models/walk_in_line_item.dart';
 import 'package:floraprise/models/walk_in_session.dart';
 import 'package:floraprise/services/product_cloud_syncability_service.dart';
+import 'package:floraprise/services/storage_mode_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -27,6 +29,7 @@ void main() {
   setUp(() async {
     await AppDatabase.instance.close();
     AppDatabase.useInMemoryForTests = true;
+    await StorageModeService().setMode(StorageMode.cloud);
   });
 
   tearDown(() async {

@@ -10,6 +10,7 @@ import '../data/database/app_database.dart';
 import '../managers/business_settings_manager.dart';
 import 'api_base_url.dart';
 import 'mobile_auth_service.dart';
+import '../utils/order_display_utils.dart';
 
 class DeliveryTrackingException implements Exception {
   const DeliveryTrackingException(this.message);
@@ -170,6 +171,8 @@ class DeliveryWorkspaceRecord {
   final DateTime? eta;
   final DateTime updatedAt;
   final DeliveryDriverInfo? driver;
+
+  String get displayOrderNo => formatDisplayOrderNo(orderNo);
 }
 
 class DeliveryTrackingService {

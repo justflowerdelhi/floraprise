@@ -304,6 +304,13 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         gstRegistered: _gstRegistered,
         gstNumber: _gstRegistered ? _gstNumber.trim() : null,
       );
+      await _businessSettingsManager.setShopName(_shopName.trim());
+      await _businessSettingsManager.setOwnerName(_ownerName.trim());
+      await _businessSettingsManager.setPhone(_businessPhone.trim());
+      await _businessSettingsManager.setAddress(_businessAddress.trim());
+      await _businessSettingsManager.setGstRegistered(_gstRegistered);
+      await _businessSettingsManager.setGstNumber(_gstRegistered ? _gstNumber.trim() : '');
+      BusinessSettingsManager.notifySettingsChanged();
       
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -364,6 +371,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         address: _businessAddress.trim().isEmpty ? null : _businessAddress.trim(),
         taxIdentifier: _gstRegistered ? _gstNumber.trim() : null,
       );
+      BusinessSettingsManager.notifySettingsChanged();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

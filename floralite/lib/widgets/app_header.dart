@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../managers/business_settings_manager.dart';
+import '../providers/storage_mode_provider.dart';
+import '../services/storage_mode_service.dart';
 
 class AppHeader extends StatefulWidget implements PreferredSizeWidget {
   const AppHeader({
@@ -29,21 +32,34 @@ class AppHeader extends StatefulWidget implements PreferredSizeWidget {
 class _AppHeaderState extends State<AppHeader> {
   final BusinessSettingsManager _businessSettingsManager =
       BusinessSettingsManager();
-  String _shopName = 'My Flower Shop';
+  final StorageModeService _storageModeService = StorageModeService();
+  String _shopName = '';
+  bool _isCloud = false;
 
   @override
   void initState() {
     super.initState();
-    _loadShopName();
+    BusinessSettingsManager.changeNotifier.addListener(_onSettingsChanged);
+    _loadStorageModeAndShopName();
   }
 
-  Future<void> _loadShopName() async {
+  @override
+  void dispose() {
+    BusinessSettingsManager.changeNotifier.removeListener(_onSettingsChanged);
+    super.dispose();
+  }
+
+  void _onSettingsChanged() {
+    _loadStorageModeAndShopName();
+  }
+
+  Future<void> _loadStorageModeAndShopName() async {
+    final isCloud = await _storageModeService.isCloud();
     final settings = await _businessSettingsManager.load();
     if (!mounted) return;
     setState(() {
-      _shopName = settings.shopName.trim().isEmpty
-          ? 'My Flower Shop'
-          : settings.shopName.trim();
+      _isCloud = isCloud;
+      _shopName = settings.shopName.trim();
     });
   }
 
@@ -52,6 +68,8 @@ class _AppHeaderState extends State<AppHeader> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context)!;
+    final storageProvider = Provider.of<StorageModeProvider?>(context);
+    final isCloud = storageProvider?.isCloud ?? _isCloud;
 
     return AppBar(
       automaticallyImplyLeading: widget.showBackButton,
@@ -76,14 +94,15 @@ class _AppHeaderState extends State<AppHeader> {
                     color: colorScheme.onSurface,
                   ),
                 ),
-                Text(
-                  _shopName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                if (_shopName.isNotEmpty)
+                  Text(
+                    _shopName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -92,9 +111,23 @@ class _AppHeaderState extends State<AppHeader> {
       bottom: widget.bottom,
       actions: [
         ...?widget.actions,
+        if (isCloud)
+          const Tooltip(
+            message: 'Cloud Mode',
+            triggerMode: TooltipTriggerMode.tap,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Icon(Icons.language, size: 22),
+            ),
+          ),
         PopupMenuButton<String>(
           tooltip: 'Profile',
-          onSelected: (value) => Navigator.pushNamed(context, value),
+          onSelected: (value) async {
+            await Navigator.pushNamed(context, value);
+            if (mounted) {
+              await _loadStorageModeAndShopName();
+            }
+          },
           itemBuilder: (context) => [
             PopupMenuItem(
                 value: '/shop-details', child: Text(l10n.shopDetails)),

@@ -12,8 +12,15 @@ export default function Header() {
     <header className="site-header">
       <div className="nav-wrap">
         <Link href="/" className="brand" onClick={close}>
-          <Image src="/logo.png" alt="Floraprise" width={34} height={34} />
-          <span>Flora<span className="brand-mark">Prise</span></span>
+          <Image src="/logo.png" alt="" width={34} height={34} />
+          <Image
+            src="/floraprise-title.png"
+            alt="Floraprise"
+            width={120}
+            height={40}
+            priority
+            className="brand-wordmark"
+          />
         </Link>
         <nav className="desktop-nav" aria-label="Primary navigation">
           <div className="product-menu">

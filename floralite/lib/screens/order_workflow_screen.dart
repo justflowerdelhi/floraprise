@@ -54,7 +54,7 @@ class _OrderWorkflowScreenState extends State<OrderWorkflowScreen> {
       appBar: AppBar(
         title: header == null
             ? const Text('Order Workflow')
-            : Text('Workflow #${header.orderNo}'),
+            : Text('Workflow #${header.displayOrderNo}'),
       ),
       body: provider.isLoading || workflow == null
           ? const Center(child: CircularProgressIndicator())
@@ -88,7 +88,7 @@ class _OrderWorkflowScreenState extends State<OrderWorkflowScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Order #${header.orderNo}',
+              'Order #${header.displayOrderNo}',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),

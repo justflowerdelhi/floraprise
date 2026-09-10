@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../../data/repositories/inventory_repository.dart';
 import '../../managers/business_settings_manager.dart';
+import '../../providers/storage_mode_provider.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/non_cloud_report_banner.dart';
 
 class WastageReportScreen extends StatefulWidget {
   const WastageReportScreen({super.key});
@@ -153,6 +156,8 @@ class _WastageReportScreenState extends State<WastageReportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isCloud = context.watch<StorageModeProvider?>()?.isCloud ?? false;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Wastage Report'),
@@ -163,9 +168,11 @@ class _WastageReportScreenState extends State<WastageReportScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
+      body: isCloud
+          ? const NonCloudReportBanner(reportTitle: 'Wastage Report')
+          : _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 _buildDateRangeSelector(),

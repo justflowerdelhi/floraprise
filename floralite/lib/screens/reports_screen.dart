@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../providers/storage_mode_provider.dart';
 import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
 
@@ -13,6 +15,8 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
+    final isCloud = context.watch<StorageModeProvider?>()?.isCloud ?? false;
+
     return Scaffold(
       appBar: const AppHeader(title: 'Reports'),
       body: ListView(
@@ -39,6 +43,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             title: 'Top Customers',
             description: 'Who are my best customers?',
             color: Colors.purple,
+            isPrimaryDeviceOnly: isCloud,
             onTap: () => Navigator.pushNamed(context, '/reports/top-customers'),
           ),
           const SizedBox(height: 12),
@@ -47,6 +52,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             title: 'Rewards Report',
             description: 'Track points earned, redeemed and outstanding.',
             color: Colors.green,
+            isPrimaryDeviceOnly: isCloud,
             onTap: () => Navigator.pushNamed(context, '/reports/rewards'),
           ),
           const SizedBox(height: 12),
@@ -55,6 +61,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             title: 'Top Products',
             description: 'Which products are selling the most?',
             color: Colors.pink,
+            isPrimaryDeviceOnly: isCloud,
             onTap: () => Navigator.pushNamed(context, '/reports/top-products'),
           ),
           const SizedBox(height: 12),
@@ -71,6 +78,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             title: 'Expense Report',
             description: 'How much have I spent?',
             color: Colors.red,
+            isPrimaryDeviceOnly: isCloud,
             onTap: () => Navigator.pushNamed(context, '/reports/expenses'),
           ),
           const SizedBox(height: 12),
@@ -79,6 +87,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             title: 'Day Closing',
             description: 'How did my day close?',
             color: Colors.indigo,
+            isPrimaryDeviceOnly: isCloud,
             onTap: () => Navigator.pushNamed(context, '/reports/day-closing'),
           ),
           const SizedBox(height: 12),
@@ -87,6 +96,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             title: 'Wastage Report',
             description: 'Track inventory losses and wastage analysis.',
             color: Colors.deepOrange,
+            isPrimaryDeviceOnly: isCloud,
             onTap: () => Navigator.pushNamed(context, '/reports/wastage'),
           ),
           const SizedBox(height: 12),
@@ -95,6 +105,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             title: 'Production Report',
             description: 'Review bouquets produced and production costs.',
             color: Colors.teal,
+            isPrimaryDeviceOnly: isCloud,
             onTap: () => Navigator.pushNamed(context, '/reports/production'),
           ),
         ],
@@ -108,6 +119,7 @@ class _ReportCard extends StatelessWidget {
   final String title;
   final String description;
   final Color color;
+  final bool isPrimaryDeviceOnly;
   final VoidCallback onTap;
 
   const _ReportCard({
@@ -115,6 +127,7 @@ class _ReportCard extends StatelessWidget {
     required this.title,
     required this.description,
     required this.color,
+    this.isPrimaryDeviceOnly = false,
     required this.onTap,
   });
 
@@ -139,11 +152,39 @@ class _ReportCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
                       ),
+                    ),
+                    if (isPrimaryDeviceOnly) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Primary Device',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
