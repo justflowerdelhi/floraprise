@@ -50,7 +50,6 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 });
 
 var configuredConnectionString = builder.Configuration.GetConnectionString("Default");
-Console.WriteLine($"[startup] Using database connection string: {configuredConnectionString?.Replace("Password=", "Password=***", StringComparison.OrdinalIgnoreCase)}");
 
 #region CORS
 
