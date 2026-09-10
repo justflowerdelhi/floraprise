@@ -10,6 +10,6 @@ public interface IPaymentRepository
     Task<decimal> GetTotalPaidForOrderAsync(Guid orderId);
     Task<decimal> GetTodayTotalAsync();
     Task<List<Payment>> GetByDateAsync(Guid companyId, Guid locationId, DateTime date);
-    Task AddAsync(Payment payment);
-    Task UpdateAsync(Payment payment);
+    Task AddAsync(Payment payment, DateTime? businessDate = null);
+    Task UpdateAsync(Payment payment, DateTime? businessDate = null);
 }

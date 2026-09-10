@@ -712,6 +712,15 @@ class OrderRepository {
     final created = DateTime.parse(createdAt);
     final dateStr = DateTime(created.year, created.month, created.day)
         .toIso8601String();
+
+    final existingEntry = await txn.query(
+      'cash_book',
+      where: 'date = ? AND description = ?',
+      whereArgs: [dateStr, 'POS cash sale $orderNo'],
+      limit: 1,
+    );
+    if (existingEntry.isNotEmpty) return;
+
     final balanceRows = await txn.rawQuery('''
       SELECT running_balance
       FROM cash_book
@@ -959,6 +968,13 @@ class OrderRepository {
         'created_by': 'walkInManager',
       });
 
+      await _createCashSaleCashBookEntryInTransaction(
+        txn: txn,
+        orderId: orderId,
+        orderNo: orderNo,
+        createdAt: now,
+      );
+
       for (final link in lineProductLinks) {
         await inventoryRepository.createConfirmedOrderSaleTransactionInTransaction(
           transaction: txn,
@@ -1027,6 +1043,21 @@ class OrderRepository {
     final orderSnapshot = Map<String, dynamic>.from(orderRows.single);
     if (orderNo != null) {
       orderSnapshot['order_no'] = orderNo;
+    }
+    final now = DateTime.now();
+    final existingConfirmed = orderSnapshot['confirmed_at'] as String?;
+    final DateTime confirmedDateTime;
+    if (existingConfirmed == null || existingConfirmed.trim().isEmpty) {
+      confirmedDateTime = now;
+      orderSnapshot['confirmed_at'] = now.toIso8601String();
+    } else {
+      confirmedDateTime = DateTime.tryParse(existingConfirmed) ?? now;
+    }
+    final existingBusinessDate = orderSnapshot['business_date'] as String?;
+    if (existingBusinessDate == null || existingBusinessDate.trim().isEmpty) {
+      final localDate = confirmedDateTime.isUtc ? confirmedDateTime.toLocal() : confirmedDateTime;
+      orderSnapshot['business_date'] =
+          DateTime.utc(localDate.year, localDate.month, localDate.day).toIso8601String();
     }
     // Prefer the order's own stored link (set at draft time); otherwise fall
     // back to the linked customer's Cloud ID so the backend can reuse it.

@@ -1,5 +1,6 @@
 import 'package:floraprise/data/database/app_database.dart';
 import 'package:floraprise/data/repositories/cash_book_repository.dart';
+import 'package:floraprise/data/repositories/order_repository.dart';
 import 'package:floraprise/models/cash_book.dart';
 import 'package:floraprise/screens/cash_book_screen.dart';
 import 'package:floraprise/screens/day_closing_screen.dart';
@@ -163,6 +164,91 @@ void main() {
 
     expect(totals.cashSales, 30000);
     expect(totals.cashExpenses, 10000);
+  });
+
+  test('finalizeCloudConfirmedDraft keeps local Cash Book parity for cash sales', () async {
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+
+    final orderId = await db.insert('orders', {
+      'order_no': 'DRAFT-123',
+      'fulfilment_type': 'take_away',
+      'status': 'draft',
+      'grand_total_paise': 50000,
+      'is_paid': 1,
+      'created_at': now,
+      'updated_at': now,
+    });
+
+    await db.insert('order_payments', {
+      'order_id': orderId,
+      'method': 'cash',
+      'amount_paise': 50000,
+      'created_at': now,
+    });
+
+    final repo = OrderRepository();
+    await repo.finalizeCloudConfirmedDraft(
+      orderId: orderId,
+      orderNo: 'ORD-CF-123',
+      cloudOrderId: 'cloud-uuid-123',
+    );
+
+    final cashEntries = await db.query(
+      'cash_book',
+      where: 'description = ?',
+      whereArgs: ['POS cash sale ORD-CF-123'],
+    );
+    expect(cashEntries, hasLength(1));
+    expect(cashEntries.single['amount'], 50000);
+    expect(cashEntries.single['cash_in'], 50000);
+    expect(cashEntries.single['transaction_type'], 'cashSale');
+
+    // Idempotency check: running again does not duplicate
+    await repo.finalizeCloudConfirmedDraft(
+      orderId: orderId,
+      orderNo: 'ORD-CF-123',
+      cloudOrderId: 'cloud-uuid-123',
+    ).catchError((_) => const ConfirmedOrder(orderId: 0, lineProductLinks: []));
+
+    final cashEntriesAfter = await db.query(
+      'cash_book',
+      where: 'description = ?',
+      whereArgs: ['POS cash sale ORD-CF-123'],
+    );
+    expect(cashEntriesAfter, hasLength(1));
+  });
+
+  test('finalizeCloudConfirmedDraft does not create local Cash Book entry for non-cash', () async {
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+
+    final orderId = await db.insert('orders', {
+      'order_no': 'DRAFT-UPI',
+      'fulfilment_type': 'take_away',
+      'status': 'draft',
+      'grand_total_paise': 40000,
+      'is_paid': 1,
+      'created_at': now,
+      'updated_at': now,
+    });
+
+    await db.insert('order_payments', {
+      'order_id': orderId,
+      'method': 'upi',
+      'amount_paise': 40000,
+      'created_at': now,
+    });
+
+    final repo = OrderRepository();
+    await repo.finalizeCloudConfirmedDraft(
+      orderId: orderId,
+      orderNo: 'ORD-CF-UPI',
+      cloudOrderId: 'cloud-uuid-upi',
+    );
+
+    final cashEntries = await db.query('cash_book');
+    expect(cashEntries, isEmpty);
   });
 }
 

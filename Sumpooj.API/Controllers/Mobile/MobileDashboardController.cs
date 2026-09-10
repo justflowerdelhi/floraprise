@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Sumpooj.API.Services.Mobile;
 using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Mobile;
@@ -31,7 +32,7 @@ public sealed class MobileDashboardController : MobileApiControllerBase
         try
         {
             var companyId = GetCompanyId();
-            var from = EnsureUtc(fromDate ?? DateTime.UtcNow.Date).Date;
+            var from = EnsureUtc(fromDate ?? PosSaleSyncService.GetServerLocalBusinessDate()).Date;
             var to = EnsureUtc(toDate ?? from).Date.AddDays(1).AddTicks(-1);
             if (to < from)
             {

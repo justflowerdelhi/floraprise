@@ -101,7 +101,9 @@ public class DayCloseService
             openingCash = cashDrawer.OpeningCash,
             cashSales = cashDrawer.CashSales,
             cashExpenses = cashDrawer.CashExpenses,
-            expectedCash = cashDrawer.OpeningCash + cashDrawer.CashSales - cashDrawer.CashExpenses,
+            cashReceived = cashDrawer.CashReceived,
+            cashPaid = cashDrawer.CashPaid,
+            expectedCash = cashDrawer.OpeningCash + cashDrawer.CashSales + cashDrawer.CashReceived - cashDrawer.CashExpenses - cashDrawer.CashPaid,
 
             refundCount,
             totalRefunds,

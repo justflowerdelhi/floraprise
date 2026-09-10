@@ -23,6 +23,7 @@ public class DayCloseRepository : IDayCloseRepository, ICashDrawerRepository
     public async Task<CashDrawerSummary> GetSummaryAsync(Guid companyId, DateTime date)
     {
         var day = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+        var dayEnd = day.AddDays(1);
         var openingCash = await _db.OpeningCashEntries
             .Where(entry => entry.CompanyId == companyId && entry.Date == day)
             .Select(entry => (decimal?)entry.Amount)
@@ -30,10 +31,30 @@ public class DayCloseRepository : IDayCloseRepository, ICashDrawerRepository
         var entries = await _db.CashBookEntries
             .Where(entry => entry.CompanyId == companyId && entry.Date == day)
             .ToListAsync();
-        return new CashDrawerSummary(
-            openingCash,
-            entries.Where(entry => entry.TransactionType == Domain.Entities.CashBookTransactionType.CashSale).Sum(entry => entry.CashIn),
-            entries.Where(entry => entry.TransactionType == Domain.Entities.CashBookTransactionType.CashExpense).Sum(entry => entry.CashOut));
+
+        var cashSalesFromEntries = entries
+            .Where(entry => entry.TransactionType == Domain.Entities.CashBookTransactionType.CashSale)
+            .Sum(entry => entry.CashIn);
+        var cashExpenses = entries
+            .Where(entry => entry.TransactionType == Domain.Entities.CashBookTransactionType.CashExpense)
+            .Sum(entry => entry.CashOut);
+        var cashReceived = entries
+            .Where(entry => entry.TransactionType == Domain.Entities.CashBookTransactionType.CashReceived)
+            .Sum(entry => entry.CashIn);
+        var cashPaid = entries
+            .Where(entry => entry.TransactionType == Domain.Entities.CashBookTransactionType.CashPaid)
+            .Sum(entry => entry.CashOut);
+
+        var cashPayments = await _db.Payments
+            .Where(p => p.CompanyId == companyId
+                && p.CreatedAtUtc >= day && p.CreatedAtUtc < dayEnd
+                && p.Method == Domain.Entities.PaymentMethod.Cash
+                && p.Status == Domain.Entities.PaymentTransactionStatus.Approved)
+            .SumAsync(p => (decimal?)p.Amount) ?? 0m;
+
+        var totalCashSales = Math.Max(cashSalesFromEntries, cashPayments);
+
+        return new CashDrawerSummary(openingCash, totalCashSales, cashExpenses, cashReceived, cashPaid);
     }
 
     public async Task<Domain.Entities.DayClose?> GetByDateAsync(Guid companyId, Guid locationId, DateTime date)

@@ -339,6 +339,7 @@ class CloudOrderRepository {
     if (amountPaise <= 0) {
       throw StateError('Payment amount must be greater than zero.');
     }
+    final now = DateTime.now();
     await _send(
       'POST',
       Uri.parse('${_auth.baseUrl}/api/payments'),
@@ -346,6 +347,8 @@ class CloudOrderRepository {
         'orderId': cloudOrderId.trim(),
         'method': _cloudPaymentMethod(method),
         'amount': amountPaise / 100,
+        'paymentDate':
+            DateTime.utc(now.year, now.month, now.day).toIso8601String(),
       },
     );
   }

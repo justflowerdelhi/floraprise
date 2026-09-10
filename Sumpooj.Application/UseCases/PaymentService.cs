@@ -47,7 +47,7 @@ public class PaymentService
         // Auto-approve payments
         payment.Approve(null, null);
 
-        await _paymentRepository.AddAsync(payment);
+        await _paymentRepository.AddAsync(payment, request.PaymentDate);
 
         // Update order payment status
         await UpdateOrderPaymentStatusAsync(companyId, request.OrderId);

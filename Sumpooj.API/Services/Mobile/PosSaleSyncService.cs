@@ -144,6 +144,7 @@ public sealed class PosSaleSyncService : IPosSaleSyncService
                     payment.SetPosReference(ClientPaymentId(paymentSnapshot), paymentSnapshot.Reference);
                     payment.SetProcessedBy(identityUserId);
                     payment.Approve(null, null);
+                    payment.SetCreatedAtUtc(order.OrderDate);
                     _db.Payments.Add(payment);
                 }
 
@@ -263,13 +264,43 @@ public sealed class PosSaleSyncService : IPosSaleSyncService
 
     private static Order CreateOrder(Guid companyId, Guid customerId, PosSaleSyncRequest request)
     {
-        var deliveryDate = request.Order.ScheduledAt ?? request.Order.ConfirmedAt ?? DateTime.UtcNow;
+        var businessDate = ResolveBusinessDate(request.Order);
+        var deliveryDate = request.Order.ScheduledAt ?? request.Order.ConfirmedAt ?? businessDate;
         var order = new Order(companyId, customerId, deliveryDate, request.Order.DeliveryAddress, request.Order.DeliveryPincode, request.Order.RecipientName, request.Order.RecipientPhone);
         if (!string.IsNullOrWhiteSpace(request.Order.OrderNo)) order.SetImportedOrderNumber(request.Order.OrderNo);
         if (!string.IsNullOrWhiteSpace(request.Order.CardMessage)) order.SetCardMessage(request.Order.CardMessage);
         if (!string.IsNullOrWhiteSpace(request.Order.DeliverySlot)) order.SetTimeSlot(request.Order.DeliverySlot);
+
+        var orderTime = request.Order.ConfirmedAt.HasValue
+            ? request.Order.ConfirmedAt.Value.TimeOfDay
+            : (request.Order.ScheduledAt.HasValue ? request.Order.ScheduledAt.Value.TimeOfDay : TimeSpan.Zero);
+        order.SetOrderDate(businessDate.Add(orderTime));
+
         order.Confirm();
         return order;
+    }
+
+    internal static DateTime ResolveBusinessDate(PosSaleOrderSnapshot order)
+    {
+        if (order.BusinessDate.HasValue)
+            return DateTime.SpecifyKind(order.BusinessDate.Value.Date, DateTimeKind.Utc);
+
+        if (order.ConfirmedAt.HasValue)
+            return DateTime.SpecifyKind(order.ConfirmedAt.Value.Date, DateTimeKind.Utc);
+
+        return GetServerLocalBusinessDate();
+    }
+
+    internal static DateTime GetServerLocalBusinessDate()
+    {
+        if (TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Kolkata", out var tz) ||
+            TimeZoneInfo.TryFindSystemTimeZoneById("India Standard Time", out tz))
+        {
+            var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
+            return DateTime.SpecifyKind(localNow.Date, DateTimeKind.Utc);
+        }
+
+        return DateTime.SpecifyKind(DateTime.Now.Date, DateTimeKind.Utc);
     }
 
     private async Task AddCashSaleEntryAsync(Guid companyId, Guid orderId, PosSaleSyncRequest request, CancellationToken cancellationToken)
@@ -279,15 +310,22 @@ public sealed class PosSaleSyncService : IPosSaleSyncService
             .Sum(p => PaiseToDecimal(p.AmountPaise));
         if (cashAmount <= 0) return;
 
-        var saleDate = (request.Order.ConfirmedAt ?? DateTime.UtcNow).ToUniversalTime().Date;
+        var saleDate = ResolveBusinessDate(request.Order);
+
+        var orderIdentifier = string.IsNullOrWhiteSpace(request.Order.OrderNo)
+            ? orderId.ToString()
+            : request.Order.OrderNo.Trim();
+
+        var alreadyExists = await _db.CashBookEntries.AnyAsync(
+            e => e.CompanyId == companyId && e.Date == saleDate && e.Description.Contains(orderIdentifier),
+            cancellationToken);
+        if (alreadyExists) return;
+
         var currentBalance = await _db.CashBookEntries
             .Where(e => e.CompanyId == companyId && e.Date == saleDate)
             .OrderByDescending(e => e.CreatedAtUtc)
             .Select(e => (decimal?)e.RunningBalance)
             .FirstOrDefaultAsync(cancellationToken) ?? 0;
-        var orderIdentifier = string.IsNullOrWhiteSpace(request.Order.OrderNo)
-            ? orderId.ToString()
-            : request.Order.OrderNo.Trim();
 
         _db.CashBookEntries.Add(new CashBookEntry(
             companyId,

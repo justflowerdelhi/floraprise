@@ -161,8 +161,8 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
           _cashExpenses = _moneyPaise(summary, 'cashExpenses');
           _upiExpenses = 0;
           _cardExpenses = 0;
-          _cashReceived = 0;
-          _cashPaid = 0;
+          _cashReceived = _moneyPaise(summary, 'cashReceived');
+          _cashPaid = _moneyPaise(summary, 'cashPaid');
           _isLoading = false;
         });
         return;

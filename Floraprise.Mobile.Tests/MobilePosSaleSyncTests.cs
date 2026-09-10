@@ -6,12 +6,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
+using Sumpooj.API.Controllers;
 using Sumpooj.API.Controllers.Mobile;
 using Sumpooj.API.Services.Mobile;
+using Sumpooj.Application.Accounting;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Mobile;
+using Sumpooj.Application.UseCases;
 using Sumpooj.Domain.Entities;
 using Sumpooj.Infrastructure.Persistence;
+using Sumpooj.Infrastructure.Repositories;
 using Xunit;
 
 namespace Floraprise.Mobile.Tests;
@@ -89,6 +93,255 @@ public sealed class MobilePosSaleSyncTests : IDisposable
         Assert.Equal(0m, cashBook.CashOut);
         Assert.Equal(600m, cashBook.RunningBalance);
         Assert.Contains("POS-CASH-600", cashBook.Description);
+    }
+
+    [Fact]
+    public async Task PosSale_WithEarlyMorningIstBusinessDate_SetsCashBookDateToLocalCalendarDate()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db);
+        await db.SaveChangesAsync();
+        var request = Request(product, clientSyncId: "sync-ist-morning");
+        request.Order.OrderNo = "POS-IST-001";
+        // ConfirmedAt in UTC: 2026-09-08 21:00:00Z (02:30 AM on 2026-09-09 in IST)
+        request.Order.ConfirmedAt = new DateTime(2026, 9, 8, 21, 0, 0, DateTimeKind.Utc);
+        // BusinessDate explicitly sent as local date: 2026-09-09
+        request.Order.BusinessDate = new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc);
+
+        await Service(db).SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "ist-morning-hash");
+
+        var cashBook = await db.CashBookEntries.SingleAsync();
+        Assert.Equal(CashBookTransactionType.CashSale, cashBook.TransactionType);
+        Assert.Equal(new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc), cashBook.Date);
+        Assert.NotEqual(new DateTime(2026, 9, 8, 0, 0, 0, DateTimeKind.Utc), cashBook.Date);
+    }
+
+    [Fact]
+    public async Task EarlyMorningIstSale_At0153_BelongsToSept9_AndIsIncludedInDashboardCashBookAndDayClose()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db);
+        await db.SaveChangesAsync();
+
+        var request = Request(product, clientSyncId: "sync-ist-0153");
+        request.Order.OrderNo = "POS-0153-IST";
+        // Sale occurred at 01:53 AM IST on 2026-09-09 (which is 20:23 UTC on 2026-09-08)
+        request.Order.ConfirmedAt = new DateTime(2026, 9, 8, 20, 23, 0, DateTimeKind.Utc);
+        request.Order.BusinessDate = new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc);
+        request.Payments.Single().Method = "cash";
+        request.Payments.Single().AmountPaise = 999;
+
+        var response = await Service(db).SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "ist-0153-hash");
+
+        // 1. Order date belongs to Sept 9
+        var order = await db.Orders.SingleAsync(o => o.Id == response.CloudOrderId);
+        Assert.Equal(new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc).Date, order.OrderDate.Date);
+
+        // 2. Cash Book date is Sept 9
+        var cashBook = await db.CashBookEntries.SingleAsync();
+        Assert.Equal(CashBookTransactionType.CashSale, cashBook.TransactionType);
+        Assert.Equal(new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc), cashBook.Date);
+        Assert.Equal(9.99m, cashBook.Amount);
+
+        // 3. Dashboard summary for Sept 9 includes the sale
+        var dashboardController = new MobileDashboardController(db, new TestTenantContext(_companyId));
+        var dashboardResult = await dashboardController.GetSummary(
+            new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc),
+            CancellationToken.None);
+        var okDashboard = Assert.IsType<OkObjectResult>(dashboardResult);
+        var summary = Assert.IsType<MobileDashboardSummaryDto>(okDashboard.Value);
+        Assert.Equal(999, summary.TotalSalesPaise);
+        Assert.Equal(1, summary.OrderCount);
+        Assert.Equal(999, summary.CashPaise);
+
+        // 4. Cash Book API returns the entry for Sept 9
+        var financeController = new MobileFinanceController(db, new TestTenantContext(_companyId));
+        var cashBookResult = await financeController.GetCashBook(new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc), null, null, null);
+        var okCashBook = Assert.IsType<OkObjectResult>(cashBookResult);
+        var entries = Assert.IsAssignableFrom<IEnumerable<CashBookEntryDto>>(okCashBook.Value);
+        Assert.Single(entries);
+
+        // 5. Day Close summary includes the sale
+        var dayCloseRepo = new DayCloseRepository(db);
+        var dayCloseSummary = await dayCloseRepo.GetSummaryAsync(_companyId, new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc));
+        Assert.Equal(9.99m, dayCloseSummary.CashSales);
+
+        var orderRepo = new OrderRepository(db);
+        var paymentRepo = new PaymentRepository(db);
+        var locationRepo = new LocationRepository(db);
+        var dayCloseService = new DayCloseService(dayCloseRepo, orderRepo, paymentRepo, locationRepo, dayCloseRepo);
+        var serviceSummary = await dayCloseService.GetSummaryAsync(_companyId, Guid.Empty, new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc));
+        var totalOrders = (int)(serviceSummary.GetType().GetProperty("totalOrders")?.GetValue(serviceSummary) ?? 0);
+        var totalSales = (decimal)(serviceSummary.GetType().GetProperty("totalSales")?.GetValue(serviceSummary) ?? 0m);
+        var cashSales = (decimal)(serviceSummary.GetType().GetProperty("cashSales")?.GetValue(serviceSummary) ?? 0m);
+        Assert.Equal(1, totalOrders);
+        Assert.Equal(9.99m, totalSales);
+        Assert.Equal(9.99m, cashSales);
+    }
+
+    [Fact]
+    public async Task PosSale_FallbackToConfirmedAt_WhenBusinessDateMissing()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db);
+        await db.SaveChangesAsync();
+
+        var request = Request(product, clientSyncId: "sync-confirmed-at-fallback");
+        request.Order.OrderNo = "POS-FALLBACK-001";
+        request.Order.BusinessDate = null;
+        request.Order.ConfirmedAt = new DateTime(2026, 9, 9, 1, 53, 0, DateTimeKind.Unspecified);
+
+        var response = await Service(db).SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "fallback-hash");
+
+        var order = await db.Orders.SingleAsync(o => o.Id == response.CloudOrderId);
+        Assert.Equal(new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc).Date, order.OrderDate.Date);
+
+        var cashBook = await db.CashBookEntries.SingleAsync();
+        Assert.Equal(new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc), cashBook.Date);
+    }
+
+    [Fact]
+    public void ResolveBusinessDate_NeverFallsBackToRawUtcNowDate()
+    {
+        var order = new PosSaleOrderSnapshot
+        {
+            BusinessDate = null,
+            ConfirmedAt = null
+        };
+
+        var resolved = PosSaleSyncService.ResolveBusinessDate(order);
+        var serverLocal = PosSaleSyncService.GetServerLocalBusinessDate();
+
+        Assert.Equal(serverLocal, resolved);
+        Assert.Equal(DateTimeKind.Utc, resolved.Kind);
+    }
+
+    [Fact]
+    public async Task NormalDaytimeSale_CorrectAcrossDashboardCashBookAndDayClose()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db);
+        await db.SaveChangesAsync();
+
+        var request = Request(product, clientSyncId: "sync-daytime-1430");
+        request.Order.OrderNo = "POS-DAYTIME-001";
+        request.Order.ConfirmedAt = new DateTime(2026, 9, 9, 14, 30, 0, DateTimeKind.Utc);
+        request.Order.BusinessDate = new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc);
+
+        var response = await Service(db).SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "daytime-hash");
+
+        var order = await db.Orders.SingleAsync(o => o.Id == response.CloudOrderId);
+        Assert.Equal(new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc).Date, order.OrderDate.Date);
+
+        var cashBook = await db.CashBookEntries.SingleAsync();
+        Assert.Equal(new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc), cashBook.Date);
+
+        var dashboardController = new MobileDashboardController(db, new TestTenantContext(_companyId));
+        var dashboardResult = await dashboardController.GetSummary(
+            new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc),
+            CancellationToken.None);
+        var summary = Assert.IsType<MobileDashboardSummaryDto>(Assert.IsType<OkObjectResult>(dashboardResult).Value);
+        Assert.Equal(1, summary.OrderCount);
+        Assert.Equal(999, summary.CashPaise);
+
+        var dayCloseRepo = new DayCloseRepository(db);
+        var dayCloseSummary = await dayCloseRepo.GetSummaryAsync(_companyId, new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc));
+        Assert.Equal(9.99m, dayCloseSummary.CashSales);
+    }
+
+    [Fact]
+    public async Task UpiAndCardSale_ExcludedFromCashBook_IncludedInDashboardAndDayClose()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db);
+        await db.SaveChangesAsync();
+
+        var request = Request(product, clientSyncId: "sync-upi-card");
+        request.Order.OrderNo = "POS-UPICARD-001";
+        request.Order.ConfirmedAt = new DateTime(2026, 9, 8, 20, 23, 0, DateTimeKind.Utc);
+        request.Order.BusinessDate = new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc);
+        request.Payments =
+        [
+            new PosSalePaymentSnapshot { Id = 1, Method = "upi", AmountPaise = 400, Reference = "UPI-1" },
+            new PosSalePaymentSnapshot { Id = 2, Method = "card", AmountPaise = 599, Reference = "CARD-1" }
+        ];
+
+        var response = await Service(db).SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "upicard-hash");
+
+        // 1. Zero CashBook entries
+        Assert.Empty(db.CashBookEntries);
+
+        // 2. Dashboard includes UPI and Card
+        var dashboardController = new MobileDashboardController(db, new TestTenantContext(_companyId));
+        var dashboardResult = await dashboardController.GetSummary(
+            new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc),
+            CancellationToken.None);
+        var summary = Assert.IsType<MobileDashboardSummaryDto>(Assert.IsType<OkObjectResult>(dashboardResult).Value);
+        Assert.Equal(1, summary.OrderCount);
+        Assert.Equal(0, summary.CashPaise);
+        Assert.Equal(400, summary.UpiPaise);
+        Assert.Equal(599, summary.CardPaise);
+        Assert.Equal(999, summary.TotalSalesPaise);
+
+        // 3. Day Close includes UPI and Card sales
+        var dayCloseRepo = new DayCloseRepository(db);
+        var orderRepo = new OrderRepository(db);
+        var paymentRepo = new PaymentRepository(db);
+        var locationRepo = new LocationRepository(db);
+        var dayCloseService = new DayCloseService(dayCloseRepo, orderRepo, paymentRepo, locationRepo, dayCloseRepo);
+        var serviceSummary = await dayCloseService.GetSummaryAsync(_companyId, Guid.Empty, new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc));
+        var totalOrders = (int)(serviceSummary.GetType().GetProperty("totalOrders")?.GetValue(serviceSummary) ?? 0);
+        var cardSales = (decimal)(serviceSummary.GetType().GetProperty("cardSales")?.GetValue(serviceSummary) ?? 0m);
+        var upiSales = (decimal)(serviceSummary.GetType().GetProperty("upiSales")?.GetValue(serviceSummary) ?? 0m);
+        var cashSales = (decimal)(serviceSummary.GetType().GetProperty("cashSales")?.GetValue(serviceSummary) ?? 0m);
+        Assert.Equal(1, totalOrders);
+        Assert.Equal(5.99m, cardSales);
+        Assert.Equal(4.00m, upiSales);
+        Assert.Equal(0m, cashSales);
+    }
+
+    [Fact]
+    public async Task IdempotentRetry_DoesNotDuplicateAcrossDashboardCashBookOrDayClose()
+    {
+        await using var db = CreateDb();
+        var product = SeedProduct(db);
+        await db.SaveChangesAsync();
+
+        var request = Request(product, clientSyncId: "sync-idempotent-full");
+        request.Order.OrderNo = "POS-IDEM-001";
+        request.Order.ConfirmedAt = new DateTime(2026, 9, 8, 20, 23, 0, DateTimeKind.Utc);
+        request.Order.BusinessDate = new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc);
+
+        var service = Service(db);
+        await service.SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "idem-full-hash");
+        await service.SyncAsync(_companyId, _mobileUserId, _identityUserId, "device-1", request, "idem-full-hash");
+
+        Assert.Single(db.Orders);
+        Assert.Single(db.CashBookEntries);
+        Assert.Single(db.Payments);
+
+        var dashboardController = new MobileDashboardController(db, new TestTenantContext(_companyId));
+        var dashboardResult = await dashboardController.GetSummary(
+            new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc),
+            CancellationToken.None);
+        var summary = Assert.IsType<MobileDashboardSummaryDto>(Assert.IsType<OkObjectResult>(dashboardResult).Value);
+        Assert.Equal(1, summary.OrderCount);
+        Assert.Equal(999, summary.CashPaise);
+
+        var dayCloseRepo = new DayCloseRepository(db);
+        var orderRepo = new OrderRepository(db);
+        var paymentRepo = new PaymentRepository(db);
+        var locationRepo = new LocationRepository(db);
+        var dayCloseService = new DayCloseService(dayCloseRepo, orderRepo, paymentRepo, locationRepo, dayCloseRepo);
+        var serviceSummary = await dayCloseService.GetSummaryAsync(_companyId, Guid.Empty, new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc));
+        var totalOrders = (int)(serviceSummary.GetType().GetProperty("totalOrders")?.GetValue(serviceSummary) ?? 0);
+        var cashSales = (decimal)(serviceSummary.GetType().GetProperty("cashSales")?.GetValue(serviceSummary) ?? 0m);
+        Assert.Equal(1, totalOrders);
+        Assert.Equal(9.99m, cashSales);
     }
 
     [Fact]

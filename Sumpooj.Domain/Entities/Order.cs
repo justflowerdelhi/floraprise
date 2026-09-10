@@ -97,6 +97,12 @@ public class Order : BaseEntity
         MarkUpdated();
     }
 
+    public void SetOrderDate(DateTime orderDate)
+    {
+        OrderDate = EnsureUtc(orderDate);
+        MarkUpdated();
+    }
+
     public void AddItem(Guid productId, string productName, int quantity, decimal unitPrice)
     {
         if (Status != OrderStatus.Pending && Status != OrderStatus.Confirmed && Status != OrderStatus.AutoCreated)

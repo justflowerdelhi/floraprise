@@ -326,6 +326,8 @@ void main() {
       'orderId': _cloudOrderId,
       'method': 'BankTransfer',
       'amount': 300.5,
+      'paymentDate':
+          DateTime.utc(DateTime.now().year, DateTime.now().month, DateTime.now().day).toIso8601String(),
     });
     expect(requests.last.uri.path, '/api/v1/mobile/orders/$_cloudOrderId');
     expect(provider.detailHeader?.cloudOrderId, _cloudOrderId);

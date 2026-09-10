@@ -84,6 +84,128 @@ public class CloudCashBookTests
         Assert.Equal("Own sale", Assert.Single(entries).Description);
     }
 
+    [Fact]
+    public async Task CashPaymentCollectedLater_CreatesCashBookEntryAtomicallyWithPayment()
+    {
+        var companyId = Guid.NewGuid();
+        var date = new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc);
+        await using var db = CreateDb(companyId);
+
+        var customer = new Customer(companyId, "Customer 1", "cust@test.com", "9876543210");
+        db.Customers.Add(customer);
+        var order = new Order(companyId, customer.Id, date, "Address", "110001", "Recipient", "9876543210");
+        order.SetImportedOrderNumber("ORD-101");
+        db.Orders.Add(order);
+        await db.SaveChangesAsync();
+
+        var paymentRepo = new PaymentRepository(db);
+        var payment = new Payment(companyId, order.Id, PaymentMethod.Cash, 450m);
+        payment.Approve(null, null);
+
+        await paymentRepo.AddAsync(payment, date);
+
+        var paymentInDb = await db.Payments.SingleAsync(p => p.Id == payment.Id);
+        Assert.Equal(PaymentTransactionStatus.Approved, paymentInDb.Status);
+
+        var cashEntry = await db.CashBookEntries.SingleAsync(e => e.CompanyId == companyId);
+        Assert.Equal(CashBookTransactionType.CashSale, cashEntry.TransactionType);
+        Assert.Equal(450m, cashEntry.Amount);
+        Assert.Equal(450m, cashEntry.CashIn);
+        Assert.Equal(date.Date, cashEntry.Date);
+        Assert.Contains("ORD-101", cashEntry.Description);
+    }
+
+    [Theory]
+    [InlineData(PaymentMethod.Card)]
+    [InlineData(PaymentMethod.Upi)]
+    public async Task UpiAndCardPayments_DoNotCreateCashBookEntry(PaymentMethod method)
+    {
+        var companyId = Guid.NewGuid();
+        var date = new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc);
+        await using var db = CreateDb(companyId);
+
+        var customer = new Customer(companyId, "Customer 1", "cust@test.com", "9876543210");
+        db.Customers.Add(customer);
+        var order = new Order(companyId, customer.Id, date, "Address", "110001", "Recipient", "9876543210");
+        order.SetImportedOrderNumber("ORD-102");
+        db.Orders.Add(order);
+        await db.SaveChangesAsync();
+
+        var paymentRepo = new PaymentRepository(db);
+        var payment = new Payment(companyId, order.Id, method, 500m);
+        payment.Approve(null, null);
+
+        await paymentRepo.AddAsync(payment, date);
+
+        Assert.Single(db.Payments);
+        Assert.Empty(db.CashBookEntries);
+    }
+
+    [Fact]
+    public async Task DayClose_IncludesAllCashPayments_PosSalesAndLaterCollections()
+    {
+        var companyId = Guid.NewGuid();
+        var date = new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc);
+        await using var db = CreateDb(companyId);
+
+        db.OpeningCashEntries.Add(new OpeningCash(companyId, date, 200m));
+
+        // 1. POS cash sale entry
+        db.CashBookEntries.Add(new CashBookEntry(
+            companyId, date, CashBookTransactionType.CashSale, "POS cash sale POS-001", 300m, 300m, 0m, 500m));
+
+        // 2. Later cash collection via Payment
+        var customer = new Customer(companyId, "Customer 1", null, "9876543210");
+        db.Customers.Add(customer);
+        var order = new Order(companyId, customer.Id, date, "Address", "110001", "Recipient", "9876543210");
+        order.SetImportedOrderNumber("ORD-COLLECT");
+        db.Orders.Add(order);
+        await db.SaveChangesAsync();
+
+        var paymentRepo = new PaymentRepository(db);
+        var payment = new Payment(companyId, order.Id, PaymentMethod.Cash, 250m);
+        payment.Approve(null, null);
+        await paymentRepo.AddAsync(payment, date);
+
+        // 3. Expense
+        db.CashBookEntries.Add(new CashBookEntry(
+            companyId, date, CashBookTransactionType.CashExpense, "Supplies", 50m, 0m, 50m, 700m));
+        await db.SaveChangesAsync();
+
+        var summary = await new DayCloseRepository(db).GetSummaryAsync(companyId, date);
+
+        Assert.Equal(200m, summary.OpeningCash);
+        Assert.Equal(550m, summary.CashSales); // 300 POS + 250 collected later
+        Assert.Equal(50m, summary.CashExpenses);
+        Assert.Equal(700m, summary.OpeningCash + summary.CashSales + summary.CashReceived - summary.CashExpenses - summary.CashPaid);
+    }
+
+    [Fact]
+    public async Task IdempotentRetry_DoesNotDuplicateCashBookEntry()
+    {
+        var companyId = Guid.NewGuid();
+        var date = new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc);
+        await using var db = CreateDb(companyId);
+
+        var customer = new Customer(companyId, "Customer 1", null, "9876543210");
+        db.Customers.Add(customer);
+        var order = new Order(companyId, customer.Id, date, "Address", "110001", "Recipient", "9876543210");
+        order.SetImportedOrderNumber("ORD-RETRY");
+        db.Orders.Add(order);
+        await db.SaveChangesAsync();
+
+        var paymentRepo = new PaymentRepository(db);
+        var payment = new Payment(companyId, order.Id, PaymentMethod.Cash, 100m);
+        payment.Approve(null, null);
+
+        await paymentRepo.AddAsync(payment, date);
+        Assert.Single(db.CashBookEntries);
+
+        // Retry / update
+        await paymentRepo.UpdateAsync(payment, date);
+        Assert.Single(db.CashBookEntries);
+    }
+
     private static SumpoojDbContext CreateDb(Guid companyId)
     {
         var options = new DbContextOptionsBuilder<SumpoojDbContext>()

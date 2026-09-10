@@ -74,10 +74,13 @@ public class MobileFinanceController : ControllerBase
     [HttpPut("expense-categories/{id:guid}/reactivate")]
     public Task<IActionResult> ReactivateCategory(Guid id) => SetCategoryActive(id, true);
 
+    private static DateTime ToCalendarDateUtc(DateTime date) =>
+        DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+
     [HttpGet("opening-cash")]
     public async Task<IActionResult> GetOpeningCash([FromQuery] DateTime date)
     {
-        var day = date.ToUniversalTime().Date;
+        var day = ToCalendarDateUtc(date);
         var entry = await _db.OpeningCashEntries.FirstOrDefaultAsync(o => o.CompanyId == CompanyId && o.Date == day);
         return entry == null ? NotFound() : Ok(ToDto(entry));
     }
@@ -85,7 +88,7 @@ public class MobileFinanceController : ControllerBase
     [HttpPost("opening-cash")]
     public async Task<IActionResult> CreateOpeningCash([FromBody] SaveOpeningCashRequest request)
     {
-        var day = request.Date.ToUniversalTime().Date;
+        var day = ToCalendarDateUtc(request.Date);
         if (await _db.OpeningCashEntries.AnyAsync(o => o.CompanyId == CompanyId && o.Date == day))
             return Conflict(new { message = "Opening cash already exists for this date." });
         try
@@ -115,18 +118,77 @@ public class MobileFinanceController : ControllerBase
     public async Task<IActionResult> GetCashBook([FromQuery] DateTime? date, [FromQuery] DateTime? from,
         [FromQuery] DateTime? to, [FromQuery] string? query)
     {
+        if (date.HasValue)
+        {
+            var targetDate = ToCalendarDateUtc(date.Value);
+            var nextDay = targetDate.AddDays(1);
+            var unlinkedPayments = await _db.Payments
+                .Where(p => p.CompanyId == CompanyId &&
+                            p.CreatedAtUtc >= targetDate && p.CreatedAtUtc < nextDay &&
+                            p.Method == PaymentMethod.Cash &&
+                            p.Status == PaymentTransactionStatus.Approved)
+                .ToListAsync();
+
+            if (unlinkedPayments.Count > 0)
+            {
+                var existingDesc = await _db.CashBookEntries
+                    .Where(e => e.CompanyId == CompanyId && e.Date == targetDate)
+                    .Select(e => e.Description)
+                    .ToListAsync();
+
+                bool addedAny = false;
+                foreach (var payment in unlinkedPayments)
+                {
+                    var paymentIdStr = payment.Id.ToString();
+                    if (!existingDesc.Any(d => d.Contains(paymentIdStr)))
+                    {
+                        var order = await _db.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == payment.OrderId);
+                        var orderNo = order?.OrderNumber ?? payment.OrderId.ToString();
+                        if (existingDesc.Any(d => d.Contains(orderNo)))
+                            continue;
+
+                        var currentBal = await _db.CashBookEntries
+                            .Where(e => e.CompanyId == CompanyId && e.Date == targetDate)
+                            .OrderByDescending(e => e.CreatedAtUtc)
+                            .Select(e => (decimal?)e.RunningBalance)
+                            .FirstOrDefaultAsync() ?? 0m;
+
+                        var newEntry = new CashBookEntry(
+                            CompanyId,
+                            targetDate,
+                            CashBookTransactionType.CashSale,
+                            $"Cash payment for order {orderNo} [{payment.Id}]",
+                            payment.Amount,
+                            payment.Amount,
+                            0m,
+                            currentBal + payment.Amount);
+                        _db.CashBookEntries.Add(newEntry);
+                        addedAny = true;
+                    }
+                }
+                if (addedAny)
+                {
+                    await _db.SaveChangesAsync();
+                }
+            }
+        }
+
         var entries = _db.CashBookEntries.Where(e => e.CompanyId == CompanyId);
-        if (date.HasValue) entries = entries.Where(e => e.Date == date.Value.ToUniversalTime().Date);
-        if (from.HasValue) entries = entries.Where(e => e.Date >= from.Value.ToUniversalTime().Date);
-        if (to.HasValue) entries = entries.Where(e => e.Date <= to.Value.ToUniversalTime().Date);
-        if (!string.IsNullOrWhiteSpace(query)) entries = entries.Where(e => e.Description.ToLower().Contains(query.Trim().ToLower()));
+        if (date.HasValue) entries = entries.Where(e => e.Date == ToCalendarDateUtc(date.Value));
+        if (from.HasValue) entries = entries.Where(e => e.Date >= ToCalendarDateUtc(from.Value));
+        if (to.HasValue) entries = entries.Where(e => e.Date <= ToCalendarDateUtc(to.Value));
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var trimmed = query.Trim().ToLower();
+            entries = entries.Where(e => e.Description.ToLower().Contains(trimmed));
+        }
         return Ok((await entries.OrderBy(e => e.CreatedAtUtc).ToListAsync()).Select(ToDto));
     }
 
     [HttpGet("cash-book/balance")]
     public async Task<IActionResult> GetCashBookBalance([FromQuery] DateTime date)
     {
-        var day = date.ToUniversalTime().Date;
+        var day = ToCalendarDateUtc(date);
         var balance = await _db.CashBookEntries.Where(e => e.CompanyId == CompanyId && e.Date == day)
             .OrderByDescending(e => e.CreatedAtUtc).Select(e => (decimal?)e.RunningBalance).FirstOrDefaultAsync() ?? 0;
         return Ok(new { balance });
@@ -137,7 +199,7 @@ public class MobileFinanceController : ControllerBase
     {
         if (!Enum.TryParse<CashBookTransactionType>(request.TransactionType, true, out var type))
             return BadRequest(new { message = "Invalid cash-book transaction type." });
-        var day = request.Date.ToUniversalTime().Date;
+        var day = ToCalendarDateUtc(request.Date);
         var current = await _db.CashBookEntries.Where(e => e.CompanyId == CompanyId && e.Date == day)
             .OrderByDescending(e => e.CreatedAtUtc).Select(e => (decimal?)e.RunningBalance).FirstOrDefaultAsync() ?? 0;
         try

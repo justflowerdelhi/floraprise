@@ -57,6 +57,8 @@ public sealed class PosSaleOrderSnapshot
     public DateTime? ScheduledAt { get; set; }
     [JsonPropertyName("confirmed_at")]
     public DateTime? ConfirmedAt { get; set; }
+    [JsonPropertyName("business_date")]
+    public DateTime? BusinessDate { get; set; }
     [JsonPropertyName("subtotal_paise")]
     public int SubtotalPaise { get; set; }
     [JsonPropertyName("gst_total_paise")]

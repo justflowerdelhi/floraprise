@@ -75,15 +75,68 @@ public class PaymentRepository : IPaymentRepository
         return await query.ToListAsync();
     }
 
-    public async Task AddAsync(Payment payment)
+    public async Task AddAsync(Payment payment, DateTime? businessDate = null)
     {
         await _db.Payments.AddAsync(payment);
+        if (payment.Method == PaymentMethod.Cash && payment.Status == PaymentTransactionStatus.Approved)
+        {
+            await AddCashBookEntryForPaymentAsync(payment, businessDate);
+        }
         await _db.SaveChangesAsync();
     }
 
-    public async Task UpdateAsync(Payment payment)
+    public async Task UpdateAsync(Payment payment, DateTime? businessDate = null)
     {
         _db.Payments.Update(payment);
+        if (payment.Method == PaymentMethod.Cash && payment.Status == PaymentTransactionStatus.Approved)
+        {
+            await AddCashBookEntryForPaymentAsync(payment, businessDate);
+        }
         await _db.SaveChangesAsync();
+    }
+
+    private async Task AddCashBookEntryForPaymentAsync(Payment payment, DateTime? businessDate)
+    {
+        if (payment.Method != PaymentMethod.Cash || payment.Status != PaymentTransactionStatus.Approved || payment.Amount <= 0)
+            return;
+
+        var entryDate = businessDate.HasValue
+            ? DateTime.SpecifyKind(businessDate.Value.Date, DateTimeKind.Utc)
+            : DateTime.SpecifyKind(payment.CreatedAtUtc.Date, DateTimeKind.Utc);
+
+        var order = await _db.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.CompanyId == payment.CompanyId && o.Id == payment.OrderId);
+        var orderIdentifier = order != null && !string.IsNullOrWhiteSpace(order.OrderNumber)
+            ? order.OrderNumber.Trim()
+            : payment.OrderId.ToString();
+
+        var paymentIdStr = payment.Id.ToString();
+
+        var alreadyExists = await _db.CashBookEntries.AnyAsync(e =>
+            e.CompanyId == payment.CompanyId &&
+            e.Date == entryDate &&
+            (e.Description.Contains(paymentIdStr) ||
+             e.Description == $"POS cash sale {orderIdentifier}" ||
+             e.Description == $"Cash payment for order {orderIdentifier}"));
+
+        if (alreadyExists)
+            return;
+
+        var currentBalance = await _db.CashBookEntries
+            .Where(e => e.CompanyId == payment.CompanyId && e.Date == entryDate)
+            .OrderByDescending(e => e.CreatedAtUtc)
+            .Select(e => (decimal?)e.RunningBalance)
+            .FirstOrDefaultAsync() ?? 0m;
+
+        var entry = new CashBookEntry(
+            payment.CompanyId,
+            entryDate,
+            CashBookTransactionType.CashSale,
+            $"Cash payment for order {orderIdentifier} [{payment.Id}]",
+            payment.Amount,
+            payment.Amount,
+            0m,
+            currentBalance + payment.Amount);
+
+        await _db.CashBookEntries.AddAsync(entry);
     }
 }

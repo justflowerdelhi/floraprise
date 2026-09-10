@@ -1,4 +1,4 @@
-﻿namespace Sumpooj.Domain.Entities;
+namespace Sumpooj.Domain.Entities;
 
 public abstract class BaseEntity
 {
@@ -10,6 +10,11 @@ public abstract class BaseEntity
     public void MarkUpdated()
     {
         UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void SetCreatedAtUtc(DateTime createdAtUtc)
+    {
+        CreatedAtUtc = EnsureUtc(createdAtUtc);
     }
 
     /// <summary>

@@ -22,6 +22,7 @@ public class CreatePaymentRequest
     public string Method { get; set; } = default!;
     public decimal Amount { get; set; }
     public Guid? LocationId { get; set; }
+    public DateTime? PaymentDate { get; set; }
 }
 
 public class UpdatePaymentRequest
