@@ -58,7 +58,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRBAC } from '../rbac/RBACContext';
 import type { MenuSection, MenuItem as MenuItemType } from '../rbac/RBACTypes';
-import { useTenant } from '../tenant/TenantContext';
+import { useTenant, useOperationalView } from '../tenant';
 
 // ─── Icon Mapping ───────────────────────────────────────────
 
@@ -514,6 +514,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const dk = theme.palette.mode === 'dark';
   const { getFilteredMenu } = useRBAC();
   const { hasFeature } = useTenant();
+  const { view, isRetail, isProfessional } = useOperationalView();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -535,6 +536,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .filter((section) => section.items.length > 0);
 
   const groupedSections = buildGroupedSections(menuSections);
+
+  // View-aware section filtering (Phase 1 establishes view awareness while keeping all existing modules accessible)
+  const displaySections = React.useMemo(() => {
+    // In future phases, when Retail screens are implemented, Retail View will filter
+    // sections down to operational modules (POS, Products, Categories, Inventory, Delivery).
+    // For Phase 1 infrastructure, all existing sections remain intact so no workflows are broken.
+    return groupedSections;
+  }, [groupedSections, view]);
 
   return (
     <Box
@@ -627,7 +636,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           },
         }}
       >
-        {groupedSections.map((section, index) => (
+        {displaySections.map((section, index) => (
           <Section
             key={section.id}
             section={section}

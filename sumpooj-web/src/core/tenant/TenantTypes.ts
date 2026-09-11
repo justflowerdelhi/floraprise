@@ -8,6 +8,56 @@
 
 export type TenantPlan = 'STARTER' | 'GROWTH' | 'PRO' | 'ENTERPRISE';
 
+// -----------------------------------------------------------------------------
+// Operational View Types (Retail vs ERP Professional)
+// -----------------------------------------------------------------------------
+
+export type OperationalView = 'RETAIL' | 'PROFESSIONAL';
+
+export const OPERATIONAL_VIEWS: Record<OperationalView, OperationalView> = {
+  RETAIL: 'RETAIL',
+  PROFESSIONAL: 'PROFESSIONAL',
+};
+
+export const OPERATIONAL_VIEW_LABELS: Record<OperationalView, string> = {
+  RETAIL: 'Retail View',
+  PROFESSIONAL: 'ERP Professional',
+};
+
+export const OPERATIONAL_VIEW_STORAGE_KEY = 'floraprise.erp.viewMode';
+
+/**
+ * Checks if plan is eligible for ERP Professional view.
+ * STARTER -> false (Retail View only)
+ * GROWTH, PRO, ENTERPRISE -> true (both Retail and Professional available)
+ */
+export function isProfessionalViewEligible(plan?: TenantPlan | string): boolean {
+  if (!plan) return false;
+  return plan === 'GROWTH' || plan === 'PRO' || plan === 'ENTERPRISE';
+}
+
+/**
+ * Resolves the operational view based on entitlement and stored preference.
+ * - Starter plan: Always forced to RETAIL, ignoring any stored Professional preference.
+ * - Growth / Pro / Enterprise: Uses valid stored preference, otherwise defaults to PROFESSIONAL.
+ * - Invalid or unknown stored values safely fall back to plan default.
+ */
+export function resolveOperationalView(
+  plan: TenantPlan | string,
+  storedPreference: string | null
+): OperationalView {
+  if (!isProfessionalViewEligible(plan)) {
+    return 'RETAIL';
+  }
+  if (storedPreference === 'RETAIL') {
+    return 'RETAIL';
+  }
+  if (storedPreference === 'PROFESSIONAL') {
+    return 'PROFESSIONAL';
+  }
+  return 'PROFESSIONAL';
+}
+
 export type SubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED';
 
 export type TenantCountry = 'US' | 'IN' | 'AE' | 'GB' | 'CA' | 'AU';

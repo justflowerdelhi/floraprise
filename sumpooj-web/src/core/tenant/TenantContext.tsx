@@ -27,6 +27,7 @@ import { setCurrentCurrency } from '../i18n/currency';
 import { CurrencyProvider } from '../i18n/CurrencyContext';
 import { useAuth } from '../../auth/AuthContext';
 import api from '../../api/axios';
+import { OperationalViewProvider } from './OperationalViewContext';
 
 // -----------------------------------------------------------------------------
 // Context Types
@@ -216,7 +217,9 @@ export function TenantProvider({ children }: TenantProviderProps) {
   return (
     <TenantContext.Provider value={value}>
       <CurrencyProvider currencyCode={tenant.currency}>
-        {children}
+        <OperationalViewProvider>
+          {children}
+        </OperationalViewProvider>
       </CurrencyProvider>
     </TenantContext.Provider>
   );

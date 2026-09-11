@@ -52,3 +52,22 @@ export {
   TrialBanner,
   PastDueBanner,
 } from './UpgradePrompt';
+
+// Operational View (Retail View vs ERP Professional)
+export type { OperationalView } from './TenantTypes';
+export {
+  OPERATIONAL_VIEWS,
+  OPERATIONAL_VIEW_LABELS,
+  OPERATIONAL_VIEW_STORAGE_KEY,
+  isProfessionalViewEligible,
+  resolveOperationalView,
+} from './TenantTypes';
+export type { OperationalViewContextValue } from './OperationalViewContext';
+export {
+  OperationalViewProvider,
+  useOperationalView,
+  getStoredOperationalView,
+  setStoredOperationalView,
+} from './OperationalViewContext';
+export { OperationalViewSwitcher } from './OperationalViewSwitcher';
+

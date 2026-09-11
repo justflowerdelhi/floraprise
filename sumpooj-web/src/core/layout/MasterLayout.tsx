@@ -101,6 +101,7 @@ import {
   TrialBanner,
   PastDueBanner,
   UpgradePromptModal,
+  OperationalViewSwitcher,
 } from '../tenant';
 import { SensitiveActionProvider } from '../audit';
 
@@ -166,6 +167,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuButton = true }) =
         {/* Global Search (in header) */}
         <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: { xs: 'flex-end', md: 'flex-start' } }}>
           <GlobalSearchDialog />
+        </Box>
+
+        {/* Operational View Switcher (Retail View vs ERP Professional) */}
+        <Box sx={{ display: { xs: 'none', sm: 'block' }, mr: 1 }}>
+          <OperationalViewSwitcher />
         </Box>
 
         {/* Location Switcher */}
