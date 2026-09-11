@@ -15,6 +15,7 @@ import { useOperationalView } from '../core/tenant';
 import PurchaseEntryForm from '../pages/purchases/PurchaseEntryForm';
 import PurchaseListPage from '../pages/purchases/PurchaseListPage';
 import InventoryBatchDashboard from '../pages/inventory/InventoryBatchDashboard';
+import { RetailInventoryPage } from '../pages/inventory/retail';
 import InventoryLedgerPage from '../pages/inventory/InventoryLedger';
 import DailyInventoryReportPage from '../pages/inventory/daily-report';
 import InventoryReconciliationPage from '../pages/inventory/reconciliation';
@@ -230,6 +231,12 @@ function ProductsRouteDispatcher() {
   return isRetail ? <RetailProductsPage /> : <ProductsListPage />;
 }
 
+/** Dispatches to Retail vs Professional Inventory management based on operational view */
+function InventoryRouteDispatcher() {
+  const { isRetail } = useOperationalView();
+  return isRetail ? <RetailInventoryPage /> : <InventoryBatchDashboard />;
+}
+
 export default function AppRoutes() {
   return (
     <RBACProvider>
@@ -322,7 +329,7 @@ export default function AppRoutes() {
           />
 
           {/* ─── Inventory ──────────────────────────────── */}
-          <Route path="/inventory" element={<InventoryBatchDashboard />} />
+          <Route path="/inventory" element={<InventoryRouteDispatcher />} />
           <Route path="/inventory/quick-receive" element={<QuickReceivePage />} />
           <Route path="/inventory/direct-add" element={<DirectAddStockPage />} />
           <Route path="/inventory/ledger" element={<InventoryLedgerPage />} />

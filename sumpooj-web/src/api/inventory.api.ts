@@ -307,3 +307,46 @@ export const directAddStock = async (data: DirectAddRequest): Promise<DirectAddR
   const res = await api.post('/inventory/direct-add', data);
   return res.data;
 };
+
+// ─── Retail Stock Changes & History ──────────────────────────
+
+export interface InventoryStockChangeRequest {
+  productId: string;
+  operation: 'purchase' | 'sale' | 'wastage' | 'adjustment';
+  quantity: number;
+  increase?: boolean;
+  costPerUnit?: number | null;
+  supplier?: string | null;
+  reason?: string | null;
+  notes?: string | null;
+}
+
+export interface InventoryHistoryDto {
+  id: string;
+  productId: string;
+  operation: string;
+  quantity: number;
+  costPerUnit?: number | null;
+  supplier: string;
+  source: string;
+  reason: string;
+  notes: string;
+  previousBalance: number;
+  balanceAfter: number;
+  createdAtUtc: string;
+}
+
+export const applyStockChange = async (
+  data: InventoryStockChangeRequest,
+): Promise<{ id: string }> => {
+  const res = await api.post('/inventory/stock-changes', data);
+  return res.data;
+};
+
+export const getProductInventoryHistory = async (
+  productId: string,
+): Promise<InventoryHistoryDto[]> => {
+  const res = await api.get(`/inventory/products/${productId}/history`);
+  return res.data;
+};
+
