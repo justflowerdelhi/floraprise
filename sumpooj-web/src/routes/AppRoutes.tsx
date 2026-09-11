@@ -10,6 +10,8 @@ import CustomerList from '../pages/customers/CustomerList';
 import OrderForm from '../pages/orders/OrderForm';
 import AddProductForm from '../pages/products/AddProductForm';
 import ProductsListPage from '../pages/products/ProductsListPage';
+import RetailProductsPage from '../pages/products/retail/RetailProductsPage';
+import { useOperationalView } from '../core/tenant';
 import PurchaseEntryForm from '../pages/purchases/PurchaseEntryForm';
 import PurchaseListPage from '../pages/purchases/PurchaseListPage';
 import InventoryBatchDashboard from '../pages/inventory/InventoryBatchDashboard';
@@ -222,6 +224,12 @@ function POSWithShift() {
   );
 }
 
+/** Dispatches to Retail vs Professional Product management based on operational view */
+function ProductsRouteDispatcher() {
+  const { isRetail } = useOperationalView();
+  return isRetail ? <RetailProductsPage /> : <ProductsListPage />;
+}
+
 export default function AppRoutes() {
   return (
     <RBACProvider>
@@ -333,7 +341,7 @@ export default function AppRoutes() {
           <Route path="/profit-intelligence" element={<ProfitDashboard />} />
 
           {/* ─── Catalog ────────────────────────────────── */}
-          <Route path="/products" element={<ProductsListPage />} />
+          <Route path="/products" element={<ProductsRouteDispatcher />} />
           <Route path="/products/new" element={<AddProductForm />} />
           <Route path="/products/:id" element={<AddProductForm />} />
           <Route path="/categories" element={<CategoryManagementPage />} />

@@ -85,6 +85,7 @@ export interface CreateProductRequest {
 
 export interface UpdateProductRequest {
   productName?: string | null;
+  categoryId?: string | null;
   barcode?: string | null;
   brand?: string | null;
   description?: string | null;
