@@ -176,3 +176,12 @@ public class OrderSearchRequest
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 20;
 }
+
+public class OrderCreationResult
+{
+    public Guid OrderId { get; set; }
+    public OrderDto Order { get; set; } = default!;
+    public bool IsReplay { get; set; }
+    public int StatusCode { get; set; } = 201;
+}
+

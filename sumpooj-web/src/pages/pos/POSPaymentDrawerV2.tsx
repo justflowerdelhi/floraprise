@@ -88,9 +88,15 @@ const POSPaymentDrawerV2: React.FC = () => {
   const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
   const [submitError, setSubmitError] = useState<string>('');
   const [receiptPrintMode, setReceiptPrintModeState] = useState<PosReceiptPrintMode>(() => getPosReceiptPrintMode());
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() =>
+    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pos-pro-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
 
   // Initialize billing from customer when drawer opens
   useEffect(() => {
+    if (isOpen) {
+      setIdempotencyKey(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pos-pro-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    }
     if (isOpen && state.customer) {
       setLocalBilling({
         name: state.customer.name || '',
@@ -318,7 +324,7 @@ const POSPaymentDrawerV2: React.FC = () => {
         })),
       };
 
-      const createdOrder = await createOrder(orderPayload);
+      const createdOrder = await createOrder(orderPayload, idempotencyKey);
 
       try {
         const subtotal = orderPayload.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);

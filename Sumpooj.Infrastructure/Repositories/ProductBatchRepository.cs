@@ -46,7 +46,15 @@ public class ProductBatchRepository : IProductBatchRepository
 
     public async Task UpdateAsync(ProductBatch batch)
     {
-        _db.ProductBatches.Update(batch);
+        var tracked = _db.ProductBatches.Local.FirstOrDefault(b => b.Id == batch.Id);
+        if (tracked != null && !ReferenceEquals(tracked, batch))
+        {
+            _db.Entry(tracked).CurrentValues.SetValues(batch);
+        }
+        else
+        {
+            _db.ProductBatches.Update(batch);
+        }
         await _db.SaveChangesAsync();
     }
 

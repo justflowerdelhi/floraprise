@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sumpooj.Application.Accounting;
 using Sumpooj.Application.Authorization;
+using Sumpooj.Application.Common;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Application.Orders;
 using Sumpooj.Application.UseCases;
@@ -72,11 +73,33 @@ public class OrdersController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateOrderRequest request)
+    public async Task<IActionResult> Create([FromBody] CreateOrderRequest request, CancellationToken cancellationToken = default)
     {
-        var id = await _orderService.CreateAsync(CompanyId, request);
-        var order = await _orderService.GetByIdAsync(CompanyId, id);
-        return CreatedAtAction(nameof(GetById), new { id }, order);
+        var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
+
+        try
+        {
+            var result = await _orderService.CreateOrderAsync(CompanyId, request, idempotencyKey, cancellationToken);
+            if (result.IsReplay)
+            {
+                Response.Headers["Idempotency-Replayed"] = "true";
+                return StatusCode(result.StatusCode, result.Order);
+            }
+
+            return CreatedAtAction(nameof(GetById), new { id = result.OrderId }, result.Order);
+        }
+        catch (IdempotencyConflictException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
     }
 
     [HttpPatch("{id:guid}/status")]

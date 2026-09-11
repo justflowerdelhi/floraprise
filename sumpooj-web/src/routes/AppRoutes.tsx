@@ -31,6 +31,7 @@ import { CartProvider } from '../pages/cart/CartContext';
 import { PaymentProvider } from '../pages/payments/PaymentContext';
 import { OrderProvider } from '../pages/orders/OrderContext';
 import { POSLayout } from '../pages/pos';
+import { RetailPOSPage } from '../pages/pos/retail';
 import { ShiftProvider } from '../pages/pos/ShiftContext';
 import ManualSaleEntry from "../pages/pos/ManualSaleEntry";
 
@@ -225,6 +226,18 @@ function POSWithShift() {
   );
 }
 
+/** Dispatches to Retail vs Professional POS based on operational view */
+function POSRouteDispatcher() {
+  const { isRetail } = useOperationalView();
+  return isRetail ? (
+    <ShiftProvider>
+      <RetailPOSPage />
+    </ShiftProvider>
+  ) : (
+    <POSWithShift />
+  );
+}
+
 /** Dispatches to Retail vs Professional Product management based on operational view */
 function ProductsRouteDispatcher() {
   const { isRetail } = useOperationalView();
@@ -279,7 +292,7 @@ export default function AppRoutes() {
             path="/pos" 
             element={
               <RequireTenantAccess>
-                <POSWithShift />
+                <POSRouteDispatcher />
               </RequireTenantAccess>
             } 
           />

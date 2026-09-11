@@ -112,10 +112,11 @@ export const getOrderByNumber = async (orderNumber: string) => {
   return res.data;
 };
 
-export const createOrder = async (data: CreateOrderRequest) => {
+export const createOrder = async (data: CreateOrderRequest, idempotencyKey?: string) => {
   console.log("🚀 FINAL API PAYLOAD:", data);  // 🔥 THIS WILL ALWAYS RUN
 
-  const res = await api.post('/Orders', data);
+  const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+  const res = await api.post('/Orders', data, { headers });
 
   console.log("✅ API RESPONSE:", res.data);
 

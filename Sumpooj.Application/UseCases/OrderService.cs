@@ -22,6 +22,8 @@ public class OrderService
     private readonly IJournalEntryRepository _journalEntryRepository;
     private readonly IDeliveryRepository _deliveryRepository;
     private readonly ICorporateRepository _corporateRepository;
+    private readonly IIdempotencyRecordRepository? _idempotencyRecordRepository;
+    private readonly IUnitOfWork? _unitOfWork;
 
     public OrderService(
         IOrderRepository orderRepository,
@@ -36,7 +38,9 @@ public class OrderService
         IFinishedGoodsBatchRepository finishedGoodsBatchRepository,
         IJournalEntryRepository journalEntryRepository,
         IDeliveryRepository deliveryRepository,
-        ICorporateRepository corporateRepository)
+        ICorporateRepository corporateRepository,
+        IIdempotencyRecordRepository? idempotencyRecordRepository = null,
+        IUnitOfWork? unitOfWork = null)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
@@ -51,6 +55,8 @@ public class OrderService
         _journalEntryRepository = journalEntryRepository;
         _deliveryRepository = deliveryRepository;
         _corporateRepository = corporateRepository;
+        _idempotencyRecordRepository = idempotencyRecordRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<OrderDto?> GetByIdAsync(Guid companyId, Guid id)
@@ -85,7 +91,127 @@ public class OrderService
         return await _orderRepository.GetByCustomerAsync(companyId, customerId);
     }
 
+    public static string ComputeRequestHash(CreateOrderRequest request)
+    {
+        var options = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            WriteIndented = false,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        };
+        var json = System.Text.Json.JsonSerializer.Serialize(request, options);
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        var bytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(json));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
     public async Task<Guid> CreateAsync(Guid companyId, CreateOrderRequest request)
+    {
+        var result = await CreateOrderAsync(companyId, request);
+        return result.OrderId;
+    }
+
+    public async Task<OrderCreationResult> CreateOrderAsync(
+        Guid companyId,
+        CreateOrderRequest request,
+        string? idempotencyKey = null,
+        CancellationToken cancellationToken = default)
+    {
+        string? trimmedKey = idempotencyKey?.Trim();
+        string? requestHash = null;
+
+        if (!string.IsNullOrWhiteSpace(trimmedKey) && _idempotencyRecordRepository != null)
+        {
+            requestHash = ComputeRequestHash(request);
+            var existing = await _idempotencyRecordRepository.GetByKeyAsync(companyId, trimmedKey, cancellationToken);
+            if (existing != null)
+            {
+                if (string.Equals(existing.RequestHash, requestHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    var cachedDto = System.Text.Json.JsonSerializer.Deserialize<OrderDto>(
+                        existing.ResponsePayload,
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    return new OrderCreationResult
+                    {
+                        OrderId = existing.OrderId ?? cachedDto?.Id ?? Guid.Empty,
+                        Order = cachedDto!,
+                        IsReplay = true,
+                        StatusCode = existing.ResponseStatusCode
+                    };
+                }
+
+                throw new IdempotencyConflictException("Idempotency key already used for a different request payload.");
+            }
+        }
+
+        Func<Task<OrderCreationResult>> executeOrderCreation = async () =>
+        {
+            var order = await ExecuteCreateOrderCoreAsync(companyId, request);
+            var orderDto = MapToDto(order);
+
+            if (!string.IsNullOrWhiteSpace(trimmedKey) && _idempotencyRecordRepository != null && requestHash != null)
+            {
+                var payloadJson = System.Text.Json.JsonSerializer.Serialize(orderDto);
+                var record = new IdempotencyRecord(
+                    companyId,
+                    trimmedKey,
+                    "/api/Orders",
+                    requestHash,
+                    201,
+                    payloadJson,
+                    order.Id,
+                    DateTime.UtcNow.AddHours(24));
+
+                await _idempotencyRecordRepository.AddAsync(record, cancellationToken);
+            }
+
+            return new OrderCreationResult
+            {
+                OrderId = order.Id,
+                Order = orderDto,
+                IsReplay = false,
+                StatusCode = 201
+            };
+        };
+
+        if (_unitOfWork != null)
+        {
+            try
+            {
+                return await _unitOfWork.ExecuteInTransactionAsync(executeOrderCreation, cancellationToken);
+            }
+            catch (Exception ex) when (!string.IsNullOrWhiteSpace(trimmedKey) && _idempotencyRecordRepository != null)
+            {
+                var existing = await _idempotencyRecordRepository.GetByKeyAsync(companyId, trimmedKey, cancellationToken);
+                if (existing != null)
+                {
+                    if (string.Equals(existing.RequestHash, requestHash, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var cachedDto = System.Text.Json.JsonSerializer.Deserialize<OrderDto>(
+                            existing.ResponsePayload,
+                            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                        return new OrderCreationResult
+                        {
+                            OrderId = existing.OrderId ?? cachedDto?.Id ?? Guid.Empty,
+                            Order = cachedDto!,
+                            IsReplay = true,
+                            StatusCode = existing.ResponseStatusCode
+                        };
+                    }
+
+                    throw new IdempotencyConflictException("Idempotency key already used for a different request payload.", ex);
+                }
+
+                throw;
+            }
+        }
+
+        return await executeOrderCreation();
+    }
+
+    private async Task<Order> ExecuteCreateOrderCoreAsync(Guid companyId, CreateOrderRequest request)
     {
         // Validate LocationId is provided
         if (!request.LocationId.HasValue || request.LocationId == Guid.Empty)
@@ -280,12 +406,14 @@ public class OrderService
             }
         }
 
-        // Walk-in orders with full payment: auto-confirm + complete
+        // Direct fulfillment orders (TAKE_NOW or non-delivery walk-in) with full payment: auto-confirm + complete
         // Customer takes items on the spot — no delivery/design pipeline needed
-        var isWalkIn = order.OrderSource == OrderSource.WalkIn;
         var isTakeNow = string.Equals(request.OrderIntent, "TAKE_NOW", StringComparison.OrdinalIgnoreCase);
+        var isWalkIn = order.OrderSource == OrderSource.WalkIn;
 
-        if (isWalkIn || isTakeNow)
+        var isDirectFulfillment = isTakeNow || (!isDeliveryOrder && isWalkIn);
+
+        if (isDirectFulfillment)
         {
             if (order.Status == OrderStatus.Pending)
                 order.Confirm();
@@ -313,7 +441,7 @@ public class OrderService
         // ── Update customer purchase stats ──
         await UpdateCustomerStatsAsync(customerId);
 
-        return order.Id;
+        return order;
     }
 
     /// <summary>
@@ -677,6 +805,19 @@ public class OrderService
 
         if (activeReservations.Count == 0)
         {
+            var isDirectFulfillment =
+                order.OrderSource == OrderSource.WalkIn
+                || order.Status == OrderStatus.Delivered
+                || order.FulfillmentStatus == FulfillmentStatus.Completed;
+
+            if (isDirectFulfillment)
+            {
+                await DeductInventoryForOrderAsync(companyId, order);
+                order.MarkInventoryProcessed();
+                await _orderRepository.UpdateAsync(order);
+                return;
+            }
+
             throw new InvalidOperationException(
                 "Inventory reservation required before delivery. Fallback deduction disabled.");
         }
@@ -739,7 +880,7 @@ public class OrderService
             if (finishedBatch != null)
             {
                 if (finishedBatch.QuantityAvailable < item.Quantity)
-                    throw new Exception($"Not enough stock for finished goods batch {finishedBatch.BatchCode}");
+                    throw new InvalidOperationException($"Not enough stock for finished goods batch {finishedBatch.BatchCode}");
 
                 finishedBatch.Deduct(item.Quantity);
                 await _finishedGoodsBatchRepository.UpdateAsync(finishedBatch);
@@ -758,6 +899,9 @@ public class OrderService
             if (product.TrackBatch)
             {
                 var batches = await _productBatchRepository.GetBatchesByProductIdAsync(product.Id);
+                var totalAvailable = batches.Sum(b => b.QuantityRemaining);
+                if (totalAvailable < item.Quantity)
+                    throw new InvalidOperationException($"Not enough stock for product {product.Name}");
 
                 var remainingQty = item.Quantity;
 
@@ -774,7 +918,7 @@ public class OrderService
                 }
 
                 if (remainingQty > 0)
-                    throw new Exception($"Not enough stock for product {product.Name}");
+                    throw new InvalidOperationException($"Not enough stock for product {product.Name}");
 
                 // Keep aggregate product stock synchronized with batch-level deductions.
                 // This is used by inventory dropdowns and should match sum of active batches.
@@ -804,6 +948,10 @@ public class OrderService
                 var batches = await _productBatchRepository.GetBatchesByProductIdAsync(product.Id);
                 if (batches.Count > 0)
                 {
+                    var totalAvailable = batches.Sum(b => b.QuantityRemaining);
+                    if (totalAvailable < item.Quantity)
+                        throw new InvalidOperationException($"Not enough batch stock for product {product.Name}");
+
                     var remainingQty = item.Quantity;
 
                     foreach (var batch in batches.OrderBy(b => b.ExpiryDate ?? DateTime.MaxValue))
@@ -820,7 +968,12 @@ public class OrderService
                     }
 
                     if (remainingQty > 0)
-                        throw new Exception($"Not enough batch stock for product {product.Name}");
+                        throw new InvalidOperationException($"Not enough batch stock for product {product.Name}");
+                }
+                else
+                {
+                    if (product.StockQuantity < item.Quantity)
+                        throw new InvalidOperationException($"Insufficient stock for product '{product.Name}'. Available: {product.StockQuantity}, Requested: {item.Quantity}");
                 }
 
                 product.AdjustStock(-item.Quantity);

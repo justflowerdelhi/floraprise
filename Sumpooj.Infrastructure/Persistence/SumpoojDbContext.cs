@@ -1,4 +1,4 @@
-﻿
+
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +34,7 @@ public class SumpoojDbContext
     public DbSet<PosSaleSyncReceipt> PosSaleSyncReceipts => Set<PosSaleSyncReceipt>();
     public DbSet<PosSaleSyncInventoryTransaction> PosSaleSyncInventoryTransactions => Set<PosSaleSyncInventoryTransaction>();
     public DbSet<PosSaleSyncOrderLine> PosSaleSyncOrderLines => Set<PosSaleSyncOrderLine>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
     public DbSet<Order> Orders => Set<Order>();
