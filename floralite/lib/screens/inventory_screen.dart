@@ -233,19 +233,42 @@ class _InventoryScreenState extends State<InventoryScreen> {
       );
     }
 
+    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
+
+    if (isDesktop) {
+      return GridView.builder(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 24 + bottomInset),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 600,
+          mainAxisExtent: 235,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
+        itemCount: provider.filteredProducts.length,
+        itemBuilder: (context, index) {
+          final product = provider.filteredProducts[index];
+          return _buildProductCard(product, colorScheme, l10n, isDesktop: true);
+        },
+      );
+    }
+
     return ListView.separated(
       padding: EdgeInsets.fromLTRB(16, 0, 16, 24 + bottomInset),
       itemCount: provider.filteredProducts.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final product = provider.filteredProducts[index];
-        return _buildProductCard(product, colorScheme, l10n);
+        return _buildProductCard(product, colorScheme, l10n, isDesktop: false);
       },
     );
   }
 
-  Widget _buildProductCard(InventoryProductRecord product,
-      ColorScheme colorScheme, AppLocalizations l10n) {
+  Widget _buildProductCard(
+    InventoryProductRecord product,
+    ColorScheme colorScheme,
+    AppLocalizations l10n, {
+    bool isDesktop = false,
+  }) {
     final status = _statusFor(product);
     return AppCard(
       onTap: () => _showProductDetail(product),
@@ -321,6 +344,63 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 ),
             ],
           ),
+          if (isDesktop && product.trackInventory) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+            const SizedBox(height: 6),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  FilledButton.tonalIcon(
+                    onPressed: () => _showPurchaseDialog(product),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Purchase'),
+                    style: FilledButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  FilledButton.tonalIcon(
+                    onPressed: () => _showSaleDialog(product),
+                    icon: const Icon(Icons.remove, size: 16),
+                    label: const Text('Sale'),
+                    style: FilledButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  OutlinedButton.icon(
+                    onPressed: () => _showWastageDialog(product),
+                    icon: const Icon(Icons.delete_outline, size: 16),
+                    label: const Text('Wastage'),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  OutlinedButton.icon(
+                    onPressed: () => _showAdjustmentDialog(product),
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    label: const Text('Adjust'),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'History',
+                    icon: const Icon(Icons.history, size: 20),
+                    onPressed: () => _showHistorySheet(product),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -350,6 +430,146 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   void _showProductDetail(InventoryProductRecord product) {
     final l10n = AppLocalizations.of(context)!;
+    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
+
+    Widget buildDetailBody(BuildContext ctx) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildDetailRow(l10n.productName, product.name),
+                const Divider(),
+                _buildDetailRow('Category', product.category),
+                const Divider(),
+                _buildDetailRow('Unit', product.unit),
+                const Divider(),
+                _buildDetailRow(l10n.barcode, product.barcode),
+                const Divider(),
+                _buildDetailRow('Current Stock',
+                    _formatStock(product.currentQty, product.unit)),
+                const Divider(),
+                _buildDetailRow('Minimum Stock',
+                    _formatStock(product.minQty, product.unit)),
+                const Divider(),
+                _buildDetailRow('Status', _statusFor(product).label),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (!product.trackInventory)
+            AppCard(
+              backgroundColor: Colors.grey.shade100,
+              child: const Text('Inventory tracking disabled.'),
+            )
+          else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      if (isDesktop) Navigator.pop(ctx);
+                      _showPurchaseDialog(product);
+                    },
+                    icon: const Icon(Icons.inventory_2_rounded),
+                    label: const Text('Purchase'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      if (isDesktop) Navigator.pop(ctx);
+                      _showSaleDialog(product);
+                    },
+                    icon: const Icon(Icons.remove_circle_outline),
+                    label: const Text('Sale'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      if (isDesktop) Navigator.pop(ctx);
+                      _showWastageDialog(product);
+                    },
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Wastage'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      if (isDesktop) Navigator.pop(ctx);
+                      _showAdjustmentDialog(product);
+                    },
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Adjustment'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                if (isDesktop) Navigator.pop(ctx);
+                _showHistorySheet(product);
+              },
+              icon: const Icon(Icons.history),
+              label: const Text('History'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (isDesktop) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.productDetail),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 540),
+            child: SingleChildScrollView(
+              child: buildDetailBody(ctx),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -374,99 +594,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildDetailRow(l10n.productName, product.name),
-                    const Divider(),
-                    _buildDetailRow('Category', product.category),
-                    const Divider(),
-                    _buildDetailRow('Unit', product.unit),
-                    const Divider(),
-                    _buildDetailRow(l10n.barcode, product.barcode),
-                    const Divider(),
-                    _buildDetailRow('Current Stock',
-                        _formatStock(product.currentQty, product.unit)),
-                    const Divider(),
-                    _buildDetailRow('Minimum Stock',
-                        _formatStock(product.minQty, product.unit)),
-                    const Divider(),
-                    _buildDetailRow('Status', _statusFor(product).label),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              if (!product.trackInventory)
-                AppCard(
-                  backgroundColor: Colors.grey.shade100,
-                  child: const Text('Inventory tracking disabled.'),
-                )
-              else ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _showPurchaseDialog(product),
-                        icon: const Icon(Icons.inventory_2_rounded),
-                        label: const Text('Purchase'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _showSaleDialog(product),
-                        icon: const Icon(Icons.remove_circle_outline),
-                        label: const Text('Sale'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showWastageDialog(product),
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('Wastage'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showAdjustmentDialog(product),
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('Adjustment'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showHistorySheet(product),
-                  icon: const Icon(Icons.history),
-                  label: const Text('History'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                ),
-              ),
+              buildDetailBody(context),
               const SizedBox(height: 20),
             ],
           ),
@@ -638,7 +766,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
           final isSaving = context.watch<InventoryProvider>().isSaving;
           return AlertDialog(
           title: Text(title),
-          content: SingleChildScrollView(
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -727,6 +857,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 ),
               ],
             ),
+          ),
           ),
           actions: [
             TextButton(
@@ -915,27 +1046,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   Future<void> _showHistorySheet(InventoryProductRecord product) async {
     final provider = context.read<InventoryProvider>();
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.8,
-        child: FutureBuilder<List<InventoryTransactionRecord>>(
-          future: provider.loadHistory(product.productId),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return const Center(child: Text('Could not load history.'));
-            }
+    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
 
-            final history = snapshot.data ?? const [];
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              children: [
+    Widget buildHistoryContent(BuildContext ctx) {
+      return FutureBuilder<List<InventoryTransactionRecord>>(
+        future: provider.loadHistory(product.productId),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return const Center(child: Text('Could not load history.'));
+          }
+
+          final history = snapshot.data ?? const [];
+          return ListView(
+            padding: EdgeInsets.fromLTRB(16, isDesktop ? 0 : 8, 16, 24),
+            children: [
+              if (!isDesktop) ...[
                 Text(
                   'History',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -943,109 +1071,142 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                    'Closing ${_formatStock(product.currentQty, product.unit)}'),
-                const SizedBox(height: 16),
-                if (history.isEmpty)
-                  const Text('No inventory transactions yet.'),
-                ...history.map(
-                  (entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: AppCard(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  LocaleFormatter.formatDateTime(
-                                    context,
-                                    DateTime.parse(entry.createdAt),
-                                  ),
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 12,
-                                  ),
+              ],
+              Text(
+                'Closing ${_formatStock(product.currentQty, product.unit)}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              if (history.isEmpty)
+                const Text('No inventory transactions yet.'),
+              ...history.map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: AppCard(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                LocaleFormatter.formatDateTime(
+                                  context,
+                                  DateTime.parse(entry.createdAt),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${_txnLabel(entry)} ${_signedQty(entry)} ${_pluralizeUnit(product.unit, entry.qty)}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 12,
                                 ),
-                                if (entry.balanceAfter != null) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Stock: ${entry.previousQty ?? 0} to ${entry.balanceAfter} ${_pluralizeUnit(product.unit, entry.balanceAfter!)}',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                                if (entry.txnType == 'purchase' &&
-                                    entry.purchasePricePaise != null) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${LocaleFormatter.formatCurrency(context, entry.purchasePricePaise!)} / ${product.unit}',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade800,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                                if (entry.txnType == 'purchase' &&
-                                    entry.supplier.trim().isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Supplier',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  Text(
-                                    entry.supplier.trim(),
-                                    style: TextStyle(
-                                      color: Colors.grey.shade800,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${_txnLabel(entry)} ${_signedQty(entry)} ${_pluralizeUnit(product.unit, entry.qty)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (entry.balanceAfter != null) ...[
                                 const SizedBox(height: 2),
                                 Text(
-                                  entry.reason.isNotEmpty
-                                      ? '${entry.source} • ${entry.reason}'
-                                      : entry.source,
+                                  'Stock: ${entry.previousQty ?? 0} to ${entry.balanceAfter} ${_pluralizeUnit(product.unit, entry.balanceAfter!)}',
                                   style: TextStyle(
                                     color: Colors.grey.shade700,
                                     fontSize: 12,
                                   ),
                                 ),
-                                if (entry.note.isNotEmpty)
-                                  Text(
-                                    entry.note,
-                                    style: TextStyle(
-                                      color: Colors.grey.shade700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
                               ],
-                            ),
+                              if (entry.txnType == 'purchase' &&
+                                  entry.purchasePricePaise != null) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${LocaleFormatter.formatCurrency(context, entry.purchasePricePaise!)} / ${product.unit}',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade800,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                              if (entry.txnType == 'purchase' &&
+                                  entry.supplier.trim().isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Supplier',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  entry.supplier.trim(),
+                                  style: TextStyle(
+                                    color: Colors.grey.shade800,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 2),
+                              Text(
+                                entry.reason.isNotEmpty
+                                    ? '${entry.source} • ${entry.reason}'
+                                    : entry.source,
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              if (entry.note.isNotEmpty)
+                                Text(
+                                  entry.note,
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            );
-          },
+              ),
+            ],
+          );
+        },
+      );
+    }
+
+    if (isDesktop) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Inventory History: ${product.name}'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640, maxHeight: 550),
+            child: buildHistoryContent(ctx),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
         ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.8,
+        child: buildHistoryContent(context),
       ),
     );
   }

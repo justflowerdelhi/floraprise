@@ -11,12 +11,12 @@ class StorageModeProvider extends ChangeNotifier {
   StorageMode? _mode;
   bool _loaded = false;
 
-  StorageMode? get selectedMode => _mode;
-  StorageMode get effectiveMode => _mode ?? StorageMode.local;
+  StorageMode? get selectedMode => kIsWeb ? StorageMode.cloud : _mode;
+  StorageMode get effectiveMode => kIsWeb ? StorageMode.cloud : (_mode ?? StorageMode.local);
   bool get isLoaded => _loaded;
-  bool get hasSelectedMode => _mode != null;
-  bool get isLocal => effectiveMode == StorageMode.local;
-  bool get isCloud => effectiveMode == StorageMode.cloud;
+  bool get hasSelectedMode => kIsWeb ? true : _mode != null;
+  bool get isLocal => kIsWeb ? false : effectiveMode == StorageMode.local;
+  bool get isCloud => kIsWeb ? true : effectiveMode == StorageMode.cloud;
 
   Future<void> load() async {
     _mode = await _service.getCurrentMode();

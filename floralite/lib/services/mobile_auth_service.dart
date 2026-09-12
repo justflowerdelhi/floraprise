@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 
 import 'api_base_url.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -26,9 +27,10 @@ class MobileAuthService {
   MobileAuthService({
     FlutterSecureStorage? secureStorage,
     HttpClient? httpClient,
+    http.Client? client,
     String? baseUrl,
   })  : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
-        _httpClient = httpClient ?? HttpClient(),
+        _client = client ?? http.Client(),
         _baseUrl = _computeBaseUrl(baseUrl);
 
   static String _computeBaseUrl(String? baseUrl) {
@@ -66,7 +68,7 @@ class MobileAuthService {
   static const _deviceFingerprintKey = 'mobile_auth_device_fingerprint';
 
   final FlutterSecureStorage _secureStorage;
-  final HttpClient _httpClient;
+  final http.Client _client;
   late final String _baseUrl;
 
   String get baseUrl => _baseUrl;
@@ -190,6 +192,28 @@ class MobileAuthService {
     return payload;
   }
 
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final token = await _secureStorage.read(key: _accessTokenKey);
+    if (token == null || token.trim().isEmpty) {
+      throw const MobileAuthServiceException(
+        'missing_token',
+        'You must be logged in to change your password.',
+      );
+    }
+
+    await _postJson(
+      '/api/auth/change-password',
+      {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+      bearerToken: token,
+    );
+  }
+
   Future<void> logout() async {
     final accessToken = await _secureStorage.read(key: _accessTokenKey);
 
@@ -209,17 +233,21 @@ class MobileAuthService {
   }
 
   Future<void> clearAuthState() async {
-    await _secureStorage.delete(key: _accessTokenKey);
-    await _secureStorage.delete(key: _refreshTokenKey);
-    await _secureStorage.delete(key: _rememberLoginKey);
-    await _secureStorage.delete(key: _sessionKey);
-    await _secureStorage.delete(key: _userKey);
-    await _secureStorage.delete(key: _companyKey);
-    await _secureStorage.delete(key: _subscriptionKey);
-    await _secureStorage.delete(key: _permissionsKey);
-    await _secureStorage.delete(key: _appConfigKey);
-    await _secureStorage.delete(key: _featureFlagsKey);
-    await _secureStorage.delete(key: 'cloud_company_profile');
+    try {
+      await _secureStorage.deleteAll();
+    } catch (_) {
+      await _secureStorage.delete(key: _accessTokenKey);
+      await _secureStorage.delete(key: _refreshTokenKey);
+      await _secureStorage.delete(key: _rememberLoginKey);
+      await _secureStorage.delete(key: _sessionKey);
+      await _secureStorage.delete(key: _userKey);
+      await _secureStorage.delete(key: _companyKey);
+      await _secureStorage.delete(key: _subscriptionKey);
+      await _secureStorage.delete(key: _permissionsKey);
+      await _secureStorage.delete(key: _appConfigKey);
+      await _secureStorage.delete(key: _featureFlagsKey);
+      await _secureStorage.delete(key: 'cloud_company_profile');
+    }
     BusinessSettingsManager.notifySettingsChanged();
   }
 
@@ -641,8 +669,8 @@ class MobileAuthService {
       'deviceId': fingerprint,
       'platform': _platformName(),
       'manufacturer': kIsWeb ? 'Web' : Platform.operatingSystem,
-      'model': Platform.localHostname,
-      'osVersion': Platform.operatingSystemVersion,
+      'model': kIsWeb ? 'Chrome' : Platform.localHostname,
+      'osVersion': kIsWeb ? 'Web Browser' : Platform.operatingSystemVersion,
       'appVersion': '${packageInfo.version}+${packageInfo.buildNumber}',
       'pushToken': null,
       'ipAddress': null,
@@ -687,31 +715,30 @@ class MobileAuthService {
     String? bearerToken,
   }) async {
     try {
-      final request = await _httpClient.openUrl(method, uri).timeout(
-            const Duration(seconds: 12),
-          );
-      request.headers.contentType = ContentType.json;
-      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
+      final request = http.Request(method, uri);
+      request.headers['Accept'] = 'application/json';
+      request.headers['Content-Type'] = 'application/json';
       if (bearerToken != null && bearerToken.trim().isNotEmpty) {
-        request.headers
-            .set(HttpHeaders.authorizationHeader, 'Bearer $bearerToken');
+        request.headers['Authorization'] = 'Bearer $bearerToken';
       }
 
       if (body != null) {
-        request.write(jsonEncode(body));
+        request.body = jsonEncode(body);
       }
 
-      final response =
-          await request.close().timeout(const Duration(seconds: 20));
-      final responseBody = await response.transform(utf8.decoder).join();
+      final streamedResponse =
+          await _client.send(request).timeout(const Duration(seconds: 20));
+      final responseBody = await streamedResponse.stream.bytesToString();
+      final statusCode = streamedResponse.statusCode;
+      final contentType =
+          streamedResponse.headers['content-type'] ?? 'unknown';
 
       // Log request/response details for debugging
-      final contentType = response.headers.contentType?.mimeType ?? 'unknown';
       final bodyPreview = responseBody.length > 500
           ? '${responseBody.substring(0, 500)}...'
           : responseBody;
       debugPrint('[API] $method $uri');
-      debugPrint('[API] Status: ${response.statusCode}');
+      debugPrint('[API] Status: $statusCode');
       debugPrint('[API] Content-Type: $contentType');
       debugPrint('[API] Response body preview: $bodyPreview');
 
@@ -721,11 +748,11 @@ class MobileAuthService {
           responseBody.trim().isNotEmpty) {
         throw MobileAuthServiceException(
           'invalid_content_type',
-          'Server returned non-JSON response (Content-Type: $contentType). URL: $uri, Status: ${response.statusCode}. Response: $bodyPreview',
+          'Server returned non-JSON response (Content-Type: $contentType). URL: $uri, Status: $statusCode. Response: $bodyPreview',
         );
       }
 
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (statusCode < 200 || statusCode >= 300) {
         final parsed = _tryParseJsonObject(responseBody);
         if (parsed != null) {
           final error = _extractError(parsed);
@@ -734,7 +761,7 @@ class MobileAuthService {
 
         throw MobileAuthServiceException(
           'request_failed',
-          _buildHttpErrorMessage(response.statusCode, responseBody),
+          _buildHttpErrorMessage(statusCode, responseBody),
         );
       }
 
@@ -760,6 +787,13 @@ class MobileAuthService {
       throw const MobileAuthServiceException(
         'server_unavailable',
         'Server is taking too long to respond. Please try again.',
+      );
+    } catch (e) {
+      if (e is MobileAuthServiceException) rethrow;
+      debugPrint('[API] Network/client error: $e');
+      throw const MobileAuthServiceException(
+        'network_unavailable',
+        'Network unavailable. Please check your internet connection.',
       );
     }
   }

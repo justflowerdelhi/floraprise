@@ -51,48 +51,114 @@ class _CloudCategoriesScreenState extends State<CloudCategoriesScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CloudProductProvider>();
+    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
+
+    Widget content;
+    if (provider.isLoading && provider.categories.isEmpty) {
+      content = const Center(child: CircularProgressIndicator());
+    } else if (isDesktop) {
+      content = Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: GridView.builder(
+            padding: const EdgeInsets.all(16),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 420,
+              mainAxisExtent: 80,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: provider.categories.length,
+            itemBuilder: (_, index) {
+              final category = provider.categories[index];
+              return Card(
+                child: ListTile(
+                  title: Text(category.name),
+                  subtitle: Text(category.isActive ? 'Active' : 'Inactive'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Switch(
+                        value: category.isActive,
+                        onChanged: (value) async {
+                          try {
+                            await provider.setCategoryActive(category.id, value);
+                          } catch (error) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(error.toString())),
+                            );
+                          }
+                        },
+                      ),
+                      IconButton(
+                        onPressed: () => _edit(category: category),
+                        icon: const Icon(Icons.edit),
+                        tooltip: 'Edit',
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    } else {
+      content = ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: provider.categories.length,
+        itemBuilder: (_, index) {
+          final category = provider.categories[index];
+          return Card(
+            child: ListTile(
+              title: Text(category.name),
+              subtitle: Text(category.isActive ? 'Active' : 'Inactive'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Switch(
+                    value: category.isActive,
+                    onChanged: (value) async {
+                      try {
+                        await provider.setCategoryActive(category.id, value);
+                      } catch (error) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(error.toString())),
+                        );
+                      }
+                    },
+                  ),
+                  IconButton(
+                    onPressed: () => _edit(category: category),
+                    icon: const Icon(Icons.edit),
+                    tooltip: 'Edit',
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cloud Categories'),
         actions: [
-          IconButton(onPressed: provider.isLoading ? null : provider.load, icon: const Icon(Icons.refresh), tooltip: 'Refresh'),
+          IconButton(
+            onPressed: provider.isLoading ? null : provider.load,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+          ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(onPressed: () => _edit(), child: const Icon(Icons.add)),
-      body: provider.isLoading && provider.categories.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: provider.categories.length,
-              itemBuilder: (_, index) {
-                final category = provider.categories[index];
-                return Card(
-                  child: ListTile(
-                    title: Text(category.name),
-                    subtitle: Text(category.isActive ? 'Active' : 'Inactive'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Switch(
-                          value: category.isActive,
-                          onChanged: (value) async {
-                            try {
-                              await provider.setCategoryActive(category.id, value);
-                            } catch (error) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(error.toString())),
-                              );
-                            }
-                          },
-                        ),
-                        IconButton(onPressed: () => _edit(category: category), icon: const Icon(Icons.edit), tooltip: 'Edit'),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _edit(),
+        child: const Icon(Icons.add),
+      ),
+      body: content,
     );
   }
 }
@@ -123,10 +189,13 @@ class _CategoryNameDialogState extends State<_CategoryNameDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.initialName.isEmpty ? 'Add Cloud Category' : 'Edit Cloud Category'),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        decoration: const InputDecoration(labelText: 'Category name'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: TextField(
+          controller: _controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Category name'),
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),

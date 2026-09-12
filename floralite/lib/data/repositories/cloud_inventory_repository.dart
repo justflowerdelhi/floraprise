@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 
 import '../../models/gst_calculation_type.dart';
 import '../../services/mobile_auth_service.dart';
@@ -53,18 +54,27 @@ class CloudLowStockProduct {
 
 typedef CloudLowStockSender = Future<dynamic> Function(Uri uri);
 
+typedef CloudInventorySender = Future<dynamic> Function(
+  String method,
+  Uri uri, {
+  Map<String, dynamic>? body,
+});
+
 class CloudInventoryRepository {
   CloudInventoryRepository({
     MobileAuthService? auth,
     CloudLowStockSender? lowStockSender,
     FlutterSecureStorage? secureStorage,
+    CloudInventorySender? sender,
   })  : _auth = auth ?? MobileAuthService(),
         _lowStockSender = lowStockSender,
-        _secureStorage = secureStorage ?? const FlutterSecureStorage();
+        _secureStorage = secureStorage ?? const FlutterSecureStorage(),
+        _sender = sender;
 
   final MobileAuthService _auth;
   final CloudLowStockSender? _lowStockSender;
   final FlutterSecureStorage? _secureStorage;
+  final CloudInventorySender? _sender;
   final Map<String, List<CloudLowStockProduct>> _lowStockCache = {};
   static const String _lowStockStorageKey = 'cloud_low_stock_cache';
 
@@ -238,6 +248,90 @@ class CloudInventoryRepository {
     );
   }
 
+  Future<List<InventoryTransactionRecord>> getWastageTransactions({
+    required DateTime startDate,
+    required DateTime endDate,
+    String? category,
+    int? productId,
+    String? supplier,
+    String? reason,
+  }) async {
+    final startUtc = DateTime.utc(startDate.year, startDate.month, startDate.day);
+    final endUtc = DateTime.utc(endDate.year, endDate.month, endDate.day, 23, 59, 59);
+
+    final queryParams = <String, String>{
+      'wastageOnly': 'true',
+      'fromDate': startUtc.toIso8601String(),
+      'toDate': endUtc.toIso8601String(),
+      'page': '1',
+      'pageSize': '1000',
+    };
+
+    final response = await _send(
+      'GET',
+      Uri.parse('${_auth.baseUrl}/api/inventory/adjustments').replace(
+        queryParameters: queryParams,
+      ),
+    );
+
+    dynamic itemsRaw;
+    if (response is Map) {
+      itemsRaw = response['items'] ?? response['Items'];
+    } else if (response is List) {
+      itemsRaw = response;
+    }
+
+    if (itemsRaw is! List) return const [];
+
+    final records = <InventoryTransactionRecord>[];
+    for (var i = 0; i < itemsRaw.length; i++) {
+      final raw = itemsRaw[i];
+      if (raw is! Map) continue;
+      final json = raw.cast<String, dynamic>();
+
+      final itemCategory = _string(json, 'category', fallback: 'Other');
+      final itemProductName = _string(json, 'productName', fallback: 'Unknown');
+      final itemSupplier = _string(json, 'supplierName');
+      final itemReason = _string(json, 'reason', fallback: _string(json, 'adjustmentType'));
+
+      if (category != null && category.trim().isNotEmpty && category != 'All') {
+        if (itemCategory.toLowerCase() != category.trim().toLowerCase()) continue;
+      }
+
+      if (supplier != null && supplier.trim().isNotEmpty && supplier != 'All') {
+        if (itemSupplier.toLowerCase() != supplier.trim().toLowerCase()) continue;
+      }
+
+      if (reason != null && reason.trim().isNotEmpty && reason != 'All') {
+        if (itemReason.toLowerCase() != reason.trim().toLowerCase()) continue;
+      }
+
+      final qty = _int(json, 'quantity').abs();
+      final costPerUnit = (json[_key(json, 'costPerUnit')] as num?)?.toDouble() ?? 0.0;
+      final purchasePricePaise = (costPerUnit * 100).round();
+      final dateStr = _string(json, 'adjustmentDate', fallback: _string(json, 'createdAtUtc'));
+
+      records.add(InventoryTransactionRecord(
+        id: -(i + 1),
+        cloudId: _string(json, 'id'),
+        productId: 0,
+        txnType: 'wastage',
+        qty: qty,
+        purchasePricePaise: purchasePricePaise,
+        supplier: itemSupplier,
+        source: 'cloud',
+        reason: itemReason,
+        note: _string(json, 'notes'),
+        createdAt: dateStr,
+        productName: itemProductName,
+        category: itemCategory,
+        unit: _string(json, 'unit', fallback: 'Piece'),
+      ));
+    }
+
+    return records;
+  }
+
   Future<String?> findProductIdByBarcode(String barcode) async {
     final value = barcode.trim();
     if (value.isEmpty) return null;
@@ -257,6 +351,9 @@ class CloudInventoryRepository {
     Uri uri, {
     Map<String, dynamic>? body,
   }) async {
+    final override = _sender;
+    if (override != null) return override(method, uri, body: body);
+
     var token = await _auth.getStoredAccessToken();
     if (token == null || token.trim().isEmpty) {
       throw StateError('Cloud session is not available. Please log in again.');
@@ -265,24 +362,23 @@ class CloudInventoryRepository {
     final encodedBody = body == null ? null : jsonEncode(body);
     debugPrint('[INVENTORY-CLOUD] $method $uri');
     for (var attempt = 0; attempt < 2; attempt++) {
-      final client = HttpClient();
+      final client = http.Client();
       try {
-        final request = await client.openUrl(method, uri).timeout(
-              const Duration(seconds: 12),
-            );
-        request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
-        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-        if (body != null) {
-          request.headers.contentType = ContentType.json;
-          request.write(encodedBody);
+        final request = http.Request(method, uri);
+        request.headers['Accept'] = 'application/json';
+        request.headers['Authorization'] = 'Bearer $token';
+        if (encodedBody != null) {
+          request.headers['Content-Type'] = 'application/json';
+          request.body = encodedBody;
         }
 
-        final response =
-            await request.close().timeout(const Duration(seconds: 20));
-        final responseBody = await response.transform(utf8.decoder).join();
-        debugPrint('[INVENTORY-CLOUD] HTTP STATUS: ${response.statusCode}');
+        final streamedResponse =
+            await client.send(request).timeout(const Duration(seconds: 20));
+        final responseBody = await streamedResponse.stream.bytesToString();
+        final statusCode = streamedResponse.statusCode;
+        debugPrint('[INVENTORY-CLOUD] HTTP STATUS: $statusCode');
 
-        if (response.statusCode == 401 && attempt == 0) {
+        if (statusCode == 401 && attempt == 0) {
           final refreshed = await _auth.refreshAndBootstrap();
           token = refreshed.accessToken;
           continue;
@@ -291,7 +387,7 @@ class CloudInventoryRepository {
         final decoded = responseBody.trim().isEmpty
             ? <String, dynamic>{}
             : _decode(responseBody);
-        if (response.statusCode < 200 || response.statusCode >= 300) {
+        if (statusCode < 200 || statusCode >= 300) {
           final message = decoded is Map
               ? decoded['message'] ??
                   decoded['detail'] ??
@@ -300,14 +396,14 @@ class CloudInventoryRepository {
               : null;
           throw StateError(
             message?.toString() ??
-                'Cloud inventory request failed (HTTP ${response.statusCode}).',
+                'Cloud inventory request failed (HTTP $statusCode).',
           );
         }
         return decoded;
       } on SocketException catch (error) {
         throw StateError('Unable to connect to Floraprise Cloud: $error');
       } finally {
-        client.close(force: true);
+        client.close();
       }
     }
     throw StateError('Cloud inventory request failed.');

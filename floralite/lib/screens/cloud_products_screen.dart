@@ -184,6 +184,7 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CloudProductProvider>();
+    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cloud Products'),
@@ -290,120 +291,140 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: provider.load,
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-                itemCount: provider.products.length,
-                itemBuilder: (_, index) {
-                  final product = provider.products[index];
-                  final isFav = provider.isFavorite(product.id);
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+              child: isDesktop
+                  ? GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 440,
+                        mainAxisExtent: 190,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      product.name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${product.sku}  |  ${product.category}  |  ${product.unitOfMeasure}  |  '
-                                      '${product.isActive ? 'Active' : 'Inactive'}',
-                                      style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Text(
-                                '₹${product.retailPrice.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2E7D32),
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              IconButton(
-                                tooltip: isFav ? 'Unfavourite' : 'Favourite',
-                                icon: Icon(
-                                  isFav ? Icons.star : Icons.star_border,
-                                  color: isFav ? Colors.amber : null,
-                                ),
-                                onPressed: () =>
-                                    provider.toggleFavorite(product.id),
-                              ),
-                              const Spacer(),
-                              IconButton(
-                                tooltip: 'Recipe',
-                                icon: const Icon(Icons.menu_book_outlined),
-                                onPressed: () => _openRecipe(product),
-                              ),
-                              IconButton(
-                                tooltip: 'Print Barcode',
-                                icon: const Icon(Icons.print_outlined),
-                                onPressed: () => _printBarcode(product),
-                              ),
-                              IconButton(
-                                tooltip: 'Edit',
-                                icon: const Icon(Icons.edit_outlined),
-                                onPressed: () => _editProduct(product: product),
-                              ),
-                              PopupMenuButton<String>(
-                                onSelected: (value) async {
-                                  if (value == 'toggle') {
-                                    try {
-                                      await provider.setProductActive(
-                                        product.id,
-                                        !product.isActive,
-                                      );
-                                    } catch (error) {
-                                      if (mounted) _showError(error);
-                                    }
-                                  }
-                                },
-                                itemBuilder: (_) => [
-                                  PopupMenuItem(
-                                    value: 'toggle',
-                                    child: Text(
-                                      product.isActive
-                                          ? 'Deactivate'
-                                          : 'Activate',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
+                      itemCount: provider.products.length,
+                      itemBuilder: (_, index) => _buildProductCard(
+                        provider.products[index],
+                        provider,
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                      itemCount: provider.products.length,
+                      itemBuilder: (_, index) => _buildProductCard(
+                        provider.products[index],
+                        provider,
                       ),
                     ),
-                  );
-                },
-              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProductCard(
+    CloudProduct product,
+    CloudProductProvider provider,
+  ) {
+    final isFav = provider.isFavorite(product.id);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${product.sku}  |  ${product.category}  |  ${product.unitOfMeasure}  |  '
+                        '${product.isActive ? 'Active' : 'Inactive'}',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '₹${product.retailPrice.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2E7D32),
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                IconButton(
+                  tooltip: isFav ? 'Unfavourite' : 'Favourite',
+                  icon: Icon(
+                    isFav ? Icons.star : Icons.star_border,
+                    color: isFav ? Colors.amber : null,
+                  ),
+                  onPressed: () => provider.toggleFavorite(product.id),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Recipe',
+                  icon: const Icon(Icons.menu_book_outlined),
+                  onPressed: () => _openRecipe(product),
+                ),
+                IconButton(
+                  tooltip: 'Print Barcode',
+                  icon: const Icon(Icons.print_outlined),
+                  onPressed: () => _printBarcode(product),
+                ),
+                IconButton(
+                  tooltip: 'Edit',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: () => _editProduct(product: product),
+                ),
+                PopupMenuButton<String>(
+                  onSelected: (value) async {
+                    if (value == 'toggle') {
+                      try {
+                        await provider.setProductActive(
+                          product.id,
+                          !product.isActive,
+                        );
+                      } catch (error) {
+                        if (mounted) _showError(error);
+                      }
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'toggle',
+                      child: Text(
+                        product.isActive ? 'Deactivate' : 'Activate',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -506,85 +527,170 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.product == null ? 'Add Cloud Product' : 'Edit Cloud Product'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _field(_name, 'Name'),
-            _field(_sku, 'SKU'),
-            if (widget.categories.isNotEmpty)
-              DropdownButtonFormField<String>(
-                initialValue: _categoryId,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: widget.categories
-                    .map((category) => DropdownMenuItem(value: category.id, child: Text(category.name)))
-                    .toList(),
-                onChanged: (value) => setState(() => _categoryId = value),
-              ),
-            DropdownButtonFormField<String>(
-              initialValue: _unit,
-              decoration: const InputDecoration(labelText: 'Unit'),
-              items: _units.map((unit) => DropdownMenuItem(value: unit, child: Text(unit))).toList(),
-              onChanged: (value) => setState(() => _unit = value ?? 'Stem'),
-            ),
-            _field(_retail, 'Selling price', numeric: true),
-            _field(_cost, 'Purchase price', numeric: true),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: TextField(
-                controller: _barcode,
-                decoration: InputDecoration(
-                  labelText: 'Manufacturer Barcode',
-                  suffixIcon: IconButton(
-                    tooltip: 'Scan Manufacturer Barcode',
-                    icon: const Icon(Icons.qr_code_scanner),
-                    onPressed: () async {
-                      final scanned = await showCameraBarcodeScanner(
-                        context,
-                        title: 'Scan Manufacturer Barcode',
-                      );
-                      if (scanned == null || scanned.isEmpty) return;
-                      _barcode.text = scanned;
-                    },
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: SingleChildScrollView(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 480;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isWide)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _field(_name, 'Name')),
+                        const SizedBox(width: 12),
+                        Expanded(child: _field(_sku, 'SKU')),
+                      ],
+                    )
+                  else ...[
+                    _field(_name, 'Name'),
+                    _field(_sku, 'SKU'),
+                  ],
+                  if (isWide)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (widget.categories.isNotEmpty)
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: _categoryId,
+                              decoration: const InputDecoration(labelText: 'Category'),
+                              items: widget.categories
+                                  .map((category) => DropdownMenuItem(value: category.id, child: Text(category.name)))
+                                  .toList(),
+                              onChanged: (value) => setState(() => _categoryId = value),
+                            ),
+                          ),
+                        if (widget.categories.isNotEmpty) const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _unit,
+                            decoration: const InputDecoration(labelText: 'Unit'),
+                            items: _units.map((unit) => DropdownMenuItem(value: unit, child: Text(unit))).toList(),
+                            onChanged: (value) => setState(() => _unit = value ?? 'Stem'),
+                          ),
+                        ),
+                      ],
+                    )
+                  else ...[
+                    if (widget.categories.isNotEmpty)
+                      DropdownButtonFormField<String>(
+                        initialValue: _categoryId,
+                        decoration: const InputDecoration(labelText: 'Category'),
+                        items: widget.categories
+                            .map((category) => DropdownMenuItem(value: category.id, child: Text(category.name)))
+                            .toList(),
+                        onChanged: (value) => setState(() => _categoryId = value),
+                      ),
+                    DropdownButtonFormField<String>(
+                      initialValue: _unit,
+                      decoration: const InputDecoration(labelText: 'Unit'),
+                      items: _units.map((unit) => DropdownMenuItem(value: unit, child: Text(unit))).toList(),
+                      onChanged: (value) => setState(() => _unit = value ?? 'Stem'),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  if (isWide)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _field(_retail, 'Selling price', numeric: true)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _field(_cost, 'Purchase price (optional)', numeric: true)),
+                      ],
+                    )
+                  else ...[
+                    _field(_retail, 'Selling price', numeric: true),
+                    _field(_cost, 'Purchase price (optional)', numeric: true),
+                  ],
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: TextField(
+                      controller: _barcode,
+                      decoration: InputDecoration(
+                        labelText: 'Manufacturer Barcode',
+                        suffixIcon: IconButton(
+                          tooltip: 'Scan Manufacturer Barcode',
+                          icon: const Icon(Icons.qr_code_scanner),
+                          onPressed: () async {
+                            final scanned = await showCameraBarcodeScanner(
+                              context,
+                              title: 'Scan Manufacturer Barcode',
+                            );
+                            if (scanned == null || scanned.isEmpty) return;
+                            _barcode.text = scanned;
+                          },
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
-            if (widget.product != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: InputDecorator(
-                  decoration: const InputDecoration(labelText: 'FloraPrise Barcode'),
-                  child: Text(widget.product!.internalBarcode ?? 'Not generated yet'),
-                ),
-              )
-            else
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Text(
-                  'A FloraPrise barcode will be generated automatically once this product is saved.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ),
-            _field(_description, 'Description'),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _trackInventory,
-              title: const Text('Track inventory'),
-              onChanged: (value) => setState(() => _trackInventory = value),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _trackBatch,
-              title: const Text('Track batches'),
-              onChanged: (value) => setState(() => _trackBatch = value),
-            ),
-            if (_formError != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(_formError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              ),
-          ],
+                  if (widget.product != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(labelText: 'FloraPrise Barcode'),
+                        child: Text(widget.product!.internalBarcode ?? 'Not generated yet'),
+                      ),
+                    )
+                  else
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'A FloraPrise barcode will be generated automatically once this product is saved.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  _field(_description, 'Description'),
+                  if (isWide)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: _trackInventory,
+                            title: const Text('Track inventory'),
+                            onChanged: (value) => setState(() => _trackInventory = value),
+                          ),
+                        ),
+                        Expanded(
+                          child: SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: _trackBatch,
+                            title: const Text('Track batches'),
+                            onChanged: (value) => setState(() => _trackBatch = value),
+                          ),
+                        ),
+                      ],
+                    )
+                  else ...[
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: _trackInventory,
+                      title: const Text('Track inventory'),
+                      onChanged: (value) => setState(() => _trackInventory = value),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: _trackBatch,
+                      title: const Text('Track batches'),
+                      onChanged: (value) => setState(() => _trackBatch = value),
+                    ),
+                  ],
+                  if (_formError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(_formError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    ),
+                ],
+              );
+            },
+          ),
         ),
       ),
       actions: [
@@ -609,7 +715,10 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
     if (_isSaving) return;
     final categoryId = _categoryId;
     final retail = double.tryParse(_retail.text.trim());
-    final cost = double.tryParse(_cost.text.trim());
+    // Purchase cost is optional: florist purchases have variable costs
+    // recorded per inventory stock addition, not on the product master.
+    final costText = _cost.text.trim();
+    double? cost;
     String? error;
     if (_name.text.trim().isEmpty) {
       error = 'Name is required.';
@@ -619,8 +728,11 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
       error = 'Select a category.';
     } else if (retail == null) {
       error = 'Enter a valid selling price.';
-    } else if (cost == null) {
-      error = 'Enter a valid purchase price.';
+    } else if (costText.isNotEmpty) {
+      cost = double.tryParse(costText);
+      if (cost == null) {
+        error = 'Enter a valid purchase price.';
+      }
     }
     if (error != null) {
       setState(() => _formError = error);
@@ -638,7 +750,7 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
         categoryId: categoryId!,
         unitOfMeasure: _unit,
         retailPrice: retail!,
-        costPrice: cost!,
+        costPrice: cost,
         manufacturerBarcode: _barcode.text.trim().isEmpty ? null : _barcode.text.trim(),
         description: _description.text.trim().isEmpty ? null : _description.text.trim(),
         trackInventory: _trackInventory,

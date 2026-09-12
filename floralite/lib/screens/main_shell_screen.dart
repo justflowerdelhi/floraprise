@@ -41,6 +41,7 @@ import 'reports/expense_report_screen.dart';
 import 'reports/low_stock_report_screen.dart';
 import 'reports/order_status_report_screen.dart';
 import 'reports/production_report_screen.dart';
+import 'reports/profit_margin_report_screen.dart';
 import 'reports/sales_report_screen.dart';
 import 'reports/top_customers_report_screen.dart';
 import 'reports/top_products_report_screen.dart';
@@ -55,7 +56,9 @@ import 'subscription_screen.dart';
 import 'walkin_sales_screen.dart';
 
 class MainShellScreen extends StatefulWidget {
-  const MainShellScreen({super.key});
+  const MainShellScreen({super.key, this.initialRoute});
+
+  final String? initialRoute;
 
   @override
   State<MainShellScreen> createState() => _MainShellScreenState();
@@ -93,11 +96,30 @@ class _MainShellScreenState extends State<MainShellScreen> {
     '/about',
   };
 
+  void _onSelectTab(int index, AppShellController controller) {
+    final tab = _tabs[index];
+    final rootRoute = _rootRoutes[index];
+    if (tab == AppShellTab.home &&
+        controller.selectedTab == AppShellTab.home) {
+      context.read<DashboardProvider>().refresh();
+      return;
+    }
+    controller.selectTab(tab);
+    _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+      rootRoute,
+      (route) => false,
+    );
+    if (tab == AppShellTab.home) {
+      context.read<DashboardProvider>().refresh();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AppShellController>();
     final selectedIndex = controller.selectedIndex;
     final subscriptionProvider = context.watch<SubscriptionProvider>();
+    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
 
     return PopScope(
       canPop: false,
@@ -106,68 +128,152 @@ class _MainShellScreenState extends State<MainShellScreen> {
         _handleBackNavigation();
       },
       child: Scaffold(
-        body: Column(
-          children: [
-            if (subscriptionProvider.isGracePeriod)
-              _GracePeriodBanner(
-                message: subscriptionProvider.gracePeriodMessage,
+        body: isDesktop
+            ? Row(
+                children: [
+                  NavigationRail(
+                    selectedIndex: selectedIndex,
+                    labelType: NavigationRailLabelType.all,
+                    leading: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.local_florist,
+                            size: 32,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Floraprise',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0x1F2E7D32),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Pro Cloud',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF2E7D32),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    onDestinationSelected: (index) =>
+                        _onSelectTab(index, controller),
+                    destinations: const [
+                      NavigationRailDestination(
+                        icon: Icon(Icons.home_outlined),
+                        selectedIcon: Icon(Icons.home_rounded),
+                        label: Text('Home'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.list_alt_outlined),
+                        selectedIcon: Icon(Icons.list_alt_rounded),
+                        label: Text('Orders'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.shopping_cart_outlined),
+                        selectedIcon: Icon(Icons.shopping_cart_rounded),
+                        label: Text('POS'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.inventory_2_outlined),
+                        selectedIcon: Icon(Icons.inventory_2_rounded),
+                        label: Text('Inventory'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.account_balance_wallet_outlined),
+                        selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+                        label: Text('Accounts'),
+                      ),
+                    ],
+                  ),
+                  const VerticalDivider(thickness: 1, width: 1),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        if (subscriptionProvider.isGracePeriod)
+                          _GracePeriodBanner(
+                            message: subscriptionProvider.gracePeriodMessage,
+                          ),
+                        Expanded(
+                          child: Navigator(
+                            key: _navigatorKey,
+                            initialRoute: widget.initialRoute ??
+                                _rootRoutes[AppShellTab.home.index],
+                            onGenerateRoute: _onGenerateRoute,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                children: [
+                  if (subscriptionProvider.isGracePeriod)
+                    _GracePeriodBanner(
+                      message: subscriptionProvider.gracePeriodMessage,
+                    ),
+                  Expanded(
+                    child: Navigator(
+                      key: _navigatorKey,
+                      initialRoute: widget.initialRoute ??
+                          _rootRoutes[AppShellTab.home.index],
+                      onGenerateRoute: _onGenerateRoute,
+                    ),
+                  ),
+                ],
               ),
-            Expanded(
-              child: Navigator(
-                key: _navigatorKey,
-                initialRoute: _rootRoutes[AppShellTab.home.index],
-                onGenerateRoute: _onGenerateRoute,
+        bottomNavigationBar: isDesktop
+            ? null
+            : NavigationBar(
+                selectedIndex: selectedIndex,
+                onDestinationSelected: (index) =>
+                    _onSelectTab(index, controller),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.home_outlined),
+                    selectedIcon: Icon(Icons.home_rounded),
+                    label: 'Home',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.list_alt_outlined),
+                    selectedIcon: Icon(Icons.list_alt_rounded),
+                    label: 'Orders',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.shopping_cart_outlined),
+                    selectedIcon: Icon(Icons.shopping_cart_rounded),
+                    label: 'POS',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.inventory_2_outlined),
+                    selectedIcon: Icon(Icons.inventory_2_rounded),
+                    label: 'Inventory',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.account_balance_wallet_outlined),
+                    selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+                    label: 'Accounts',
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: (index) {
-            final tab = _tabs[index];
-            final rootRoute = _rootRoutes[index];
-            if (tab == AppShellTab.home &&
-                controller.selectedTab == AppShellTab.home) {
-              context.read<DashboardProvider>().refresh();
-              return;
-            }
-            controller.selectTab(tab);
-            _navigatorKey.currentState?.pushNamedAndRemoveUntil(
-              rootRoute,
-              (route) => false,
-            );
-            if (tab == AppShellTab.home) {
-              context.read<DashboardProvider>().refresh();
-            }
-          },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.list_alt_outlined),
-              selectedIcon: Icon(Icons.list_alt_rounded),
-              label: 'Orders',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.shopping_cart_outlined),
-              selectedIcon: Icon(Icons.shopping_cart_rounded),
-              label: 'POS',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.inventory_2_outlined),
-              selectedIcon: Icon(Icons.inventory_2_rounded),
-              label: 'Inventory',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.account_balance_wallet_outlined),
-              selectedIcon: Icon(Icons.account_balance_wallet_rounded),
-              label: 'Accounts',
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -308,6 +414,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
         '/reports/day-closing' => const DayClosingReportScreen(),
         '/reports/wastage' => const WastageReportScreen(),
         '/reports/production' => const ProductionReportScreen(),
+        '/reports/profit-margin' => const ProfitMarginReportScreen(),
         _ => const DashboardScreen(),
       },
     );

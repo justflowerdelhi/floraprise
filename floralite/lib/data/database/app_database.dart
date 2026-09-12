@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
@@ -9,7 +10,8 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
   static Database? _db;
 
-  static final bool _isTest = Platform.environment['FLUTTER_TEST'] == 'true';
+  static final bool _isTest =
+      kIsWeb ? false : Platform.environment['FLUTTER_TEST'] == 'true';
   static int _testCounter = 0;
 
   /// Override used by tests to give each test its own database file.

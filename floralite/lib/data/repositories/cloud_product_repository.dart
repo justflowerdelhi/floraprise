@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../../services/mobile_auth_service.dart';
 
@@ -147,7 +147,7 @@ class CloudProductInput {
     required this.categoryId,
     required this.unitOfMeasure,
     required this.retailPrice,
-    required this.costPrice,
+    this.costPrice,
     required this.manufacturerBarcode,
     required this.description,
     required this.trackInventory,
@@ -160,7 +160,9 @@ class CloudProductInput {
   final String categoryId;
   final String unitOfMeasure;
   final double retailPrice;
-  final double costPrice;
+  // Purchase cost is optional: florist purchases have variable costs recorded
+  // per inventory stock addition, not on the product master.
+  final double? costPrice;
   final String? manufacturerBarcode;
   final String? description;
   final bool trackInventory;
@@ -175,7 +177,9 @@ class CloudProductInput {
         'productType': 'SingleFlower',
         'unitOfMeasure': unitOfMeasure,
         'retailPrice': retailPrice,
-        'costPrice': costPrice,
+        // Omitted entirely when blank so the backend's default (0) applies
+        // instead of sending a JSON null into a non-nullable field.
+        if (costPrice != null) 'costPrice': costPrice,
         // Backend's Barcode field represents the Manufacturer barcode.
         'barcode': manufacturerBarcode,
         'description': description,
@@ -198,7 +202,9 @@ class CloudProductInput {
         'barcode': manufacturerBarcode,
         'description': description,
         'retailPrice': retailPrice,
-        'costPrice': costPrice,
+        // Omitted when blank so the backend's UpdateProductRequest.CostPrice
+        // stays null and the existing product cost is preserved, not zeroed.
+        if (costPrice != null) 'costPrice': costPrice,
         'trackInventory': trackInventory,
         'trackBatch': trackBatch,
         'reorderLevel': reorderLevel,
@@ -343,11 +349,6 @@ class CloudProductRepository {
 
   Future<CloudCategory> createCategory(String name) async {
     final uri = Uri.parse('${_auth.baseUrl}/api/categories');
-    debugPrint('[CATEGORY-CLOUD-DIAGNOSTIC] POST URL: $uri');
-    debugPrint(
-      '[CATEGORY-CLOUD-DIAGNOSTIC] Authorization present: ${((await _auth.getStoredAccessToken())?.trim().isNotEmpty ?? false) ? 'YES' : 'NO'}',
-    );
-    debugPrint('[CATEGORY-CLOUD-DIAGNOSTIC] Category name: $name');
     final response = await _send(
       'POST',
       uri,
@@ -357,8 +358,6 @@ class CloudProductRepository {
         'trackBatchByDefault': false,
       },
     );
-    debugPrint('[CATEGORY-CLOUD-DIAGNOSTIC] HTTP STATUS: 2xx');
-    debugPrint('[CATEGORY-CLOUD-DIAGNOSTIC] RESPONSE: $response');
     final id = _readString(response, 'id');
     if (id.isEmpty) throw StateError('Cloud API did not return a category ID.');
     final categories = await listCategories();
@@ -391,6 +390,9 @@ class CloudProductRepository {
     Uri uri, {
     Map<String, dynamic>? body,
   }) async {
+    final override = _sendOverride;
+    if (override != null) return override(method, uri, body: body);
+
     var token = await _auth.getStoredAccessToken();
     if (token == null || token.trim().isEmpty) {
       throw StateError('Cloud session is not available.');
@@ -401,22 +403,24 @@ class CloudProductRepository {
     }
 
     for (var attempt = 0; attempt < 2; attempt++) {
-      final client = HttpClient();
+      final client = http.Client();
       try {
-        final request = await client.openUrl(method, uri);
-        request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
-        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+        final request = http.Request(method, uri);
+        request.headers['Accept'] = 'application/json';
+        request.headers['Authorization'] = 'Bearer $token';
         if (body != null) {
-          request.headers.contentType = ContentType.json;
-          request.write(jsonEncode(body));
+          request.headers['Content-Type'] = 'application/json';
+          request.body = jsonEncode(body);
         }
-        final response = await request.close().timeout(const Duration(seconds: 20));
-        final responseBody = await response.transform(utf8.decoder).join();
+        final streamedResponse =
+            await client.send(request).timeout(const Duration(seconds: 20));
+        final responseBody = await streamedResponse.stream.bytesToString();
+        final statusCode = streamedResponse.statusCode;
         if (loggable) {
-          debugPrint('[CLOUD-API] HTTP STATUS: ${response.statusCode}');
+          debugPrint('[CLOUD-API] HTTP STATUS: $statusCode');
           debugPrint('[CLOUD-API] RESPONSE: $responseBody');
         }
-        if (response.statusCode == 401 && attempt == 0) {
+        if (statusCode == 401 && attempt == 0) {
           final refreshed = await _auth.refreshAndBootstrap();
           token = refreshed.accessToken;
           continue;
@@ -424,14 +428,14 @@ class CloudProductRepository {
         final decoded = responseBody.trim().isEmpty
             ? <String, dynamic>{}
             : jsonDecode(responseBody);
-        if (response.statusCode < 200 || response.statusCode >= 300) {
-          if (loggable) debugPrint('[CLOUD-API] EXCEPTION: StateError (HTTP ${response.statusCode})');
-          throw StateError('Cloud API HTTP ${response.statusCode}: $responseBody');
+        if (statusCode < 200 || statusCode >= 300) {
+          if (loggable) debugPrint('[CLOUD-API] EXCEPTION: StateError (HTTP $statusCode)');
+          throw StateError('Cloud API HTTP $statusCode: $responseBody');
         }
         if (decoded is Map<String, dynamic> || decoded is List) return decoded;
         throw StateError('Cloud API returned an unexpected response.');
       } finally {
-        client.close(force: true);
+        client.close();
       }
     }
     throw StateError('Cloud request failed.');
