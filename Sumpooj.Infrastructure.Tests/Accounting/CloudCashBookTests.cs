@@ -12,6 +12,67 @@ namespace Sumpooj.Infrastructure.Tests.Accounting;
 
 public class CloudCashBookTests
 {
+    [Fact]
+    public async Task CashBookRead_WhenDateIsPreviousBusinessDate_ReturnsHistoricalEntries()
+    {
+        var companyId = Guid.NewGuid();
+        var previous = new DateTime(2026, 9, 7, 0, 0, 0, DateTimeKind.Utc);
+        var today = previous.AddDays(1);
+        await using var db = CreateDb(companyId);
+        db.CashBookEntries.AddRange(
+            new CashBookEntry(companyId, previous, CashBookTransactionType.CashSale, "Previous sale", 200m, 200m, 0m, 200m),
+            new CashBookEntry(companyId, today, CashBookTransactionType.CashSale, "Today sale", 300m, 300m, 0m, 300m));
+        await db.SaveChangesAsync();
+
+        var controller = new MobileFinanceController(db, new TenantContext(companyId));
+        var result = await controller.GetCashBook(previous, null, null, null);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var entries = Assert.IsAssignableFrom<IEnumerable<CashBookEntryDto>>(ok.Value).ToList();
+        Assert.Equal("Previous sale", entries.Single().Description);
+    }
+
+    [Fact]
+    public async Task CashBookRead_WhenRangeIsProvided_IncludesAllDaysInRange()
+    {
+        var companyId = Guid.NewGuid();
+        var start = new DateTime(2026, 9, 7, 0, 0, 0, DateTimeKind.Utc);
+        var mid = start.AddDays(1);
+        var end = start.AddDays(2);
+        await using var db = CreateDb(companyId);
+        db.CashBookEntries.AddRange(
+            new CashBookEntry(companyId, start, CashBookTransactionType.CashSale, "Day 1", 100m, 100m, 0m, 100m),
+            new CashBookEntry(companyId, mid, CashBookTransactionType.CashExpense, "Day 2", 40m, 0m, 40m, 60m),
+            new CashBookEntry(companyId, end, CashBookTransactionType.CashSale, "Day 3", 120m, 120m, 0m, 180m));
+        await db.SaveChangesAsync();
+
+        var controller = new MobileFinanceController(db, new TenantContext(companyId));
+        var result = await controller.GetCashBook(null, start, end, null);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var entries = Assert.IsAssignableFrom<IEnumerable<CashBookEntryDto>>(ok.Value).ToList();
+        Assert.Equal(3, entries.Count);
+        Assert.Equal(new[] { "Day 1", "Day 2", "Day 3" }, entries.Select(e => e.Description).ToArray());
+    }
+
+    [Fact]
+    public async Task CashBookRead_UsesIstBusinessDateBoundary_ForUtcTimesNearMidnight()
+    {
+        var companyId = Guid.NewGuid();
+        var expectedBusinessDate = new DateTime(2026, 9, 8, 0, 0, 0, DateTimeKind.Utc);
+        var utcRequest = new DateTime(2026, 9, 7, 18, 30, 0, DateTimeKind.Utc);
+        await using var db = CreateDb(companyId);
+        db.CashBookEntries.Add(new CashBookEntry(companyId, expectedBusinessDate, CashBookTransactionType.CashSale, "IST business date", 250m, 250m, 0m, 250m));
+        await db.SaveChangesAsync();
+
+        var controller = new MobileFinanceController(db, new TenantContext(companyId));
+        var result = await controller.GetCashBook(utcRequest, null, null, null);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var entries = Assert.IsAssignableFrom<IEnumerable<CashBookEntryDto>>(ok.Value).ToList();
+        Assert.Equal("IST business date", entries.Single().Description);
+    }
+
     [Theory]
     [InlineData("Cash", 1)]
     [InlineData("Upi", 0)]

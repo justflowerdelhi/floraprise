@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/catalogue/catalogue_installer.dart';
@@ -12,6 +13,8 @@ import '../../services/scheduler_service.dart';
 import 'floral_background.dart';
 import 'splash_animation.dart';
 import 'animated_loading_dots.dart';
+import 'web_desktop_splash.dart';
+import 'web_splash_remover.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -32,7 +35,9 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _initializeAndNavigate() async {
-    await Future.delayed(const Duration(milliseconds: 3000));
+    if (!kIsWeb) {
+      await Future.delayed(const Duration(milliseconds: 3000));
+    }
     if (mounted) {
       await _navigateToNextScreen();
     }
@@ -43,44 +48,59 @@ class _SplashScreenState extends State<SplashScreen> {
     final navigator = Navigator.of(context);
     final authProvider = context.read<AuthProvider>();
 
-    await storageModeProvider.ensureLoaded();
-    if (!mounted) return;
-
-    if (!storageModeProvider.hasSelectedMode) {
-      navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => const OnboardingFlowScreen()),
-      );
-      return;
-    }
-
-    if (storageModeProvider.isCloud) {
-      await authProvider.initialize();
+    try {
+      await storageModeProvider.ensureLoaded();
       if (!mounted) return;
 
-      if (!authProvider.isAuthenticated) {
-        navigator.pushReplacementNamed('/mobile-register');
+      if (!storageModeProvider.hasSelectedMode) {
+        if (kIsWeb) removeWebSplash();
+        navigator.pushReplacement(
+          MaterialPageRoute(builder: (_) => const OnboardingFlowScreen()),
+        );
         return;
       }
 
-      await _onboardingManager.completeOnboarding();
+      if (storageModeProvider.isCloud) {
+        await authProvider.initialize();
+        if (!mounted) return;
+
+        if (kIsWeb) removeWebSplash();
+        if (!authProvider.isAuthenticated) {
+          navigator.pushReplacementNamed('/mobile-register');
+          return;
+        }
+
+        await _onboardingManager.completeOnboarding();
+        navigator.pushReplacementNamed('/dashboard');
+        return;
+      }
+
+      final completed = await _onboardingManager.isOnboardingCompleted();
+      if (!mounted) return;
+
+      if (!completed) {
+        if (kIsWeb) removeWebSplash();
+        navigator.pushReplacement(
+          MaterialPageRoute(builder: (_) => const OnboardingFlowScreen()),
+        );
+        return;
+      }
+
+      await _ensureMasterCatalogue();
+      if (!mounted) return;
+
+      if (kIsWeb) removeWebSplash();
       navigator.pushReplacementNamed('/dashboard');
-      return;
+    } catch (e, st) {
+      debugPrint('SplashScreen: unexpected startup error: $e\n$st');
+      if (!mounted) return;
+      if (kIsWeb) removeWebSplash();
+      if (authProvider.isAuthenticated) {
+        navigator.pushReplacementNamed('/dashboard');
+      } else {
+        navigator.pushReplacementNamed('/mobile-register');
+      }
     }
-
-    final completed = await _onboardingManager.isOnboardingCompleted();
-    if (!mounted) return;
-
-    if (!completed) {
-      navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => const OnboardingFlowScreen()),
-      );
-      return;
-    }
-
-    await _ensureMasterCatalogue();
-    if (!mounted) return;
-
-    navigator.pushReplacementNamed('/dashboard');
   }
 
   Future<void> _ensureMasterCatalogue() async {
@@ -97,6 +117,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return const WebDesktopSplash();
+    }
+
     return const Scaffold(
       body: Stack(
         children: [

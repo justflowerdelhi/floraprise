@@ -77,6 +77,25 @@ public class MobileFinanceController : ControllerBase
     private static DateTime ToCalendarDateUtc(DateTime date) =>
         DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
 
+    private static DateTime ToBusinessDateUtc(DateTime date)
+    {
+        var utcValue = date.Kind switch
+        {
+            DateTimeKind.Unspecified => DateTime.SpecifyKind(date.Date, DateTimeKind.Utc),
+            DateTimeKind.Local => date.ToUniversalTime(),
+            _ => date
+        };
+
+        if (TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Kolkata", out var tz) ||
+            TimeZoneInfo.TryFindSystemTimeZoneById("India Standard Time", out tz))
+        {
+            var localDate = TimeZoneInfo.ConvertTimeFromUtc(utcValue, tz).Date;
+            return DateTime.SpecifyKind(localDate, DateTimeKind.Utc);
+        }
+
+        return ToCalendarDateUtc(utcValue);
+    }
+
     [HttpGet("opening-cash")]
     public async Task<IActionResult> GetOpeningCash([FromQuery] DateTime date)
     {
@@ -118,9 +137,12 @@ public class MobileFinanceController : ControllerBase
     public async Task<IActionResult> GetCashBook([FromQuery] DateTime? date, [FromQuery] DateTime? from,
         [FromQuery] DateTime? to, [FromQuery] string? query)
     {
+        var targetDate = date.HasValue ? ToBusinessDateUtc(date.Value) : default;
+        var fromDate = from.HasValue ? ToBusinessDateUtc(from.Value) : targetDate;
+        var toDate = to.HasValue ? ToBusinessDateUtc(to.Value) : targetDate;
+
         if (date.HasValue)
         {
-            var targetDate = ToCalendarDateUtc(date.Value);
             var nextDay = targetDate.AddDays(1);
             var unlinkedPayments = await _db.Payments
                 .Where(p => p.CompanyId == CompanyId &&
@@ -174,9 +196,15 @@ public class MobileFinanceController : ControllerBase
         }
 
         var entries = _db.CashBookEntries.Where(e => e.CompanyId == CompanyId);
-        if (date.HasValue) entries = entries.Where(e => e.Date == ToCalendarDateUtc(date.Value));
-        if (from.HasValue) entries = entries.Where(e => e.Date >= ToCalendarDateUtc(from.Value));
-        if (to.HasValue) entries = entries.Where(e => e.Date <= ToCalendarDateUtc(to.Value));
+        if (date.HasValue)
+        {
+            entries = entries.Where(e => e.Date == targetDate);
+        }
+        else
+        {
+            if (from.HasValue) entries = entries.Where(e => e.Date >= fromDate);
+            if (to.HasValue) entries = entries.Where(e => e.Date <= toDate);
+        }
         if (!string.IsNullOrWhiteSpace(query))
         {
             var trimmed = query.Trim().ToLower();
@@ -192,6 +220,228 @@ public class MobileFinanceController : ControllerBase
         var balance = await _db.CashBookEntries.Where(e => e.CompanyId == CompanyId && e.Date == day)
             .OrderByDescending(e => e.CreatedAtUtc).Select(e => (decimal?)e.RunningBalance).FirstOrDefaultAsync() ?? 0;
         return Ok(new { balance });
+    }
+
+    [HttpGet("expense-summary")]
+    public async Task<IActionResult> GetExpenseSummary([FromQuery] DateTime? date, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
+    {
+        var providedDate = date.HasValue ? ToBusinessDateUtc(date.Value) : (DateTime?)null;
+        var providedFrom = from.HasValue ? ToBusinessDateUtc(from.Value) : (DateTime?)null;
+        var providedTo = to.HasValue ? ToBusinessDateUtc(to.Value) : (DateTime?)null;
+
+        var businessFromDate = providedDate ?? providedFrom ?? Sumpooj.API.Services.Mobile.PosSaleSyncService.GetServerLocalBusinessDate();
+        var businessToDate = providedDate ?? providedTo ?? businessFromDate;
+
+        var (utcFromStart, utcToEnd) = GetUtcRangeForBusinessDates(businessFromDate, businessToDate);
+        if (utcToEnd < utcFromStart)
+        {
+            (utcFromStart, utcToEnd) = (utcToEnd, utcFromStart);
+        }
+
+        var expenses = await _db.Expenses
+            .AsNoTracking()
+            .Where(e =>
+                e.CompanyId == CompanyId &&
+                e.IsActive &&
+                e.ExpenseDate >= utcFromStart &&
+                e.ExpenseDate <= utcToEnd)
+            .ToListAsync();
+
+        var summary = new ExpenseSummaryDto
+        {
+            TotalAmount = expenses.Sum(e => e.Amount),
+            CashAmount = expenses.Where(e => e.PaymentMode == ExpensePaymentMode.Cash).Sum(e => e.Amount),
+            UpiAmount = expenses.Where(e => e.PaymentMode == ExpensePaymentMode.Upi).Sum(e => e.Amount),
+            CardAmount = expenses.Where(e => e.PaymentMode == ExpensePaymentMode.Card).Sum(e => e.Amount),
+            ExpenseCount = expenses.Count,
+        };
+
+        return Ok(summary);
+    }
+
+    [HttpGet("top-customers")]
+    public async Task<IActionResult> GetTopCustomers(
+        [FromQuery] DateTime? date,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] int limit = 10)
+    {
+        var providedDate = date.HasValue ? ToBusinessDateUtc(date.Value) : (DateTime?)null;
+        var providedFrom = from.HasValue ? ToBusinessDateUtc(from.Value) : (DateTime?)null;
+        var providedTo = to.HasValue ? ToBusinessDateUtc(to.Value) : (DateTime?)null;
+        var businessFromDate = providedDate ?? providedFrom ?? Sumpooj.API.Services.Mobile.PosSaleSyncService.GetServerLocalBusinessDate();
+        var businessToDate = providedDate ?? providedTo ?? businessFromDate;
+        var (utcFromStart, utcToEnd) = GetUtcRangeForBusinessDates(businessFromDate, businessToDate);
+        if (utcToEnd < utcFromStart)
+        {
+            (utcFromStart, utcToEnd) = (utcToEnd, utcFromStart);
+        }
+
+        var includedStatuses = new[]
+        {
+            OrderStatus.Confirmed,
+            OrderStatus.Processing,
+            OrderStatus.ReadyForDelivery,
+            OrderStatus.OutForDelivery,
+            OrderStatus.Delivered,
+        };
+        var resultLimit = Math.Clamp(limit, 1, 100);
+
+        var customers = await (
+                from order in _db.Orders.AsNoTracking()
+                join customer in _db.Customers.AsNoTracking() on order.CustomerId equals customer.Id
+                where order.CompanyId == CompanyId &&
+                      customer.CompanyId == CompanyId &&
+                      order.IsActive &&
+                      customer.IsActive &&
+                      includedStatuses.Contains(order.Status) &&
+                      order.CreatedAtUtc >= utcFromStart &&
+                      order.CreatedAtUtc <= utcToEnd
+                group order by new { customer.Id, customer.Name } into orders
+                select new TopCustomerDto
+                {
+                    CustomerId = orders.Key.Id,
+                    CustomerName = orders.Key.Name,
+                    TotalAmount = orders.Sum(order => order.TotalAmount),
+                    OrderCount = orders.Count(),
+                })
+            .OrderByDescending(customer => customer.TotalAmount)
+            .ThenByDescending(customer => customer.OrderCount)
+            .ThenBy(customer => customer.CustomerName.ToLower())
+            .Take(resultLimit)
+            .ToListAsync();
+
+        return Ok(customers);
+    }
+
+    [HttpGet("rewards-summary")]
+    public async Task<IActionResult> GetRewardsSummary()
+    {
+        var customerTotals = await _db.Customers
+            .AsNoTracking()
+            .Where(customer => customer.CompanyId == CompanyId && customer.IsActive)
+            .GroupBy(_ => 1)
+            .Select(customers => new
+            {
+                CurrentPoints = customers.Sum(customer => customer.RewardPoints),
+                LifetimePoints = customers.Sum(customer => customer.LifetimeRewardPoints),
+                RedeemedPoints = customers.Sum(customer => customer.RedeemedRewardPoints),
+            })
+            .FirstOrDefaultAsync();
+
+        var orderTotals = await _db.Orders
+            .AsNoTracking()
+            .Where(order =>
+                order.CompanyId == CompanyId &&
+                order.IsActive &&
+                (order.RewardPointsRedeemed > 0 || order.RewardPointsEarned > 0))
+            .GroupBy(_ => 1)
+            .Select(orders => new
+            {
+                RewardOrders = orders.Count(),
+                DiscountAmount = orders.Sum(order => order.RewardDiscountAmount),
+            })
+            .FirstOrDefaultAsync();
+
+        var customers = await _db.Customers
+            .AsNoTracking()
+            .Where(customer =>
+                customer.CompanyId == CompanyId &&
+                customer.IsActive &&
+                (customer.RewardPoints > 0 ||
+                 customer.LifetimeRewardPoints > 0 ||
+                 customer.RedeemedRewardPoints > 0))
+            .OrderByDescending(customer => customer.RewardPoints)
+            .ThenByDescending(customer => customer.LifetimeRewardPoints)
+            .Take(25)
+            .Select(customer => new RewardCustomerDto
+            {
+                CustomerId = customer.Id,
+                CustomerName = customer.Name,
+                Phone = customer.Phone,
+                RewardPoints = customer.RewardPoints,
+                LifetimeRewardPoints = customer.LifetimeRewardPoints,
+                RedeemedRewardPoints = customer.RedeemedRewardPoints,
+                LastRewardActivityAtUtc = customer.LastRewardActivityAtUtc,
+            })
+            .ToListAsync();
+
+        return Ok(new RewardsReportDto
+        {
+            CurrentPoints = customerTotals?.CurrentPoints ?? 0,
+            LifetimePoints = customerTotals?.LifetimePoints ?? 0,
+            RedeemedPoints = customerTotals?.RedeemedPoints ?? 0,
+            RewardOrders = orderTotals?.RewardOrders ?? 0,
+            DiscountAmount = orderTotals?.DiscountAmount ?? 0m,
+            Customers = customers,
+        });
+    }
+
+    [HttpGet("top-products")]
+    public async Task<IActionResult> GetTopProducts(
+        [FromQuery] DateTime? date,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] int limit = 10)
+    {
+        var providedDate = date.HasValue ? ToBusinessDateUtc(date.Value) : (DateTime?)null;
+        var providedFrom = from.HasValue ? ToBusinessDateUtc(from.Value) : (DateTime?)null;
+        var providedTo = to.HasValue ? ToBusinessDateUtc(to.Value) : (DateTime?)null;
+        var businessFromDate = providedDate ?? providedFrom ?? Sumpooj.API.Services.Mobile.PosSaleSyncService.GetServerLocalBusinessDate();
+        var businessToDate = providedDate ?? providedTo ?? businessFromDate;
+        var (utcFromStart, utcToEnd) = GetUtcRangeForBusinessDates(businessFromDate, businessToDate);
+        if (utcToEnd < utcFromStart)
+        {
+            (utcFromStart, utcToEnd) = (utcToEnd, utcFromStart);
+        }
+
+        var resultLimit = Math.Clamp(limit, 1, 100);
+        var products = await (
+                from order in _db.Orders.AsNoTracking()
+                from item in order.Items
+                join product in _db.Products.AsNoTracking() on item.ProductId equals product.Id
+                where order.CompanyId == CompanyId &&
+                      product.CompanyId == CompanyId &&
+                      order.IsActive &&
+                      product.IsActive &&
+                      order.CreatedAtUtc >= utcFromStart &&
+                      order.CreatedAtUtc <= utcToEnd
+                group item by new { product.Id, product.Name } into items
+                select new TopProductDto
+                {
+                    ProductId = items.Key.Id,
+                    ProductName = items.Key.Name,
+                    QuantitySold = items.Sum(item => item.Quantity),
+                    TotalRevenue = items.Sum(item => item.TotalPrice),
+                })
+            .OrderByDescending(product => product.TotalRevenue)
+            .Take(resultLimit)
+            .ToListAsync();
+
+        return Ok(products);
+    }
+
+    // Mirrors MobileDashboardController's boundary conversion: ExpenseDate is a full
+    // timestamp (not a per-day column like CashBookEntry.Date), so the IST business
+    // day must be converted to a UTC start/end range rather than compared for equality.
+    private static (DateTime utcStart, DateTime utcEnd) GetUtcRangeForBusinessDates(DateTime businessDateFrom, DateTime businessDateTo)
+    {
+        if (TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Kolkata", out var tz) ||
+            TimeZoneInfo.TryFindSystemTimeZoneById("India Standard Time", out tz))
+        {
+            var istFromMidnight = new DateTime(businessDateFrom.Year, businessDateFrom.Month, businessDateFrom.Day, 0, 0, 0);
+            var istToMidnight = new DateTime(businessDateTo.Year, businessDateTo.Month, businessDateTo.Day).AddDays(1).AddTicks(-1);
+
+            var utcStart = TimeZoneInfo.ConvertTimeToUtc(istFromMidnight, tz);
+            var utcEnd = TimeZoneInfo.ConvertTimeToUtc(istToMidnight, tz);
+
+            return (utcStart, utcEnd);
+        }
+
+        return (
+            DateTime.SpecifyKind(businessDateFrom.Date, DateTimeKind.Utc),
+            DateTime.SpecifyKind(businessDateTo.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc)
+        );
     }
 
     [HttpPost("cash-book")]

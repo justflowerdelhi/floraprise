@@ -62,9 +62,13 @@ public class DayCloseController : ControllerBase
     }
 
     [HttpGet("history")]
-    public async Task<IActionResult> GetHistory([FromQuery] Guid locationId, [FromQuery] int days = 30)
+    public async Task<IActionResult> GetHistory(
+        [FromQuery] Guid? locationId = null,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null,
+        [FromQuery] int days = 30)
     {
-        var history = await _dayCloseService.GetHistoryAsync(CompanyId, locationId, days);
+        var history = await _dayCloseService.GetHistoryAsync(CompanyId, locationId, startDate, endDate, days);
         return Ok(history);
     }
 

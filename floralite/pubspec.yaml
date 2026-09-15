@@ -63,6 +63,7 @@ flutter:
     - assets/logo/
     - assets/icon.png
     - assets/splash_icon.png
+    - assets/floraprise-title.png
 
 flutter_launcher_icons:
   android: true

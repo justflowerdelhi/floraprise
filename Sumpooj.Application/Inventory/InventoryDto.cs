@@ -75,6 +75,9 @@ public class InventoryAdjustmentDto
     public string? AdjustedByName { get; set; }
     public DateTime AdjustmentDate { get; set; }
     public string? Notes { get; set; }
+    public string? Category { get; set; }
+    public string? Unit { get; set; }
+    public string? SupplierName { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 }
 

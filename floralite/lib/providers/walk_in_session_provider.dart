@@ -123,6 +123,7 @@ class WalkInSessionProvider extends ChangeNotifier {
   }
 
   Future<OrderRewardSummary?> getOrderRewardSummary(int orderId) {
+    if (kIsWeb) return Future.value(null);
     return _walkInManager.getOrderRewardSummary(orderId);
   }
 
@@ -173,11 +174,11 @@ class WalkInSessionProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      if (_storageModeProvider?.isCloud == true && _session.draftOrderId == null) {
+      if (!kIsWeb && _storageModeProvider?.isCloud == true && _session.draftOrderId == null) {
         final draft = await _walkInManager.saveDraft(_session);
         _session = draft.session;
       }
-      final result = _storageModeProvider?.isCloud == true
+      final result = (_storageModeProvider?.isCloud == true || kIsWeb)
           ? await _walkInManager.confirmOnlineOrder(_session)
           : await _walkInManager.confirmOrder(_session);
       _session = WalkInSession.empty(_session.fulfilmentType);

@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/repositories/cloud_top_customers_repository.dart';
 import '../../data/repositories/order_repository.dart';
 import '../../managers/business_settings_manager.dart';
 import '../../providers/storage_mode_provider.dart';
 import '../../widgets/common_widgets.dart';
-import '../../widgets/non_cloud_report_banner.dart';
 
 class TopCustomersReportScreen extends StatefulWidget {
   const TopCustomersReportScreen({super.key});
@@ -18,6 +18,8 @@ class TopCustomersReportScreen extends StatefulWidget {
 
 class _TopCustomersReportScreenState extends State<TopCustomersReportScreen> {
   final OrderRepository _orderRepository = OrderRepository();
+  final CloudTopCustomersRepository _cloudRepository =
+      CloudTopCustomersRepository();
   final BusinessSettingsManager _businessSettingsManager =
       BusinessSettingsManager();
 
@@ -49,6 +51,30 @@ class _TopCustomersReportScreenState extends State<TopCustomersReportScreen> {
     setState(() => _isLoading = true);
 
     try {
+      if (context.read<StorageModeProvider>().isCloud) {
+        final customers = await _cloudRepository.getTopCustomers(
+          fromDate: _startDate,
+          toDate: _endDate,
+          limit: 10,
+        );
+
+        if (!mounted) return;
+        setState(() {
+          _topCustomers = customers
+              .map(
+                (customer) => _CustomerData(
+                  customerId: null,
+                  customerName: customer.customerName,
+                  totalAmount: customer.totalPaise,
+                  orderCount: customer.orderCount,
+                ),
+              )
+              .toList();
+          _isLoading = false;
+        });
+        return;
+      }
+
       final sortedCustomers = await _orderRepository.getTopCustomerStatistics(
         startDate: _startDate,
         endDate: _endDate,
@@ -93,17 +119,13 @@ class _TopCustomersReportScreenState extends State<TopCustomersReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isCloud = context.watch<StorageModeProvider?>()?.isCloud ?? false;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Top Customers'),
       ),
-      body: isCloud
-          ? const NonCloudReportBanner(reportTitle: 'Top Customers Report')
-          : _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : ListView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 _buildDateRangeSelector(),

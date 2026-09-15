@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../database/app_database.dart';
@@ -442,6 +443,7 @@ class ReadyBouquetRepository {
   }
 
   Future<List<ReadyBouquetSummary>> getAttentionBouquets() async {
+    if (kIsWeb) return const [];
     final all = await listReadyBouquets();
     return all
         .where((b) =>

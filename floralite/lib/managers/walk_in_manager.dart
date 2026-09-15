@@ -1,9 +1,15 @@
+import 'package:flutter/foundation.dart';
+
+import '../models/gst_calculation_type.dart';
 import '../models/payment_split.dart';
 import '../models/order_workspace_models.dart';
 import '../models/walk_in_enums.dart';
 import '../models/walk_in_line_item.dart';
 import '../models/walk_in_session.dart';
+import '../services/discount_service.dart';
 import '../services/pos_sale_sync_service.dart';
+import '../data/repositories/customer_repository.dart';
+import '../data/repositories/order_repository.dart';
 import 'customer_manager.dart';
 import 'inventory_manager.dart';
 import 'order_manager.dart';
@@ -40,6 +46,9 @@ String cloudPosOrderNumber(String clientSyncId) {
 }
 
 class WalkInManager {
+  @visibleForTesting
+  static bool debugForceWebMode = false;
+
   WalkInManager({
     required CustomerManager customerManager,
     required PricingManager pricingManager,
@@ -222,6 +231,25 @@ class WalkInManager {
           paymentValidation.message ?? 'Payment validation failed');
     }
 
+    if (kIsWeb || debugForceWebMode) {
+      final clientSyncId =
+          'web_${DateTime.now().millisecondsSinceEpoch}_${(DateTime.now().microsecondsSinceEpoch % 1000)}';
+      final now = DateTime.now();
+      final payload = buildWebPosPayload(
+        session: session,
+        totals: totals,
+        ensuredCustomer: ensuredCustomer,
+        clientSyncId: clientSyncId,
+        now: now,
+      );
+
+      await syncService.submitPayload(payload);
+      return ConfirmOrderResult(
+        orderId: payload['localOrderId'] as int,
+        grandTotalPaise: totals.grandTotalPaise,
+      );
+    }
+
     final draftId = await _orderManager.saveDraft(
       session: session,
       totals: totals,
@@ -317,5 +345,120 @@ class WalkInManager {
       rewardPointsRedeemed: points,
       rewardDiscountAmountPaise: discountPaise,
     );
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic> buildWebPosPayload({
+    required WalkInSession session,
+    required OrderTotals totals,
+    required CustomerRecord? ensuredCustomer,
+    required String clientSyncId,
+    required DateTime now,
+  }) {
+    final orderNo = cloudPosOrderNumber(clientSyncId);
+    final lineSnapshots = <Map<String, dynamic>>[];
+    final inventorySnapshots = <Map<String, dynamic>>[];
+
+    for (var i = 0; i < session.lines.length; i++) {
+      final line = session.lines[i];
+      final authoritativeId = line.cloudProductId?.trim();
+      final hasAuthoritativeProduct =
+          authoritativeId != null && authoritativeId.isNotEmpty;
+
+      if (line.source == 'product' && !hasAuthoritativeProduct) {
+        throw StateError(
+            'Unable to complete sale because product information is incomplete.');
+      }
+
+      final lineSubtotal = (line.unitPricePaise * line.quantity).round();
+      final lineDiscount = line.discountType != null && line.discountValue != null
+          ? DiscountService.calculateLineDiscount(
+              lineSubtotalPaise: lineSubtotal,
+              discountType: line.discountType!,
+              discountValue: line.discountValue!,
+            )
+          : line.discountPaise;
+      final discounted = lineSubtotal - lineDiscount;
+      final breakup = calculateGstLineBreakup(
+        amountPaise: discounted,
+        gstPercent: line.gstPercent,
+        calculationType: line.gstCalculationType,
+      );
+
+      lineSnapshots.add({
+        'id': i + 1,
+        if (hasAuthoritativeProduct) ...{
+          'product_id': authoritativeId,
+          'cloudProductId': authoritativeId,
+        },
+        'design_ref': line.designRef,
+        'description': line.description,
+        'qty': line.quantity.round(),
+        'unit_price_paise': line.unitPricePaise.round(),
+        'gst_percent': line.gstPercent,
+        'discount_type': line.discountType,
+        'discount_value': line.discountValue,
+        'discount_paise': lineDiscount.round(),
+        'line_subtotal_paise': breakup.basicAmountPaise.round(),
+        'line_gst_paise': breakup.gstAmountPaise.round(),
+        'line_total_paise': discounted.round(),
+        'source': line.source,
+      });
+
+      if (hasAuthoritativeProduct) {
+        inventorySnapshots.add({
+          'id': i + 1,
+          'product_id': authoritativeId,
+          'cloudProductId': authoritativeId,
+          'qty': line.quantity.round(),
+          'created_at': now.toIso8601String(),
+        });
+      }
+    }
+
+    final paymentSnapshots = session.payments.asMap().entries.map((e) => {
+          'id': e.key + 1,
+          'method': e.value.persistenceMethod,
+          'amount_paise': e.value.amountPaise.round(),
+          'reference': e.value.reference,
+          'created_at': now.toIso8601String(),
+        }).toList();
+
+    return {
+      'clientSyncId': clientSyncId,
+      'localOrderId': (now.millisecondsSinceEpoch & 0x7FFFFFFF),
+      'order': {
+        'order_no': orderNo,
+        'cloudCustomerId': ensuredCustomer?.cloudCustomerId,
+        'customer_phone': session.customerPhone,
+        'customer_name': session.customerName,
+        'source': 'pos',
+        'channel': 'walkin',
+        'fulfilment_type': session.fulfilmentType.name,
+        'recipient_name': session.recipientName,
+        'recipient_phone': session.recipientPhone,
+        'delivery_address': session.deliveryAddress,
+        'delivery_pincode': session.deliveryPincode,
+        'card_message': session.cardMessage,
+        'delivery_slot': session.deliverySlot,
+        'scheduled_at': session.scheduledAt?.toIso8601String(),
+        'confirmed_at': now.toIso8601String(),
+        'business_date':
+            DateTime.utc(now.year, now.month, now.day).toIso8601String(),
+        'subtotal_paise': totals.subtotalPaise.round(),
+        'gst_total_paise': totals.gstTotalPaise.round(),
+        'discount_total_paise': totals.discountTotalPaise.round(),
+        'grand_total_paise': totals.grandTotalPaise.round(),
+        'round_off_paise':
+            totals.roundOffPaise == 0 ? 0 : totals.roundOffPaise.round(),
+        'reward_discount_amount_paise': session.rewardDiscountAmountPaise.round(),
+        'reward_points_earned': 0,
+        'reward_points_redeemed': session.rewardPointsRedeemed.round(),
+        'is_paid': 1,
+      },
+      'lines': lineSnapshots,
+      'payments': paymentSnapshots,
+      'inventoryTransactions': inventorySnapshots,
+    };
   }
 }

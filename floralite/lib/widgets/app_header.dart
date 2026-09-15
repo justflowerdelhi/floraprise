@@ -67,9 +67,14 @@ class _AppHeaderState extends State<AppHeader> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final storageProvider = Provider.of<StorageModeProvider?>(context);
     final isCloud = storageProvider?.isCloud ?? _isCloud;
+
+    final isDefaultTitle = widget.title == null ||
+        widget.title!.trim().isEmpty ||
+        widget.title!.trim() == 'Floraprise' ||
+        (l10n != null && widget.title!.trim() == l10n.appTitle);
 
     return AppBar(
       automaticallyImplyLeading: widget.showBackButton,
@@ -83,17 +88,23 @@ class _AppHeaderState extends State<AppHeader> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  widget.title?.trim().isNotEmpty == true
-                      ? widget.title!.trim()
-                      : 'Floraprise',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
+                if (isDefaultTitle)
+                  Image.asset(
+                    'assets/floraprise-title.png',
+                    height: 22,
+                    fit: BoxFit.contain,
+                    alignment: Alignment.centerLeft,
+                  )
+                else
+                  Text(
+                    widget.title!.trim(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
-                ),
                 if (_shopName.isNotEmpty)
                   Text(
                     _shopName,
@@ -130,10 +141,17 @@ class _AppHeaderState extends State<AppHeader> {
           },
           itemBuilder: (context) => [
             PopupMenuItem(
-                value: '/shop-details', child: Text(l10n.shopDetails)),
-            PopupMenuItem(value: '/backup-restore', child: Text(l10n.backup)),
-            PopupMenuItem(value: '/settings', child: Text(l10n.settingsTitle)),
-            PopupMenuItem(value: '/about', child: Text(l10n.about)),
+                value: '/shop-details',
+                child: Text(l10n?.shopDetails ?? 'Shop Details')),
+            PopupMenuItem(
+                value: '/backup-restore',
+                child: Text(l10n?.backup ?? 'Backup & Restore')),
+            PopupMenuItem(
+                value: '/settings',
+                child: Text(l10n?.settingsTitle ?? 'Settings')),
+            PopupMenuItem(
+                value: '/about',
+                child: Text(l10n?.about ?? 'About')),
           ],
           icon: const Icon(Icons.account_circle_rounded),
         ),

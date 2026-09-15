@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../../services/mobile_auth_service.dart';
 import 'staff_repository.dart';
@@ -235,37 +235,35 @@ class CloudStaffRepository {
 
     debugPrint('[STAFF-CLOUD] $method $uri');
     for (var attempt = 0; attempt < 2; attempt++) {
-      final client = HttpClient();
+      final client = http.Client();
       try {
-        final request = await client.openUrl(method, uri).timeout(
-              const Duration(seconds: 12),
-            );
-        request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
-        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+        final request = http.Request(method, uri);
+        request.headers['Accept'] = 'application/json';
+        request.headers['Authorization'] = 'Bearer $token';
         if (body != null) {
-          request.headers.contentType = ContentType.json;
-          request.write(jsonEncode(body));
+          request.headers['Content-Type'] = 'application/json';
+          request.body = jsonEncode(body);
         }
 
-        final response =
-            await request.close().timeout(const Duration(seconds: 20));
-        final responseBody = await response.transform(utf8.decoder).join();
-        debugPrint('[STAFF-CLOUD] HTTP STATUS: ${response.statusCode}');
+        final streamedResponse =
+            await client.send(request).timeout(const Duration(seconds: 20));
+        final responseBody = await streamedResponse.stream.bytesToString();
+        debugPrint('[STAFF-CLOUD] HTTP STATUS: ${streamedResponse.statusCode}');
 
-        if (response.statusCode == 401 && attempt == 0) {
+        if (streamedResponse.statusCode == 401 && attempt == 0) {
           final refreshed = await _auth.refreshAndBootstrap();
           token = refreshed.accessToken;
           continue;
         }
 
-        if (response.statusCode == 403) {
+        if (streamedResponse.statusCode == 403) {
           throw const CloudStaffPermissionException();
         }
 
         final decoded = responseBody.trim().isEmpty
             ? <String, dynamic>{}
             : _decode(responseBody);
-        if (response.statusCode < 200 || response.statusCode >= 300) {
+        if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
           final message = decoded is Map
               ? decoded['message'] ??
                   decoded['error'] ??
@@ -274,14 +272,17 @@ class CloudStaffRepository {
               : null;
           throw StateError(
             message?.toString() ??
-                'Cloud staff request failed (HTTP ${response.statusCode}).',
+                'Cloud staff request failed (HTTP ${streamedResponse.statusCode}).',
           );
         }
         return decoded;
-      } on SocketException catch (error) {
-        throw StateError('Unable to connect to Floraprise Cloud: $error');
+      } catch (error) {
+        if (error is CloudStaffPermissionException || error is StateError) rethrow;
+        if (attempt == 1) {
+          throw StateError('Unable to connect to Floraprise Cloud: $error');
+        }
       } finally {
-        client.close(force: true);
+        client.close();
       }
     }
     throw StateError('Cloud staff request failed.');

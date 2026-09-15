@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
+import '../data/repositories/cash_book_repository.dart';
 import '../data/repositories/opening_cash_repository.dart';
 import '../models/opening_cash.dart';
+import '../providers/storage_mode_provider.dart';
 
 class OpeningCashScreen extends StatefulWidget {
   const OpeningCashScreen({super.key});
@@ -14,8 +17,11 @@ class OpeningCashScreen extends StatefulWidget {
 class _OpeningCashScreenState extends State<OpeningCashScreen> {
   final _amountController = TextEditingController();
   final _repository = OpeningCashRepository();
+  final _cloudRepository = CloudOpeningCashRepository();
+  final _cloudCashBookRepository = CloudCashBookRepository();
   DateTime _selectedDate = DateTime.now();
   OpeningCash? _existingOpeningCash;
+  String? _cloudOpeningCashId;
   bool _isLocked = false;
   bool _isLoading = true;
 
@@ -33,18 +39,53 @@ class _OpeningCashScreenState extends State<OpeningCashScreen> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    
-    final openingCash = await _repository.getByDate(_selectedDate);
-    final hasTransactions = await _repository.hasTransactionsForDate(_selectedDate);
-    
-    setState(() {
-      _existingOpeningCash = openingCash;
-      _isLocked = hasTransactions;
-      if (openingCash != null) {
-        _amountController.text = (openingCash.amount / 100).toStringAsFixed(2);
+
+    try {
+      final isCloud = context.read<StorageModeProvider>().isCloud;
+      if (isCloud) {
+        final cloudEntry = await _cloudRepository.getByDate(_selectedDate);
+        final cashBook = await _cloudCashBookRepository.getByDate(_selectedDate);
+        final hasTransactions = cashBook.isNotEmpty;
+
+        setState(() {
+          _existingOpeningCash = cloudEntry?.openingCash;
+          _cloudOpeningCashId = cloudEntry?.id;
+          _isLocked = hasTransactions;
+          if (cloudEntry != null) {
+            _amountController.text =
+                (cloudEntry.openingCash.amount / 100).toStringAsFixed(2);
+          } else {
+            _amountController.clear();
+          }
+          _isLoading = false;
+        });
+        return;
       }
-      _isLoading = false;
-    });
+
+      final openingCash = await _repository.getByDate(_selectedDate);
+      final hasTransactions =
+          await _repository.hasTransactionsForDate(_selectedDate);
+
+      setState(() {
+        _existingOpeningCash = openingCash;
+        _cloudOpeningCashId = null;
+        _isLocked = hasTransactions;
+        if (openingCash != null) {
+          _amountController.text =
+              (openingCash.amount / 100).toStringAsFixed(2);
+        } else {
+          _amountController.clear();
+        }
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   Future<void> _selectDate() async {
@@ -59,6 +100,7 @@ class _OpeningCashScreenState extends State<OpeningCashScreen> {
         _selectedDate = selected;
         _amountController.clear();
         _existingOpeningCash = null;
+        _cloudOpeningCashId = null;
         _isLocked = false;
       });
       await _loadData();
@@ -75,14 +117,23 @@ class _OpeningCashScreenState extends State<OpeningCashScreen> {
     }
 
     final amount = (double.parse(amountText) * 100).toInt();
-    
+
     try {
-      if (_existingOpeningCash != null) {
-        await _repository.update(_existingOpeningCash!.copyWith(amount: amount));
+      final isCloud = context.read<StorageModeProvider>().isCloud;
+      if (isCloud) {
+        await _cloudRepository.save(
+          _selectedDate,
+          amount,
+          cloudId: _cloudOpeningCashId,
+        );
       } else {
-        await _repository.create(amount, _selectedDate);
+        if (_existingOpeningCash != null) {
+          await _repository.update(_existingOpeningCash!.copyWith(amount: amount));
+        } else {
+          await _repository.create(amount, _selectedDate);
+        }
       }
-      
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Opening cash saved successfully')),

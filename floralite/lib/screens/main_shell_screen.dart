@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../models/workspace_destinations.dart';
 import '../providers/app_shell_controller.dart';
 import '../providers/dashboard_provider.dart';
 import '../providers/subscription_provider.dart';
@@ -64,9 +65,64 @@ class MainShellScreen extends StatefulWidget {
   State<MainShellScreen> createState() => _MainShellScreenState();
 }
 
+class _ShellNavigatorObserver extends NavigatorObserver {
+  _ShellNavigatorObserver(this.onRouteChange);
+
+  final ValueChanged<String> onRouteChange;
+
+  void _notify(Route<dynamic>? route) {
+    final name = route?.settings.name;
+    if (name != null && name.isNotEmpty) {
+      onRouteChange(name);
+    }
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    _notify(route);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
+    _notify(previousRoute);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    _notify(newRoute);
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didRemove(route, previousRoute);
+    _notify(previousRoute);
+  }
+}
+
 class _MainShellScreenState extends State<MainShellScreen> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  late final _ShellNavigatorObserver _navigatorObserver;
+  String _currentRoute = '/dashboard';
   DateTime? _lastBackPressedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentRoute = widget.initialRoute ?? '/dashboard';
+    _navigatorObserver = _ShellNavigatorObserver((route) {
+      if (!mounted || _currentRoute == route) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _currentRoute != route) {
+          setState(() {
+            _currentRoute = route;
+          });
+        }
+      });
+    });
+  }
 
   static const _tabs = AppShellTab.values;
   static const _rootRoutes = [
@@ -101,6 +157,10 @@ class _MainShellScreenState extends State<MainShellScreen> {
     final rootRoute = _rootRoutes[index];
     if (tab == AppShellTab.home &&
         controller.selectedTab == AppShellTab.home) {
+      _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        rootRoute,
+        (route) => false,
+      );
       context.read<DashboardProvider>().refresh();
       return;
     }
@@ -112,6 +172,22 @@ class _MainShellScreenState extends State<MainShellScreen> {
     if (tab == AppShellTab.home) {
       context.read<DashboardProvider>().refresh();
     }
+  }
+
+  void _onSelectSidebarDestination(WorkspaceDestination destination) {
+    if (_currentRoute == destination.route) {
+      return;
+    }
+    if (destination.route == '/dashboard') {
+      _goHome();
+      return;
+    }
+
+    _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+      '/dashboard',
+      (route) => false,
+    );
+    _navigatorKey.currentState?.pushNamed(destination.route);
   }
 
   @override
@@ -131,77 +207,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
         body: isDesktop
             ? Row(
                 children: [
-                  NavigationRail(
-                    selectedIndex: selectedIndex,
-                    labelType: NavigationRailLabelType.all,
-                    leading: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.local_florist,
-                            size: 32,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Floraprise',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0x1F2E7D32),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'Pro Cloud',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF2E7D32),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    onDestinationSelected: (index) =>
-                        _onSelectTab(index, controller),
-                    destinations: const [
-                      NavigationRailDestination(
-                        icon: Icon(Icons.home_outlined),
-                        selectedIcon: Icon(Icons.home_rounded),
-                        label: Text('Home'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.list_alt_outlined),
-                        selectedIcon: Icon(Icons.list_alt_rounded),
-                        label: Text('Orders'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.shopping_cart_outlined),
-                        selectedIcon: Icon(Icons.shopping_cart_rounded),
-                        label: Text('POS'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.inventory_2_outlined),
-                        selectedIcon: Icon(Icons.inventory_2_rounded),
-                        label: Text('Inventory'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.account_balance_wallet_outlined),
-                        selectedIcon: Icon(Icons.account_balance_wallet_rounded),
-                        label: Text('Accounts'),
-                      ),
-                    ],
+                  _DesktopNavigationSidebar(
+                    currentRoute: _currentRoute,
+                    onDestinationSelected: _onSelectSidebarDestination,
                   ),
                   const VerticalDivider(thickness: 1, width: 1),
                   Expanded(
@@ -214,6 +222,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
                         Expanded(
                           child: Navigator(
                             key: _navigatorKey,
+                            observers: [_navigatorObserver],
                             initialRoute: widget.initialRoute ??
                                 _rootRoutes[AppShellTab.home.index],
                             onGenerateRoute: _onGenerateRoute,
@@ -233,6 +242,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
                   Expanded(
                     child: Navigator(
                       key: _navigatorKey,
+                      observers: [_navigatorObserver],
                       initialRoute: widget.initialRoute ??
                           _rootRoutes[AppShellTab.home.index],
                       onGenerateRoute: _onGenerateRoute,
@@ -732,6 +742,222 @@ class _GracePeriodBanner extends StatelessWidget {
             child: const Text('Renew Now'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DesktopNavigationSidebar extends StatelessWidget {
+  const _DesktopNavigationSidebar({
+    required this.currentRoute,
+    required this.onDestinationSelected,
+  });
+
+  final String currentRoute;
+  final ValueChanged<WorkspaceDestination> onDestinationSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final summary = context.watch<DashboardProvider>().summary;
+
+    return Container(
+      width: 236,
+      color: theme.scaffoldBackgroundColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.local_florist_rounded,
+                    size: 22,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Floraprise',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0x1F2E7D32),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Pro Cloud',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF2E7D32),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, thickness: 1),
+          Expanded(
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildDestinationTile(
+                      context: context,
+                      destination: WorkspaceNavigation.homeDestination,
+                      summary: summary,
+                    ),
+                    const SizedBox(height: 4),
+                    for (final section in WorkspaceNavigation.sections) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
+                        child: Text(
+                          section.title,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                            color: colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ),
+                      for (final item in section.items)
+                        _buildDestinationTile(
+                          context: context,
+                          destination: item,
+                          summary: summary,
+                        ),
+                    ],
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDestinationTile({
+    required BuildContext context,
+    required WorkspaceDestination destination,
+    required dynamic summary,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isHome = destination.route == '/dashboard';
+    final isSelected = isHome
+        ? currentRoute == '/dashboard'
+        : (currentRoute == destination.route ||
+            currentRoute.startsWith('${destination.route}/'));
+
+    final iconData = (isSelected && destination.selectedIcon != null)
+        ? destination.selectedIcon!
+        : destination.icon;
+    final label = destination.getLabel(context);
+    final badgeCount = summary != null ? destination.getBadge(summary) : 0;
+
+    return Tooltip(
+      message: label,
+      waitDuration: const Duration(milliseconds: 500),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 1.5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primaryContainer.withValues(alpha: 0.6)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => onDestinationSelected(destination),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              child: Row(
+                children: [
+                  Icon(
+                    iconData,
+                    size: 20,
+                    color: isSelected
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected
+                            ? colorScheme.primary
+                            : colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (badgeCount > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? colorScheme.primary
+                            : colorScheme.error,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

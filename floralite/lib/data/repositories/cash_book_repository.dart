@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../database/app_database.dart';
 import '../../models/cash_book.dart';
@@ -191,20 +191,19 @@ class CloudCashBookRepository {
 
     debugPrint('[CASH-BOOK-CLOUD] $method $uri');
     for (var attempt = 0; attempt < 2; attempt++) {
-      final client = HttpClient();
+      final client = http.Client();
       try {
-        final request = await client.openUrl(method, uri).timeout(
-              const Duration(seconds: 12),
-            );
-        request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
-        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+        final request = http.Request(method, uri);
+        request.headers['Accept'] = 'application/json';
+        request.headers['Authorization'] = 'Bearer $token';
 
-        final response =
-            await request.close().timeout(const Duration(seconds: 20));
-        final responseBody = await response.transform(utf8.decoder).join();
-        debugPrint('[CASH-BOOK-CLOUD] HTTP STATUS: ${response.statusCode}');
+        final streamedResponse =
+            await client.send(request).timeout(const Duration(seconds: 20));
+        final responseBody = await streamedResponse.stream.bytesToString();
+        final statusCode = streamedResponse.statusCode;
+        debugPrint('[CASH-BOOK-CLOUD] HTTP STATUS: $statusCode');
 
-        if (response.statusCode == 401 && attempt == 0) {
+        if (statusCode == 401 && attempt == 0) {
           final refreshed = await _auth.refreshAndBootstrap();
           token = refreshed.accessToken;
           continue;
@@ -213,7 +212,7 @@ class CloudCashBookRepository {
         final decoded = responseBody.trim().isEmpty
             ? <String, dynamic>{}
             : _decode(responseBody);
-        if (response.statusCode < 200 || response.statusCode >= 300) {
+        if (statusCode < 200 || statusCode >= 300) {
           final message = decoded is Map
               ? decoded['message'] ??
                   decoded['detail'] ??
@@ -222,14 +221,15 @@ class CloudCashBookRepository {
               : null;
           throw StateError(
             message?.toString() ??
-                'Cloud cash book request failed (HTTP ${response.statusCode}).',
+                'Cloud cash book request failed (HTTP $statusCode).',
           );
         }
         return decoded;
-      } on SocketException catch (error) {
+      } catch (error) {
+        if (error is StateError) rethrow;
         throw StateError('Unable to connect to Floraprise Cloud: $error');
       } finally {
-        client.close(force: true);
+        client.close();
       }
     }
     throw StateError('Cloud cash book request failed.');

@@ -17,7 +17,8 @@ public class FinishedGoodsBatch : BaseEntity
         DateTime expectedExpiry,
         Guid locationId,
         string locationName,
-        decimal totalCost)
+        decimal totalCost,
+        string? operatorName = null)
     {
         CompanyId = companyId;
         RecipeId = recipeId;
@@ -30,6 +31,7 @@ public class FinishedGoodsBatch : BaseEntity
         LocationId = locationId;
         LocationName = locationName;
         TotalCost = totalCost;
+        OperatorName = operatorName;
         Status = FinishedBatchStatus.Active;
         ProducedAt = DateTime.UtcNow;
     }
@@ -47,6 +49,16 @@ public class FinishedGoodsBatch : BaseEntity
     public decimal TotalCost { get; private set; }
     public FinishedBatchStatus Status { get; private set; }
     public DateTime ProducedAt { get; private set; }
+    public string? OperatorName { get; private set; }
+    public DateTime? ReversedAt { get; private set; }
+    public string? ReversalNote { get; private set; }
+    public bool IsReversed => Status == FinishedBatchStatus.Reversed || ReversedAt != null;
+
+    public void SetOperatorName(string? operatorName)
+    {
+        OperatorName = operatorName;
+        MarkUpdated();
+    }
 
     public void Deduct(int qty)
     {
@@ -67,11 +79,21 @@ public class FinishedGoodsBatch : BaseEntity
         Status = FinishedBatchStatus.Expired;
         MarkUpdated();
     }
+
+    public void Reverse(string? note)
+    {
+        Status = FinishedBatchStatus.Reversed;
+        ReversedAt = DateTime.UtcNow;
+        ReversalNote = note;
+        QuantityAvailable = 0;
+        MarkUpdated();
+    }
 }
 
 public enum FinishedBatchStatus
 {
     Active,
     Expired,
-    Discarded
+    Discarded,
+    Reversed
 }

@@ -181,12 +181,14 @@ class DeliveryTrackingService {
     HttpClient? httpClient,
     String? trackingHubPath,
   })  : _auth = auth ?? MobileAuthService(),
-        _httpClient = httpClient ?? HttpClient(),
+        _injectedClient = httpClient,
         _trackingHubPath = trackingHubPath ?? '/hubs/delivery-tracking';
 
   final MobileAuthService _auth;
-  final HttpClient _httpClient;
+  final HttpClient? _injectedClient;
   final String _trackingHubPath;
+
+  HttpClient get _httpClient => _injectedClient ?? HttpClient();
 
   static const _assignmentLocationQueueKey =
       'delivery_assignment_location_queue';
@@ -220,6 +222,7 @@ class DeliveryTrackingService {
   }
 
   Future<List<DeliveryWorkspaceRecord>> getActiveDeliveries() async {
+    if (kIsWeb) return const <DeliveryWorkspaceRecord>[];
     final localRows = await _getLocalWorkspace('active');
 
     try {
@@ -340,6 +343,7 @@ class DeliveryTrackingService {
 
   Future<List<DeliveryWorkspaceRecord>> _getLocalWorkspace(
       String status) async {
+    if (kIsWeb) return const <DeliveryWorkspaceRecord>[];
     // Simplified local workspace - no longer depends on workflow assignments
     // Local orders are shown only when cloud is unavailable
     final db = await AppDatabase.instance.database;

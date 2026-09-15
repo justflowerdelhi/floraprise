@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../controllers/voice_dictation_controller.dart';
+import '../data/repositories/cloud_production_repository.dart';
 import '../data/repositories/production_repository.dart';
+import '../providers/storage_mode_provider.dart';
 import '../services/speech_recognition_service.dart';
 import '../widgets/voice_dictation_field_header.dart';
 import 'bouquet_builder_screen.dart';
@@ -19,6 +22,7 @@ class ProductionDetailScreen extends StatefulWidget {
 
 class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
   final ProductionRepository _repository = ProductionRepository();
+  final CloudProductionRepository _cloudRepository = CloudProductionRepository();
   ProductionDetail? _detail;
   bool _isLoading = true;
   bool _isReversing = false;
@@ -31,7 +35,10 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
-    final detail = await _repository.getProductionDetail(widget.productionId);
+    final isCloud = context.read<StorageModeProvider?>()?.isCloud ?? false;
+    final detail = isCloud
+        ? await _cloudRepository.getProductionDetail(widget.productionId)
+        : await _repository.getProductionDetail(widget.productionId);
     if (!mounted) return;
     setState(() {
       _detail = detail;
@@ -42,6 +49,7 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
   Future<void> _reverse() async {
     final detail = _detail;
     if (detail == null || detail.isReversed) return;
+    final isCloud = context.read<StorageModeProvider?>()?.isCloud ?? false;
     final noteController = TextEditingController();
     final notesDictationController = VoiceDictationController(
       speechRecognition: SpeechRecognitionService(),
@@ -83,8 +91,13 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
     if (confirmed != true) return;
     setState(() => _isReversing = true);
     try {
-      await _repository.reverseProduction(
-          productionId: detail.id, note: noteController.text);
+      if (isCloud) {
+        await _cloudRepository.reverseProduction(
+            productionId: detail.id, note: noteController.text);
+      } else {
+        await _repository.reverseProduction(
+            productionId: detail.id, note: noteController.text);
+      }
       if (!mounted) return;
       await _load();
       if (!mounted) return;

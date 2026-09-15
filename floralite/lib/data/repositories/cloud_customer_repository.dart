@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../../services/mobile_auth_service.dart';
 
@@ -246,37 +246,28 @@ class CloudCustomerRepository {
     debugPrint('[CUSTOMER-CLOUD] $method $uri');
 
     for (var attempt = 0; attempt < 2; attempt++) {
-      final client = HttpClient();
+      final client = http.Client();
 
       try {
-        final request = await client.openUrl(method, uri).timeout(
-              const Duration(seconds: 12),
-            );
-
-        request.headers.set(
-          HttpHeaders.acceptHeader,
-          ContentType.json.mimeType,
-        );
-        request.headers.set(
-          HttpHeaders.authorizationHeader,
-          'Bearer $token',
-        );
+        final request = http.Request(method, uri);
+        request.headers['Accept'] = 'application/json';
+        request.headers['Authorization'] = 'Bearer $token';
 
         if (body != null) {
-          request.headers.contentType = ContentType.json;
-          request.write(jsonEncode(body));
+          request.headers['Content-Type'] = 'application/json';
+          request.body = jsonEncode(body);
         }
 
-        final response =
-            await request.close().timeout(const Duration(seconds: 20));
-        final responseBody =
-            await response.transform(utf8.decoder).join();
+        final streamedResponse =
+            await client.send(request).timeout(const Duration(seconds: 20));
+        final responseBody = await streamedResponse.stream.bytesToString();
+        final statusCode = streamedResponse.statusCode;
 
         debugPrint(
-          '[CUSTOMER-CLOUD] HTTP STATUS: ${response.statusCode}',
+          '[CUSTOMER-CLOUD] HTTP STATUS: $statusCode',
         );
 
-        if (response.statusCode == 401 && attempt == 0) {
+        if (statusCode == 401 && attempt == 0) {
           try {
             final refreshed = await _auth.refreshAndBootstrap();
             token = refreshed.accessToken;
@@ -297,7 +288,7 @@ class CloudCustomerRepository {
             ? <String, dynamic>{}
             : _decode(responseBody);
 
-        if (response.statusCode < 200 || response.statusCode >= 300) {
+        if (statusCode < 200 || statusCode >= 300) {
           final message = decoded['message'] ??
               decoded['detail'] ??
               decoded['title'] ??
@@ -306,7 +297,7 @@ class CloudCustomerRepository {
           throw CloudCustomerException(
             message?.toString() ??
                 'Cloud customer request failed '
-                    '(HTTP ${response.statusCode}).',
+                    '(HTTP $statusCode).',
           );
         }
 
@@ -314,12 +305,12 @@ class CloudCustomerRepository {
         return decoded;
       } on CloudCustomerException {
         rethrow;
-      } on SocketException catch (error) {
+      } catch (error) {
         throw CloudCustomerException(
           'Unable to connect to Floraprise Cloud: $error',
         );
       } finally {
-        client.close(force: true);
+        client.close();
       }
     }
 

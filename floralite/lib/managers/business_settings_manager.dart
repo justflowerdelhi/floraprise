@@ -69,6 +69,36 @@ class BusinessSettingsManager {
   static const String _samePhoneWhatsappKey = 'business.same_phone_whatsapp';
 
   Future<BusinessSettings> load() async {
+    if (kIsWeb) {
+      try {
+        final cloudProfile =
+            await _cloudCompanyProfileRepository.getCachedProfile();
+        if (cloudProfile != null && cloudProfile.name.trim().isNotEmpty) {
+          final taxId = cloudProfile.taxIdentifier?.trim() ?? '';
+          return BusinessSettings(
+            shopName: cloudProfile.name.trim(),
+            ownerName: '',
+            phone: cloudProfile.phone?.trim() ?? '',
+            address: cloudProfile.address?.trim() ?? '',
+            gstRegistered: taxId.isNotEmpty,
+            gstNumber: taxId,
+            defaultDeliveryChargePaise: 0,
+            minimumPreparationBufferMinutes: 60,
+          );
+        }
+      } catch (_) {}
+      return const BusinessSettings(
+        shopName: 'Floraprise',
+        ownerName: '',
+        phone: '',
+        address: '',
+        gstRegistered: false,
+        gstNumber: '',
+        defaultDeliveryChargePaise: 0,
+        minimumPreparationBufferMinutes: 60,
+      );
+    }
+
     // In Cloud mode, resolve from the authenticated Cloud company profile.
     if (await _storageModeService.isCloud()) {
       final cloudProfile =
@@ -134,12 +164,14 @@ class BusinessSettingsManager {
   }
   
   Future<int> _loadDeliveryCharge() async {
+    if (kIsWeb) return 0;
     final db = await AppDatabase.instance.database;
     final deliveryRaw = await _readValue(db, _deliveryChargeKey);
     return int.tryParse(deliveryRaw ?? '') ?? 0;
   }
   
   Future<int> _loadPreparationBuffer() async {
+    if (kIsWeb) return 60;
     final db = await AppDatabase.instance.database;
     final preparationBufferRaw =
         await _readValue(db, _minimumPreparationBufferMinutesKey);
@@ -147,6 +179,7 @@ class BusinessSettingsManager {
   }
 
   Future<void> setShopName(String value) async {
+    if (kIsWeb) return;
     await _saveToBusinessProfile();
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _shopNameKey, value.trim());
@@ -154,6 +187,7 @@ class BusinessSettingsManager {
   }
 
   Future<void> setOwnerName(String value) async {
+    if (kIsWeb) return;
     await _saveToBusinessProfile();
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _ownerNameKey, value.trim());
@@ -161,6 +195,7 @@ class BusinessSettingsManager {
   }
 
   Future<void> setPhone(String value) async {
+    if (kIsWeb) return;
     await _saveToBusinessProfile();
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _phoneKey, value.trim());
@@ -168,6 +203,7 @@ class BusinessSettingsManager {
   }
 
   Future<void> setAddress(String value) async {
+    if (kIsWeb) return;
     await _saveToBusinessProfile();
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _addressKey, value.trim());
@@ -175,6 +211,7 @@ class BusinessSettingsManager {
   }
 
   Future<void> setGstRegistered(bool value) async {
+    if (kIsWeb) return;
     await _saveToBusinessProfile();
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _gstRegisteredKey, value ? '1' : '0');
@@ -182,6 +219,7 @@ class BusinessSettingsManager {
   }
 
   Future<void> setGstNumber(String value) async {
+    if (kIsWeb) return;
     await _saveToBusinessProfile();
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _gstNumberKey, value.trim());
@@ -200,6 +238,7 @@ class BusinessSettingsManager {
     required bool gstRegistered,
     String? gstNumber,
   }) async {
+    if (kIsWeb) return;
     await _businessProfileRepository.saveBusinessProfile(
       shopName: shopName,
       ownerName: ownerName,
@@ -232,12 +271,14 @@ class BusinessSettingsManager {
   }
 
   Future<void> setDefaultDeliveryChargePaise(int paise) async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     final normalized = paise < 0 ? 0 : paise;
     await _writeValue(db, _deliveryChargeKey, normalized.toString());
   }
 
   Future<void> setMinimumPreparationBufferMinutes(int minutes) async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     final normalized = minutes <= 0 ? 60 : minutes;
     await _writeValue(
@@ -248,31 +289,37 @@ class BusinessSettingsManager {
   }
 
   Future<void> setWhatsapp(String value) async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _whatsappKey, value.trim());
   }
 
   Future<String> getWhatsapp() async {
+    if (kIsWeb) return '';
     final db = await AppDatabase.instance.database;
     return _fallback(await _readValue(db, _whatsappKey), '');
   }
 
   Future<void> setLogoPath(String value) async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _logoPathKey, value.trim());
   }
 
   Future<String> getLogoPath() async {
+    if (kIsWeb) return '';
     final db = await AppDatabase.instance.database;
     return _fallback(await _readValue(db, _logoPathKey), '');
   }
 
   Future<void> setSamePhoneAsWhatsapp(bool value) async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _samePhoneWhatsappKey, value ? '1' : '0');
   }
 
   Future<bool> isSamePhoneAsWhatsapp() async {
+    if (kIsWeb) return true;
     final db = await AppDatabase.instance.database;
     final raw = await _readValue(db, _samePhoneWhatsappKey);
     return raw == null ? true : raw == '1';

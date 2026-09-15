@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/repositories/cloud_remaining_reports_repository.dart';
 import '../../data/repositories/order_repository.dart';
 import '../../data/repositories/product_repository.dart';
 import '../../models/order_workspace_models.dart';
 import '../../managers/business_settings_manager.dart';
 import '../../providers/storage_mode_provider.dart';
 import '../../widgets/common_widgets.dart';
-import '../../widgets/non_cloud_report_banner.dart';
 
 class TopProductsReportScreen extends StatefulWidget {
   const TopProductsReportScreen({super.key});
@@ -21,6 +21,8 @@ class TopProductsReportScreen extends StatefulWidget {
 class _TopProductsReportScreenState extends State<TopProductsReportScreen> {
   final OrderRepository _orderRepository = OrderRepository();
   final ProductRepository _productRepository = ProductRepository();
+  final CloudRemainingReportsRepository _cloudRepository =
+      CloudRemainingReportsRepository();
   final BusinessSettingsManager _businessSettingsManager =
       BusinessSettingsManager();
 
@@ -52,6 +54,30 @@ class _TopProductsReportScreenState extends State<TopProductsReportScreen> {
     setState(() => _isLoading = true);
 
     try {
+      if (context.read<StorageModeProvider>().isCloud) {
+        final products = await _cloudRepository.getTopProducts(
+          fromDate: _startDate,
+          toDate: _endDate,
+          limit: 10,
+        );
+
+        if (!mounted) return;
+        setState(() {
+          _topProducts = products
+              .map(
+                (product) => _ProductData(
+                  productId: product.productId,
+                  productName: product.productName,
+                  quantitySold: product.quantitySold,
+                  totalRevenue: product.totalRevenuePaise,
+                ),
+              )
+              .toList();
+          _isLoading = false;
+        });
+        return;
+      }
+
       final orders = await _orderRepository.getOrdersForWorkspace(
         tab: 'all',
         searchQuery: '',
@@ -119,15 +145,11 @@ class _TopProductsReportScreenState extends State<TopProductsReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isCloud = context.watch<StorageModeProvider?>()?.isCloud ?? false;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Top Products'),
       ),
-      body: isCloud
-          ? const NonCloudReportBanner(reportTitle: 'Top Products Report')
-          : _isLoading
+        body: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : ListView(
               padding: const EdgeInsets.all(16),
@@ -359,7 +381,7 @@ class _RankBadge extends StatelessWidget {
 }
 
 class _ProductData {
-  final int productId;
+  final Object productId;
   final String productName;
   int quantitySold;
   int totalRevenue;

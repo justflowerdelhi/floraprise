@@ -46,7 +46,8 @@ public interface IInventoryAdjustmentRepository
         DateTime? fromDate,
         DateTime? toDate,
         int page,
-        int pageSize);
+        int pageSize,
+        bool wastageOnly = false);
 
     Task<List<InventoryAdjustment>> GetRecentAdjustmentsAsync(int count);
 }

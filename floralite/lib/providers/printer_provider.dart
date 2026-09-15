@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -7,15 +8,20 @@ import '../models/printer_models.dart';
 import '../services/first_use_permission_service.dart';
 import '../services/printer/printer_manager.dart';
 import '../services/printer/printer_service.dart';
+import '../services/printer/web_receipt_print_service.dart';
 
 class PrinterProvider extends ChangeNotifier {
   PrinterProvider(
     this._printerManager, {
     BuildContext? Function()? contextProvider,
-  }) : _contextProvider = contextProvider;
+    WebReceiptPrintService? webReceiptPrintService,
+  })  : _contextProvider = contextProvider,
+        _webReceiptPrintService =
+            webReceiptPrintService ?? WebReceiptPrintService();
 
   final PrinterManager _printerManager;
   final BuildContext? Function()? _contextProvider;
+  final WebReceiptPrintService _webReceiptPrintService;
 
   PrinterConfig? _config;
   List<PrinterDeviceInfo> _discoveredPrinters = const [];
@@ -44,6 +50,11 @@ class PrinterProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _config = await _printerManager.loadConfig();
+      if (kIsWeb) {
+        _queue = const [];
+        _hasLastReceipt = false;
+        return;
+      }
       _queue = await _printerManager.listQueue();
       _hasLastReceipt = await _printerManager.hasLastSuccessfulReceipt();
       final isConnected = await _printerManager.refreshConnectionState();
@@ -218,6 +229,13 @@ class PrinterProvider extends ChangeNotifier {
   Future<void> enqueuePosBill(Map<String, dynamic> payload) async {
     _error = null;
     try {
+      if (kIsWeb) {
+        await _webReceiptPrintService.printPosBill(
+          payload,
+          paperWidth: _config?.paperWidth ?? PrinterPaperWidth.mm80,
+        );
+        return;
+      }
       await _ensureBluetoothPermission();
       await _printerManager.enqueue(
         type: PrintJobType.posBill,
@@ -228,8 +246,10 @@ class PrinterProvider extends ChangeNotifier {
       _hasLastReceipt = await _printerManager.hasLastSuccessfulReceipt();
     } catch (error) {
       _error = error.toString();
-      _queue = await _printerManager.listQueue();
-      _hasLastReceipt = await _printerManager.hasLastSuccessfulReceipt();
+      if (!kIsWeb) {
+        _queue = await _printerManager.listQueue();
+        _hasLastReceipt = await _printerManager.hasLastSuccessfulReceipt();
+      }
     } finally {
       notifyListeners();
     }
@@ -238,6 +258,13 @@ class PrinterProvider extends ChangeNotifier {
   Future<void> enqueueDeliverySlip(Map<String, dynamic> payload) async {
     _error = null;
     try {
+      if (kIsWeb) {
+        await _webReceiptPrintService.printDeliverySlip(
+          payload,
+          paperWidth: _config?.paperWidth ?? PrinterPaperWidth.mm80,
+        );
+        return;
+      }
       await _ensureBluetoothPermission();
       await _printerManager.enqueue(
         type: PrintJobType.deliverySlip,
@@ -247,7 +274,9 @@ class PrinterProvider extends ChangeNotifier {
       _queue = await _printerManager.listQueue();
     } catch (error) {
       _error = error.toString();
-      _queue = await _printerManager.listQueue();
+      if (!kIsWeb) {
+        _queue = await _printerManager.listQueue();
+      }
     } finally {
       notifyListeners();
     }
@@ -276,7 +305,7 @@ class PrinterProvider extends ChangeNotifier {
   }
 
   Future<void> _ensureBluetoothPermission() async {
-    if (!Platform.isAndroid) return;
+    if (kIsWeb || !Platform.isAndroid) return;
     final permissionContext = _contextProvider?.call();
     if (permissionContext != null && permissionContext.mounted) {
       final proceed = await FirstUsePermissionService.ensureExplainedOnce(

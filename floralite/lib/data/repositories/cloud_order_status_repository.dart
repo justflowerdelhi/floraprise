@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 
 import '../../models/cloud_order_status_report.dart';
 import '../../services/mobile_auth_service.dart';
@@ -75,37 +75,34 @@ class CloudOrderStatusRepository {
   Future<dynamic> _sendGet(Uri uri) async {
     var token = await _auth.getStoredAccessToken();
     for (var attempt = 0; attempt < 2; attempt++) {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 15);
+      final client = http.Client();
       try {
-        final request = await client.getUrl(uri);
+        final request = http.Request('GET', uri);
         if (token != null && token.isNotEmpty) {
-          request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+          request.headers['Authorization'] = 'Bearer $token';
         }
-        request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+        request.headers['Accept'] = 'application/json';
 
-        final response = await request.close();
-        final body = await utf8.decodeStream(response);
+        final streamedResponse =
+            await client.send(request).timeout(const Duration(seconds: 20));
+        final body = await streamedResponse.stream.bytesToString();
 
-        if (response.statusCode == 401 && attempt == 0) {
+        if (streamedResponse.statusCode == 401 && attempt == 0) {
           final refreshed = await _auth.refreshAndBootstrap();
           token = refreshed.accessToken;
           continue;
         }
 
-        if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (streamedResponse.statusCode >= 200 && streamedResponse.statusCode < 300) {
           if (body.isEmpty) return const <String, dynamic>{};
           return jsonDecode(body);
         }
-        throw HttpException(
-          'GET $uri failed (${response.statusCode}): $body',
-          uri: uri,
-        );
+        throw Exception('GET $uri failed (${streamedResponse.statusCode}): $body');
       } finally {
-        client.close(force: true);
+        client.close();
       }
     }
-    throw HttpException('GET $uri failed after retry', uri: uri);
+    throw Exception('GET $uri failed after retry');
   }
 
   Future<CloudOrderStatusReport> _readCache(String cacheKey) async {

@@ -76,7 +76,8 @@ class PricingManager {
     final totalDiscount = lineDiscountTotal + billDiscount;
     final unrounded = afterDelivery;
     final paise = unrounded % 100;
-    final roundOff = paise >= 50 ? (100 - paise) : -paise;
+    final rawRoundOff = paise == 0 ? 0 : (paise >= 50 ? (100 - paise) : -paise);
+    final roundOff = rawRoundOff == 0 ? 0 : rawRoundOff;
     final rewardDiscount = rewardDiscountPaise.clamp(0, unrounded + roundOff);
     final grandTotal = unrounded + roundOff - rewardDiscount;
 

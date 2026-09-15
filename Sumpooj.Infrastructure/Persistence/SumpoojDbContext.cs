@@ -844,6 +844,11 @@ public class SumpoojDbContext
             .HasIndex(c => new { c.CompanyId, c.Name })
             .IsUnique();
 
+        modelBuilder.Entity<ProductCategoryEntity>()
+            .Property(c => c.DefaultUnit)
+            .HasMaxLength(50)
+            .IsRequired(false);
+
         // Product → ProductCategoryEntity (optional FK)
         modelBuilder.Entity<Product>()
             .HasOne(p => p.ProductCategoryRef)

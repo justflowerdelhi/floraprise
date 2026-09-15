@@ -156,8 +156,9 @@ public class MobileDashboardSummaryTests
         var companyId = Guid.NewGuid();
         await using var db = CreateDb(companyId);
         var customer = await SeedCustomerAsync(db, companyId, "Range Customer");
-        var start = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
-        var end = new DateTime(2026, 9, 3, 23, 59, 59, DateTimeKind.Utc);
+        // Use times safely within IST business-day boundaries (IST = UTC+5:30).
+        var start = new DateTime(2026, 9, 1, 10, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(2026, 9, 3, 10, 0, 0, DateTimeKind.Utc);
         var order1 = await SeedOrderAsync(db, companyId, customer.Id, 50m, start, OrderStatus.Pending, PaymentStatus.Credit, deliveryAddress: null, deliveryDateUtc: start);
         var order2 = await SeedOrderAsync(db, companyId, customer.Id, 150m, end, OrderStatus.OutForDelivery, PaymentStatus.Paid, deliveryAddress: "123 Street", deliveryDateUtc: end);
         await SeedPaymentAsync(db, companyId, order2.Id, PaymentMethod.Card, 150m);

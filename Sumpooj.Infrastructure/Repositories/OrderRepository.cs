@@ -198,7 +198,7 @@ public class OrderRepository : IOrderRepository
         await _db.SaveChangesAsync();
     }
 
-    public async Task UpdateAsync(Order order)
+    public virtual async Task UpdateAsync(Order order)
     {
         _db.Orders.Update(order);
         await _db.SaveChangesAsync();

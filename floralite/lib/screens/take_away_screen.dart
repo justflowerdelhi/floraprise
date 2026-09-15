@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -27,6 +28,7 @@ import '../widgets/customer_search_sheet.dart';
 import '../services/discount_service.dart';
 import '../services/reward_summary_formatter.dart';
 import '../utils/locale_formatter.dart';
+import '../utils/whatsapp_phone_utils.dart';
 import '../widgets/app_header.dart';
 import '../widgets/bill_discount_dialog.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
@@ -126,14 +128,16 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
   bool get _isEditingOrder => widget.editingOrderId != null;
 
   Future<void> _loadBusinessSettings() async {
-    final settings = await _businessSettingsManager.load();
-    if (!mounted) return;
-    setState(() {
-      _gstRegistered = settings.gstRegistered;
-      _shopName = settings.shopName.trim();
-      _businessPhone = settings.phone.trim();
-      _businessAddress = settings.address.trim();
-    });
+    try {
+      final settings = await _businessSettingsManager.load();
+      if (!mounted) return;
+      setState(() {
+        _gstRegistered = settings.gstRegistered;
+        _shopName = settings.shopName.trim();
+        _businessPhone = settings.phone.trim();
+        _businessAddress = settings.address.trim();
+      });
+    } catch (_) {}
   }
 
   @override
@@ -168,7 +172,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
   List<WalkInLineItem> get _walkInLines => _products
       .map(
         (product) => WalkInLineItem(
-          productId: product.trackInventory ? product.productId : null,
+          productId: product.productId,
           cloudProductId: product.cloudProductId,
           description: product.designId,
           quantity: product.quantity,
@@ -382,21 +386,29 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
                           product.attachmentPath!.isNotEmpty) ...[
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.file(
-                            File(product.attachmentPath!),
-                            width: 52,
-                            height: 52,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                width: 52,
-                                height: 52,
-                                color: Colors.grey.shade200,
-                                alignment: Alignment.center,
-                                child: const Icon(Icons.image_not_supported),
-                              );
-                            },
-                          ),
+                          child: kIsWeb
+                              ? Container(
+                                  width: 52,
+                                  height: 52,
+                                  color: Colors.grey.shade200,
+                                  alignment: Alignment.center,
+                                  child: const Icon(Icons.image),
+                                )
+                              : Image.file(
+                                  File(product.attachmentPath!),
+                                  width: 52,
+                                  height: 52,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      width: 52,
+                                      height: 52,
+                                      color: Colors.grey.shade200,
+                                      alignment: Alignment.center,
+                                      child: const Icon(Icons.image_not_supported),
+                                    );
+                                  },
+                                ),
                         ),
                         const SizedBox(width: 10),
                       ],
@@ -1119,6 +1131,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
       setState(() {
         _addOrIncrementCatalogProduct(
           productId: matched.id,
+          cloudProductId: matched.cloudProductId,
           trackInventory: matched.trackInventory,
           name: matched.name,
           pricePaise: matched.sellingPricePaise,
@@ -1332,20 +1345,28 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
                       const SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          File(attachmentPath),
-                          height: 140,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              height: 140,
-                              color: Colors.grey.shade200,
-                              alignment: Alignment.center,
-                              child: const Text('Preview not available'),
-                            );
-                          },
-                        ),
+                        child: kIsWeb
+                            ? Container(
+                                height: 140,
+                                width: double.infinity,
+                                color: Colors.grey.shade200,
+                                alignment: Alignment.center,
+                                child: const Icon(Icons.image, size: 48),
+                              )
+                            : Image.file(
+                                File(attachmentPath),
+                                height: 140,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    height: 140,
+                                    color: Colors.grey.shade200,
+                                    alignment: Alignment.center,
+                                    child: const Text('Preview not available'),
+                                  );
+                                },
+                              ),
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -2067,7 +2088,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
     final paidPaise = _paidAmountPaiseFromPayments(payments);
     final outstandingPaise =
         (_totalAmountPaise - paidPaise).clamp(0, _totalAmountPaise);
-    final rewardSummary = orderId == null
+    final rewardSummary = (orderId == null || kIsWeb)
         ? null
         : await context
             .read<WalkInSessionProvider>()
@@ -2078,8 +2099,10 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
       'customerName': _customerNameController.text.trim(),
       'customerPhone': _phoneController.text.trim(),
       'items': _printItems(),
+      'basicAmountPaise': _subtotalPaise,
       'discountPaise': _billDiscountPaise,
       'gstPaise': _gstAmountPaise,
+      'roundOffPaise': _orderTotals.roundOffPaise,
       'grandTotalPaise': _totalAmountPaise,
       'paymentMode': _selectedPayment ?? 'Pending',
       'paymentSummary': payments
@@ -2104,7 +2127,12 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(printerProvider.error ?? 'Receipt queued for printing.'),
+        content: Text(
+          printerProvider.error ??
+              (kIsWeb
+                  ? 'Receipt sent to printer.'
+                  : 'Receipt queued for printing.'),
+        ),
       ),
     );
   }
@@ -2142,8 +2170,8 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
   Future<void> _shareWhatsApp(BuildContext context, int orderId) async {
     final messenger = ScaffoldMessenger.of(context);
     final sessionProvider = context.read<WalkInSessionProvider>();
-    final phone = _normalizedWhatsAppPhone(_phoneController.text);
-    if (phone == null) {
+    final normalizedPhone = WhatsAppPhoneUtils.normalize(_phoneController.text);
+    if (normalizedPhone == null) {
       messenger.showSnackBar(
         const SnackBar(
           content: Text('Customer mobile number is required for WhatsApp.'),
@@ -2152,42 +2180,53 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
       return;
     }
 
-    await _loadBusinessSettings();
-    if (!mounted) return;
+    try {
+      if (!kIsWeb) {
+        await _loadBusinessSettings();
+      }
+      if (!mounted) return;
 
-    final rewardSummary =
-        await sessionProvider.getOrderRewardSummary(orderId);
-    final message = _buildReceiptMessage(orderId, rewardSummary);
-    final waUri = Uri.parse(
-      'https://wa.me/$phone?text=${Uri.encodeComponent(message)}',
-    );
+      final rewardSummary = kIsWeb
+          ? null
+          : await sessionProvider.getOrderRewardSummary(orderId);
+      final message = _buildReceiptMessage(orderId, rewardSummary);
+      final waUri =
+          WhatsAppPhoneUtils.buildUri(normalizedPhone, message: message);
 
-    if (await launchUrl(waUri, mode: LaunchMode.externalApplication)) {
-      return;
-    }
+      bool launched = false;
+      if (waUri != null) {
+        launched = await launchUrl(
+          waUri,
+          mode: LaunchMode.platformDefault,
+          webOnlyWindowName: '_blank',
+        );
+      }
 
-    final fallback = Uri.parse(
-      'https://api.whatsapp.com/send?phone=$phone&text=${Uri.encodeComponent(message)}',
-    );
-    if (await launchUrl(fallback, mode: LaunchMode.externalApplication)) {
-      return;
+      if (!launched) {
+        final fallback = WhatsAppPhoneUtils.buildFallbackUri(
+          normalizedPhone,
+          message: message,
+        );
+        if (fallback != null) {
+          launched = await launchUrl(
+            fallback,
+            mode: LaunchMode.platformDefault,
+            webOnlyWindowName: '_blank',
+          );
+        }
+      }
+
+      if (launched) {
+        return;
+      }
+    } catch (e) {
+      debugPrint('Error sharing via WhatsApp: $e');
     }
 
     if (!mounted) return;
     messenger.showSnackBar(
       const SnackBar(content: Text('Unable to open WhatsApp on this device')),
     );
-  }
-
-  String? _normalizedWhatsAppPhone(String value) {
-    final digits = value.replaceAll(RegExp(r'\D'), '');
-    if (digits.length == 10) {
-      return '91$digits';
-    }
-    if (digits.length == 12 && digits.startsWith('91')) {
-      return digits;
-    }
-    return null;
   }
 
   String _buildReceiptMessage(int orderId, OrderRewardSummary? rewardSummary) {

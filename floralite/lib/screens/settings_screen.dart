@@ -2,9 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../data/database/app_database.dart';
-import '../data/repositories/cloud_inventory_repository.dart';
-import '../data/repositories/pos_sync_outbox_repository.dart';
 import '../managers/onboarding_manager.dart';
 import '../l10n/app_localizations.dart';
 import '../models/storage_mode.dart';
@@ -13,10 +10,10 @@ import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/storage_mode_provider.dart';
 import '../providers/subscription_provider.dart';
-import '../services/pos_sale_sync_service.dart';
 import '../services/storage_migration_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
+import 'business_registration_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -27,7 +24,6 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final OnboardingManager _onboardingManager = OnboardingManager();
-  bool _isSyncingPendingPosSales = false;
 
   @override
   void initState() {
@@ -265,6 +261,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const Divider(height: 1),
                   _buildSettingTile(
                     context,
+                    'Reset Password',
+                    'Change your account password',
+                    Icons.lock_reset_outlined,
+                    _showResetPasswordDialog,
+                  ),
+                  const Divider(height: 1),
+                  _buildSettingTile(
+                    context,
                     'Logout',
                     'Sign out from this device',
                     Icons.logout,
@@ -468,180 +472,163 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
 
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const SplashScreen()),
+      MaterialPageRoute(builder: (_) => const BusinessRegistrationScreen()),
       (route) => false,
     );
   }
 
-  Future<void> _syncPendingPosSalesForDebug() async {
-    if (_isSyncingPendingPosSales) return;
-    setState(() => _isSyncingPendingPosSales = true);
+  Future<void> _showResetPasswordDialog() async {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+    String? errorMessage;
 
-    final outboxRepository = PosSyncOutboxRepository();
-    PosSaleSyncResult? result;
-    List<PosSyncOutboxRecord> beforeRows = const [];
-    List<PosSyncOutboxRecord> remainingRows = const [];
-    List<Map<String, Object?>> syncedRows = const [];
-    Object? failure;
-
-    try {
-      final db = await AppDatabase.instance.database;
-      beforeRows = await outboxRepository.listRetryable(db);
-      result = await PosSaleSyncService(
-        outboxRepository: outboxRepository,
-      ).syncPending();
-      remainingRows = await outboxRepository.listRetryable(db);
-      syncedRows = await _loadPosSyncOutboxRowsByIds(
-        beforeRows.map((row) => row.id).toList(),
-      );
-    } catch (error) {
-      failure = error;
-      try {
-        final db = await AppDatabase.instance.database;
-        remainingRows = await outboxRepository.listRetryable(db);
-        syncedRows = await _loadPosSyncOutboxRowsByIds(
-          beforeRows.map((row) => row.id).toList(),
-        );
-      } catch (_) {}
-    } finally {
-      if (mounted) {
-        setState(() => _isSyncingPendingPosSales = false);
-      }
-    }
-
-    if (!mounted) return;
     await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sync Pending POS Sales'),
-        content: SingleChildScrollView(
-          child: SelectableText(
-            _buildPosSaleSyncDebugReport(
-              pendingBefore: beforeRows.length,
-              result: result,
-              remainingRetryable: remainingRows.length,
-              syncedRows: syncedRows,
-              failure: failure,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setStateDialog) => AlertDialog(
+          title: const Text('Reset Password'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (errorMessage != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Text(
+                        errorMessage!,
+                        style: TextStyle(
+                          color: Colors.red.shade800,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  TextFormField(
+                    controller: currentPasswordController,
+                    obscureText: true,
+                    enabled: !isSubmitting,
+                    decoration: const InputDecoration(
+                      labelText: 'Current Password',
+                      prefixIcon: Icon(Icons.lock_outline),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if ((value ?? '').trim().isEmpty) {
+                        return 'Current password is required';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: newPasswordController,
+                    obscureText: true,
+                    enabled: !isSubmitting,
+                    decoration: const InputDecoration(
+                      labelText: 'New Password',
+                      prefixIcon: Icon(Icons.lock_reset_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      final val = (value ?? '').trim();
+                      if (val.isEmpty) return 'New password is required';
+                      if (val.length < 8) {
+                        return 'Password must be at least 8 characters';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: confirmPasswordController,
+                    obscureText: true,
+                    enabled: !isSubmitting,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm New Password',
+                      prefixIcon: Icon(Icons.lock_reset_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value != newPasswordController.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed:
+                  isSubmitting ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setStateDialog(() {
+                        isSubmitting = true;
+                        errorMessage = null;
+                      });
+
+                      final provider = context.read<AuthProvider>();
+                      final success = await provider.changePassword(
+                        currentPassword: currentPasswordController.text,
+                        newPassword: newPasswordController.text,
+                      );
+
+                      if (!dialogContext.mounted) return;
+
+                      if (success) {
+                        Navigator.pop(dialogContext);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Password changed successfully.'),
+                          ),
+                        );
+                      } else {
+                        setStateDialog(() {
+                          isSubmitting = false;
+                          errorMessage = provider.friendlyMessage;
+                        });
+                      }
+                    },
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Update Password'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
       ),
     );
-  }
 
-  Future<List<Map<String, Object?>>> _loadPosSyncOutboxRowsByIds(
-    List<int> ids,
-  ) async {
-    if (ids.isEmpty) return const [];
-    final db = await AppDatabase.instance.database;
-    final placeholders = List.filled(ids.length, '?').join(', ');
-    return db.query(
-      'pos_sync_outbox',
-      columns: [
-        'id',
-        'local_order_id',
-        'state',
-        'attempt_count',
-        'cloud_order_id',
-        'last_error',
-        'next_attempt_at',
-        'last_attempt_at',
-      ],
-      where: 'id IN ($placeholders)',
-      whereArgs: ids,
-      orderBy: 'created_at ASC, id ASC',
-    );
-  }
-
-  String _buildPosSaleSyncDebugReport({
-    required int pendingBefore,
-    required PosSaleSyncResult? result,
-    required int remainingRetryable,
-    required List<Map<String, Object?>> syncedRows,
-    required Object? failure,
-  }) {
-    final buffer = StringBuffer()
-      ..writeln('Retryable pending before: $pendingBefore')
-      ..writeln('Attempted: ${result?.processedCount ?? 0}')
-      ..writeln('Completed: ${result?.completedCount ?? 0}')
-      ..writeln('Failed: ${result?.failedCount ?? 0}')
-      ..writeln('Remaining retryable pending: $remainingRetryable');
-
-    final cloudOrderIds = syncedRows
-        .map((row) => row['cloud_order_id']?.toString())
-        .where((value) => value != null && value.trim().isNotEmpty)
-        .cast<String>()
-        .toList();
-    buffer.writeln(
-      'Cloud order IDs: ${cloudOrderIds.isEmpty ? 'none' : cloudOrderIds.join(', ')}',
-    );
-
-    final rowErrors = syncedRows
-        .map((row) => row['last_error']?.toString())
-        .where((value) => value != null && value.trim().isNotEmpty)
-        .cast<String>()
-        .toList();
-    if (failure != null) {
-      buffer.writeln('Sync exception: $failure');
-    }
-    buffer.writeln(
-      'Outbox errors: ${rowErrors.isEmpty ? 'none' : rowErrors.join('\n')}',
-    );
-
-    if (syncedRows.isNotEmpty) {
-      buffer.writeln('Outbox rows:');
-      for (final row in syncedRows) {
-        buffer.writeln(
-          '#${row['id']} order=${row['local_order_id']} state=${row['state']} attempts=${row['attempt_count']} next=${row['next_attempt_at'] ?? 'none'}',
-        );
-      }
-    }
-
-    return buffer.toString().trimRight();
-  }
-
-  Future<void> _showCloudRedRosesStockForDebug() async {
-    const cloudProductId = '0952579a-dc73-4b94-ae56-dc7d6b0ecfcf';
-    Object? failure;
-    String message;
-
-    try {
-      final products = await CloudInventoryRepository().listInventoryProducts();
-      final matches = products.where(
-        (product) => product.cloudProductId?.toLowerCase() == cloudProductId,
-      );
-      if (matches.isEmpty) {
-        message = 'Red Roses cloud product was not returned by inventory API.';
-      } else {
-        final product = matches.single;
-        message = '${product.name}: currentQty=${product.currentQty}, minQty=${product.minQty}, cloudProductId=${product.cloudProductId}';
-      }
-    } catch (error) {
-      failure = error;
-      message = 'Cloud inventory diagnostic failed: $error';
-    }
-
-    debugPrint('[CLOUD-INVENTORY-DIAG] $message');
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cloud Red Roses Stock'),
-        content: SelectableText(failure == null ? message : message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
+    currentPasswordController.dispose();
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
   }
 
   Widget _buildDeveloperSection(BuildContext context, AppLocalizations l10n) {
@@ -671,24 +658,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 l10n.resetOnboardingSubtitle,
                 Icons.restart_alt,
                 _resetOnboarding,
-              ),
-              const Divider(height: 1),
-              _buildSettingTile(
-                context,
-                'Sync Pending POS Sales',
-                _isSyncingPendingPosSales
-                    ? 'Sync in progress'
-                    : 'Temporary debug action for stored POS sale outbox rows',
-                Icons.cloud_upload_outlined,
-                _isSyncingPendingPosSales ? null : _syncPendingPosSalesForDebug,
-              ),
-              const Divider(height: 1),
-              _buildSettingTile(
-                context,
-                'Check Cloud Red Roses Stock',
-                'Temporary debug read-only Cloud inventory check',
-                Icons.cloud_queue,
-                _showCloudRedRosesStockForDebug,
               ),
             ],
           ),

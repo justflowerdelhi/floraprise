@@ -13,26 +13,30 @@ public class ProductCategoryEntity : BaseEntity
         Guid companyId,
         string name,
         bool isPerishable,
-        bool trackBatchByDefault)
+        bool trackBatchByDefault,
+        string? defaultUnit = null)
     {
         CompanyId = companyId;
         Name = name;
         IsPerishable = isPerishable;
         TrackBatchByDefault = trackBatchByDefault;
+        DefaultUnit = defaultUnit;
         IsActive = true;
     }
 
     public Guid CompanyId { get; private set; }
     public string Name { get; private set; } = default!;
+    public string? DefaultUnit { get; private set; }
     public bool IsPerishable { get; private set; }
     public bool TrackBatchByDefault { get; private set; }
     public bool IsActive { get; private set; }
 
-    public void Update(string name, bool isPerishable, bool trackBatchByDefault)
+    public void Update(string name, bool isPerishable, bool trackBatchByDefault, string? defaultUnit = null)
     {
         Name = name;
         IsPerishable = isPerishable;
         TrackBatchByDefault = trackBatchByDefault;
+        DefaultUnit = defaultUnit;
         MarkUpdated();
     }
 

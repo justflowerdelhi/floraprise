@@ -4,10 +4,15 @@ String resolveFlorapriseApiBaseUrl({
   required String explicitValue,
   required bool isDebug,
   required TargetPlatform platform,
+  bool isWeb = kIsWeb,
 }) {
   final configured = explicitValue.trim();
   if (configured.isNotEmpty) {
     return configured.replaceFirst(RegExp(r'/+$'), '');
+  }
+
+  if (isWeb) {
+    return 'https://api.floraprise.com';
   }
 
   if (isDebug) {
@@ -27,3 +32,4 @@ String resolveFlorapriseApiBaseUrl({
 
   return 'https://api.floraprise.com';
 }
+

@@ -44,6 +44,70 @@ export default function RedesignedHome() {
 
       <section className="product-ribbon"><strong>Purpose-built for the business of flowers</strong><span>Retail</span><span>Weddings & events</span><span>Perishable inventory</span><span>Production</span><span>Delivery</span></section>
 
+      {/* SECTION 1 — COMPACT SIZE. BIG POSSIBILITIES */}
+      <section className="promo-story-section compact-story-section">
+        <div className="promo-story-container">
+          <div className="promo-story-content">
+            <Eyebrow>Floraprise Starter Setup</Eyebrow>
+            <h2>Compact Size. Big Possibilities.</h2>
+            <p>
+              Run your entire florist shop from a single Android phone and Bluetooth printer. Complete florist POS, digital inventory, billing, and simple digital operations with zero bulky hardware.
+            </p>
+            <div className="promo-feature-list">
+              <span><b>📱</b> Android Phone</span>
+              <span><b>🖨️</b> Bluetooth Printer</span>
+              <span><b>💐</b> Florist POS</span>
+              <span><b>✨</b> Simple Digital Operation</span>
+            </div>
+            <Link href="/features" className="text-action promo-cta">
+              Explore Floraprise <span>→</span>
+            </Link>
+          </div>
+          <div className="promo-story-visual">
+            <Image
+              src="/compact.png"
+              alt="Floraprise Compact Setup - Android Phone, Bluetooth Printer & Florist POS"
+              width={1672}
+              height={941}
+              sizes="(max-width: 1050px) 100vw, 52vw"
+              className="promo-image"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 2 — DELIVERY TRACKING BUILT FOR FLORISTS */}
+      <section className="promo-story-section delivery-story-section">
+        <div className="promo-story-container alt-layout">
+          <div className="promo-story-content">
+            <Eyebrow>Integrated Logistics</Eyebrow>
+            <h2>Delivery Tracking Built for Florists.</h2>
+            <p>
+              Give your customers peace of mind with real-time rider tracking designed specifically for delicate floral arrangements and scheduled deliveries.
+            </p>
+            <div className="promo-feature-list">
+              <span><b>📍</b> Live Rider Location</span>
+              <span><b>⏱️</b> Estimated Delivery Time</span>
+              <span><b>📲</b> Customer Notifications</span>
+              <span><b>📋</b> Complete Delivery History</span>
+            </div>
+            <Link href="/features" className="text-action promo-cta">
+              See How Delivery Works <span>→</span>
+            </Link>
+          </div>
+          <div className="promo-story-visual">
+            <Image
+              src="/delivery-tracking.png"
+              alt="Floraprise Delivery Tracking - Live Rider Location & Notifications"
+              width={1672}
+              height={941}
+              sizes="(max-width: 1050px) 100vw, 52vw"
+              className="promo-image"
+            />
+          </div>
+        </div>
+      </section>
+
       <section className="products-section" id="products">
         <header className="section-heading centered"><Eyebrow>The Floraprise platform</Eyebrow><h2>One florist platform. Three powerful ways to work.</h2><p>The operating system at the centre, mobile access for the day in motion, and customer assistance at the first conversation.</p></header>
         <article className="erp-product" id="erp">

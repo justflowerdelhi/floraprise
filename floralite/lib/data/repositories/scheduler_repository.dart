@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../database/app_database.dart';
 import '../../models/scheduler_task.dart';
 
@@ -296,6 +298,13 @@ class SchedulerRepository {
     DateTime? now,
     Duration dueSoonWindow = const Duration(hours: 2),
   }) async {
+    if (kIsWeb) {
+      return const SchedulerDashboardBuckets(
+        overdue: [],
+        dueSoon: [],
+        completed: [],
+      );
+    }
     final db = await AppDatabase.instance.database;
     final current = now ?? DateTime.now();
     final currentIso = current.toIso8601String();

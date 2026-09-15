@@ -14,7 +14,7 @@ public interface IFloralRecipeRepository
 
 public interface IFinishedGoodsBatchRepository
 {
-    Task<List<FinishedGoodsBatch>> GetAllAsync(Guid companyId);
+    Task<List<FinishedGoodsBatch>> GetAllAsync(Guid companyId, DateTime? startDate = null, DateTime? endDate = null, string? batchCode = null);
     Task<FinishedGoodsBatch?> GetByIdAsync(Guid companyId, Guid id);
     Task AddAsync(FinishedGoodsBatch batch);
     Task UpdateAsync(FinishedGoodsBatch batch);

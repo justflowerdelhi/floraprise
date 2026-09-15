@@ -79,14 +79,14 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: NonCloudReportBanner(reportTitle: 'Top Customers Report'),
+            body: NonCloudReportBanner(reportTitle: 'Day Closing Report'),
           ),
         ),
       );
 
       await tester.pumpAndSettle();
       expect(find.byType(NonCloudReportBanner), findsOneWidget);
-      expect(find.text('Top Customers Report is Primary Device Only'), findsOneWidget);
+      expect(find.text('Day Closing Report is Primary Device Only'), findsOneWidget);
     });
   });
 }

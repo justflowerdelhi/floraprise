@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -400,7 +399,8 @@ class CloudInventoryRepository {
           );
         }
         return decoded;
-      } on SocketException catch (error) {
+      } catch (error) {
+        if (error is StateError) rethrow;
         throw StateError('Unable to connect to Floraprise Cloud: $error');
       } finally {
         client.close();

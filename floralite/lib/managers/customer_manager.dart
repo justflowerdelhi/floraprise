@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../data/repositories/customer_repository.dart';
 import '../services/customer_cloud_lookup_service.dart';
 
@@ -40,6 +42,24 @@ class CustomerManager {
     final normalized = normalizePhone(phone);
     if (normalized.length != 10 || name.trim().isEmpty) {
       return null;
+    }
+
+    if (kIsWeb) {
+      final lookedUp = await lookupByPhone(normalized);
+      if (lookedUp != null) {
+        return lookedUp;
+      }
+      return CustomerRecord(
+        id: -1,
+        phone: normalized,
+        name: name.trim(),
+        birthdayMd: birthdayMd,
+        anniversaryMd: anniversaryMd,
+        company: company,
+        department: department,
+        notes: notes,
+        createdAt: DateTime.now().toIso8601String(),
+      );
     }
 
     final existing = await _customerRepository.findByPhone(normalized);

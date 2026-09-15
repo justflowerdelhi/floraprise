@@ -1,26 +1,38 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../l10n/app_localizations.dart';
+
+import '../data/repositories/cloud_order_repository.dart';
+import '../data/repositories/order_repository.dart';
 import '../data/repositories/ready_bouquet_repository.dart';
 import '../data/repositories/scheduler_repository.dart';
+import '../managers/business_settings_manager.dart';
 import '../models/dashboard_summary.dart';
+import '../models/order_workspace_models.dart';
 import '../models/scheduler_task.dart';
-import '../providers/app_shell_controller.dart';
+import '../models/workspace_destinations.dart';
+import '../providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
+import '../providers/inventory_provider.dart';
 import '../providers/license_provider.dart';
+import '../providers/storage_mode_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../services/app_route_observer.dart';
 import '../services/delivery_tracking_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/dashboard/dashboard_attention_section.dart';
+import '../widgets/dashboard/dashboard_deliveries_panel.dart';
+import '../widgets/dashboard/dashboard_hero_header.dart';
+import '../widgets/dashboard/dashboard_inventory_health.dart';
+import '../widgets/dashboard/dashboard_kpi_section.dart';
+import '../widgets/dashboard/dashboard_orders_stream.dart';
 
-const double _kSectionSpacing = 24;
+const double _kSectionSpacing = 22;
 const double _kGridSpacing = 16;
 
 const Color _successColor = Color(0xFF2E7D32);
-const Color _infoColor = Color(0xFF1565C0);
 const Color _pendingColor = Color(0xFFEF6C00);
-const Color _creativeColor = Color(0xFF7B1FA2);
 const Color _urgentColor = Color(0xFFC62828);
 const Color _warningColor = Color(0xFFF57C00);
 
@@ -36,7 +48,19 @@ class _DashboardScreenState extends State<DashboardScreen>
   final DeliveryTrackingService _deliveryTrackingService =
       DeliveryTrackingService();
   final SchedulerRepository _schedulerRepository = SchedulerRepository();
+  final BusinessSettingsManager _businessSettingsManager =
+      BusinessSettingsManager();
+  final CloudOrderRepository _cloudOrderRepository = CloudOrderRepository();
+  final OrderRepository _orderRepository = OrderRepository();
+
   bool _subscribedToRouteObserver = false;
+  String _shopName = '';
+
+  List<OrderListItem> _todayOrders = const [];
+  bool _ordersLoading = false;
+
+  List<DeliveryWorkspaceRecord> _activeDeliveries = const [];
+  bool _deliveriesLoading = false;
 
   @override
   void initState() {
@@ -44,8 +68,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<DashboardProvider>().loadSummary(showLoading: true);
-        context.read<LicenseProvider>().heartbeat();
+        try {
+          context.read<DashboardProvider>().loadSummary(showLoading: true);
+        } catch (_) {}
+        try {
+          context.read<LicenseProvider>().heartbeat();
+        } catch (_) {}
+        try {
+          context.read<InventoryProvider>().loadProducts();
+        } catch (_) {}
+        _loadBusinessIdentity();
+        _loadTodayOrders();
+        _loadDeliveries();
       }
     });
   }
@@ -84,94 +118,328 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (!mounted) return;
     context.read<LicenseProvider>().heartbeat();
     context.read<DashboardProvider>().refresh();
+    context.read<InventoryProvider>().loadProducts();
+    _loadBusinessIdentity();
+    _loadTodayOrders();
+    _loadDeliveries();
   }
 
-  void _openShellTab(AppShellTab tab, String routeName) {
-    context.read<AppShellController>().selectTab(tab);
-    Navigator.of(context).pushNamedAndRemoveUntil(routeName, (route) => false);
+  Future<void> _loadBusinessIdentity() async {
+    try {
+      final settings = await _businessSettingsManager.load();
+      if (!mounted) return;
+      setState(() {
+        _shopName = settings.shopName.trim();
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _loadTodayOrders() async {
+    if (!mounted) return;
+    setState(() => _ordersLoading = true);
+    try {
+      bool isCloud = kIsWeb;
+      try {
+        isCloud = context.read<StorageModeProvider>().isCloud || kIsWeb;
+      } catch (_) {}
+      final now = DateTime.now();
+      final todayFilter = OrderWorkspaceFilters(selectedDate: now);
+      final List<OrderListItem> orders;
+      if (isCloud) {
+        orders = await _cloudOrderRepository.getWorkspace(
+          tab: 'all',
+          searchQuery: '',
+          filters: todayFilter,
+          limit: 10,
+        );
+      } else {
+        orders = await _orderRepository.getOrdersForWorkspace(
+          tab: 'all',
+          searchQuery: '',
+          filters: todayFilter,
+          limit: 10,
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        _todayOrders = orders;
+        _ordersLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _ordersLoading = false);
+    }
+  }
+
+  Future<void> _loadDeliveries() async {
+    if (!mounted) return;
+    setState(() => _deliveriesLoading = true);
+    try {
+      final deliveries = await _deliveryTrackingService.getActiveDeliveries();
+      if (!mounted) return;
+      setState(() {
+        _activeDeliveries = deliveries;
+        _deliveriesLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _deliveriesLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
+    final authProvider = context.watch<AuthProvider?>();
+    final ownerName = authProvider?.bootstrap?['user']?['fullName'] as String?;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9F5),
       appBar: const AppHeader(),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + bottomInset),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSubscriptionBanner(context),
-              _buildBusinessSnapshot(context),
-              _buildReadyBouquetAttention(context),
-              _buildTodaysWork(context),
-              _buildTaskSections(context),
-              _buildActiveDeliveriesCard(context),
-              _buildWorkspaces(context),
-            ],
+          padding: EdgeInsets.fromLTRB(
+            isDesktop ? 28 : 16,
+            isDesktop ? 20 : 12,
+            isDesktop ? 28 : 16,
+            28 + bottomInset,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1440),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Subscription Banner
+                  _buildSubscriptionBanner(context),
+
+                  // 2. Botanical Hero & Quick Actions
+                  DashboardHeroHeader(
+                    shopName: _shopName,
+                    ownerName: ownerName,
+                    onNewSale: () => Navigator.pushNamed(context, '/walkin-sales'),
+                    onNewOrder: () => Navigator.pushNamed(context, '/orders'),
+                    onAddProduct: () => Navigator.pushNamed(context, '/products'),
+                    onDeliveryMap: () =>
+                        Navigator.pushNamed(context, '/delivery-workspace'),
+                  ),
+                  const SizedBox(height: _kSectionSpacing),
+
+                  // 3. Business Performance KPI Section
+                  Consumer<DashboardProvider>(
+                    builder: (context, dashboard, _) {
+                      return DashboardKpiSection(
+                        summary: dashboard.summary,
+                        onSalesTap: () =>
+                            Navigator.pushNamed(context, '/reports/sales'),
+                        onOrdersTap: () =>
+                            Navigator.pushNamed(context, '/orders'),
+                        onDeliveriesTap: () =>
+                            Navigator.pushNamed(context, '/delivery-workspace'),
+                        onExpensesTap: () =>
+                            Navigator.pushNamed(context, '/expenses'),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: _kSectionSpacing),
+
+                  // 4. Operational Stream (Desktop Two-Column Grid vs Mobile Stack)
+                  if (isDesktop)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left Column: Attention + Orders Feed (~58% width)
+                        Expanded(
+                          flex: 58,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Consumer<DashboardProvider>(
+                                builder: (context, dashboard, _) {
+                                  return DashboardAttentionSection(
+                                    summary: dashboard.summary,
+                                    onInventoryTap: () =>
+                                        Navigator.pushNamed(context, '/inventory'),
+                                    onOrdersTap: () =>
+                                        Navigator.pushNamed(context, '/orders'),
+                                    onDeliveriesTap: () => Navigator.pushNamed(
+                                        context, '/delivery-workspace'),
+                                    onPaymentsTap: () =>
+                                        Navigator.pushNamed(context, '/reminders'),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 20),
+                              DashboardOrdersStream(
+                                orders: _todayOrders,
+                                isLoading: _ordersLoading,
+                                onViewAllOrders: () =>
+                                    Navigator.pushNamed(context, '/orders'),
+                                onOrderTap: (_) =>
+                                    Navigator.pushNamed(context, '/orders'),
+                                onNewSale: () =>
+                                    Navigator.pushNamed(context, '/walkin-sales'),
+                              ),
+                              _buildReadyBouquetAttention(context),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+
+                        // Right Column: Deliveries + Inventory Health + Tasks (~42% width)
+                        Expanded(
+                          flex: 42,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              DashboardDeliveriesPanel(
+                                deliveries: _activeDeliveries,
+                                isLoading: _deliveriesLoading,
+                                onViewWorkspace: () => Navigator.pushNamed(
+                                    context, '/delivery-workspace'),
+                              ),
+                              const SizedBox(height: 20),
+                              const _DashboardInventorySection(),
+                              const SizedBox(height: 20),
+                              _buildTaskSections(context),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    // Mobile single-column flow
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Consumer<DashboardProvider>(
+                          builder: (context, dashboard, _) {
+                            return DashboardAttentionSection(
+                              summary: dashboard.summary,
+                              onInventoryTap: () =>
+                                  Navigator.pushNamed(context, '/inventory'),
+                              onOrdersTap: () =>
+                                  Navigator.pushNamed(context, '/orders'),
+                              onDeliveriesTap: () => Navigator.pushNamed(
+                                  context, '/delivery-workspace'),
+                              onPaymentsTap: () =>
+                                  Navigator.pushNamed(context, '/reminders'),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        DashboardOrdersStream(
+                          orders: _todayOrders,
+                          isLoading: _ordersLoading,
+                          onViewAllOrders: () =>
+                              Navigator.pushNamed(context, '/orders'),
+                          onOrderTap: (_) =>
+                              Navigator.pushNamed(context, '/orders'),
+                          onNewSale: () =>
+                              Navigator.pushNamed(context, '/walkin-sales'),
+                        ),
+                        const SizedBox(height: 16),
+                        DashboardDeliveriesPanel(
+                          deliveries: _activeDeliveries,
+                          isLoading: _deliveriesLoading,
+                          onViewWorkspace: () => Navigator.pushNamed(
+                              context, '/delivery-workspace'),
+                        ),
+                        const SizedBox(height: 16),
+                        const _DashboardInventorySection(),
+                        const SizedBox(height: 16),
+                        _buildTaskSections(context),
+                        _buildReadyBouquetAttention(context),
+                        const SizedBox(height: 16),
+                        // Mobile retains workspace navigation tiles since there is no left sidebar on phone
+                        _buildWorkspaces(context),
+                      ],
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildActiveDeliveriesCard(BuildContext context) {
-    return FutureBuilder<List<DeliveryWorkspaceRecord>>(
-      future: _deliveryTrackingService.getActiveDeliveries(),
+  Widget _buildSubscriptionBanner(BuildContext context) {
+    return Selector<SubscriptionProvider,
+        ({String title, String message, bool critical})?>(
+      selector: (_, provider) {
+        final access = provider.access;
+        if (access == null) return null;
+        final now = DateTime.now();
+        final daysRemaining = access.daysRemaining(now);
+        final showTrial = access.isTrial;
+        final showPaidReminder = !access.isTrial && daysRemaining <= 30;
+        if (!showTrial && !showPaidReminder) return null;
+        return (
+          title: access.isTrial ? 'Free Trial' : 'Subscription',
+          message: access.expiryReminder(now),
+          critical: daysRemaining <= 3,
+        );
+      },
+      builder: (context, banner, child) {
+        if (banner == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: AppCard(
+            backgroundColor: banner.critical
+                ? const Color(0xFFFFEBEE)
+                : const Color(0xFFFFF8E1),
+            onTap: () => Navigator.pushNamed(context, '/subscription'),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.local_florist_rounded,
+                  color: banner.critical ? _urgentColor : _warningColor,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        banner.title,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(banner.message),
+                    ],
+                  ),
+                ),
+                const Text(
+                  'Renew',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReadyBouquetAttention(BuildContext context) {
+    return FutureBuilder<List<ReadyBouquetSummary>>(
+      future: ReadyBouquetRepository().getAttentionBouquets(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox.shrink();
         }
-
-        if (snapshot.hasError) {
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
           return const SizedBox.shrink();
         }
-
-        final active = snapshot.data ?? const <DeliveryWorkspaceRecord>[];
-
+        final items = snapshot.data!;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionTitle(title: 'Active Deliveries'),
-            const SizedBox(height: 14),
-            AppCard(
-              onTap: () => Navigator.pushNamed(context, '/delivery-workspace'),
-              child: Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: _infoColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.local_shipping_rounded,
-                        color: _infoColor),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Live Delivery Tracking',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          active.isEmpty
-                              ? 'No active deliveries right now'
-                              : '${active.length} active deliveries in progress',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right_rounded),
-                ],
-              ),
-            ),
-            const SizedBox(height: _kSectionSpacing),
+            const SizedBox(height: 16),
+            const _SectionTitle(title: 'Bouquets Requiring Attention'),
+            const SizedBox(height: 10),
+            ...items.map((item) => _ReadyBouquetAttentionCard(item: item)),
           ],
         );
       },
@@ -196,31 +464,101 @@ class _DashboardScreenState extends State<DashboardScreen>
           return const SizedBox.shrink();
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionTitle(title: 'Task Reminders'),
-            const SizedBox(height: 14),
-            AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildTaskBucket('Overdue', buckets.overdue, _urgentColor),
-                  if (buckets.overdue.isNotEmpty &&
-                      (buckets.dueSoon.isNotEmpty ||
-                          buckets.completed.isNotEmpty))
-                    const Divider(height: 20),
-                  _buildTaskBucket('Due Soon', buckets.dueSoon, _pendingColor),
-                  if (buckets.dueSoon.isNotEmpty &&
-                      buckets.completed.isNotEmpty)
-                    const Divider(height: 20),
-                  _buildTaskBucket(
-                      'Completed', buckets.completed, _successColor),
-                ],
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE5E7DF), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
-            ),
-            const SizedBox(height: _kSectionSpacing),
-          ],
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.event_note_rounded,
+                        color: Color(0xFFD97706),
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Task Reminders',
+                      style: TextStyle(
+                        color: Color(0xFF1E2922),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    InkWell(
+                      onTap: () => Navigator.pushNamed(context, '/scheduler'),
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Scheduler',
+                              style: TextStyle(
+                                color: Color(0xFFD97706),
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            SizedBox(width: 4),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 11,
+                              color: Color(0xFFD97706),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFFEAECE6)),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTaskBucket('Overdue', buckets.overdue, _urgentColor),
+                    if (buckets.overdue.isNotEmpty &&
+                        (buckets.dueSoon.isNotEmpty ||
+                            buckets.completed.isNotEmpty))
+                      const Divider(height: 20),
+                    _buildTaskBucket('Due Soon', buckets.dueSoon, _pendingColor),
+                    if (buckets.dueSoon.isNotEmpty &&
+                        buckets.completed.isNotEmpty)
+                      const Divider(height: 20),
+                    _buildTaskBucket(
+                        'Completed', buckets.completed, _successColor),
+                  ],
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -282,376 +620,25 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  Widget _buildSubscriptionBanner(BuildContext context) {
-    return Selector<SubscriptionProvider,
-        ({String title, String message, bool critical})?>(
-      selector: (_, provider) {
-        final access = provider.access;
-        if (access == null) return null;
-        final now = DateTime.now();
-        final daysRemaining = access.daysRemaining(now);
-        final showTrial = access.isTrial;
-        final showPaidReminder = !access.isTrial && daysRemaining <= 30;
-        if (!showTrial && !showPaidReminder) return null;
-        return (
-          title: access.isTrial ? 'Free Trial' : 'Subscription',
-          message: access.expiryReminder(now),
-          critical: daysRemaining <= 3,
-        );
-      },
-      builder: (context, banner, child) {
-        if (banner == null) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.only(bottom: _kSectionSpacing),
-          child: AppCard(
-            backgroundColor: banner.critical
-                ? const Color(0xFFFFEBEE)
-                : const Color(0xFFFFF8E1),
-            onTap: () => Navigator.pushNamed(context, '/subscription'),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.local_florist_rounded,
-                  color: banner.critical ? _urgentColor : _warningColor,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        banner.title,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(banner.message),
-                    ],
-                  ),
-                ),
-                const Text(
-                  'Renew',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildReadyBouquetAttention(BuildContext context) {
-    return FutureBuilder<List<ReadyBouquetSummary>>(
-      future: ReadyBouquetRepository().getAttentionBouquets(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox.shrink();
-        }
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        final items = snapshot.data!;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionTitle(title: 'Ready Bouquets Requiring Attention'),
-            const SizedBox(height: 14),
-            ...items.map((item) => _ReadyBouquetAttentionCard(item: item)),
-            const SizedBox(height: _kSectionSpacing),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildBusinessSnapshot(BuildContext context) {
-    return Selector<DashboardProvider, DashboardSummary>(
-      selector: (_, provider) => provider.summary,
-      builder: (context, summary, child) {
-        final cards = <_KpiCardData>[
-          _KpiCardData(
-            icon: Icons.payments_rounded,
-            value: '₹${(summary.todaySalesAmount / 100).toStringAsFixed(0)}',
-            label: 'Today\'s Sales',
-            color: _successColor,
-            onTap: () => Navigator.pushNamed(context, '/reports/sales'),
-          ),
-          _KpiCardData(
-            icon: Icons.receipt_long_rounded,
-            value: '${summary.todayOrderCount}',
-            label: 'Today\'s Orders',
-            color: _pendingColor,
-            onTap: () => _openShellTab(AppShellTab.orders, '/_orders-tab'),
-          ),
-          _KpiCardData(
-            icon: Icons.shopping_cart_rounded,
-            value: '₹${(summary.todayExpenses / 100).toStringAsFixed(0)}',
-            label: 'Today\'s Expenses',
-            color: _warningColor,
-            onTap: () => _openShellTab(AppShellTab.money, '/_money-tab'),
-          ),
-          _KpiCardData(
-            icon: Icons.local_shipping_rounded,
-            value: '${summary.outForDeliveryOrders}',
-            label: 'Pending Deliveries',
-            color: _infoColor,
-            onTap: () => _openShellTab(AppShellTab.orders, '/_orders-tab'),
-          ),
-        ];
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionTitle(
-              title: 'Business Snapshot',
-            ),
-            const SizedBox(height: 14),
-            _ResponsiveCardGrid(
-              minTileWidth: 150,
-              children: cards.map((card) => _KpiCard(data: card)).toList(),
-            ),
-            const SizedBox(height: _kSectionSpacing),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildTodaysWork(BuildContext context) {
-    return Selector<DashboardProvider, DashboardSummary>(
-      selector: (_, provider) => provider.summary,
-      builder: (context, summary, child) {
-        final items = <_WorkItemData>[
-          if (summary.preparingOrders > 0)
-            _WorkItemData(
-              priority: 10,
-              icon: Icons.local_florist_rounded,
-              title: 'Prepare Orders',
-              subtitle: 'Orders waiting for preparation',
-              count: summary.preparingOrders,
-              color: _pendingColor,
-              onTap: () => Navigator.pushNamed(context, '/orders'),
-            ),
-          if (summary.outForDeliveryOrders > 0)
-            _WorkItemData(
-              priority: 20,
-              icon: Icons.local_shipping_rounded,
-              title: 'Deliveries',
-              subtitle: 'Orders pending delivery',
-              count: summary.outForDeliveryOrders,
-              color: _infoColor,
-              onTap: () => Navigator.pushNamed(context, '/orders'),
-            ),
-          if (summary.todayPickupCount > 0)
-            _WorkItemData(
-              priority: 30,
-              icon: Icons.shopping_bag_rounded,
-              title: 'Pickups',
-              subtitle: 'Customer pickups due today',
-              count: summary.todayPickupCount,
-              color: _creativeColor,
-              onTap: () => Navigator.pushNamed(context, '/orders'),
-            ),
-          if (summary.todayPendingPayments > 0)
-            _WorkItemData(
-              priority: 40,
-              icon: Icons.call_rounded,
-              title: 'Payment Follow-up',
-              subtitle: 'Customers with pending payments',
-              count: summary.todayPendingPayments,
-              color: _urgentColor,
-              onTap: () => Navigator.pushNamed(context, '/reminders'),
-            ),
-          _WorkItemData(
-            priority: 50,
-            icon: Icons.task_alt_rounded,
-            title: 'Today\'s Scheduled Tasks',
-            subtitle: summary.todayTaskCount == 0
-                ? 'No tasks scheduled for today'
-                : 'Tasks planned for today',
-            count: summary.todayTaskCount,
-            color: _pendingColor,
-            onTap: () => Navigator.pushNamed(
-              context,
-              '/scheduler',
-              arguments: {'focus': 'todayScheduledTasks'},
-            ),
-          ),
-        ]..sort((a, b) => a.priority.compareTo(b.priority));
-
-        if (items.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionTitle(
-              title: 'Today\'s Work',
-            ),
-            const SizedBox(height: 14),
-            _WorkQueueCard(items: items),
-            const SizedBox(height: _kSectionSpacing),
-          ],
-        );
-      },
-    );
-  }
-
   Widget _buildWorkspaces(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     return Selector<DashboardProvider, DashboardSummary>(
       selector: (_, provider) => provider.summary,
       builder: (context, summary, child) {
-        final inventoryAttention =
-            summary.lowStockItems + summary.outOfStockItems;
-        final groups = <_WorkspaceGroupData>[
-          _WorkspaceGroupData(
-            icon: Icons.shopping_bag_rounded,
-            title: 'Sales & Orders',
-            color: _pendingColor,
-            items: [
-              _WorkspaceItemData(
-                icon: Icons.point_of_sale_rounded,
-                title: l10n.navWalkinSales,
-                onTap: () => Navigator.pushNamed(context, '/walkin-sales'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.receipt_long_rounded,
-                title: l10n.orders,
-                badgeCount: summary.pendingOrders,
-                onTap: () => Navigator.pushNamed(context, '/orders'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.event_note_rounded,
-                title: 'Scheduled Tasks',
-                badgeCount: summary.todayTaskCount,
-                onTap: () => Navigator.pushNamed(context, '/scheduler'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.groups_rounded,
-                title: l10n.customers,
-                onTap: () => Navigator.pushNamed(context, '/customers'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.business_rounded,
-                title: 'Associates',
-                onTap: () => Navigator.pushNamed(context, '/associates'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.location_searching_rounded,
-                title: 'Delivery Workspace',
-                onTap: () =>
-                    Navigator.pushNamed(context, '/delivery-workspace'),
-              ),
-            ],
-          ),
-          _WorkspaceGroupData(
-            icon: Icons.local_florist_rounded,
-            title: 'Catalogue & Inventory',
-            color: _successColor,
-            items: [
-              _WorkspaceItemData(
-                icon: Icons.category_rounded,
-                title: 'Categories',
-                onTap: () => Navigator.pushNamed(context, '/categories'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.spa_rounded,
-                title: l10n.products,
-                onTap: () => Navigator.pushNamed(context, '/products'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.palette_rounded,
-                title: 'My Designs',
-                onTap: () => Navigator.pushNamed(context, '/my-designs'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.inventory_2_rounded,
-                title: l10n.inventoryTitle,
-                badgeCount: inventoryAttention,
-                onTap: () => Navigator.pushNamed(context, '/inventory'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.shopping_cart_rounded,
-                title: 'Create Puchase List',
-                badgeCount: summary.todayPurchaseListCount,
-                onTap: () => Navigator.pushNamed(context, '/purchase-list'),
-              ),
-            ],
-          ),
-          _WorkspaceGroupData(
-            icon: Icons.groups_2_rounded,
-            title: 'Team',
-            color: _infoColor,
-            items: [
-              _WorkspaceItemData(
-                icon: Icons.badge_rounded,
-                title: l10n.staff,
-                onTap: () async {
-                  await Navigator.pushNamed(context, '/staff');
-                },
-              ),
-              _WorkspaceItemData(
-                icon: Icons.event_available_rounded,
-                title: l10n.attendance,
-                badgeCount: summary.unmarkedAttendanceCount,
-                onTap: () async {
-                  await Navigator.pushNamed(context, '/attendance');
-                },
-              ),
-            ],
-          ),
-          _WorkspaceGroupData(
-            icon: Icons.account_balance_wallet_rounded,
-            title: 'Accounting',
-            color: _creativeColor,
-            items: [
-              _WorkspaceItemData(
-                icon: Icons.attach_money_rounded,
-                title: 'Opening Cash',
-                onTap: () => Navigator.pushNamed(context, '/opening-cash'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.receipt_long_rounded,
-                title: 'Cash Book',
-                onTap: () => Navigator.pushNamed(context, '/cash-book'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.receipt_rounded,
-                title: 'Expenses',
-                onTap: () => Navigator.pushNamed(context, '/expenses'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.nights_stay_rounded,
-                title: 'Day Closing',
-                onTap: () => Navigator.pushNamed(context, '/day-closing'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.bar_chart_rounded,
-                title: 'Reports',
-                onTap: () => Navigator.pushNamed(context, '/reports'),
-              ),
-            ],
-          ),
-          _WorkspaceGroupData(
-            icon: Icons.tune_rounded,
-            title: 'Utilities',
-            color: _creativeColor,
-            items: [
-              _WorkspaceItemData(
-                icon: Icons.notifications_rounded,
-                title: l10n.reminders,
-                badgeCount: summary.todayFollowUps,
-                onTap: () => Navigator.pushNamed(context, '/reminders'),
-              ),
-              _WorkspaceItemData(
-                icon: Icons.settings_rounded,
-                title: l10n.settingsTitle,
-                onTap: () => Navigator.pushNamed(context, '/settings'),
-              ),
-            ],
-          ),
-        ];
+        final groups = WorkspaceNavigation.sections.map((section) {
+          return _WorkspaceGroupData(
+            icon: section.icon,
+            title: section.title,
+            color: section.color,
+            items: section.items.map((item) {
+              return _WorkspaceItemData(
+                icon: item.icon,
+                title: item.getLabel(context),
+                badgeCount: item.getBadge(summary),
+                onTap: () => Navigator.pushNamed(context, item.route),
+              );
+            }).toList(),
+          );
+        }).toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -686,7 +673,7 @@ class _SectionTitle extends StatelessWidget {
       children: [
         Text(
           title,
-          style: textTheme.titleLarge?.copyWith(
+          style: textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w800,
             color: colorScheme.onSurface,
           ),
@@ -732,209 +719,46 @@ class _ResponsiveCardGrid extends StatelessWidget {
   }
 }
 
-class _KpiCardData {
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
+class _ReadyBouquetAttentionCard extends StatelessWidget {
+  final ReadyBouquetSummary item;
 
-  const _KpiCardData({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-}
-
-class _KpiCard extends StatelessWidget {
-  final _KpiCardData data;
-
-  const _KpiCard({required this.data});
+  const _ReadyBouquetAttentionCard({required this.item});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return AppCard(
-      onTap: data.onTap,
-      padding: const EdgeInsets.all(12),
-      backgroundColor: colorScheme.surface,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 88),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: data.color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(data.icon, color: data.color, size: 21),
-            ),
-            const SizedBox(height: 7),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.12),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
-              ),
-              child: Text(
-                data.value,
-                key: ValueKey('${data.label}-${data.value}'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
-                    ),
-              ),
-            ),
-            const SizedBox(height: 1),
-            Text(
-              data.label,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _WorkItemData {
-  final int priority;
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final int count;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _WorkItemData({
-    required this.priority,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.count,
-    required this.color,
-    required this.onTap,
-  });
-}
-
-class _WorkQueueCard extends StatelessWidget {
-  final List<_WorkItemData> items;
-
-  const _WorkQueueCard({required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: items.asMap().entries.map((entry) {
-          final index = entry.key;
-          final item = entry.value;
-          return Column(
-            children: [
-              _WorkQueueRow(item: item),
-              if (index != items.length - 1) const Divider(height: 1),
-            ],
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-class _WorkQueueRow extends StatelessWidget {
-  final _WorkItemData item;
-
-  const _WorkQueueRow({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return InkWell(
-      onTap: item.onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AppCard(
+        onTap: () => Navigator.pushNamed(context, '/ready-bouquets'),
         child: Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: item.color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
+                color: const Color(0xFFFDE8E8),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(item.icon, color: item.color, size: 24),
+              child: const Icon(Icons.warning_amber_rounded,
+                  color: _urgentColor, size: 22),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                    item.productName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 2),
                   Text(
-                    item.subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                    '${item.currentStock} remaining • ${item.ageDays} days in studio',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
-            Container(
-              constraints: const BoxConstraints(minWidth: 36),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: item.color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Text(
-                '${item.count}',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: item.color,
-                      fontWeight: FontWeight.w800,
-                    ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: colorScheme.onSurfaceVariant,
-            ),
+            const Icon(Icons.chevron_right_rounded),
           ],
         ),
       ),
@@ -965,7 +789,7 @@ class _WorkspaceItemData {
   const _WorkspaceItemData({
     required this.icon,
     required this.title,
-    this.badgeCount = 0,
+    required this.badgeCount,
     required this.onTap,
   });
 }
@@ -980,114 +804,86 @@ class _WorkspaceGroupCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return AppCard(
-      padding: const EdgeInsets.all(16),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 150),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: group.color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(group.icon, color: group.color, size: 20),
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: BoxDecoration(
+              color: group.color.withValues(alpha: 0.08),
+              border: Border(
+                bottom: BorderSide(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                 ),
-                const SizedBox(width: 12),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(group.icon, size: 20, color: group.color),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     group.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      color: group.color,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: group.color.withValues(alpha: 0.16),
-            ),
-            const SizedBox(height: 10),
-            ...group.items.map(
-              (item) => _WorkspaceItemRow(
-                item: item,
-                color: group.color,
-                foregroundColor: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
+          ),
+          ...group.items.map((item) => _WorkspaceItemTile(item: item)),
+        ],
       ),
     );
   }
 }
 
-class _WorkspaceItemRow extends StatelessWidget {
+class _WorkspaceItemTile extends StatelessWidget {
   final _WorkspaceItemData item;
-  final Color color;
-  final Color foregroundColor;
 
-  const _WorkspaceItemRow({
-    required this.item,
-    required this.color,
-    required this.foregroundColor,
-  });
+  const _WorkspaceItemTile({required this.item});
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return InkWell(
       onTap: item.onTap,
-      borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
-            Icon(item.icon, color: color, size: 22),
+            Icon(item.icon, size: 20, color: colorScheme.onSurfaceVariant),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
               ),
             ),
-            if (item.badgeCount > 0) ...[
-              const SizedBox(width: 8),
+            if (item.badgeCount > 0)
               Container(
-                constraints: const BoxConstraints(minWidth: 28),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
+                  color: colorScheme.error,
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   '${item.badgeCount}',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  style: TextStyle(
+                    color: colorScheme.onError,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            ],
-            const SizedBox(width: 6),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: foregroundColor,
-              size: 22,
-            ),
+            Icon(Icons.chevron_right, size: 18, color: colorScheme.outline),
           ],
         ),
       ),
@@ -1095,75 +891,24 @@ class _WorkspaceItemRow extends StatelessWidget {
   }
 }
 
-class _ReadyBouquetAttentionCard extends StatelessWidget {
-  const _ReadyBouquetAttentionCard({required this.item});
-
-  final ReadyBouquetSummary item;
+class _DashboardInventorySection extends StatelessWidget {
+  const _DashboardInventorySection();
 
   @override
   Widget build(BuildContext context) {
-    final color = _statusColor(item.status);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: AppCard(
-        onTap: () => Navigator.pushNamed(context, '/ready-bouquets'),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.productName,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Age: ${item.ageDays} day${item.ageDays == 1 ? '' : 's'} • Stock: ${item.currentStock} ${item.unit}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: color),
-              ),
-              child: Text(
-                _statusLabel(item.status),
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    InventoryProvider? inventory;
+    try {
+      inventory = Provider.of<InventoryProvider>(context);
+    } catch (_) {
+      inventory = null;
+    }
+
+    return DashboardInventoryHealth(
+      products: inventory?.products ?? const [],
+      lowStockProducts: inventory?.cloudLowStockProducts ?? const [],
+      isLoading: inventory?.isLoading ?? false,
+      onViewInventory: () => Navigator.pushNamed(context, '/inventory'),
     );
   }
-
-  String _statusLabel(ReadyBouquetStatus status) {
-    return switch (status) {
-      ReadyBouquetStatus.fresh => 'Fresh',
-      ReadyBouquetStatus.needsRefresh => 'Needs Refresh',
-      ReadyBouquetStatus.nearExpiry => 'Near Expiry',
-      ReadyBouquetStatus.expired => 'Expired',
-    };
-  }
-
-  Color _statusColor(ReadyBouquetStatus status) {
-    return switch (status) {
-      ReadyBouquetStatus.fresh => Colors.green,
-      ReadyBouquetStatus.needsRefresh => Colors.amber.shade700,
-      ReadyBouquetStatus.nearExpiry => Colors.orange,
-      ReadyBouquetStatus.expired => Colors.red,
-    };
-  }
 }
+

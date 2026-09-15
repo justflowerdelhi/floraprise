@@ -65,6 +65,27 @@ public class FinishedGoodsBatchDto
     public string LocationName { get; set; } = default!;
     public string Status { get; set; } = default!;
     public string ProducedAt { get; set; } = default!;
+    public decimal TotalCost { get; set; }
+    public string? OperatorName { get; set; }
+    public DateTime? ReversedAt { get; set; }
+    public string? ReversalNote { get; set; }
+    public bool IsReversed { get; set; }
+    public List<ProductionConsumptionDto> Consumptions { get; set; } = new();
+}
+
+public class ProductionConsumptionDto
+{
+    public Guid RawProductId { get; set; }
+    public string ProductName { get; set; } = default!;
+    public string Unit { get; set; } = default!;
+    public int Quantity { get; set; }
+    public decimal UnitCost { get; set; }
+    public decimal TotalCost { get; set; }
+}
+
+public class ReverseBatchRequest
+{
+    public string? Reason { get; set; }
 }
 
 // ─── Production Run DTOs ───────────────────────────────────
@@ -75,6 +96,7 @@ public class ProductionRunRequest
     public int Quantity { get; set; }
     public string ExpectedExpiry { get; set; } = default!;
     public Guid LocationId { get; set; }
+    public string? OperatorName { get; set; }
 }
 
 public class ComponentDeduction

@@ -21,6 +21,9 @@ class AppDatabase {
   static bool useInMemoryForTests = false;
 
   Future<Database> get database async {
+    if (kIsWeb) {
+      throw UnsupportedError('SQLite database cannot be opened on Web');
+    }
     if (_db != null) return _db!;
     _db = await _open();
     return _db!;

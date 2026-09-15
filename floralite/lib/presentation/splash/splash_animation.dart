@@ -326,14 +326,10 @@ class _Wordmark extends StatelessWidget {
       offset: Offset(0, 20 * (1 - progress)),
       child: Opacity(
         opacity: progress,
-        child: const Text(
-          'Floraprise',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 32,
-            color: Colors.white,
-            letterSpacing: 0.5,
-          ),
+        child: Image.asset(
+          'assets/floraprise-title.png',
+          height: 40,
+          fit: BoxFit.contain,
         ),
       ),
     );

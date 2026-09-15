@@ -95,15 +95,27 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
             _logger.LogInformation("[MobileSubscription] MobileUser already active: {UserId}", user.Id);
         }
 
+        _logger.LogInformation("[MobileSubscription] Ensuring default subscription plans exist");
+        await EnsureDefaultPlansAsync(request.ActorUserId);
+
+        _logger.LogInformation("[MobileSubscription] Ensuring trial plan exists");
+        var plan = await EnsureTrialPlanAsync(request.ActorUserId);
+        _logger.LogInformation("[MobileSubscription] Trial plan ID: {PlanId}", plan.Id);
+
         _logger.LogInformation("[MobileSubscription] Getting/creating MobileDevice for userId: {UserId}, deviceId: {DeviceId}", user.Id, request.DeviceId);
         var device = await _devices.GetByDeviceIdAsync(request.CompanyId, user.Id, request.DeviceId);
         if (device == null)
         {
             var subscriptionForLimit = await _subscriptions.GetByUserIdAsync(request.CompanyId, user.Id);
-            var planForLimit = subscriptionForLimit?.SubscriptionPlan ?? await EnsureTrialPlanAsync(request.ActorUserId);
+            var planForLimit = subscriptionForLimit?.SubscriptionPlan ?? plan;
+            var maxAllowedDevices = planForLimit.PlanType == MobilePlanType.Pro ? 3 : planForLimit.MaximumDevices;
             var activeDeviceCount = await _devices.CountActiveByUserAsync(request.CompanyId, user.Id);
-            if (activeDeviceCount >= planForLimit.MaximumDevices)
-                throw new InvalidOperationException($"Maximum device limit reached for plan '{planForLimit.Code}'.");
+            if (activeDeviceCount >= maxAllowedDevices)
+            {
+                _logger.LogWarning("[MobileSubscription] Device limit reached. User: {UserId}, Active: {Count}, Max: {Max}, Plan: {Plan}",
+                    user.Id, activeDeviceCount, maxAllowedDevices, planForLimit.Code);
+                throw new InvalidOperationException($"Maximum {maxAllowedDevices} devices are already active for this account.");
+            }
 
             _logger.LogInformation("[MobileSubscription] Creating new MobileDevice for userId: {UserId}, deviceId: {DeviceId}", user.Id, request.DeviceId);
             device = new MobileDevice(
@@ -126,18 +138,23 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
         {
             _logger.LogInformation("[MobileSubscription] MobileDevice found with ID: {DeviceId}, updating", device.Id);
             if (device.Status != MobileDeviceStatus.Active)
+            {
+                var subscriptionForLimit = await _subscriptions.GetByUserIdAsync(request.CompanyId, user.Id);
+                var planForLimit = subscriptionForLimit?.SubscriptionPlan ?? plan;
+                var maxAllowedDevices = planForLimit.PlanType == MobilePlanType.Pro ? 3 : planForLimit.MaximumDevices;
+                var activeDeviceCount = await _devices.CountActiveByUserAsync(request.CompanyId, user.Id);
+                if (activeDeviceCount >= maxAllowedDevices)
+                {
+                    _logger.LogWarning("[MobileSubscription] Device limit reached on reactivating device. User: {UserId}, Active: {Count}, Max: {Max}, Plan: {Plan}",
+                        user.Id, activeDeviceCount, maxAllowedDevices, planForLimit.Code);
+                    throw new InvalidOperationException($"Maximum {maxAllowedDevices} devices are already active for this account.");
+                }
                 device.Activate(request.ActorUserId);
+            }
 
             device.MarkLogin(request.IpAddress, request.ActorUserId);
             device.UpdateHeartbeat(request.AppVersion, request.IpAddress, now, request.ActorUserId);
         }
-
-        _logger.LogInformation("[MobileSubscription] Ensuring default subscription plans exist");
-        await EnsureDefaultPlansAsync(request.ActorUserId);
-
-        _logger.LogInformation("[MobileSubscription] Ensuring trial plan exists");
-        var plan = await EnsureTrialPlanAsync(request.ActorUserId);
-        _logger.LogInformation("[MobileSubscription] Trial plan ID: {PlanId}", plan.Id);
 
         _logger.LogInformation("[MobileSubscription] Getting/creating MobileSubscription for userId: {UserId}", user.Id);
         var subscription = await _subscriptions.GetByUserIdAsync(request.CompanyId, user.Id);
@@ -291,6 +308,8 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
         var graceDays = _configuration.GetValue<int?>("MobileSubscription:GraceDays") ?? 30;
         var offlineDays = _configuration.GetValue<int?>("MobileSubscription:OfflineDays") ?? 3;
 
+        var proMaxDevices = _configuration.GetValue<int?>("MobileSubscription:ProMaxDevices") ?? 3;
+
         await EnsurePlanAsync(
             code: TrialPlanCode,
             name: "Mobile Trial",
@@ -317,7 +336,7 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
             trialDays: trialDays,
             offlineDays: offlineDays,
             graceDays: graceDays,
-            maximumDevices: 5,
+            maximumDevices: _configuration.GetValue<int?>("MobileSubscription:Plans:Quarterly:MaxDevices") ?? proMaxDevices,
             maximumStaff: 10,
             includedModulesJson: "[]",
             isActive: true,
@@ -333,7 +352,7 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
             trialDays: trialDays,
             offlineDays: offlineDays,
             graceDays: graceDays,
-            maximumDevices: 5,
+            maximumDevices: _configuration.GetValue<int?>("MobileSubscription:Plans:HalfYearly:MaxDevices") ?? proMaxDevices,
             maximumStaff: 10,
             includedModulesJson: "[]",
             isActive: true,
@@ -349,7 +368,7 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
             trialDays: trialDays,
             offlineDays: offlineDays,
             graceDays: graceDays,
-            maximumDevices: 5,
+            maximumDevices: _configuration.GetValue<int?>("MobileSubscription:Plans:Annual:MaxDevices") ?? proMaxDevices,
             maximumStaff: 10,
             includedModulesJson: "[]",
             isActive: true,

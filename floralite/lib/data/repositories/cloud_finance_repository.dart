@@ -1,6 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:http/http.dart' as http;
+
+import '../../models/day_closing.dart';
 import '../../models/expense.dart';
 import '../../models/expense_category.dart';
 import '../../services/mobile_auth_service.dart';
@@ -111,21 +113,33 @@ class CloudExpenseRepository {
   Future<dynamic> _send(String method, Uri uri, {Map<String, dynamic>? body}) async {
     final override = _sender;
     if (override != null) return override(method, uri, body: body);
-    final token = await _auth.getStoredAccessToken();
+    var token = await _auth.getStoredAccessToken();
     if (token == null || token.trim().isEmpty) throw StateError('Cloud session is not available. Please log in again.');
-    final client = HttpClient();
-    try {
-      final request = await client.openUrl(method, uri);
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.contentType = ContentType.json;
-      if (body != null) request.write(jsonEncode(body));
-      final response = await request.close();
-      final text = await response.transform(utf8.decoder).join();
-      if (response.statusCode < 200 || response.statusCode >= 300) throw StateError('Cloud finance request failed (HTTP ${response.statusCode}).');
-      return text.trim().isEmpty ? <String, dynamic>{} : jsonDecode(text);
-    } finally {
-      client.close(force: true);
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final client = http.Client();
+      try {
+        final request = http.Request(method, uri);
+        request.headers['Accept'] = 'application/json';
+        request.headers['Authorization'] = 'Bearer $token';
+        if (body != null) {
+          request.headers['Content-Type'] = 'application/json';
+          request.body = jsonEncode(body);
+        }
+        final streamedResponse = await client.send(request).timeout(const Duration(seconds: 20));
+        final text = await streamedResponse.stream.bytesToString();
+        final statusCode = streamedResponse.statusCode;
+        if (statusCode == 401 && attempt == 0) {
+          final refreshed = await _auth.refreshAndBootstrap();
+          token = refreshed.accessToken;
+          continue;
+        }
+        if (statusCode < 200 || statusCode >= 300) throw StateError('Cloud finance request failed (HTTP $statusCode).');
+        return text.trim().isEmpty ? <String, dynamic>{} : jsonDecode(text);
+      } finally {
+        client.close();
+      }
     }
+    throw StateError('Cloud finance request failed.');
   }
 
   static String _dateQuery(DateTime value) => DateTime.utc(value.year, value.month, value.day).toIso8601String();
@@ -141,6 +155,44 @@ class CloudDayCloseRepository {
       : _auth = auth ?? MobileAuthService(), _sender = sender;
   final MobileAuthService _auth;
   final CloudFinanceSender? _sender;
+
+  Future<List<DayClosing>> getByDateRange(DateTime startDate, DateTime endDate) async {
+    final locationId = await _locationId();
+    final response = await _send(
+      'GET',
+      Uri.parse('${_auth.baseUrl}/api/day-close/history').replace(
+        queryParameters: {
+          'locationId': locationId,
+          'startDate': _dateQuery(startDate),
+          'endDate': _dateQuery(endDate),
+        },
+      ),
+    );
+    if (response is! List) return const [];
+    return response.whereType<Map>().toList().asMap().entries.map((entry) {
+      final row = entry.value.cast<String, dynamic>();
+      final closedAt = CloudExpenseRepository._date(row, 'closedAt');
+      final date = CloudExpenseRepository._date(row, 'businessDate');
+      return DayClosing(
+        id: -(entry.key + 1),
+        date: date,
+        cashSales: CloudExpenseRepository._paise(row, 'cashTotal'),
+        upiSales: CloudExpenseRepository._paise(row, 'upiTotal'),
+        cardSales: CloudExpenseRepository._paise(row, 'cardTotal'),
+        creditSales: 0,
+        cashExpenses: CloudExpenseRepository._paise(row, 'cashExpenses'),
+        upiExpenses: 0,
+        cardExpenses: 0,
+        openingCash: 0,
+        expectedCash: CloudExpenseRepository._paise(row, 'expectedCash'),
+        countedCash: CloudExpenseRepository._paise(row, 'actualCash'),
+        difference: CloudExpenseRepository._paise(row, 'cashVariance'),
+        notes: CloudExpenseRepository._nullableString(row, 'notes'),
+        closedAt: closedAt,
+        createdAt: closedAt,
+      );
+    }).toList();
+  }
 
   Future<Map<String, dynamic>> summary(DateTime date) async {
     final locationId = await _locationId();

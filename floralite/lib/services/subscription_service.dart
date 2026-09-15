@@ -670,6 +670,20 @@ class SubscriptionService {
   }
 
   Future<SubscriptionRecord> _loadOrCreateTrial() async {
+    if (kIsWeb) {
+      final now = _now();
+      return SubscriptionRecord(
+        status: SubscriptionState.active,
+        plan: SubscriptionPlan.annual,
+        purchaseToken: null,
+        expiryDate: now.add(const Duration(days: 3650)),
+        graceEndDate: now.add(const Duration(days: 3650)),
+        lastVerification: now,
+        offlineExpiry: now.add(const Duration(days: 3650)),
+        lastAppVersion: _appVersion,
+      );
+    }
+
     final db = await AppDatabase.instance.database;
     final rows = await db.query('subscription', limit: 1);
     if (rows.isNotEmpty) {
@@ -732,6 +746,7 @@ class SubscriptionService {
   }
 
   Future<void> _save(SubscriptionRecord record) async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     await db.insert(
       'subscription',
@@ -753,6 +768,7 @@ class SubscriptionService {
   }
 
   Future<void> _log(String event, String status) async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     await db.insert('license_log', {
       'event': event,

@@ -143,6 +143,7 @@ class SchedulerService {
   }
 
   Future<void> restorePendingSchedules() async {
+    if (kIsWeb) return;
     await initialize();
     final activeTasks = await _repository.listActiveTasks();
     for (final task in activeTasks) {

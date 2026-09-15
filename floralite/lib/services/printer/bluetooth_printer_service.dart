@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/printer_device.dart';
@@ -63,7 +64,7 @@ class BluetoothPrinterService implements PrinterService {
 
   @override
   Future<void> disconnect() async {
-    if (!Platform.isAndroid) return;
+    if (kIsWeb || !Platform.isAndroid) return;
     try {
       await _channel.invokeMethod<void>('disconnect');
     } on PlatformException catch (error) {
@@ -73,7 +74,7 @@ class BluetoothPrinterService implements PrinterService {
 
   @override
   Future<bool> isConnected() async {
-    if (!Platform.isAndroid) return false;
+    if (kIsWeb || !Platform.isAndroid) return false;
     try {
       return await _channel.invokeMethod<bool>('isConnected') ?? false;
     } on PlatformException {
@@ -104,7 +105,7 @@ class BluetoothPrinterService implements PrinterService {
   }
 
   void _ensureAndroid() {
-    if (!Platform.isAndroid) {
+    if (kIsWeb || !Platform.isAndroid) {
       throw const PrinterServiceException(
           'Bluetooth printing is currently available on Android only.');
     }

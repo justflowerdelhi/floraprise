@@ -178,7 +178,6 @@ class _BusinessRegistrationScreenState
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AuthProvider>();
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: Stack(
@@ -197,27 +196,18 @@ class _BusinessRegistrationScreenState
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.storefront_rounded,
-                            size: 44,
-                            color: colorScheme.primary,
+                          Center(
+                            child: Image.asset(
+                              'assets/floraprise-title.png',
+                              height: 48,
+                              fit: BoxFit.contain,
+                            ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           Text(
                             _loginMode
-                                ? 'Floraprise Cloud Store'
-                                : 'Business Registration',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _loginMode
-                                ? 'Sign in with your Floraprise account.'
-                                : 'Create your Floraprise account.',
+                                ? 'Sign in to your Floraprise account'
+                                : 'Create your Floraprise account',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.grey.shade700),
                           ),

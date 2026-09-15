@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 import '../data/repositories/job_repository.dart';
@@ -9,6 +10,7 @@ import '../models/order_workspace_models.dart';
 import 'reward_summary_formatter.dart';
 import '../models/printer_models.dart';
 import 'printer/printer_manager.dart';
+import 'printer/web_receipt_print_service.dart';
 
 /// Service for printing order receipts and work sheets from the
 /// Order Workflow module.
@@ -44,6 +46,11 @@ class OrderPrintService {
 
     final bundle = await _orderManager.getOrderDetailBundle(orderId);
     final payload = await _posPayload(header, bundle);
+    if (kIsWeb) {
+      final webPrinter = WebReceiptPrintService();
+      await webPrinter.printPosBill(payload);
+      return;
+    }
     await repo.enqueueReceiptJob(orderId, payload);
     await _printerManager.enqueue(
       type: PrintJobType.posBill,

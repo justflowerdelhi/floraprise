@@ -39,77 +39,351 @@
   
   
   <style id="splash-screen-style">
-    html {
-      height: 100%
-    }
-
-    body {
+    html, body {
       margin: 0;
-      min-height: 100%;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
       background-color: #062F25;
-          background-size: 100% 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
-    .center {
-      margin: 0;
+    #splash {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 42%, #0D4638 0%, #062F25 65%, #041F19 100%);
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.4s ease;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #splash.fade-out {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .botanical-bg {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      -ms-transform: translate(-50%, -50%);
-      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 0.045;
+      width: 320px;
+      height: 240px;
     }
 
-    .contain {
-      display:block;
-      width:100%; height:100%;
-      object-fit: contain;
+    .botanical-tl {
+      top: -30px;
+      left: -30px;
+      transform: rotate(-15deg);
     }
 
-    .stretch {
-      display:block;
-      width:100%; height:100%;
+    .botanical-br {
+      bottom: -30px;
+      right: -30px;
+      transform: rotate(165deg);
     }
 
-    .cover {
-      display:block;
-      width:100%; height:100%;
-      object-fit: cover;
+    .splash-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      max-width: 480px;
+      padding: 0 24px;
+      animation: splashEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
-    .bottom {
-      position: absolute;
-      bottom: 0;
-      left: 50%;
-      -ms-transform: translate(-50%, 0);
-      transform: translate(-50%, 0);
+    @keyframes splashEntrance {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
-    .bottomLeft {
-      position: absolute;
-      bottom: 0;
-      left: 0;
+    .logo-container {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    .bottomRight {
-      position: absolute;
-      bottom: 0;
-      right: 0;
+    .floraprise-mark {
+      width: 120px;
+      height: 120px;
+      display: block;
+      filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.25));
+    }
+
+    .brand-title {
+      font-size: 32px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      color: #FFFFFF;
+      margin: 22px 0 0 0;
+      line-height: 1.2;
+    }
+
+    .edition-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 4px 14px;
+      border-radius: 20px;
+      background: rgba(229, 184, 50, 0.12);
+      border: 1px solid rgba(229, 184, 50, 0.35);
+      color: #E5B832;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2.2px;
+      text-transform: uppercase;
+    }
+
+    .edition-badge svg {
+      width: 12px;
+      height: 12px;
+      fill: currentColor;
+    }
+
+    .brand-tagline {
+      margin: 16px 0 0 0;
+      font-size: 15px;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      color: rgba(255, 255, 255, 0.76);
+      line-height: 1.4;
+    }
+
+    .brand-divider {
+      width: 44px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.16);
+      margin: 24px auto 20px auto;
+    }
+
+    .loading-status {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-text {
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0.3px;
+      color: rgba(255, 255, 255, 0.52);
+    }
+
+    .loading-dots {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .loading-dots .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #E5B832;
+      animation: dotPulse 1.4s ease-in-out infinite;
+    }
+
+    .loading-dots .dot:nth-child(2) {
+      animation-delay: 0.25s;
+    }
+
+    .loading-dots .dot:nth-child(3) {
+      animation-delay: 0.5s;
+    }
+
+    @keyframes dotPulse {
+      0%, 100% {
+        opacity: 0.25;
+        transform: scale(0.85);
+      }
+      50% {
+        opacity: 0.95;
+        transform: scale(1.2);
+      }
+    }
+
+    @media (max-width: 600px), (max-height: 550px) {
+      .logo-container, .floraprise-mark {
+        width: 96px;
+        height: 96px;
+      }
+      .brand-title {
+        font-size: 26px;
+        margin-top: 16px;
+      }
+      .brand-tagline {
+        font-size: 13px;
+        margin-top: 12px;
+      }
+      .brand-divider {
+        margin: 18px auto 16px auto;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .splash-content, .loading-dots .dot {
+        animation: none !important;
+      }
+      #splash {
+        transition: none !important;
+      }
     }
   </style>
+
   <script id="splash-screen-script">
     function removeSplashFromWeb() {
-      document.getElementById("splash")?.remove();
-      document.getElementById("splash-branding")?.remove();
-      document.body.style.background = "transparent";
+      const splash = document.getElementById("splash");
+      if (splash && !splash.classList.contains("fade-out")) {
+        splash.classList.add("fade-out");
+        setTimeout(function() {
+          splash.remove();
+          document.body.style.background = "transparent";
+        }, 400);
+      }
     }
+
+    // Auto-dismiss once Flutter initializes and mounts its root view
+    (function() {
+      let dismissed = false;
+      function checkAndDismiss() {
+        if (dismissed) return;
+        const fltView = document.querySelector('flutter-view') || document.querySelector('flt-glass-pane');
+        if (fltView) {
+          dismissed = true;
+          window.requestAnimationFrame(function() {
+            setTimeout(removeSplashFromWeb, 150);
+          });
+        }
+      }
+
+      const observer = new MutationObserver(function() {
+        checkAndDismiss();
+      });
+
+      if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+      } else {
+        document.addEventListener('DOMContentLoaded', function() {
+          observer.observe(document.body, { childList: true, subtree: true });
+        });
+      }
+
+      // Safety timeout: dismiss if observer doesn't fire after 4.5 seconds
+      setTimeout(removeSplashFromWeb, 4500);
+    })();
   </script>
 </head>
 <body>
-  <picture id="splash">
-      <source srcset="splash/img/light-1x.png 1x, splash/img/light-2x.png 2x, splash/img/light-3x.png 3x, splash/img/light-4x.png 4x" media="(prefers-color-scheme: light)">
-      <source srcset="splash/img/dark-1x.png 1x, splash/img/dark-2x.png 2x, splash/img/dark-3x.png 3x, splash/img/dark-4x.png 4x" media="(prefers-color-scheme: dark)">
-      <img class="contain" aria-hidden="true" src="splash/img/light-1x.png" alt="">
-  </picture>
+  <div id="splash" role="status" aria-label="Loading Floraprise Pro Cloud workspace">
+    <!-- Top-Left Botanical Atmosphere -->
+    <svg class="botanical-bg botanical-tl" viewBox="0 0 240 180" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <g stroke="#6F8F72" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M113 154C117 124 123 91 137 55" />
+        <path d="M137 55C150 74 154 91 148 107C135 101 127 88 125 70C124 62 128 57 137 55Z" />
+        <path d="M119 100C100 87 88 72 82 55C101 55 116 63 126 78C130 84 127 93 119 100Z" />
+        <path d="M112 134C134 123 152 109 166 91C173 112 168 130 151 145C138 156 124 152 112 134Z" />
+        <path d="M137 55C134 70 131 85 128 101" />
+        <path d="M82 55C96 68 108 82 119 100" />
+        <path d="M166 91C150 106 132 121 112 134" />
+      </g>
+    </svg>
+
+    <!-- Bottom-Right Botanical Atmosphere -->
+    <svg class="botanical-bg botanical-br" viewBox="0 0 240 180" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <g stroke="#6F8F72" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M113 154C117 124 123 91 137 55" />
+        <path d="M137 55C150 74 154 91 148 107C135 101 127 88 125 70C124 62 128 57 137 55Z" />
+        <path d="M119 100C100 87 88 72 82 55C101 55 116 63 126 78C130 84 127 93 119 100Z" />
+        <path d="M112 134C134 123 152 109 166 91C173 112 168 130 151 145C138 156 124 152 112 134Z" />
+        <path d="M137 55C134 70 131 85 128 101" />
+        <path d="M82 55C96 68 108 82 119 100" />
+        <path d="M166 91C150 106 132 121 112 134" />
+      </g>
+    </svg>
+
+    <!-- Centered Brand Composition -->
+    <div class="splash-content">
+      <div class="logo-container">
+        <svg class="floraprise-mark" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Floraprise Logo">
+          <circle cx="100" cy="100" r="90" fill="url(#logoGlow)" opacity="0.6"/>
+          <defs>
+            <radialGradient id="logoGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#D8A020" stop-opacity="0.35"/>
+              <stop offset="50%" stop-color="#D8A020" stop-opacity="0.1"/>
+              <stop offset="100%" stop-color="#D8A020" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+
+          <!-- Left Leaf -->
+          <g transform="translate(20, 100) scale(0.6)">
+            <path d="M50 80 Q30 60 20 40 Q15 20 30 10 Q45 5 50 20 Q55 5 70 10 Q85 20 80 40 Q70 60 50 80" fill="#16553D" stroke="#0F3D2E" stroke-width="2"/>
+          </g>
+
+          <!-- Right Leaf -->
+          <g transform="translate(120, 100) scale(0.6)">
+            <path d="M50 80 Q70 60 80 40 Q85 20 70 10 Q55 5 50 20 Q45 5 30 10 Q15 20 20 40 Q30 60 50 80" fill="#16553D" stroke="#0F3D2E" stroke-width="2"/>
+          </g>
+
+          <!-- Flower -->
+          <g transform="translate(50, 50)">
+            <circle cx="50" cy="50" r="35" fill="#D8A020" stroke="#B8860B" stroke-width="2"/>
+            <circle cx="50" cy="50" r="25" fill="#E5B832" stroke="#D8A020" stroke-width="1"/>
+            <circle cx="50" cy="50" r="15" fill="#F0C846" stroke="#E5B832" stroke-width="1"/>
+          </g>
+
+          <!-- Letter F -->
+          <g transform="translate(80, 75)">
+            <path d="M10 5 L10 50 M10 5 L32 5 M10 27 L25 27" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+        </svg>
+      </div>
+
+      <h1 class="brand-title">Floraprise</h1>
+
+      <div class="edition-badge" role="status">
+        <svg viewBox="0 0 24 24">
+          <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/>
+        </svg>
+        <span>PRO CLOUD</span>
+      </div>
+
+      <p class="brand-tagline">Your Florist Business, Simplified.</p>
+
+      <div class="brand-divider" aria-hidden="true"></div>
+
+      <div class="loading-status">
+        <span class="status-text">Loading workspace…</span>
+        <div class="loading-dots" aria-hidden="true">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
+    </div>
+  </div>
   
   
   

@@ -32,6 +32,7 @@ import { PaymentProvider } from '../pages/payments/PaymentContext';
 import { OrderProvider } from '../pages/orders/OrderContext';
 import { POSLayout } from '../pages/pos';
 import { RetailPOSPage } from '../pages/pos/retail';
+import { RetailDeliveryPage } from '../pages/delivery/retail';
 import { ShiftProvider } from '../pages/pos/ShiftContext';
 import ManualSaleEntry from "../pages/pos/ManualSaleEntry";
 
@@ -250,6 +251,12 @@ function InventoryRouteDispatcher() {
   return isRetail ? <RetailInventoryPage /> : <InventoryBatchDashboard />;
 }
 
+/** Dispatches to Retail vs Professional Delivery management based on operational view */
+function DeliveryRouteDispatcher() {
+  const { isRetail } = useOperationalView();
+  return isRetail ? <RetailDeliveryPage /> : <DeliveryBoardPage />;
+}
+
 export default function AppRoutes() {
   return (
     <RBACProvider>
@@ -315,7 +322,7 @@ export default function AppRoutes() {
 
           {/* Backward compatibility: /phone-order → /phone-orders */}
           <Route path="/phone-order/*" element={<Navigate to="/phone-orders" replace />} />
-          <Route path="/deliveries" element={<DeliveryBoardPage />} />
+          <Route path="/deliveries" element={<DeliveryRouteDispatcher />} />
           <Route path="/delivery-scheduler" element={<Navigate to="/deliveries" replace />} />
 
           {/* ─── Delivery Operations ───────────────────────────── */}

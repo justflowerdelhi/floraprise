@@ -32,7 +32,7 @@ import {
 } from '@mui/icons-material';
 import { useShift } from '../ShiftContext';
 import { useLocation as useLocationCtx } from '../../../core/location/LocationContext';
-import { useOperationalView } from '../../../core/contexts/OperationalViewContext';
+import { useOperationalView } from '../../../core/tenant';
 import { formatCurrency } from '../../../core/i18n';
 
 interface RetailPOSShiftBarProps {

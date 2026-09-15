@@ -65,6 +65,52 @@ public class ExpenseCategoryDto
     public DateTime? UpdatedAtUtc { get; set; }
 }
 
+public class ExpenseSummaryDto
+{
+    public decimal TotalAmount { get; set; }
+    public decimal CashAmount { get; set; }
+    public decimal UpiAmount { get; set; }
+    public decimal CardAmount { get; set; }
+    public int ExpenseCount { get; set; }
+}
+
+public class TopCustomerDto
+{
+    public Guid CustomerId { get; set; }
+    public string CustomerName { get; set; } = default!;
+    public decimal TotalAmount { get; set; }
+    public int OrderCount { get; set; }
+}
+
+public class RewardsReportDto
+{
+    public int CurrentPoints { get; set; }
+    public int LifetimePoints { get; set; }
+    public int RedeemedPoints { get; set; }
+    public int RewardOrders { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public List<RewardCustomerDto> Customers { get; set; } = [];
+}
+
+public class RewardCustomerDto
+{
+    public Guid CustomerId { get; set; }
+    public string CustomerName { get; set; } = default!;
+    public string? Phone { get; set; }
+    public int RewardPoints { get; set; }
+    public int LifetimeRewardPoints { get; set; }
+    public int RedeemedRewardPoints { get; set; }
+    public DateTime? LastRewardActivityAtUtc { get; set; }
+}
+
+public class TopProductDto
+{
+    public Guid ProductId { get; set; }
+    public string ProductName { get; set; } = default!;
+    public int QuantitySold { get; set; }
+    public decimal TotalRevenue { get; set; }
+}
+
 public class SaveExpenseCategoryRequest
 {
     public string Name { get; set; } = default!;

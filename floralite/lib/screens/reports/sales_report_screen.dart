@@ -27,6 +27,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
   DateTime _endDate = DateTime.now();
   bool _isLoading = true;
   String _shopName = 'My Flower Shop';
+  String _selectedPreset = 'custom';
 
   int _totalSales = 0;
   int _cashSales = 0;
@@ -136,9 +137,43 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
       setState(() {
         _startDate = picked.start;
         _endDate = picked.end;
+        _selectedPreset = 'custom';
       });
       await _loadData();
     }
+  }
+
+  void _applyPreset(String preset) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    DateTime start;
+    DateTime end;
+    switch (preset) {
+      case 'today':
+        start = today;
+        end = today;
+        break;
+      case 'yesterday':
+        start = today.subtract(const Duration(days: 1));
+        end = start;
+        break;
+      case 'this_week':
+        start = today.subtract(Duration(days: today.weekday - 1));
+        end = today;
+        break;
+      case 'this_month':
+        start = DateTime(today.year, today.month, 1);
+        end = today;
+        break;
+      default:
+        return;
+    }
+    setState(() {
+      _startDate = start;
+      _endDate = end;
+      _selectedPreset = preset;
+    });
+    _loadData();
   }
 
   @override
@@ -152,6 +187,8 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                _buildPresetSelector(),
+                const SizedBox(height: 12),
                 _buildDateRangeSelector(),
                 const SizedBox(height: 16),
                 _buildSummaryCard(),
@@ -163,6 +200,32 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                 _buildReportFooter(),
               ],
             ),
+    );
+  }
+
+  Widget _buildPresetSelector() {
+    final presets = <(String, String)>[
+      ('today', 'Today'),
+      ('yesterday', 'Yesterday'),
+      ('this_week', 'This Week'),
+      ('this_month', 'This Month'),
+    ];
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: presets.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final (value, label) = presets[index];
+          final isSelected = _selectedPreset == value;
+          return ChoiceChip(
+            label: Text(label),
+            selected: isSelected,
+            onSelected: (_) => _applyPreset(value),
+          );
+        },
+      ),
     );
   }
 

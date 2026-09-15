@@ -1,4 +1,5 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 
 import '../data/repositories/cloud_customer_repository.dart';
 import '../data/repositories/customer_repository.dart';
@@ -39,6 +40,20 @@ class CustomerCloudLookupService {
     final companyId = ProductCloudSyncabilityService.normalizeUuid(
       await _currentCompanyId(),
     );
+    if (kIsWeb) {
+      final cloudCustomer = await _findCloudCustomerByPhone(normalizedPhone);
+      if (cloudCustomer == null || cloudCustomer.id.isEmpty) return null;
+      final linkPhone = (cloudCustomer.phone ?? '').trim();
+      return CustomerRecord(
+        id: -1,
+        phone: linkPhone.isNotEmpty ? linkPhone : normalizedPhone,
+        name: cloudCustomer.name,
+        cloudCustomerId: cloudCustomer.id,
+        cloudCompanyId: companyId,
+        createdAt: DateTime.now().toIso8601String(),
+      );
+    }
+
     if (companyId == null) {
       // Not authenticated to a Cloud company; behave like Local mode.
       return _customerRepository.findByPhone(normalizedPhone);

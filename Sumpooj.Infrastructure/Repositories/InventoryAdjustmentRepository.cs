@@ -47,9 +47,23 @@ public class InventoryAdjustmentRepository : IInventoryAdjustmentRepository
         DateTime? fromDate,
         DateTime? toDate,
         int page,
-        int pageSize)
+        int pageSize,
+        bool wastageOnly = false)
     {
         var q = _db.InventoryAdjustments.AsNoTracking().AsQueryable();
+
+        if (wastageOnly)
+        {
+            var wastageTypes = new[]
+            {
+                AdjustmentType.Damaged,
+                AdjustmentType.Spoiled,
+                AdjustmentType.Expired,
+                AdjustmentType.Lost,
+                AdjustmentType.Theft
+            };
+            q = q.Where(a => wastageTypes.Contains(a.AdjustmentType));
+        }
 
         if (productId.HasValue)
         {

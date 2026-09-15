@@ -6,6 +6,7 @@ public class ProductCategoryDto
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = default!;
+    public string? DefaultUnit { get; set; }
     public bool IsPerishable { get; set; }
     public bool TrackBatchByDefault { get; set; }
     public bool IsActive { get; set; }
@@ -19,6 +20,7 @@ public class ProductCategoryDto
 public class CreateProductCategoryRequest
 {
     public string Name { get; set; } = default!;
+    public string? DefaultUnit { get; set; }
     public bool IsPerishable { get; set; }
     public bool TrackBatchByDefault { get; set; }
 }
@@ -26,6 +28,7 @@ public class CreateProductCategoryRequest
 public class UpdateProductCategoryRequest
 {
     public string Name { get; set; } = default!;
+    public string? DefaultUnit { get; set; }
     public bool IsPerishable { get; set; }
     public bool TrackBatchByDefault { get; set; }
 }

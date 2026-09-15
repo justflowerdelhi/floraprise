@@ -1,5 +1,7 @@
-import '../data/database/app_database.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
+
+import '../data/database/app_database.dart';
 
 class OnboardingChecklist {
   const OnboardingChecklist({
@@ -34,6 +36,7 @@ class OnboardingManager {
   static const String _printerTestKey = 'onboarding.printer_tested';
 
   Future<bool> isOnboardingCompleted() async {
+    if (kIsWeb) return true;
     return _readBool(_completedKey, defaultValue: false);
   }
 
@@ -58,6 +61,7 @@ class OnboardingManager {
   }
 
   Future<void> completeOnboarding() async {
+    if (kIsWeb) return;
     await _writeBool(_completedKey, true);
   }
 

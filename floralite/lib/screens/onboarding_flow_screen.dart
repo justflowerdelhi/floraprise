@@ -299,9 +299,10 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
-            'Floraprise',
-            style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+          Image.asset(
+            'assets/floraprise-title.png',
+            height: 48,
+            fit: BoxFit.contain,
           ),
           const SizedBox(height: 8),
           Text(

@@ -50,7 +50,8 @@ public class ProductCategoryService
             companyId: _tenant.CompanyId.Value,
             name: request.Name.Trim(),
             isPerishable: request.IsPerishable,
-            trackBatchByDefault: request.TrackBatchByDefault);
+            trackBatchByDefault: request.TrackBatchByDefault,
+            defaultUnit: string.IsNullOrWhiteSpace(request.DefaultUnit) ? null : request.DefaultUnit.Trim());
 
         await _repo.AddAsync(category);
         return category.Id;
@@ -67,7 +68,8 @@ public class ProductCategoryService
         category.Update(
             name: request.Name.Trim(),
             isPerishable: request.IsPerishable,
-            trackBatchByDefault: request.TrackBatchByDefault);
+            trackBatchByDefault: request.TrackBatchByDefault,
+            defaultUnit: string.IsNullOrWhiteSpace(request.DefaultUnit) ? null : request.DefaultUnit.Trim());
 
         await _repo.UpdateAsync(category);
     }
@@ -99,6 +101,7 @@ public class ProductCategoryService
     {
         Id = c.Id,
         Name = c.Name,
+        DefaultUnit = c.DefaultUnit,
         IsPerishable = c.IsPerishable,
         TrackBatchByDefault = c.TrackBatchByDefault,
         IsActive = c.IsActive,

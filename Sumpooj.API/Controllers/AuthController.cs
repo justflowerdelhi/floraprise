@@ -353,6 +353,13 @@ public class AuthController : ControllerBase
         await _db.SaveChangesAsync();
     }
 
+    private string? GetIdentityUserId()
+    {
+        return User.FindFirstValue("identity_user_id")
+            ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub");
+    }
+
     /// <summary>
     /// Verify the current user's password. Used for sensitive actions (e.g. currency change).
     /// </summary>
@@ -360,7 +367,7 @@ public class AuthController : ControllerBase
     [Microsoft.AspNetCore.Authorization.Authorize]
     public async Task<IActionResult> VerifyPassword([FromBody] VerifyPasswordRequest request)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = GetIdentityUserId();
         if (userId == null) return Unauthorized();
 
         var user = await _userManager.FindByIdAsync(userId);
@@ -378,7 +385,7 @@ public class AuthController : ControllerBase
     [Microsoft.AspNetCore.Authorization.Authorize]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = GetIdentityUserId();
         if (userId == null) return Unauthorized();
 
         var user = await _userManager.FindByIdAsync(userId);
@@ -403,7 +410,7 @@ public class AuthController : ControllerBase
     [Microsoft.AspNetCore.Authorization.Authorize]
     public async Task<IActionResult> AdminResetPassword([FromBody] AdminResetPasswordRequest request)
     {
-        var callerUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var callerUserId = GetIdentityUserId();
         if (callerUserId == null) return Unauthorized();
 
         var caller = await _userManager.FindByIdAsync(callerUserId);
@@ -449,7 +456,7 @@ public class AuthController : ControllerBase
     [Microsoft.AspNetCore.Authorization.Authorize]
     public async Task<IActionResult> GetManageableUsers()
     {
-        var callerUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var callerUserId = GetIdentityUserId();
         if (callerUserId == null) return Unauthorized();
 
         var caller = await _userManager.FindByIdAsync(callerUserId);

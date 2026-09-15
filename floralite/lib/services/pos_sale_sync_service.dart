@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
+
+import 'package:http/http.dart' as http;
 
 import '../data/database/app_database.dart';
 import '../data/repositories/pos_sync_outbox_repository.dart';
@@ -132,7 +133,7 @@ class PosSaleSyncService {
     }
 
     var response = await _send(payloadJson, token);
-    if (response.statusCode == HttpStatus.unauthorized) {
+    if (response.statusCode == 401) {
       token = await _refreshToken();
       response = await _send(payloadJson, token);
     }
@@ -164,20 +165,23 @@ class PosSaleSyncService {
     String payloadJson,
     String token,
   ) async {
-    final client = HttpClient();
+    final client = http.Client();
     try {
-      final request = await client.postUrl(uri).timeout(
-            const Duration(seconds: 12),
-          );
-      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.contentType = ContentType.json;
-      request.write(payloadJson);
-      final response = await request.close().timeout(const Duration(seconds: 20));
-      final body = await response.transform(utf8.decoder).join();
-      return PosSaleSyncHttpResponse(statusCode: response.statusCode, body: body);
+      final request = http.Request('POST', uri);
+      request.headers['Accept'] = 'application/json';
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Content-Type'] = 'application/json';
+      request.body = payloadJson;
+
+      final streamedResponse =
+          await client.send(request).timeout(const Duration(seconds: 20));
+      final body = await streamedResponse.stream.bytesToString();
+      return PosSaleSyncHttpResponse(
+        statusCode: streamedResponse.statusCode,
+        body: body,
+      );
     } finally {
-      client.close(force: true);
+      client.close();
     }
   }
 

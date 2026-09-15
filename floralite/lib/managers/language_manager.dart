@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../data/database/app_database.dart';
 
 class LanguageManager {
@@ -14,6 +16,7 @@ class LanguageManager {
   }
 
   Future<String> getSavedLanguage() async {
+    if (kIsWeb) return _defaultLanguage;
     final db = await AppDatabase.instance.database;
     final result = await db.rawQuery(
       'SELECT value FROM settings WHERE key = ?',

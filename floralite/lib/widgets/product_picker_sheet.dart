@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/inventory_repository.dart';
 import '../data/repositories/cloud_product_repository.dart';
 import '../data/repositories/product_repository.dart';
+import '../models/gst_calculation_type.dart';
+import '../providers/auth_provider.dart';
 import '../providers/inventory_provider.dart';
 import '../screens/purchase_list_screen.dart';
 
@@ -26,7 +29,7 @@ class _ProductPickerSheet extends StatefulWidget {
 
 class _ProductPickerSheetState extends State<_ProductPickerSheet> {
   final ProductRepository _repository = ProductRepository();
-  final CloudProductRepository _cloudProductRepository = CloudProductRepository();
+  late CloudProductRepository _cloudProductRepository;
   final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
@@ -36,7 +39,19 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _cloudProductRepository = CloudProductRepository();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    try {
+      final auth = context.read<AuthProvider?>()?.authService;
+      if (auth != null) {
+        _cloudProductRepository = CloudProductRepository(auth: auth);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -53,7 +68,8 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
 
     try {
       final inventoryProvider = context.read<InventoryProvider>();
-      final products = inventoryProvider.isCloud
+      final isCloud = inventoryProvider.isCloud || kIsWeb;
+      final products = isCloud
           ? productPickerRowsFromCloudInventory(
               await _loadCloudInventoryProducts(inventoryProvider),
               await _cloudProductRepository.listProducts(),
@@ -76,8 +92,12 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
   Future<List<InventoryProductRecord>> _loadCloudInventoryProducts(
     InventoryProvider inventoryProvider,
   ) async {
-    await inventoryProvider.loadProducts();
-    return inventoryProvider.products;
+    try {
+      await inventoryProvider.loadProducts();
+      return inventoryProvider.products;
+    } catch (_) {
+      return const [];
+    }
   }
 
   @override
@@ -492,6 +512,113 @@ List<ProductInventoryRecord> productPickerRowsFromCloudInventory(
   List<InventoryProductRecord> inventoryProducts,
   [List<CloudProduct> cloudProducts = const <CloudProduct>[]]
 ) {
+  final inventoryByCloudProductId = {
+    for (final product in inventoryProducts)
+      if (product.cloudProductId?.trim().isNotEmpty == true)
+        product.cloudProductId!.trim().toLowerCase(): product,
+  };
+
+  // If cloud catalogue products are available, build rows primarily from them.
+  if (cloudProducts.isNotEmpty) {
+    final matchedCloudIds = <String>{};
+    final rows = <ProductInventoryRecord>[];
+
+    for (final cloudProduct in cloudProducts) {
+      if (!cloudProduct.isActive) continue;
+      final cloudIdLower = cloudProduct.id.trim().toLowerCase();
+      matchedCloudIds.add(cloudIdLower);
+      final inv = inventoryByCloudProductId[cloudIdLower];
+
+      final sku = cloudProduct.sku.trim();
+      final barcode = (cloudProduct.barcode?.trim().isNotEmpty == true
+              ? cloudProduct.barcode!.trim()
+              : (cloudProduct.manufacturerBarcode?.trim().isNotEmpty == true
+                  ? cloudProduct.manufacturerBarcode!.trim()
+                  : inv?.barcode)) ??
+          '';
+      final manufacturer = (cloudProduct.manufacturerBarcode?.trim().isNotEmpty == true
+              ? cloudProduct.manufacturerBarcode!.trim()
+              : (cloudProduct.barcode?.trim().isNotEmpty == true
+                  ? cloudProduct.barcode!.trim()
+                  : (inv?.manufacturerBarcode ?? inv?.barcode))) ??
+          '';
+      final internal = (cloudProduct.internalBarcode?.trim().isNotEmpty == true
+              ? cloudProduct.internalBarcode!.trim()
+              : inv?.internalBarcode) ??
+          '';
+
+      rows.add(
+        ProductInventoryRecord(
+          id: inv?.productId ?? -1,
+          code: inv != null && inv.sku.isNotEmpty
+              ? inv.sku
+              : (sku.isNotEmpty ? sku : 'P-${cloudProduct.id}'),
+          name: inv != null && inv.name.isNotEmpty
+              ? inv.name
+              : cloudProduct.name,
+          category: inv != null && inv.category.isNotEmpty
+              ? inv.category
+              : (cloudProduct.category.isEmpty ? 'Other' : cloudProduct.category),
+          defaultUnit: inv != null && inv.unit.isNotEmpty
+              ? inv.unit
+              : (cloudProduct.unitOfMeasure.isEmpty
+                  ? 'Piece'
+                  : cloudProduct.unitOfMeasure),
+          sku: sku.isNotEmpty ? sku : (inv?.sku ?? ''),
+          barcode: barcode,
+          manufacturerBarcode: manufacturer,
+          florapriseBarcode: internal,
+          cloudProductId: cloudProduct.id,
+          sellingPricePaise: ((cloudProduct.retailPrice) * 100).round(),
+          purchasePricePaise: (cloudProduct.costPrice * 100).round(),
+          gstPercent: inv?.gstPercent ?? 0,
+          gstCalculationType:
+              inv?.gstCalculationType ?? GstCalculationType.inclusive,
+          trackInventory: inv?.trackInventory ?? cloudProduct.trackInventory,
+          active: cloudProduct.isActive,
+          favorite: false,
+          currentQty: inv?.currentQty ?? cloudProduct.stockQuantity.toInt(),
+          minQty: inv?.minQty ?? cloudProduct.minimumStockLevel.toInt(),
+        ),
+      );
+    }
+
+    // Preserve any inventory items whose cloudProductId wasn't matched above
+    for (final inv in inventoryProducts) {
+      if (inv.cloudProductId == null || inv.cloudProductId!.trim().isEmpty) {
+        continue;
+      }
+      if (!matchedCloudIds.contains(inv.cloudProductId!.trim().toLowerCase())) {
+        rows.add(
+          ProductInventoryRecord(
+            id: inv.productId,
+            code: inv.sku,
+            name: inv.name,
+            category: inv.category.isEmpty ? 'Other' : inv.category,
+            defaultUnit: inv.unit.isEmpty ? 'Piece' : inv.unit,
+            sku: inv.sku,
+            barcode: inv.barcode,
+            manufacturerBarcode: inv.manufacturerBarcode ?? inv.barcode,
+            florapriseBarcode: inv.internalBarcode ?? '',
+            cloudProductId: inv.cloudProductId,
+            sellingPricePaise: 0,
+            purchasePricePaise: null,
+            gstPercent: inv.gstPercent,
+            gstCalculationType: inv.gstCalculationType,
+            trackInventory: inv.trackInventory,
+            active: true,
+            favorite: false,
+            currentQty: inv.currentQty,
+            minQty: inv.minQty,
+          ),
+        );
+      }
+    }
+
+    return rows;
+  }
+
+  // Fallback when cloudProducts list is empty
   final productById = {
     for (final product in cloudProducts) product.id.trim().toLowerCase(): product,
   };
@@ -501,27 +628,27 @@ List<ProductInventoryRecord> productPickerRowsFromCloudInventory(
         (product) {
           final cloudProduct = productById[product.cloudProductId!.trim().toLowerCase()];
           return ProductInventoryRecord(
-          id: product.productId,
-          code: product.sku,
-          name: product.name.isEmpty ? cloudProduct?.name ?? '' : product.name,
-          category: product.category.isEmpty ? cloudProduct?.category ?? 'Other' : product.category,
-          defaultUnit: product.unit.isEmpty ? cloudProduct?.unitOfMeasure ?? 'Piece' : product.unit,
-          sku: product.sku.isEmpty ? cloudProduct?.sku ?? '' : product.sku,
-          barcode: product.barcode,
-          manufacturerBarcode: product.manufacturerBarcode ?? product.barcode,
-          florapriseBarcode: product.internalBarcode ?? '',
-          cloudProductId: product.cloudProductId,
-          sellingPricePaise: ((cloudProduct?.retailPrice ?? 0) * 100).round(),
-          purchasePricePaise: cloudProduct == null
-              ? null
-              : (cloudProduct.costPrice * 100).round(),
-          gstPercent: product.gstPercent,
-          gstCalculationType: product.gstCalculationType,
-          trackInventory: product.trackInventory,
-          active: true,
-          favorite: false,
-          currentQty: product.currentQty,
-          minQty: product.minQty,
+            id: product.productId,
+            code: product.sku,
+            name: product.name.isEmpty ? cloudProduct?.name ?? '' : product.name,
+            category: product.category.isEmpty ? cloudProduct?.category ?? 'Other' : product.category,
+            defaultUnit: product.unit.isEmpty ? cloudProduct?.unitOfMeasure ?? 'Piece' : product.unit,
+            sku: product.sku.isEmpty ? cloudProduct?.sku ?? '' : product.sku,
+            barcode: product.barcode,
+            manufacturerBarcode: product.manufacturerBarcode ?? product.barcode,
+            florapriseBarcode: product.internalBarcode ?? '',
+            cloudProductId: product.cloudProductId,
+            sellingPricePaise: ((cloudProduct?.retailPrice ?? 0) * 100).round(),
+            purchasePricePaise: cloudProduct == null
+                ? null
+                : (cloudProduct.costPrice * 100).round(),
+            gstPercent: product.gstPercent,
+            gstCalculationType: product.gstCalculationType,
+            trackInventory: product.trackInventory,
+            active: true,
+            favorite: false,
+            currentQty: product.currentQty,
+            minQty: product.minQty,
           );
         },
       )

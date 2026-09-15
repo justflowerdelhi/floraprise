@@ -242,7 +242,7 @@ void main() {
   });
 
   group('Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation', () {
-    testWidgets('renders NavigationRail on desktop viewport (>= 800px)', (tester) async {
+    testWidgets('renders desktop sidebar on desktop viewport (>= 800px)', (tester) async {
       tester.view.physicalSize = const Size(1200, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -275,7 +275,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.byType(NavigationRail), findsOneWidget);
+      expect(find.text('SALES & ORDERS'), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
       expect(find.text('Pro Cloud'), findsOneWidget);
     });

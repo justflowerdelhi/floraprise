@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/repositories/cloud_expense_repository.dart';
 import '../../data/repositories/expense_repository.dart';
 import '../../models/expense.dart';
 import '../../managers/business_settings_manager.dart';
 import '../../providers/storage_mode_provider.dart';
 import '../../widgets/common_widgets.dart';
-import '../../widgets/non_cloud_report_banner.dart';
 
 class ExpenseReportScreen extends StatefulWidget {
   const ExpenseReportScreen({super.key});
@@ -18,6 +18,7 @@ class ExpenseReportScreen extends StatefulWidget {
 
 class _ExpenseReportScreenState extends State<ExpenseReportScreen> {
   final ExpenseRepository _expenseRepository = ExpenseRepository();
+  final CloudExpenseRepository _cloudExpenseRepository = CloudExpenseRepository();
   final BusinessSettingsManager _businessSettingsManager =
       BusinessSettingsManager();
 
@@ -53,6 +54,24 @@ class _ExpenseReportScreenState extends State<ExpenseReportScreen> {
     setState(() => _isLoading = true);
 
     try {
+      if (context.read<StorageModeProvider>().isCloud) {
+        final summary = await _cloudExpenseRepository.getExpenseSummary(
+          fromDate: _startDate,
+          toDate: _endDate,
+        );
+
+        if (!mounted) return;
+        setState(() {
+          _totalExpenses = summary?.totalPaise ?? 0;
+          _cashExpenses = summary?.cashPaise ?? 0;
+          _upiExpenses = summary?.upiPaise ?? 0;
+          _cardExpenses = summary?.cardPaise ?? 0;
+          _expenseCount = summary?.expenseCount ?? 0;
+          _isLoading = false;
+        });
+        return;
+      }
+
       final expenses =
           await _expenseRepository.getByDateRange(_startDate, _endDate);
 
@@ -110,17 +129,13 @@ class _ExpenseReportScreenState extends State<ExpenseReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isCloud = context.watch<StorageModeProvider?>()?.isCloud ?? false;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Expense Report'),
       ),
-      body: isCloud
-          ? const NonCloudReportBanner(reportTitle: 'Expense Report')
-          : _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : ListView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 _buildDateRangeSelector(),

@@ -64,8 +64,11 @@ public class ProductionController : ControllerBase
 
     [HttpGet("finished-goods")]
     [HttpGet("finished-batches")]
-    public async Task<ActionResult<List<FinishedGoodsBatchDto>>> GetFinishedBatches()
-        => Ok(await _service.GetFinishedBatchesAsync(CompanyId));
+    public async Task<ActionResult<List<FinishedGoodsBatchDto>>> GetFinishedBatches(
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null,
+        [FromQuery] string? batchCode = null)
+        => Ok(await _service.GetFinishedBatchesAsync(CompanyId, startDate, endDate, batchCode));
 
     [HttpGet("finished-goods/sellable")]
     public async Task<ActionResult<List<SellableFinishedGoodDto>>> GetSellableFinishedGoods()
@@ -83,6 +86,24 @@ public class ProductionController : ControllerBase
     {
         await _service.DeductFromBatchAsync(CompanyId, id, request.Quantity);
         return NoContent();
+    }
+
+    [HttpPost("finished-goods/{id:guid}/reverse")]
+    public async Task<IActionResult> ReverseBatch(Guid id, [FromBody] ReverseBatchRequest? request)
+    {
+        try
+        {
+            await _service.ReverseProductionBatchAsync(CompanyId, id, request?.Reason);
+            return Ok(new { success = true, message = "Production run reversed successfully." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
     }
 
     // ─── Production Runs ────────────────────────────────────

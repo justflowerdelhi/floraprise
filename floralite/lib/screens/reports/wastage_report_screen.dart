@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/repositories/cloud_inventory_repository.dart';
 import '../../data/repositories/inventory_repository.dart';
 import '../../managers/business_settings_manager.dart';
 import '../../providers/storage_mode_provider.dart';
 import '../../widgets/common_widgets.dart';
-import '../../widgets/non_cloud_report_banner.dart';
 
 class WastageReportScreen extends StatefulWidget {
   const WastageReportScreen({super.key});
@@ -17,6 +17,7 @@ class WastageReportScreen extends StatefulWidget {
 
 class _WastageReportScreenState extends State<WastageReportScreen> {
   final InventoryRepository _inventoryRepository = InventoryRepository();
+  final CloudInventoryRepository _cloudInventoryRepository = CloudInventoryRepository();
   final BusinessSettingsManager _businessSettingsManager =
       BusinessSettingsManager();
 
@@ -69,14 +70,24 @@ class _WastageReportScreenState extends State<WastageReportScreen> {
       debugPrint('Supplier: $_selectedSupplier');
       debugPrint('Reason: $_selectedReason');
       
-      final transactions = await _inventoryRepository.getWastageTransactions(
-        startDate: _startDate,
-        endDate: _endDate,
-        category: _selectedCategory,
-        productId: _selectedProduct != null ? int.tryParse(_selectedProduct!) : null,
-        supplier: _selectedSupplier,
-        reason: _selectedReason,
-      );
+      final isCloud = context.read<StorageModeProvider?>()?.isCloud ?? false;
+      final transactions = isCloud
+          ? await _cloudInventoryRepository.getWastageTransactions(
+              startDate: _startDate,
+              endDate: _endDate,
+              category: _selectedCategory,
+              productId: _selectedProduct != null ? int.tryParse(_selectedProduct!) : null,
+              supplier: _selectedSupplier,
+              reason: _selectedReason,
+            )
+          : await _inventoryRepository.getWastageTransactions(
+              startDate: _startDate,
+              endDate: _endDate,
+              category: _selectedCategory,
+              productId: _selectedProduct != null ? int.tryParse(_selectedProduct!) : null,
+              supplier: _selectedSupplier,
+              reason: _selectedReason,
+            );
       
       debugPrint('Transactions fetched: ${transactions.length}');
       for (final txn in transactions) {
@@ -156,8 +167,6 @@ class _WastageReportScreenState extends State<WastageReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isCloud = context.watch<StorageModeProvider?>()?.isCloud ?? false;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Wastage Report'),
@@ -168,11 +177,9 @@ class _WastageReportScreenState extends State<WastageReportScreen> {
           ),
         ],
       ),
-      body: isCloud
-          ? const NonCloudReportBanner(reportTitle: 'Wastage Report')
-          : _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : ListView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 _buildDateRangeSelector(),

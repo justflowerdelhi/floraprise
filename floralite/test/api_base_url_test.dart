@@ -43,5 +43,39 @@ void main() {
 
       expect(result, 'https://api.floraprise.com');
     });
+
+    test('uses production fallback on Web even in debug mode on desktop platform', () {
+      final result = resolveFlorapriseApiBaseUrl(
+        explicitValue: '',
+        isDebug: true,
+        platform: TargetPlatform.windows,
+        isWeb: true,
+      );
+
+      expect(result, 'https://api.floraprise.com');
+    });
+
+    test('prefers explicit configuration over production fallback on Web', () {
+      final result = resolveFlorapriseApiBaseUrl(
+        explicitValue: 'http://localhost:5148',
+        isDebug: true,
+        platform: TargetPlatform.windows,
+        isWeb: true,
+      );
+
+      expect(result, 'http://localhost:5148');
+    });
+
+    test('uses production host on Web outside debug mode', () {
+      final result = resolveFlorapriseApiBaseUrl(
+        explicitValue: '',
+        isDebug: false,
+        platform: TargetPlatform.windows,
+        isWeb: true,
+      );
+
+      expect(result, 'https://api.floraprise.com');
+    });
   });
 }
+

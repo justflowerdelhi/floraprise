@@ -25,6 +25,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _state == AuthProviderState.loading;
   bool get isAuthenticated => _state == AuthProviderState.authenticated;
   Map<String, dynamic>? get bootstrap => _bootstrap;
+  MobileAuthService get authService => _service;
 
   String get friendlyMessage {
     if (_message == null || _message!.trim().isEmpty) {
@@ -140,6 +141,38 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    _state = AuthProviderState.loading;
+    _message = null;
+    _errorCode = null;
+    notifyListeners();
+
+    try {
+      await _service.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      _message = 'Password changed successfully.';
+      _state = AuthProviderState.authenticated;
+      notifyListeners();
+      return true;
+    } on MobileAuthServiceException catch (ex) {
+      _state = AuthProviderState.authenticated;
+      _errorCode = ex.code;
+      _message = _mapErrorMessage(ex.code, ex.message);
+      notifyListeners();
+      return false;
+    } catch (ex) {
+      _state = AuthProviderState.authenticated;
+      _message = ex.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     _state = AuthProviderState.loading;
     notifyListeners();
@@ -149,6 +182,7 @@ class AuthProvider extends ChangeNotifier {
     } finally {
       _bootstrap = null;
       _message = null;
+      _errorCode = null;
       _state = AuthProviderState.unauthenticated;
       notifyListeners();
     }

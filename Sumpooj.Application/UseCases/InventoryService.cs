@@ -558,14 +558,30 @@ public class InventoryService
             request.FromDate,
             request.ToDate,
             request.Page,
-            request.PageSize);
+            request.PageSize,
+            request.WastageOnly);
 
         var dtos = new List<InventoryAdjustmentDto>();
         foreach (var adj in items)
         {
             var product = await _productRepo.GetByIdAsync(adj.ProductId);
             var batch = adj.BatchId.HasValue ? await _batchRepo.GetByIdAsync(adj.BatchId.Value) : null;
-            dtos.Add(ToAdjustmentDto(adj, product?.Name ?? "Unknown", batch?.BatchNumber));
+
+            string? supplierName = null;
+            if (!string.IsNullOrWhiteSpace(adj.Notes))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(adj.Notes, @"Supplier:\s*([^\|\r\n]+)");
+                if (match.Success)
+                    supplierName = match.Groups[1].Value.Trim();
+            }
+
+            dtos.Add(ToAdjustmentDto(
+                adj,
+                product?.Name ?? "Unknown",
+                batch?.BatchNumber,
+                product?.ProductCategoryRef?.Name ?? product?.Category.ToString() ?? "Other",
+                product?.UnitOfMeasure.ToString() ?? "Piece",
+                supplierName));
         }
 
         return new PagedResult<InventoryAdjustmentDto>
@@ -586,7 +602,22 @@ public class InventoryService
         {
             var product = await _productRepo.GetByIdAsync(adj.ProductId);
             var batch = adj.BatchId.HasValue ? await _batchRepo.GetByIdAsync(adj.BatchId.Value) : null;
-            dtos.Add(ToAdjustmentDto(adj, product?.Name ?? "Unknown", batch?.BatchNumber));
+
+            string? supplierName = null;
+            if (!string.IsNullOrWhiteSpace(adj.Notes))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(adj.Notes, @"Supplier:\s*([^\r\n]+)");
+                if (match.Success)
+                    supplierName = match.Groups[1].Value.Trim();
+            }
+
+            dtos.Add(ToAdjustmentDto(
+                adj,
+                product?.Name ?? "Unknown",
+                batch?.BatchNumber,
+                product?.ProductCategoryRef?.Name ?? product?.Category.ToString() ?? "Other",
+                product?.UnitOfMeasure.ToString() ?? "Piece",
+                supplierName));
         }
 
         return dtos;
@@ -758,7 +789,13 @@ public class InventoryService
         };
     }
 
-    private static InventoryAdjustmentDto ToAdjustmentDto(InventoryAdjustment a, string productName, string? batchNumber) => new()
+    private static InventoryAdjustmentDto ToAdjustmentDto(
+        InventoryAdjustment a,
+        string productName,
+        string? batchNumber,
+        string? category = null,
+        string? unit = null,
+        string? supplierName = null) => new()
     {
         Id = a.Id,
         ProductId = a.ProductId,
@@ -772,6 +809,9 @@ public class InventoryService
         Reason = a.Reason,
         AdjustmentDate = a.AdjustmentDate,
         Notes = a.Notes,
+        Category = category,
+        Unit = unit,
+        SupplierName = supplierName,
         CreatedAtUtc = a.CreatedAtUtc
     };
 

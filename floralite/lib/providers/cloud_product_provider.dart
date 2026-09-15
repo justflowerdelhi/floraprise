@@ -137,18 +137,33 @@ class CloudProductProvider extends ChangeNotifier {
     await load();
   }
 
-  Future<void> createCategory(String name) async {
-    await _repository.createCategory(name);
+  Future<void> createCategory(dynamic input) async {
+    await _repository.createCategory(input);
     await load();
   }
 
-  Future<void> updateCategory(String id, String name) async {
-    await _repository.updateCategory(id, name);
+  Future<void> updateCategory(String id, dynamic input) async {
+    await _repository.updateCategory(id, input);
+    await load();
+  }
+
+  Future<void> deleteCategory(String id) async {
+    await _repository.deleteCategory(id);
     await load();
   }
 
   Future<void> setCategoryActive(String id, bool active) async {
     await _repository.setCategoryActive(id, active);
     await load();
+  }
+
+  String defaultUnitForCategory(String categoryName) {
+    final cat = _categories
+        .where((c) => c.name.trim().toLowerCase() == categoryName.trim().toLowerCase())
+        .firstOrNull;
+    if (cat != null) {
+      return cat.effectiveDefaultUnit;
+    }
+    return ProductRepository.defaultUnitForCategory(categoryName);
   }
 }

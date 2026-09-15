@@ -112,9 +112,20 @@ public class DayCloseService
         };
     }
 
-    public async Task<List<DayCloseDto>> GetHistoryAsync(Guid companyId, Guid locationId, int days = 30)
+    public async Task<List<DayCloseDto>> GetHistoryAsync(
+        Guid companyId,
+        Guid? locationId,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        int days = 30)
     {
-        return await _dayCloseRepository.GetHistoryAsync(companyId, locationId, days);
+        if (!locationId.HasValue || locationId.Value == Guid.Empty)
+        {
+            var defaultLoc = await _locationRepository.GetDefaultAsync(companyId);
+            locationId = defaultLoc?.Id;
+        }
+
+        return await _dayCloseRepository.GetHistoryAsync(companyId, locationId, startDate, endDate, days);
     }
 
     public async Task<Guid> CloseAsync(Guid companyId, CloseDayRequest request, Guid userId)
@@ -143,6 +154,7 @@ public class DayCloseService
         var upiSales = (decimal)(summary.GetType().GetProperty("upiSales")?.GetValue(summary) ?? 0m);
         var otherPaymentsVal = (decimal)(summary.GetType().GetProperty("otherPayments")?.GetValue(summary) ?? 0m);
         var expectedCash = (decimal)(summary.GetType().GetProperty("expectedCash")?.GetValue(summary) ?? 0m);
+        var cashExpenses = (decimal)(summary.GetType().GetProperty("cashExpenses")?.GetValue(summary) ?? 0m);
 
         var dayClose = new Domain.Entities.DayClose(
             companyId,
@@ -154,6 +166,7 @@ public class DayCloseService
         dayClose.SetPaymentBreakdown(cashSales, cardSales, upiSales, 0m, otherPaymentsVal);
         dayClose.SetExpectedCash(expectedCash);
         dayClose.SetCashCount(request.ActualCash);
+        dayClose.SetCashExpenses(cashExpenses);
 
         if (!string.IsNullOrEmpty(request.Notes))
             dayClose.AddNotes(request.Notes);
@@ -182,6 +195,7 @@ public class DayCloseService
         ExpectedCash = dc.ExpectedCash,
         ActualCash = dc.ActualCash,
         CashVariance = dc.CashVariance,
+        CashExpenses = dc.CashExpenses,
         Notes = dc.Notes
     };
 }

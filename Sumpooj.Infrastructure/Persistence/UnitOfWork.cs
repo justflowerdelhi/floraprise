@@ -17,9 +17,13 @@ public class UnitOfWork : IUnitOfWork
     {
         if (!_db.Database.IsRelational())
         {
-            var trackedBefore = _db.ChangeTracker.Entries()
-                .Select(e => e.Entity)
-                .ToHashSet();
+            var existingDeliveries = _db.Deliveries.AsNoTracking().ToList();
+            var existingOrders = _db.Orders.AsNoTracking().ToList();
+            var existingProducts = _db.Products.AsNoTracking().ToList();
+            var existingDeliveryIds = existingDeliveries.Select(d => d.Id).ToHashSet();
+            var existingOrderIds = existingOrders.Select(o => o.Id).ToHashSet();
+            var existingLedgerIds = _db.InventoryLedgers.AsNoTracking().Select(l => l.Id).ToHashSet();
+            var existingPaymentIds = _db.Payments.AsNoTracking().Select(p => p.Id).ToHashSet();
 
             try
             {
@@ -27,21 +31,40 @@ public class UnitOfWork : IUnitOfWork
             }
             catch
             {
-                var trackedOrders = _db.ChangeTracker.Entries<Order>().Select(e => e.Entity).ToList();
-                var trackedPayments = _db.ChangeTracker.Entries<Payment>().Select(e => e.Entity).ToList();
-                var trackedLedgers = _db.ChangeTracker.Entries<InventoryLedger>().Select(e => e.Entity).ToList();
-                var trackedDeliveries = _db.ChangeTracker.Entries<Delivery>().Select(e => e.Entity).ToList();
+                var addedOrders = _db.Orders.Where(o => !existingOrderIds.Contains(o.Id)).ToList();
+                var addedPayments = _db.Payments.Where(p => !existingPaymentIds.Contains(p.Id)).ToList();
+                var addedLedgers = _db.InventoryLedgers.Where(l => !existingLedgerIds.Contains(l.Id)).ToList();
+                var addedDeliveries = _db.Deliveries.Where(d => !existingDeliveryIds.Contains(d.Id)).ToList();
 
-                _db.Orders.RemoveRange(trackedOrders);
-                _db.Payments.RemoveRange(trackedPayments);
-                _db.InventoryLedgers.RemoveRange(trackedLedgers);
-                _db.Deliveries.RemoveRange(trackedDeliveries);
+                _db.Orders.RemoveRange(addedOrders);
+                _db.Payments.RemoveRange(addedPayments);
+                _db.InventoryLedgers.RemoveRange(addedLedgers);
+                _db.Deliveries.RemoveRange(addedDeliveries);
 
-                foreach (var entry in _db.ChangeTracker.Entries().ToList())
+                foreach (var original in existingDeliveries)
                 {
-                    if (entry.State == EntityState.Modified)
+                    var current = _db.Deliveries.Find(original.Id);
+                    if (current != null)
                     {
-                        entry.Reload();
+                        _db.Entry(current).CurrentValues.SetValues(original);
+                    }
+                }
+
+                foreach (var original in existingOrders)
+                {
+                    var current = _db.Orders.Find(original.Id);
+                    if (current != null)
+                    {
+                        _db.Entry(current).CurrentValues.SetValues(original);
+                    }
+                }
+
+                foreach (var original in existingProducts)
+                {
+                    var current = _db.Products.Find(original.Id);
+                    if (current != null)
+                    {
+                        _db.Entry(current).CurrentValues.SetValues(original);
                     }
                 }
 

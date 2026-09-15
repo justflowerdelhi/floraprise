@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/repositories/cloud_production_repository.dart';
 import '../../data/repositories/production_repository.dart';
 import '../../providers/storage_mode_provider.dart';
 import '../production_detail_screen.dart';
 import '../../widgets/common_widgets.dart';
-import '../../widgets/non_cloud_report_banner.dart';
 
 class ProductionReportScreen extends StatefulWidget {
   const ProductionReportScreen({super.key});
@@ -17,6 +17,7 @@ class ProductionReportScreen extends StatefulWidget {
 
 class _ProductionReportScreenState extends State<ProductionReportScreen> {
   final ProductionRepository _repository = ProductionRepository();
+  final CloudProductionRepository _cloudRepository = CloudProductionRepository();
   DateTime _startDate = DateTime(DateTime.now().year, DateTime.now().month, 1);
   DateTime _endDate = DateTime.now();
   List<ProductionReportRecord> _records = const [];
@@ -31,7 +32,10 @@ class _ProductionReportScreenState extends State<ProductionReportScreen> {
   Future<void> _load() async {
     setState(() => _isLoading = true);
     try {
-      final records = await _repository.getProductionReport(startDate: _startDate, endDate: _endDate);
+      final isCloud = context.read<StorageModeProvider?>()?.isCloud ?? false;
+      final records = isCloud
+          ? await _cloudRepository.getProductionReport(startDate: _startDate, endDate: _endDate)
+          : await _repository.getProductionReport(startDate: _startDate, endDate: _endDate);
       if (!mounted) return;
       setState(() => _records = records);
     } finally {
@@ -60,15 +64,12 @@ class _ProductionReportScreenState extends State<ProductionReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isCloud = context.watch<StorageModeProvider?>()?.isCloud ?? false;
     final producedQuantity = _records.fold<int>(0, (total, record) => total + record.quantity);
     final producedCost = _records.fold<int>(0, (total, record) => total + record.productionCostPaise);
     return Scaffold(
       appBar: AppBar(title: const Text('Production Report')),
-      body: isCloud
-          ? const NonCloudReportBanner(reportTitle: 'Production Report')
-          : SafeArea(
-              child: RefreshIndicator(
+      body: SafeArea(
+        child: RefreshIndicator(
           onRefresh: _load,
           child: ListView(
             padding: const EdgeInsets.all(16),

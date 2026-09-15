@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 
 import '../../data/repositories/printer_repository.dart';
 import '../../models/printer_models.dart';
@@ -135,6 +136,7 @@ class PrinterManager {
   Future<void> cancelJob(int id) => _repository.cancel(id);
 
   Future<void> processQueue() async {
+    if (kIsWeb) return;
     await refreshConnectionState();
     if (!_isConnected) {
       final connected = await autoConnect();

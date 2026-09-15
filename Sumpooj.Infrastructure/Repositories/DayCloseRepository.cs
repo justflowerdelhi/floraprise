@@ -77,14 +77,38 @@ public class DayCloseRepository : IDayCloseRepository, ICashDrawerRepository
                           d.BusinessDate >= dayStart && d.BusinessDate < dayEnd);
     }
 
-    public async Task<List<DayCloseDto>> GetHistoryAsync(Guid companyId, Guid locationId, int days = 30)
+    public async Task<List<DayCloseDto>> GetHistoryAsync(
+        Guid companyId,
+        Guid? locationId,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        int days = 30)
     {
-        var startDate = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-days).Date, DateTimeKind.Utc);
+        var q = _db.DayCloses.Where(d => d.CompanyId == companyId);
 
-        return await _db.DayCloses
-            .Where(d => d.CompanyId == companyId && 
-                       d.LocationId == locationId && 
-                       d.BusinessDate >= startDate)
+        if (locationId.HasValue && locationId.Value != Guid.Empty)
+        {
+            q = q.Where(d => d.LocationId == locationId.Value);
+        }
+
+        if (startDate.HasValue)
+        {
+            var startUtc = DateTime.SpecifyKind(startDate.Value.Date, DateTimeKind.Utc);
+            q = q.Where(d => d.BusinessDate >= startUtc);
+        }
+        else if (!endDate.HasValue)
+        {
+            var defaultStart = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-days).Date, DateTimeKind.Utc);
+            q = q.Where(d => d.BusinessDate >= defaultStart);
+        }
+
+        if (endDate.HasValue)
+        {
+            var endUtc = DateTime.SpecifyKind(endDate.Value.Date, DateTimeKind.Utc).AddDays(1);
+            q = q.Where(d => d.BusinessDate < endUtc);
+        }
+
+        return await q
             .OrderByDescending(d => d.BusinessDate)
             .Select(d => new DayCloseDto
             {
@@ -106,6 +130,7 @@ public class DayCloseRepository : IDayCloseRepository, ICashDrawerRepository
                 ExpectedCash = d.ExpectedCash,
                 ActualCash = d.ActualCash,
                 CashVariance = d.CashVariance,
+                CashExpenses = d.CashExpenses,
                 Notes = d.Notes
             })
             .ToListAsync();

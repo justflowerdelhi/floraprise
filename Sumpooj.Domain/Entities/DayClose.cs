@@ -42,6 +42,7 @@ public class DayClose : BaseEntity
     public decimal ExpectedCash { get; private set; }
     public decimal ActualCash { get; private set; }
     public decimal CashVariance { get; private set; }
+    public decimal CashExpenses { get; private set; }
 
     // Notes
     public string? Notes { get; private set; }
@@ -77,6 +78,12 @@ public class DayClose : BaseEntity
     {
         ExpectedCash = expectedCash;
         CashVariance = ActualCash - ExpectedCash;
+        MarkUpdated();
+    }
+
+    public void SetCashExpenses(decimal cashExpenses)
+    {
+        CashExpenses = cashExpenses;
         MarkUpdated();
     }
 

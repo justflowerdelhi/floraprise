@@ -1,5 +1,7 @@
 import 'package:floraprise/data/repositories/cloud_company_profile_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 void main() {
   test('updateCompanyProfile PUTs only the provided fields to the company profile endpoint', () async {
@@ -71,5 +73,39 @@ void main() {
     );
 
     expect(requests.single.body, {'phone': '9999999999'});
+  });
+
+  test('fetchCompanyProfile uses http.Client and parses response without dart:io HttpClient', () async {
+    final client = MockClient((request) async {
+      expect(request.method, 'GET');
+      expect(request.url.path, '/api/v1/mobile/company/profile');
+      expect(request.headers['authorization'], 'Bearer token-abc');
+      return http.Response(
+        '''
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "name": "Floral Shop Web",
+          "phone": "9876543210",
+          "timeZone": "Asia/Kolkata",
+          "currencyCode": "INR",
+          "region": "IN",
+          "isActive": true,
+          "createdAtUtc": "2026-01-01T00:00:00Z"
+        }
+        ''',
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    final repository = CloudCompanyProfileRepository(client: client);
+    final profile = await repository.fetchCompanyProfile(
+      baseUrl: 'https://api.test.floraprise.local',
+      accessToken: 'token-abc',
+    );
+
+    expect(profile, isNotNull);
+    expect(profile!.name, 'Floral Shop Web');
+    expect(profile.phone, '9876543210');
   });
 }

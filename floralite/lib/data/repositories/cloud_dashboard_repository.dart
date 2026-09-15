@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 
 import '../../services/mobile_auth_service.dart';
 
@@ -121,10 +121,12 @@ class CloudDashboardRepository {
     FlutterSecureStorage? secureStorage,
     CloudDashboardSummarySender? summarySender,
     CloudPendingPaymentsSender? pendingPaymentsSender,
+    http.Client? client,
   })  : _auth = auth ?? MobileAuthService(),
         _secureStorage = secureStorage ?? const FlutterSecureStorage(),
         _summarySender = summarySender,
-        _pendingPaymentsSender = pendingPaymentsSender;
+        _pendingPaymentsSender = pendingPaymentsSender,
+        _client = client;
 
   static const _cacheKeyPrefix = 'cloud_dashboard_summary_';
   static const _pendingPaymentsCacheKeyPrefix = 'cloud_pending_payments_';
@@ -133,6 +135,7 @@ class CloudDashboardRepository {
   final FlutterSecureStorage _secureStorage;
   final CloudDashboardSummarySender? _summarySender;
   final CloudPendingPaymentsSender? _pendingPaymentsSender;
+  final http.Client? _client;
   final Map<String, CloudDashboardSummary> _summaryCache = {};
   final Map<String, CloudPendingPaymentsSummary> _pendingPaymentsCache = {};
 
@@ -200,22 +203,28 @@ class CloudDashboardRepository {
       return <String, dynamic>{};
     }
 
-    final client = HttpClient();
+    final client = _client ?? http.Client();
+    final shouldClose = _client == null;
     try {
-      final request = await client.getUrl(uri).timeout(const Duration(seconds: 12));
-      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      final response = await request.close().timeout(const Duration(seconds: 20));
-      final text = await response.transform(utf8.decoder).join();
+      final response = await client.get(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 20));
+
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return <String, dynamic>{};
       }
-      final decoded = jsonDecode(text);
+      final decoded = jsonDecode(response.body);
       return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
     } catch (_) {
       return <String, dynamic>{};
     } finally {
-      client.close(force: true);
+      if (shouldClose) {
+        client.close();
+      }
     }
   }
 

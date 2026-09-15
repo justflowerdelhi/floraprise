@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/database/app_database.dart';
+import '../../data/repositories/cloud_remaining_reports_repository.dart';
 import '../../providers/storage_mode_provider.dart';
 import '../../widgets/common_widgets.dart';
-import '../../widgets/non_cloud_report_banner.dart';
 
 class RewardsReportScreen extends StatefulWidget {
   const RewardsReportScreen({super.key});
@@ -14,6 +14,8 @@ class RewardsReportScreen extends StatefulWidget {
 }
 
 class _RewardsReportScreenState extends State<RewardsReportScreen> {
+  final CloudRemainingReportsRepository _cloudRepository =
+      CloudRemainingReportsRepository();
   late Future<_RewardsReportData> _future;
 
   @override
@@ -23,6 +25,18 @@ class _RewardsReportScreenState extends State<RewardsReportScreen> {
   }
 
   Future<_RewardsReportData> _load() async {
+    if (context.read<StorageModeProvider>().isCloud) {
+      final report = await _cloudRepository.getRewardsReport();
+      return _RewardsReportData(
+        currentPoints: report?.currentPoints ?? 0,
+        lifetimePoints: report?.lifetimePoints ?? 0,
+        redeemedPoints: report?.redeemedPoints ?? 0,
+        rewardOrders: report?.rewardOrders ?? 0,
+        discountPaise: report?.discountPaise ?? 0,
+        customers: report?.customers ?? const [],
+      );
+    }
+
     final db = await AppDatabase.instance.database;
     final summaryRows = await db.rawQuery('''
       SELECT
@@ -61,13 +75,9 @@ class _RewardsReportScreenState extends State<RewardsReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isCloud = context.watch<StorageModeProvider?>()?.isCloud ?? false;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Rewards Report')),
-      body: isCloud
-          ? const NonCloudReportBanner(reportTitle: 'Rewards Report')
-          : FutureBuilder<_RewardsReportData>(
+      body: FutureBuilder<_RewardsReportData>(
         future: _future,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {

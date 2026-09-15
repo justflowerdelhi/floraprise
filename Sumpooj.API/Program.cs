@@ -53,11 +53,12 @@ var configuredConnectionString = builder.Configuration.GetConnectionString("Defa
 
 #region CORS
 
-// Read allowed origins from configuration (appsettings.json)
+// Read allowed origins from configuration (appsettings.json / appsettings.Production.json)
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                   ?? Array.Empty<string>();
 
 builder.Services.AddCors(options =>
+
 {
     options.AddPolicy("DefaultCorsPolicy", policy =>
     {

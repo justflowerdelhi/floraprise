@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../models/payment_split.dart';
@@ -210,6 +211,7 @@ class OrderRepository {
   }
 
   Future<List<DraftOrderSummary>> listDraftOrders({String query = ''}) async {
+    if (kIsWeb) return const [];
     final db = await AppDatabase.instance.database;
     final whereParts = <String>['o.status = ?'];
     final whereArgs = <Object?>['draft'];
@@ -250,6 +252,7 @@ class OrderRepository {
   }
 
   Future<int> countDraftOrders() async {
+    if (kIsWeb) return 0;
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery(
       "SELECT COUNT(*) AS count FROM orders WHERE status = 'draft'",
@@ -1132,6 +1135,7 @@ class OrderRepository {
   }
 
   Future<OrderRewardSummary?> getOrderRewardSummary(int orderId) async {
+    if (kIsWeb) return null;
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery('''
       SELECT

@@ -32,11 +32,15 @@ public sealed class MobileDashboardController : MobileApiControllerBase
         try
         {
             var companyId = GetCompanyId();
-            var from = EnsureUtc(fromDate ?? PosSaleSyncService.GetServerLocalBusinessDate()).Date;
-            var to = EnsureUtc(toDate ?? from).Date.AddDays(1).AddTicks(-1);
-            if (to < from)
+            
+            var businessFromDate = fromDate ?? PosSaleSyncService.GetServerLocalBusinessDate();
+            var businessToDate = toDate ?? businessFromDate;
+            
+            var (utcFromStart, utcToEnd) = GetUtcRangeForBusinessDates(businessFromDate, businessToDate);
+            
+            if (utcToEnd < utcFromStart)
             {
-                (from, to) = (to, from);
+                (utcFromStart, utcToEnd) = (utcToEnd, utcFromStart);
             }
 
             var orders = await _db.Orders
@@ -44,8 +48,8 @@ public sealed class MobileDashboardController : MobileApiControllerBase
                 .Where(o =>
                     o.CompanyId == companyId &&
                     o.IsActive &&
-                    o.OrderDate >= from &&
-                    o.OrderDate <= to)
+                    o.OrderDate >= utcFromStart &&
+                    o.OrderDate <= utcToEnd)
                 .ToListAsync(cancellationToken);
 
             var orderIds = orders.Select(o => o.Id).ToList();
@@ -64,8 +68,8 @@ public sealed class MobileDashboardController : MobileApiControllerBase
                 .Where(e =>
                     e.CompanyId == companyId &&
                     e.IsActive &&
-                    e.ExpenseDate >= from &&
-                    e.ExpenseDate <= to)
+                    e.ExpenseDate >= DateTime.SpecifyKind(businessFromDate.Date, DateTimeKind.Utc) &&
+                    e.ExpenseDate <= DateTime.SpecifyKind(businessToDate.Date.AddDays(1), DateTimeKind.Utc))
                 .ToListAsync(cancellationToken);
 
             var summary = new MobileDashboardSummaryDto(
@@ -93,8 +97,106 @@ public sealed class MobileDashboardController : MobileApiControllerBase
         }
     }
 
-    private static DateTime EnsureUtc(DateTime value) =>
-        value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+    [HttpGet("profit-margin")]
+    public async Task<IActionResult> GetProfitMargin(
+        [FromQuery] DateTime? fromDate,
+        [FromQuery] DateTime? toDate,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var companyId = GetCompanyId();
+
+            var businessFromDate = fromDate ?? PosSaleSyncService.GetServerLocalBusinessDate();
+            var businessToDate = toDate ?? businessFromDate;
+
+            var (utcFromStart, utcToEnd) = GetUtcRangeForBusinessDates(businessFromDate, businessToDate);
+
+            if (utcToEnd < utcFromStart)
+            {
+                (utcFromStart, utcToEnd) = (utcToEnd, utcFromStart);
+            }
+
+            // Same inclusion rule as GetSummary (Cloud Sales Report): active orders in range.
+            var orders = await _db.Orders
+                .AsNoTracking()
+                .Where(o =>
+                    o.CompanyId == companyId &&
+                    o.IsActive &&
+                    o.OrderDate >= utcFromStart &&
+                    o.OrderDate <= utcToEnd)
+                .ToListAsync(cancellationToken);
+
+            var orderIds = orders.Select(o => o.Id).ToList();
+            var orderItems = orderIds.Count == 0
+                ? new List<OrderItem>()
+                : await _db.OrderItems
+                    .AsNoTracking()
+                    .Where(i => EF.Property<Guid?>(i, "OrderId") != null && orderIds.Contains(EF.Property<Guid?>(i, "OrderId")!.Value))
+                    .ToListAsync(cancellationToken);
+
+            var productIds = orderItems.Select(i => i.ProductId).Distinct().ToList();
+            var productCosts = productIds.Count == 0
+                ? new Dictionary<Guid, decimal>()
+                : await _db.Products
+                    .AsNoTracking()
+                    .Where(p => p.CompanyId == companyId && productIds.Contains(p.Id))
+                    .Select(p => new { p.Id, p.CostPrice })
+                    .ToDictionaryAsync(p => p.Id, p => p.CostPrice, cancellationToken);
+
+            var grossSales = orders.Sum(o => o.SubTotal);
+            var discounts = orders.Sum(o => o.DiscountAmount);
+            var netRevenue = grossSales - discounts;
+
+            // COGS uses each product's current CostPrice, since OrderItem does not
+            // store a per-sale historical cost snapshot. Products missing from the
+            // catalog (e.g. deleted) contribute zero cost and are excluded from the estimate.
+            var cogs = orderItems.Sum(i =>
+                productCosts.TryGetValue(i.ProductId, out var costPrice) ? costPrice * i.Quantity : 0m);
+
+            var grossProfit = netRevenue - cogs;
+            var marginPercent = netRevenue > 0 ? Math.Round(grossProfit / netRevenue * 100m, 2) : 0m;
+
+            var dto = new MobileProfitMarginDto(
+                ToPaise(grossSales),
+                ToPaise(discounts),
+                ToPaise(netRevenue),
+                ToPaise(cogs),
+                ToPaise(grossProfit),
+                marginPercent,
+                orders.Count,
+                CogsIsEstimate: true,
+                CogsLimitationNote: "Cost of goods sold is calculated from each product's current cost price. " +
+                    "The system does not store a historical cost snapshot per sale, so COGS for past orders " +
+                    "may differ from the actual cost incurred at the time of sale if product costs changed since.");
+
+            return Ok(dto);
+        }
+        catch (Exception ex)
+        {
+            return ProblemFromException(ex);
+        }
+    }
+
+    private static (DateTime utcStart, DateTime utcEnd) GetUtcRangeForBusinessDates(DateTime businessDateFrom, DateTime businessDateTo)
+    {
+        if (TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Kolkata", out var tz) ||
+            TimeZoneInfo.TryFindSystemTimeZoneById("India Standard Time", out tz))
+        {
+            var istFromMidnight = new DateTime(businessDateFrom.Year, businessDateFrom.Month, businessDateFrom.Day, 0, 0, 0);
+            var istToMidnight = new DateTime(businessDateTo.Year, businessDateTo.Month, businessDateTo.Day, 23, 59, 59);
+            
+            var utcStart = TimeZoneInfo.ConvertTimeToUtc(istFromMidnight, tz);
+            var utcEnd = TimeZoneInfo.ConvertTimeToUtc(istToMidnight, tz);
+            
+            return (utcStart, utcEnd);
+        }
+        
+        return (
+            DateTime.SpecifyKind(businessDateFrom.Date, DateTimeKind.Utc),
+            DateTime.SpecifyKind(businessDateTo.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc)
+        );
+    }
 
     private static int ToPaise(decimal amount) =>
         (int)decimal.Round(amount * 100m, 0, MidpointRounding.AwayFromZero);

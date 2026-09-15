@@ -43,6 +43,7 @@ class MobileAuthService {
       explicitValue: '',
       isDebug: kDebugMode,
       platform: defaultTargetPlatform,
+      isWeb: kIsWeb,
     );
   }
 

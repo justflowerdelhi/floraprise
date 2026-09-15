@@ -1,8 +1,11 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 import '../database/app_database.dart';
 import '../../models/gst_calculation_type.dart';
 import '../../services/barcode_service.dart';
+import 'cloud_product_repository.dart';
 
 enum ProductSort {
   nameAsc,
@@ -258,6 +261,7 @@ class ProductRepository {
     bool includeDeleted = false,
     ProductSort sort = ProductSort.nameAsc,
   }) async {
+    if (kIsWeb) return const [];
     final db = await AppDatabase.instance.database;
 
     final where = <String>[];
@@ -692,6 +696,7 @@ class ProductRepository {
   }
 
   Future<List<ProductInventoryRecord>> listActiveProductsWithInventory() async {
+    if (kIsWeb) return const [];
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery('''
       SELECT
@@ -762,6 +767,7 @@ class ProductRepository {
   }
 
   Future<List<ProductRecord>> listProductsMissingFlorapriseBarcode() async {
+    if (kIsWeb) return const [];
     final db = await AppDatabase.instance.database;
     final rows = await db.query(
       'products',
@@ -788,6 +794,51 @@ class ProductRepository {
 
     final needle = rawInput.toLowerCase();
     final likeNeedle = '%$needle%';
+
+    if (kIsWeb) {
+      final cloudRepo = CloudProductRepository();
+      final products = await cloudRepo.listProducts(query: rawInput);
+      if (products.isEmpty) return null;
+      CloudProduct? matched;
+      for (final p in products) {
+        if (p.barcode?.trim().toLowerCase() == needle ||
+            p.manufacturerBarcode?.trim().toLowerCase() == needle ||
+            p.internalBarcode?.trim().toLowerCase() == needle) {
+          matched = p;
+          break;
+        }
+      }
+      matched ??= products.cast<CloudProduct?>().firstWhere(
+        (p) => p?.sku.trim().toLowerCase() == needle,
+        orElse: () => null,
+      );
+      matched ??= products.first;
+
+      return ProductInventoryRecord(
+        id: -1,
+        code: matched.sku,
+        name: matched.name,
+        category: matched.category.isEmpty ? 'Other' : matched.category,
+        defaultUnit:
+            matched.unitOfMeasure.isEmpty ? 'Piece' : matched.unitOfMeasure,
+        sku: matched.sku,
+        barcode: matched.barcode ?? matched.manufacturerBarcode ?? '',
+        manufacturerBarcode:
+            matched.manufacturerBarcode ?? matched.barcode ?? '',
+        florapriseBarcode: matched.internalBarcode ?? '',
+        cloudProductId: matched.id,
+        sellingPricePaise: (matched.retailPrice * 100).round(),
+        purchasePricePaise: (matched.costPrice * 100).round(),
+        gstPercent: 0,
+        gstCalculationType: GstCalculationType.inclusive,
+        trackInventory: matched.trackInventory,
+        active: matched.isActive,
+        favorite: false,
+        currentQty: matched.stockQuantity.toInt(),
+        minQty: matched.minimumStockLevel.toInt(),
+      );
+    }
+
     final db = await AppDatabase.instance.database;
 
     final rows = await db.rawQuery(

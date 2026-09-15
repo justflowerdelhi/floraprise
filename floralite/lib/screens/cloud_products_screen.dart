@@ -6,6 +6,7 @@ import '../data/repositories/product_repository.dart';
 import '../providers/cloud_product_provider.dart';
 import '../providers/printer_provider.dart';
 import '../services/cloud_product_local_catalog_sync_service.dart';
+import '../services/sku_generator_service.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
 import '../widgets/common_widgets.dart';
 import 'bouquet_builder_screen.dart';
@@ -487,15 +488,16 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
   static const List<String> _units = [
     'Stem',
     'Bunch',
+    'Piece',
+    'Box',
+    'Roll',
+    'Pack',
+    'Meter',
+    'Set',
     'Dozen',
     'Bundle',
     'Bouquet',
-    'Box',
     'Vase',
-    'Roll',
-    'Pack',
-    'Set',
-    'Meter',
   ];
 
   @override
@@ -509,10 +511,67 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
     _cost = TextEditingController(text: product?.costPrice.toString() ?? '');
     _description = TextEditingController(text: product?.description ?? '');
     _categoryId = product?.categoryId ?? (widget.categories.isEmpty ? null : widget.categories.first.id);
-    _unit = _units.contains(product?.unitOfMeasure) ? product!.unitOfMeasure : 'Stem';
+
+    final initialCat = widget.categories.where((c) => c.id == _categoryId).firstOrNull;
+    if (product != null) {
+      _unit = _units.contains(product.unitOfMeasure) ? product.unitOfMeasure : 'Stem';
+    } else if (initialCat != null && _units.contains(initialCat.effectiveDefaultUnit)) {
+      _unit = initialCat.effectiveDefaultUnit;
+    } else {
+      _unit = 'Stem';
+    }
+
     _trackInventory = product?.trackInventory ?? false;
     _trackBatch = product?.trackBatch ?? false;
     _reorderLevel = product?.reorderLevel ?? 0;
+  }
+
+  void _autoGenerateSku() {
+    final selectedCategory = widget.categories
+        .where((c) => c.id == _categoryId)
+        .firstOrNull;
+    final catName = selectedCategory?.name ?? 'General';
+    final generated = SkuGeneratorService.generateSku(
+      categoryName: catName,
+      productName: _name.text,
+    );
+    setState(() {
+      _sku.text = generated;
+      _formError = null;
+    });
+  }
+
+  void _onCategoryChanged(String? value) {
+    if (value == null) return;
+    setState(() {
+      _categoryId = value;
+      final selectedCategory = widget.categories
+          .where((c) => c.id == value)
+          .firstOrNull;
+      if (selectedCategory != null) {
+        final defUnit = selectedCategory.effectiveDefaultUnit;
+        if (_units.contains(defUnit)) {
+          _unit = defUnit;
+        }
+      }
+    });
+  }
+
+  Widget _skuField() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TextField(
+        controller: _sku,
+        decoration: InputDecoration(
+          labelText: 'SKU',
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.autorenew_rounded),
+            tooltip: 'Auto-generate SKU',
+            onPressed: _autoGenerateSku,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -542,12 +601,12 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
                       children: [
                         Expanded(child: _field(_name, 'Name')),
                         const SizedBox(width: 12),
-                        Expanded(child: _field(_sku, 'SKU')),
+                        Expanded(child: _skuField()),
                       ],
                     )
                   else ...[
                     _field(_name, 'Name'),
-                    _field(_sku, 'SKU'),
+                    _skuField(),
                   ],
                   if (isWide)
                     Row(
@@ -561,12 +620,13 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
                               items: widget.categories
                                   .map((category) => DropdownMenuItem(value: category.id, child: Text(category.name)))
                                   .toList(),
-                              onChanged: (value) => setState(() => _categoryId = value),
+                              onChanged: _onCategoryChanged,
                             ),
                           ),
                         if (widget.categories.isNotEmpty) const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
+                            key: ValueKey('unit-wide-$_unit'),
                             initialValue: _unit,
                             decoration: const InputDecoration(labelText: 'Unit'),
                             items: _units.map((unit) => DropdownMenuItem(value: unit, child: Text(unit))).toList(),
@@ -583,9 +643,10 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
                         items: widget.categories
                             .map((category) => DropdownMenuItem(value: category.id, child: Text(category.name)))
                             .toList(),
-                        onChanged: (value) => setState(() => _categoryId = value),
+                        onChanged: _onCategoryChanged,
                       ),
                     DropdownButtonFormField<String>(
+                      key: ValueKey('unit-narrow-$_unit'),
                       initialValue: _unit,
                       decoration: const InputDecoration(labelText: 'Unit'),
                       items: _units.map((unit) => DropdownMenuItem(value: unit, child: Text(unit))).toList(),
@@ -722,8 +783,6 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
     String? error;
     if (_name.text.trim().isEmpty) {
       error = 'Name is required.';
-    } else if (_sku.text.trim().isEmpty) {
-      error = 'SKU is required.';
     } else if (categoryId == null) {
       error = 'Select a category.';
     } else if (retail == null) {
@@ -734,6 +793,25 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
         error = 'Enter a valid purchase price.';
       }
     }
+
+    var finalSku = _sku.text.trim();
+    if (error == null) {
+      if (finalSku.isEmpty) {
+        // Auto-generate SKU if blank instead of blocking with error
+        final selectedCategory = widget.categories
+            .where((c) => c.id == categoryId)
+            .firstOrNull;
+        final catName = selectedCategory?.name ?? 'General';
+        finalSku = SkuGeneratorService.generateSku(
+          categoryName: catName,
+          productName: _name.text,
+        );
+        _sku.text = finalSku;
+      } else if (!SkuGeneratorService.isValidSku(finalSku)) {
+        error = 'SKU can only contain letters, numbers, hyphens, and underscores.';
+      }
+    }
+
     if (error != null) {
       setState(() => _formError = error);
       return;
@@ -746,7 +824,7 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
       context,
       CloudProductInput(
         name: _name.text.trim(),
-        sku: _sku.text.trim(),
+        sku: finalSku,
         categoryId: categoryId!,
         unitOfMeasure: _unit,
         retailPrice: retail!,

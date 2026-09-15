@@ -18,6 +18,7 @@ public class ProductionService
     private readonly IProductRepository _productRepo;
     private readonly ILocationRepository _locationRepo;
     private readonly IInventoryLedgerRepository _inventoryLedgerRepo;
+    private readonly IUnitOfWork? _unitOfWork;
 
     public ProductionService(
         IFloralRecipeRepository recipeRepo,
@@ -30,7 +31,8 @@ public class ProductionService
         IOrderRepository orderRepo,
         IProductRepository productRepo,
         ILocationRepository locationRepo,
-        IInventoryLedgerRepository inventoryLedgerRepo)
+        IInventoryLedgerRepository inventoryLedgerRepo,
+        IUnitOfWork? unitOfWork = null)
     {
         _recipeRepo = recipeRepo;
         _batchRepo = batchRepo;
@@ -43,6 +45,7 @@ public class ProductionService
         _productRepo = productRepo;
         _locationRepo = locationRepo;
         _inventoryLedgerRepo = inventoryLedgerRepo;
+        _unitOfWork = unitOfWork;
     }
 
     // ─── Recipes ────────────────────────────────────────────
@@ -114,16 +117,41 @@ public class ProductionService
 
     // ─── Finished Goods ─────────────────────────────────────
 
-    public async Task<List<FinishedGoodsBatchDto>> GetFinishedBatchesAsync(Guid companyId)
+    public async Task<List<FinishedGoodsBatchDto>> GetFinishedBatchesAsync(
+        Guid companyId,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        string? batchCode = null)
     {
-        var batches = await _batchRepo.GetAllAsync(companyId);
+        var batches = await _batchRepo.GetAllAsync(companyId, startDate, endDate, batchCode);
         return batches.Select(MapBatch).ToList();
     }
 
     public async Task<FinishedGoodsBatchDto?> GetFinishedBatchByIdAsync(Guid companyId, Guid id)
     {
         var batch = await _batchRepo.GetByIdAsync(companyId, id);
-        return batch == null ? null : MapBatch(batch);
+        if (batch == null) return null;
+
+        var dto = MapBatch(batch);
+        var recipe = await _recipeRepo.GetByIdAsync(companyId, batch.RecipeId);
+        if (recipe != null)
+        {
+            foreach (var comp in recipe.Components)
+            {
+                var product = await _productRepo.GetByIdAsync(companyId, comp.ProductId);
+                var qty = comp.QuantityRequired * batch.QuantityProduced;
+                dto.Consumptions.Add(new ProductionConsumptionDto
+                {
+                    RawProductId = comp.ProductId,
+                    ProductName = product?.Name ?? comp.ProductName,
+                    Unit = product?.UnitOfMeasure.ToString() ?? "Piece",
+                    Quantity = qty,
+                    UnitCost = comp.UnitCost,
+                    TotalCost = comp.UnitCost * qty
+                });
+            }
+        }
+        return dto;
     }
 
     public async Task DeductFromBatchAsync(Guid companyId, Guid batchId, int quantity)
@@ -152,9 +180,20 @@ public class ProductionService
         var deductions = new List<ComponentDeduction>();
         decimal totalCost = 0;
 
+        var productsToUpdate = new List<(Product Product, int QtyRequired)>();
         foreach (var comp in recipe.Components)
         {
             var qty = comp.QuantityRequired * request.Quantity;
+            var product = await _productRepo.GetByIdAsync(companyId, comp.ProductId)
+                ?? throw new InvalidOperationException($"Product not found: {comp.ProductName}");
+
+            if (product.TrackInventory && product.StockQuantity < qty)
+            {
+                throw new InvalidOperationException(
+                    $"Insufficient stock for raw material '{product.Name}'. Required: {qty}, Available: {product.StockQuantity}");
+            }
+
+            productsToUpdate.Add((product, qty));
             deductions.Add(new ComponentDeduction { ProductId = comp.ProductId, QuantityDeducted = qty });
             totalCost += comp.UnitCost * qty;
         }
@@ -164,9 +203,38 @@ public class ProductionService
 
         var batch = new FinishedGoodsBatch(
             companyId, recipe.Id, recipe.Name, batchCode, barcode,
-            request.Quantity, expiry, request.LocationId, locationName, totalCost);
+            request.Quantity, expiry, request.LocationId, locationName, totalCost, request.OperatorName);
 
-        await _batchRepo.AddAsync(batch);
+        Func<Task> executeProduction = async () =>
+        {
+            foreach (var (product, qty) in productsToUpdate)
+            {
+                if (product.TrackInventory)
+                {
+                    product.AdjustStock(-qty);
+                    var ledger = new InventoryLedger(
+                        companyId,
+                        product.Id,
+                        batchCode,
+                        "PRODUCTION",
+                        -qty,
+                        product.StockQuantity,
+                        $"Consumed for production of {request.Quantity}x {recipe.Name}");
+                    await _inventoryLedgerRepo.AddAsync(ledger);
+                }
+            }
+
+            await _batchRepo.AddAsync(batch);
+        };
+
+        if (_unitOfWork != null)
+        {
+            await _unitOfWork.ExecuteInTransactionAsync(executeProduction);
+        }
+        else
+        {
+            await executeProduction();
+        }
 
         return new ProductionRunResult
         {
@@ -177,6 +245,58 @@ public class ProductionService
             ComponentsDeducted = deductions,
             TotalCost = totalCost
         };
+    }
+
+    public async Task ReverseProductionBatchAsync(Guid companyId, Guid batchId, string? reason)
+    {
+        var batch = await _batchRepo.GetByIdAsync(companyId, batchId)
+            ?? throw new KeyNotFoundException("Production batch not found.");
+
+        if (batch.IsReversed)
+            throw new InvalidOperationException("Production batch is already reversed.");
+
+        if (batch.QuantityAvailable < batch.QuantityProduced)
+            throw new InvalidOperationException(
+                $"Cannot reverse production batch '{batch.BatchCode}' because finished goods have already been sold or consumed.");
+
+        var recipe = await _recipeRepo.GetByIdAsync(companyId, batch.RecipeId);
+
+        Func<Task> executeReversal = async () =>
+        {
+            if (recipe != null)
+            {
+                foreach (var comp in recipe.Components)
+                {
+                    var qty = comp.QuantityRequired * batch.QuantityProduced;
+                    var product = await _productRepo.GetByIdAsync(companyId, comp.ProductId);
+                    if (product != null && product.TrackInventory)
+                    {
+                        product.AdjustStock(qty);
+                        var ledger = new InventoryLedger(
+                            companyId,
+                            product.Id,
+                            batch.BatchCode,
+                            "PRODUCTION_REVERSAL",
+                            qty,
+                            product.StockQuantity,
+                            $"Restored from reversal of {batch.QuantityProduced}x {batch.RecipeName}. Reason: {reason ?? "Reversal"}");
+                        await _inventoryLedgerRepo.AddAsync(ledger);
+                    }
+                }
+            }
+
+            batch.Reverse(reason);
+            await _batchRepo.UpdateAsync(batch);
+        };
+
+        if (_unitOfWork != null)
+        {
+            await _unitOfWork.ExecuteInTransactionAsync(executeReversal);
+        }
+        else
+        {
+            await executeReversal();
+        }
     }
 
     // ─── On-Demand Assembly ─────────────────────────────────
@@ -706,7 +826,12 @@ public class ProductionService
         LocationId = b.LocationId,
         LocationName = b.LocationName,
         Status = b.Status.ToString(),
-        ProducedAt = b.ProducedAt.ToString("o")
+        ProducedAt = b.ProducedAt.ToString("o"),
+        TotalCost = b.TotalCost,
+        OperatorName = b.OperatorName,
+        ReversedAt = b.ReversedAt,
+        ReversalNote = b.ReversalNote,
+        IsReversed = b.IsReversed
     };
 
     private static List<MaintenanceReplacementDto> DeserializeReplacements(string? json)

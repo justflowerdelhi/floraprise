@@ -97,7 +97,7 @@ public sealed class PosSaleSyncService : IPosSaleSyncService
                 _db.Orders.Add(order);
 
                 var productIds = request.Lines
-                    .Where(l => l.ProductId.HasValue)
+                    .Where(l => l.ProductId.HasValue || l.CloudProductId.HasValue)
                     .Select(l => l.CloudProductId ?? Guid.Empty)
                     .Concat(request.InventoryTransactions.Select(t => t.CloudProductId ?? Guid.Empty))
                     .Where(id => id != Guid.Empty)
@@ -107,7 +107,7 @@ public sealed class PosSaleSyncService : IPosSaleSyncService
                     .Where(p => p.CompanyId == companyId && productIds.Contains(p.Id))
                     .ToDictionaryAsync(p => p.Id, cancellationToken);
 
-                foreach (var line in request.Lines.Where(l => l.ProductId.HasValue))
+                foreach (var line in request.Lines.Where(l => l.ProductId.HasValue || l.CloudProductId.HasValue))
                 {
                     var cloudProductId = line.CloudProductId ?? throw new ArgumentException("Product-backed line is missing cloudProductId.");
                     if (!products.TryGetValue(cloudProductId, out var product))
@@ -155,7 +155,7 @@ public sealed class PosSaleSyncService : IPosSaleSyncService
 
                 foreach (var line in request.Lines)
                 {
-                    var cloudProductId = line.ProductId.HasValue ? line.CloudProductId : null;
+                    var cloudProductId = (line.ProductId.HasValue || line.CloudProductId.HasValue) ? line.CloudProductId : null;
                     _db.PosSaleSyncOrderLines.Add(new PosSaleSyncOrderLine(
                         companyId,
                         receipt.Id,

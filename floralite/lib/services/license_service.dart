@@ -1,15 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' show Platform, SocketException;
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
-import 'api_base_url.dart';
+import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../models/license.dart';
+import 'api_base_url.dart';
 
 class LicenseServiceException implements Exception {
   const LicenseServiceException(this.message);
@@ -23,11 +23,12 @@ class LicenseServiceException implements Exception {
 class LicenseService {
   LicenseService({
     FlutterSecureStorage? secureStorage,
-    HttpClient? httpClient,
+    Object? httpClient,
+    http.Client? client,
     String? baseUrl,
     DateTime Function()? now,
   })  : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
-        _httpClient = httpClient ?? HttpClient(),
+        _client = client ?? http.Client(),
         _baseUrl = _computeBaseUrl(baseUrl),
         _now = now ?? DateTime.now;
 
@@ -61,7 +62,7 @@ class LicenseService {
   static const _authDeviceIdKey = 'mobile_auth_device_fingerprint';
 
   final FlutterSecureStorage _secureStorage;
-  final HttpClient _httpClient;
+  final http.Client _client;
   late final String _baseUrl;
   final DateTime Function() _now;
 
@@ -108,8 +109,9 @@ class LicenseService {
       'country': 'India',
       'deviceId': deviceId,
       'platform': _platformName(),
-      'model': Platform.localHostname,
-      'androidVersion': Platform.operatingSystemVersion,
+      'model': kIsWeb ? 'Chrome' : Platform.localHostname,
+      'androidVersion':
+          kIsWeb ? 'Web Browser' : Platform.operatingSystemVersion,
       'appVersion': appVersion,
     };
 
@@ -330,29 +332,42 @@ class LicenseService {
     Map<String, Object?>? body,
     String? bearerToken,
   }) async {
-    final request = await _httpClient.openUrl(method, uri).timeout(
-          const Duration(seconds: 12),
-        );
-    request.headers.contentType = ContentType.json;
-    request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
+    final request = http.Request(method, uri);
+    request.headers['Accept'] = 'application/json';
+    request.headers['Content-Type'] = 'application/json';
     if (bearerToken != null && bearerToken.trim().isNotEmpty) {
-      request.headers
-          .set(HttpHeaders.authorizationHeader, 'Bearer $bearerToken');
+      request.headers['Authorization'] = 'Bearer $bearerToken';
     }
     if (body != null) {
-      request.write(jsonEncode(body));
+      request.body = jsonEncode(body);
     }
 
-    final response = await request.close().timeout(const Duration(seconds: 20));
-    final responseBody = await response.transform(utf8.decoder).join();
+    final http.StreamedResponse streamedResponse;
+    try {
+      streamedResponse =
+          await _client.send(request).timeout(const Duration(seconds: 20));
+    } on SocketException {
+      rethrow;
+    } on TimeoutException {
+      rethrow;
+    } on Object catch (error) {
+      if (error is http.ClientException) {
+        throw const SocketException('Client network error');
+      }
+      rethrow;
+    }
+
+    final responseBody = await streamedResponse.stream.bytesToString();
+    final statusCode = streamedResponse.statusCode;
+    final contentType =
+        streamedResponse.headers['content-type'] ?? 'unknown';
 
     // Log request/response details for debugging
-    final contentType = response.headers.contentType?.mimeType ?? 'unknown';
     final bodyPreview = responseBody.length > 500
         ? '${responseBody.substring(0, 500)}...'
         : responseBody;
     debugPrint('[LicenseService] $method $uri');
-    debugPrint('[LicenseService] Status: ${response.statusCode}');
+    debugPrint('[LicenseService] Status: $statusCode');
     debugPrint('[LicenseService] Content-Type: $contentType');
     debugPrint('[LicenseService] Response body preview: $bodyPreview');
 
@@ -361,11 +376,11 @@ class LicenseService {
         !contentType.contains('text/json') &&
         responseBody.trim().isNotEmpty) {
       throw LicenseServiceException(
-        'Server returned non-JSON response (Content-Type: $contentType). URL: $uri, Status: ${response.statusCode}. Response: $bodyPreview',
+        'Server returned non-JSON response (Content-Type: $contentType). URL: $uri, Status: $statusCode. Response: $bodyPreview',
       );
     }
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
+    if (statusCode < 200 || statusCode >= 300) {
       final parsed = _tryParseJsonObject(responseBody);
       if (parsed != null) {
         final detail = _readString(parsed, 'detail');
@@ -373,13 +388,13 @@ class LicenseService {
         throw LicenseServiceException(
           (detail ??
                   title ??
-                  'License server returned HTTP ${response.statusCode}.')
+                  'License server returned HTTP $statusCode.')
               .trim(),
         );
       }
 
       throw LicenseServiceException(
-        _buildHttpErrorMessage(response.statusCode, responseBody),
+        _buildHttpErrorMessage(statusCode, responseBody),
       );
     }
 
@@ -390,7 +405,7 @@ class LicenseService {
     final decoded = _tryParseJsonObject(responseBody);
     if (decoded == null) {
       throw LicenseServiceException(
-        _buildHttpErrorMessage(response.statusCode, responseBody),
+        _buildHttpErrorMessage(statusCode, responseBody),
       );
     }
 

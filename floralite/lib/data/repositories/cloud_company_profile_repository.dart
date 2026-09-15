@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 
 /// Cloud Company Profile DTO
 /// Represents the company profile fetched from the Cloud API.
@@ -90,12 +90,15 @@ class CloudCompanyProfileRepository {
 
   final FlutterSecureStorage _secureStorage;
   final CloudCompanyProfileSender? _sender;
+  final http.Client? _client;
 
   CloudCompanyProfileRepository({
     FlutterSecureStorage? secureStorage,
     CloudCompanyProfileSender? sender,
+    http.Client? client,
   })  : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
-        _sender = sender;
+        _sender = sender,
+        _client = client;
 
   /// Fetches the company profile from the Cloud API.
   /// The endpoint uses the authenticated JWT company_id claim,
@@ -152,21 +155,22 @@ class CloudCompanyProfileRepository {
       '[SHOP-CLOUD-DIAGNOSTIC] JWT expired: ${jwtExpired ? 'YES' : 'NO'}',
     );
 
-    final httpClient = HttpClient();
+    final client = _client ?? http.Client();
+    final shouldClose = _client == null;
     try {
       if (accessToken.trim().isEmpty) {
         return null;
       }
 
-      final request = await httpClient.getUrl(uri);
-      request.headers.add('Authorization', 'Bearer $accessToken');
-      request.headers.contentType = ContentType.json;
+      final response = await client.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 20));
 
-      final response = await request.close().timeout(
-            const Duration(seconds: 20),
-          );
-
-      final responseBody = await response.transform(utf8.decoder).join();
+      final responseBody = response.body;
 
       if (response.statusCode == 200) {
         final json = jsonDecode(responseBody);
@@ -199,7 +203,9 @@ class CloudCompanyProfileRepository {
       // On error, return cached profile if available
       return await getCachedProfile();
     } finally {
-      httpClient.close(force: true);
+      if (shouldClose) {
+        client.close();
+      }
     }
   }
 
@@ -237,26 +243,29 @@ class CloudCompanyProfileRepository {
       return profile;
     }
 
-    final httpClient = HttpClient();
+    final client = _client ?? http.Client();
+    final shouldClose = _client == null;
     try {
-      final request = await httpClient.openUrl('PUT', uri);
-      request.headers.add('Authorization', 'Bearer $accessToken');
-      request.headers.contentType = ContentType.json;
-      request.write(jsonEncode({
-        if (name != null) 'name': name,
-        if (phone != null) 'phone': phone,
-        if (email != null) 'email': email,
-        if (address != null) 'address': address,
-        if (shortDescription != null) 'shortDescription': shortDescription,
-        if (timeZone != null) 'timeZone': timeZone,
-        if (currencyCode != null) 'currencyCode': currencyCode,
-        if (taxIdentifier != null) 'taxIdentifier': taxIdentifier,
-      }));
+      final response = await client.put(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          if (name != null) 'name': name,
+          if (phone != null) 'phone': phone,
+          if (email != null) 'email': email,
+          if (address != null) 'address': address,
+          if (shortDescription != null) 'shortDescription': shortDescription,
+          if (timeZone != null) 'timeZone': timeZone,
+          if (currencyCode != null) 'currencyCode': currencyCode,
+          if (taxIdentifier != null) 'taxIdentifier': taxIdentifier,
+        }),
+      ).timeout(const Duration(seconds: 20));
 
-      final response = await request.close().timeout(
-            const Duration(seconds: 20),
-          );
-      final responseBody = await response.transform(utf8.decoder).join();
+      final responseBody = response.body;
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw StateError('Cloud company profile update failed (HTTP ${response.statusCode}).');
@@ -268,7 +277,9 @@ class CloudCompanyProfileRepository {
       await _cacheProfile(profile);
       return profile;
     } finally {
-      httpClient.close(force: true);
+      if (shouldClose) {
+        client.close();
+      }
     }
   }
 

@@ -54,10 +54,32 @@ public class FinishedGoodsBatchRepository : IFinishedGoodsBatchRepository
 
     public FinishedGoodsBatchRepository(SumpoojDbContext db) => _db = db;
 
-    public async Task<List<FinishedGoodsBatch>> GetAllAsync(Guid companyId)
+    public async Task<List<FinishedGoodsBatch>> GetAllAsync(
+        Guid companyId,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        string? batchCode = null)
     {
-        return await _db.FinishedGoodsBatches
-            .Where(b => b.CompanyId == companyId)
+        var q = _db.FinishedGoodsBatches.Where(b => b.CompanyId == companyId);
+
+        if (startDate.HasValue)
+        {
+            var startUtc = DateTime.SpecifyKind(startDate.Value.Date, DateTimeKind.Utc);
+            q = q.Where(b => b.ProducedAt >= startUtc);
+        }
+
+        if (endDate.HasValue)
+        {
+            var endUtc = DateTime.SpecifyKind(endDate.Value.Date, DateTimeKind.Utc).AddDays(1);
+            q = q.Where(b => b.ProducedAt < endUtc);
+        }
+
+        if (!string.IsNullOrWhiteSpace(batchCode))
+        {
+            q = q.Where(b => b.BatchCode.Contains(batchCode));
+        }
+
+        return await q
             .OrderByDescending(b => b.ProducedAt)
             .ToListAsync();
     }

@@ -26,6 +26,7 @@ public class DayCloseDto
     public decimal ExpectedCash { get; set; }
     public decimal ActualCash { get; set; }
     public decimal CashVariance { get; set; }
+    public decimal CashExpenses { get; set; }
 
     public string? Notes { get; set; }
 }

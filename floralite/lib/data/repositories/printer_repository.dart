@@ -1,12 +1,28 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../models/printer_models.dart';
 import '../database/app_database.dart';
 
 class PrinterRepository {
+  static PrinterConfig _webConfig = const PrinterConfig(
+    connectionKind: PrinterConnectionKind.bluetooth,
+    paperWidth: PrinterPaperWidth.mm80,
+    autoConnect: false,
+    autoPrintAfterBilling: false,
+    copies: 1,
+    cutPaper: true,
+    printLogo: false,
+    printQrCode: false,
+    printBarcode: true,
+    printDuplicateCopy: false,
+    thankYouMessage: 'Thank you for shopping with us',
+  );
+
   Future<PrinterConfig> getConfig() async {
+    if (kIsWeb) return _webConfig;
     final db = await AppDatabase.instance.database;
     final rows = await db.query(
       'printer_config',
@@ -21,6 +37,10 @@ class PrinterRepository {
   }
 
   Future<void> saveConfig(PrinterConfig config) async {
+    if (kIsWeb) {
+      _webConfig = config;
+      return;
+    }
     final db = await AppDatabase.instance.database;
     await db.insert(
       'printer_config',
@@ -50,6 +70,7 @@ class PrinterRepository {
     required Map<String, dynamic> payload,
     int? copies,
   }) async {
+    if (kIsWeb) return 0;
     final db = await AppDatabase.instance.database;
     final now = DateTime.now().toIso8601String();
     final config = await getConfig();
@@ -71,6 +92,7 @@ class PrinterRepository {
     },
     int limit = 50,
   }) async {
+    if (kIsWeb) return const [];
     final db = await AppDatabase.instance.database;
     final statusArgs = statuses.map((status) => status.name).toList();
     final rows = await db.query(
@@ -84,6 +106,7 @@ class PrinterRepository {
   }
 
   Future<PrintQueueJob?> getLastSuccessfulReceipt() async {
+    if (kIsWeb) return null;
     final db = await AppDatabase.instance.database;
     final rows = await db.query(
       'print_queue',
@@ -108,6 +131,7 @@ class PrinterRepository {
       );
 
   Future<void> markFailed(int id, Object error) async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     await db.rawUpdate('''
       UPDATE print_queue
@@ -135,6 +159,7 @@ class PrinterRepository {
     String? printedAt,
     bool clearError = false,
   }) async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     await db.update(
       'print_queue',
@@ -150,6 +175,7 @@ class PrinterRepository {
   }
 
   Future<void> _insertDefaultConfig() async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     await db.insert('printer_config', {
       'id': 1,

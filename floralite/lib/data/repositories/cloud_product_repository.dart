@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../services/mobile_auth_service.dart';
+import 'product_repository.dart';
 
 typedef CloudProductHttpSender = Future<dynamic> Function(
   String method,
@@ -212,6 +213,28 @@ class CloudProductInput {
       };
 }
 
+class CloudCategoryInput {
+  const CloudCategoryInput({
+    required this.name,
+    this.defaultUnit,
+    this.isPerishable = false,
+    this.trackBatchByDefault = false,
+  });
+
+  final String name;
+  final String? defaultUnit;
+  final bool isPerishable;
+  final bool trackBatchByDefault;
+
+  Map<String, dynamic> toJson() => {
+        'name': name.trim(),
+        if (defaultUnit != null && defaultUnit!.trim().isNotEmpty)
+          'defaultUnit': defaultUnit!.trim(),
+        'isPerishable': isPerishable,
+        'trackBatchByDefault': trackBatchByDefault,
+      };
+}
+
 class CloudCategory {
   const CloudCategory({
     required this.id,
@@ -219,6 +242,8 @@ class CloudCategory {
     required this.isActive,
     required this.isPerishable,
     required this.trackBatchByDefault,
+    this.defaultUnit,
+    this.productCount = 0,
   });
 
   final String id;
@@ -226,6 +251,18 @@ class CloudCategory {
   final bool isActive;
   final bool isPerishable;
   final bool trackBatchByDefault;
+  final String? defaultUnit;
+  final int productCount;
+
+  /// Returns the effective default unit, falling back to Solo's standard
+  /// category mapping if not set on the cloud category entity.
+  String get effectiveDefaultUnit {
+    final trimmed = defaultUnit?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) {
+      return trimmed;
+    }
+    return ProductRepository.defaultUnitForCategory(name);
+  }
 
   factory CloudCategory.fromJson(Map<String, dynamic> json) => CloudCategory(
         id: _read(json, 'id'),
@@ -233,10 +270,23 @@ class CloudCategory {
         isActive: _readBool(json, 'isActive', true),
         isPerishable: _readBool(json, 'isPerishable', false),
         trackBatchByDefault: _readBool(json, 'trackBatchByDefault', false),
+        defaultUnit: _readNullable(json, 'defaultUnit'),
+        productCount: _readInt(json, 'productCount'),
       );
 
   static String _read(Map<String, dynamic> json, String key) =>
       json[key]?.toString() ?? json['${key[0].toUpperCase()}${key.substring(1)}']?.toString() ?? '';
+
+  static String? _readNullable(Map<String, dynamic> json, String key) {
+    final val = json[key]?.toString() ?? json['${key[0].toUpperCase()}${key.substring(1)}']?.toString();
+    return (val == null || val.trim().isEmpty) ? null : val.trim();
+  }
+
+  static int _readInt(Map<String, dynamic> json, String key) {
+    final val = json[key] ?? json['${key[0].toUpperCase()}${key.substring(1)}'];
+    if (val is num) return val.toInt();
+    return int.tryParse(val?.toString() ?? '') ?? 0;
+  }
 
   static bool _readBool(Map<String, dynamic> json, String key, bool fallback) =>
       (json[key] ?? json['${key[0].toUpperCase()}${key.substring(1)}']) is bool
@@ -347,16 +397,15 @@ class CloudProductRepository {
         .toList();
   }
 
-  Future<CloudCategory> createCategory(String name) async {
+  Future<CloudCategory> createCategory(dynamic input) async {
+    final CloudCategoryInput categoryInput = input is CloudCategoryInput
+        ? input
+        : CloudCategoryInput(name: input.toString());
     final uri = Uri.parse('${_auth.baseUrl}/api/categories');
     final response = await _send(
       'POST',
       uri,
-      body: {
-        'name': name,
-        'isPerishable': false,
-        'trackBatchByDefault': false,
-      },
+      body: categoryInput.toJson(),
     );
     final id = _readString(response, 'id');
     if (id.isEmpty) throw StateError('Cloud API did not return a category ID.');
@@ -364,15 +413,21 @@ class CloudProductRepository {
     return categories.firstWhere((category) => category.id == id);
   }
 
-  Future<void> updateCategory(String id, String name) async {
+  Future<void> updateCategory(String id, dynamic input) async {
+    final CloudCategoryInput categoryInput = input is CloudCategoryInput
+        ? input
+        : CloudCategoryInput(name: input.toString());
     await _send(
       'PUT',
       Uri.parse('${_auth.baseUrl}/api/categories/$id'),
-      body: {
-        'name': name,
-        'isPerishable': false,
-        'trackBatchByDefault': false,
-      },
+      body: categoryInput.toJson(),
+    );
+  }
+
+  Future<void> deleteCategory(String id) async {
+    await _send(
+      'DELETE',
+      Uri.parse('${_auth.baseUrl}/api/categories/$id'),
     );
   }
 

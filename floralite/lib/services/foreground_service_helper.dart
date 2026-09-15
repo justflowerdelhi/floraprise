@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class ForegroundServiceHelper {
@@ -6,7 +7,7 @@ class ForegroundServiceHelper {
       MethodChannel('com.floraprise/location');
 
   static Future<void> startForegroundService(String deliveryId) async {
-    if (!Platform.isAndroid) return;
+    if (kIsWeb || !Platform.isAndroid) return;
 
     try {
       await _channel
@@ -18,7 +19,7 @@ class ForegroundServiceHelper {
   }
 
   static Future<void> stopForegroundService() async {
-    if (!Platform.isAndroid) return;
+    if (kIsWeb || !Platform.isAndroid) return;
 
     try {
       await _channel.invokeMethod('stopForegroundService');
@@ -29,7 +30,7 @@ class ForegroundServiceHelper {
   }
 
   static Future<void> updateNotification(String status) async {
-    if (!Platform.isAndroid) return;
+    if (kIsWeb || !Platform.isAndroid) return;
 
     try {
       await _channel.invokeMethod('updateNotification', {'status': status});
