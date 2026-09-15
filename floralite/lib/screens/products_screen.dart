@@ -18,6 +18,7 @@ import '../services/speech_recognition_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/floraprise_page_header.dart';
 import '../widgets/voice_dictation_field_header.dart';
 
 class ProductsScreen extends StatefulWidget {
@@ -78,7 +79,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
     return Scaffold(
       appBar: AppHeader(
-        title: l10n.products,
+        title: FloraprisePageHeader.isDesktop(context) ? null : l10n.products,
         actions: [
           PopupMenuButton<ProductSort>(
             icon: const Icon(Icons.sort),
@@ -123,6 +124,20 @@ class _ProductsScreenState extends State<ProductsScreen> {
         top: false,
         child: Column(
           children: [
+            FloraprisePageHeader(
+              title: l10n.products,
+              subtitle: 'Manage your flower catalogue and pricing',
+              icon: Icons.local_florist_rounded,
+              actions: [
+                FloraprisePageHeaderAction(
+                  label: l10n.addProduct,
+                  icon: Icons.add_rounded,
+                  primary: true,
+                  onPressed: _showCreateProduct,
+                ),
+              ],
+              decorationAlignment: Alignment.centerLeft,
+            ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -215,11 +230,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.small(
-        onPressed: _showCreateProduct,
-        tooltip: l10n.addProduct,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: FloraprisePageHeader.isDesktop(context)
+          ? null
+          : FloatingActionButton.small(
+              onPressed: _showCreateProduct,
+              tooltip: l10n.addProduct,
+              child: const Icon(Icons.add),
+            ),
     );
   }
 

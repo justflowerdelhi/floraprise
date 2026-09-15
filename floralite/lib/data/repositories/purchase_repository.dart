@@ -2,8 +2,10 @@ import '../database/app_database.dart';
 
 class PurchaseListItem {
   final int id;
+  final String? cloudId;
   final String listDate;
   final int productId;
+  final String? cloudProductId;
   final String productName;
   final String productCategory;
   final int quantity;
@@ -18,8 +20,10 @@ class PurchaseListItem {
 
   const PurchaseListItem({
     required this.id,
+    this.cloudId,
     required this.listDate,
     required this.productId,
+    this.cloudProductId,
     required this.productName,
     required this.productCategory,
     required this.quantity,
@@ -32,6 +36,29 @@ class PurchaseListItem {
     required this.createdAt,
     required this.updatedAt,
   });
+
+  factory PurchaseListItem.fromCloudJson(Map<String, dynamic> json) {
+    final idStr = (json['id'] ?? json['Id'])?.toString() ?? '';
+    final prodIdStr = (json['productId'] ?? json['ProductId'])?.toString() ?? '';
+    return PurchaseListItem(
+      id: int.tryParse(idStr) ?? idStr.hashCode,
+      cloudId: idStr,
+      listDate: (json['listDate'] ?? json['ListDate'])?.toString() ?? '',
+      productId: int.tryParse(prodIdStr) ?? prodIdStr.hashCode,
+      cloudProductId: prodIdStr,
+      productName: (json['productName'] ?? json['ProductName'])?.toString() ?? '',
+      productCategory: (json['category'] ?? json['Category'])?.toString() ?? 'Others',
+      quantity: (json['quantity'] ?? json['Quantity']) as int? ?? 1,
+      unit: (json['unit'] ?? json['Unit'])?.toString() ?? 'Piece',
+      supplier: (json['supplier'] ?? json['Supplier'])?.toString(),
+      priority: (json['priority'] ?? json['Priority'])?.toString() ?? 'Normal',
+      remarks: (json['remarks'] ?? json['Remarks'])?.toString(),
+      purchased: (json['purchased'] ?? json['Purchased']) == true,
+      inventoryUpdated: (json['inventoryUpdated'] ?? json['InventoryUpdated']) == true,
+      createdAt: (json['createdAtUtc'] ?? json['CreatedAtUtc'])?.toString() ?? '',
+      updatedAt: (json['updatedAtUtc'] ?? json['UpdatedAtUtc'])?.toString() ?? '',
+    );
+  }
 }
 
 class PurchaseRepository {

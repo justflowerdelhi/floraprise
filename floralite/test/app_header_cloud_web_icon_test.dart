@@ -6,6 +6,8 @@ import 'package:floraprise/models/storage_mode.dart';
 import 'package:floraprise/providers/storage_mode_provider.dart';
 import 'package:floraprise/services/storage_mode_service.dart';
 import 'package:floraprise/widgets/app_header.dart';
+import 'package:floraprise/widgets/business_identity.dart';
+import 'package:floraprise/widgets/floraprise_brand.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,6 +30,22 @@ void main() {
   });
 
   group('AppHeader - Cloud Globe Indicator & Shop Name', () {
+    testWidgets('does not expose onboarding metadata as business identity subtitle', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: BusinessIdentity(
+              name: 'Sunflower Studios',
+              subtitle: 'Registered from mobile onboarding',
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Sunflower Studios'), findsOneWidget);
+      expect(find.text('Registered from mobile onboarding'), findsNothing);
+    });
+
     testWidgets('In Cloud mode: renders globe visual indicator and displays authenticated company name', (tester) async {
       await tester.runAsync(() async {
         final storageService = StorageModeService();
@@ -78,6 +96,8 @@ void main() {
       // Authenticated company name is displayed
       expect(find.text('Sunflower Studios'), findsOneWidget);
       expect(find.text('My Flower Shop'), findsNothing);
+      expect(find.byType(BusinessIdentity), findsOneWidget);
+      expect(find.byType(FlorapriseBrand), findsNothing);
     });
 
     testWidgets('In Local Storage mode: does NOT render globe indicator', (tester) async {

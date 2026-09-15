@@ -107,6 +107,18 @@ class CloudStaff {
 
   String get roleLabel =>
       appRole == null ? cloudRole : CloudStaffRoles.displayName(appRole!);
+
+  Staff toStaff() {
+    return Staff.fromCloudData(
+      id: id,
+      name: name,
+      phone: phone,
+      email: email,
+      role: appRole,
+      isActive: isActive,
+      createdAt: createdAtUtc,
+    );
+  }
 }
 
 class CloudStaffInput {

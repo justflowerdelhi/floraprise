@@ -1,14 +1,25 @@
 import 'package:flutter/foundation.dart';
 
+import '../data/repositories/cloud_scheduler_repository.dart';
 import '../managers/scheduler_manager.dart';
 import '../models/scheduler_task.dart';
 import '../services/business_data_event_bus.dart';
+import 'storage_mode_provider.dart';
 
 class SchedulerProvider extends ChangeNotifier {
-  SchedulerProvider(this._schedulerManager, [this._businessDataEvents]);
+  SchedulerProvider(
+    this._schedulerManager, [
+    this._businessDataEvents,
+    this._storageModeProvider,
+    this._cloudRepo,
+  ]);
 
   final SchedulerManager _schedulerManager;
   final BusinessDataEventBus? _businessDataEvents;
+  final StorageModeProvider? _storageModeProvider;
+  final CloudSchedulerRepository? _cloudRepo;
+
+  bool get isCloud => _storageModeProvider?.isCloud == true;
 
   DateTime _selectedDate = DateTime.now();
   List<SchedulerTask> _queueTasks = const [];
@@ -35,6 +46,24 @@ class SchedulerProvider extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   String? get error => _error;
 
+  SchedulerTask? _findTask(int taskId) {
+    for (final t in _queueTasks) {
+      if (t.id == taskId) return t;
+    }
+    for (final t in _historyTasks) {
+      if (t.id == taskId) return t;
+    }
+    for (final t in _completedTasks) {
+      if (t.id == taskId) return t;
+    }
+    return null;
+  }
+
+  String? _findCloudId(int taskId) {
+    final t = _findTask(taskId);
+    return t?.cloudId;
+  }
+
   Future<void> loadOperationalQueue({DateTime? date}) async {
     _isLoading = true;
     _error = null;
@@ -44,11 +73,19 @@ class SchedulerProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _queueTasks = await _schedulerManager.getOperationalQueue(
-        selectedDate: _selectedDate,
-        searchQuery: _searchQuery,
-      );
-      _todaySummary = await _schedulerManager.getTodaySummary();
+      if (isCloud && _cloudRepo != null) {
+        _queueTasks = await _cloudRepo!.getOperationalQueue(
+          selectedDate: _selectedDate,
+          searchQuery: _searchQuery,
+        );
+        _todaySummary = await _cloudRepo!.getTodaySummary();
+      } else {
+        _queueTasks = await _schedulerManager.getOperationalQueue(
+          selectedDate: _selectedDate,
+          searchQuery: _searchQuery,
+        );
+        _todaySummary = await _schedulerManager.getTodaySummary();
+      }
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -66,10 +103,14 @@ class SchedulerProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _queueTasks = await _schedulerManager.getTodayScheduledTasks(
-        _selectedDate,
-      );
-      _todaySummary = await _schedulerManager.getTodaySummary();
+      if (isCloud && _cloudRepo != null) {
+        _queueTasks = await _cloudRepo!.getTodayScheduledTasks(_selectedDate);
+        _todaySummary = await _cloudRepo!.getTodaySummary();
+      } else {
+        _queueTasks =
+            await _schedulerManager.getTodayScheduledTasks(_selectedDate);
+        _todaySummary = await _schedulerManager.getTodaySummary();
+      }
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -96,28 +137,54 @@ class SchedulerProvider extends ChangeNotifier {
   }
 
   Future<void> loadHistory({int limit = 100, int offset = 0}) async {
-    _historyTasks =
-        await _schedulerManager.getHistory(limit: limit, offset: offset);
+    if (isCloud && _cloudRepo != null) {
+      _historyTasks = await _cloudRepo!.listTasks(query: _searchQuery);
+    } else {
+      _historyTasks =
+          await _schedulerManager.getHistory(limit: limit, offset: offset);
+    }
     notifyListeners();
   }
 
   Future<void> loadCompleted({DateTime? start, DateTime? end}) async {
-    _completedTasks = await _schedulerManager.getCompleted(
-      start: start,
-      end: end,
-    );
+    if (isCloud && _cloudRepo != null) {
+      _completedTasks = await _cloudRepo!.listTasks(
+        from: start,
+        to: end,
+        status: TaskStatus.completed.name,
+      );
+    } else {
+      _completedTasks = await _schedulerManager.getCompleted(
+        start: start,
+        end: end,
+      );
+    }
     notifyListeners();
   }
 
   Future<void> markTaskInProgress(int taskId) async {
-    await _schedulerManager.markInProgress(taskId);
+    if (isCloud && _cloudRepo != null) {
+      final cloudId = _findCloudId(taskId);
+      if (cloudId != null) {
+        await _cloudRepo!.setStatus(cloudId, TaskStatus.inProgress);
+      }
+    } else {
+      await _schedulerManager.markInProgress(taskId);
+    }
     await loadOperationalQueue();
     _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
   }
 
   Future<void> markTaskCompleted(int taskId) async {
     try {
-      await _schedulerManager.markCompleted(taskId);
+      if (isCloud && _cloudRepo != null) {
+        final cloudId = _findCloudId(taskId);
+        if (cloudId != null) {
+          await _cloudRepo!.setStatus(cloudId, TaskStatus.completed);
+        }
+      } else {
+        await _schedulerManager.markCompleted(taskId);
+      }
     } catch (e) {
       _error = 'Failed to complete task: $e';
       rethrow;
@@ -128,7 +195,14 @@ class SchedulerProvider extends ChangeNotifier {
   }
 
   Future<void> markTaskDeferred(int taskId) async {
-    await _schedulerManager.markDeferred(taskId);
+    if (isCloud && _cloudRepo != null) {
+      final cloudId = _findCloudId(taskId);
+      if (cloudId != null) {
+        await _cloudRepo!.setStatus(cloudId, TaskStatus.deferred);
+      }
+    } else {
+      await _schedulerManager.markDeferred(taskId);
+    }
     await loadOperationalQueue();
     _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
   }
@@ -143,13 +217,32 @@ class SchedulerProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      await _schedulerManager.createManualTask(
-        title: title,
-        scheduledAt: scheduledAt,
-        priority: priority,
-        requiresAlarm: requiresAlarm,
-        notes: notes,
-      );
+      if (isCloud && _cloudRepo != null) {
+        final now = DateTime.now();
+        final task = SchedulerTask(
+          title: title,
+          type: TaskType.personalTask,
+          category: TaskCategory.operational,
+          priority: priority,
+          status: TaskStatus.pending,
+          scheduledAt: scheduledAt,
+          notes: notes,
+          producer: TaskProducer.manual,
+          sourceRef: 'manual_${now.millisecondsSinceEpoch}',
+          requiresAlarm: requiresAlarm,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await _cloudRepo!.publishTask(task);
+      } else {
+        await _schedulerManager.createManualTask(
+          title: title,
+          scheduledAt: scheduledAt,
+          priority: priority,
+          requiresAlarm: requiresAlarm,
+          notes: notes,
+        );
+      }
       await loadOperationalQueue(date: scheduledAt);
       _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
       return true;
@@ -171,14 +264,41 @@ class SchedulerProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      await _schedulerManager.editTask(
-        taskId: taskId,
-        title: title,
-        scheduledAt: scheduledAt,
-        priority: priority,
-        requiresAlarm: requiresAlarm,
-        notes: notes,
-      );
+      if (isCloud && _cloudRepo != null) {
+        final existing = _findTask(taskId);
+        final cloudId = existing?.cloudId ?? taskId.toString();
+        final now = DateTime.now();
+        final updated = (existing ??
+                SchedulerTask(
+                  title: title,
+                  type: TaskType.personalTask,
+                  category: TaskCategory.operational,
+                  priority: priority,
+                  status: TaskStatus.pending,
+                  scheduledAt: scheduledAt,
+                  producer: TaskProducer.manual,
+                  createdAt: now,
+                  updatedAt: now,
+                ))
+            .copyWith(
+          title: title,
+          scheduledAt: scheduledAt,
+          priority: priority,
+          requiresAlarm: requiresAlarm,
+          notes: notes,
+          updatedAt: now,
+        );
+        await _cloudRepo!.updateTask(cloudId, updated);
+      } else {
+        await _schedulerManager.editTask(
+          taskId: taskId,
+          title: title,
+          scheduledAt: scheduledAt,
+          priority: priority,
+          requiresAlarm: requiresAlarm,
+          notes: notes,
+        );
+      }
       await loadOperationalQueue(date: scheduledAt);
       _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
       return true;
@@ -193,7 +313,14 @@ class SchedulerProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      await _schedulerManager.deleteTask(taskId);
+      if (isCloud && _cloudRepo != null) {
+        final cloudId = _findCloudId(taskId);
+        if (cloudId != null) {
+          await _cloudRepo!.deleteTask(cloudId);
+        }
+      } else {
+        await _schedulerManager.deleteTask(taskId);
+      }
       await loadOperationalQueue();
       _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
       return true;
@@ -205,12 +332,20 @@ class SchedulerProvider extends ChangeNotifier {
   }
 
   Future<void> restorePendingSchedules() async {
+    if (isCloud || kIsWeb) return;
     await _schedulerManager.restorePendingSchedules();
     await loadOperationalQueue();
   }
 
   Future<void> snoozeTask(int taskId, Duration duration) async {
-    await _schedulerManager.snoozeTask(taskId, duration);
+    if (isCloud && _cloudRepo != null) {
+      final cloudId = _findCloudId(taskId);
+      if (cloudId != null) {
+        await _cloudRepo!.setStatus(cloudId, TaskStatus.deferred);
+      }
+    } else {
+      await _schedulerManager.snoozeTask(taskId, duration);
+    }
     await loadOperationalQueue();
     _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
   }

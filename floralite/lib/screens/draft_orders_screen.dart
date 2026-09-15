@@ -326,7 +326,7 @@ class _DraftOrderCard extends StatelessWidget {
 
   String _fulfilmentLabel(FulfilmentType type) {
     return switch (type) {
-      FulfilmentType.takeAway => 'Take Away',
+      FulfilmentType.takeAway => 'Walk-in Sale',
       FulfilmentType.pickupLater => 'Pickup Later',
       FulfilmentType.delivery => 'Delivery',
     };

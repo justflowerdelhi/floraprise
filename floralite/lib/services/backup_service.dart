@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -9,6 +10,11 @@ import '../data/database/app_database.dart';
 
 class BackupService {
   Future<String> createManualBackup() async {
+    if (kIsWeb) {
+      throw UnsupportedError(
+        'Backup is not available on Web. Your data is stored in the Cloud.',
+      );
+    }
     await AppDatabase.instance.close();
     final dbPath = p.join(await getDatabasesPath(), 'floraprise.db');
     final source = File(dbPath);
@@ -36,6 +42,11 @@ class BackupService {
   }
 
   Future<bool> restoreManualBackup() async {
+    if (kIsWeb) {
+      throw UnsupportedError(
+        'Restore is not available on Web. Your data is stored in the Cloud.',
+      );
+    }
     const typeGroup = XTypeGroup(
       label: 'Floraprise backup',
       extensions: ['db'],

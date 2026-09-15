@@ -6,6 +6,7 @@ import '../providers/customer_provider.dart';
 import '../services/contact_picker_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/floraprise_page_header.dart';
 import 'customer_profile_screen.dart';
 
 class CustomersScreen extends StatefulWidget {
@@ -52,11 +53,26 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppHeader(title: l10n.customers),
+      appBar: AppHeader(
+        title: FloraprisePageHeader.isDesktop(context) ? null : l10n.customers,
+      ),
       body: SafeArea(
         top: false,
         child: Column(
           children: [
+            FloraprisePageHeader(
+              title: l10n.customers,
+              subtitle: 'Build stronger relationships with your customers',
+              icon: Icons.people_alt_rounded,
+              actions: [
+                FloraprisePageHeaderAction(
+                  label: l10n.addCustomer,
+                  icon: Icons.person_add_rounded,
+                  primary: true,
+                  onPressed: () => _showAddCustomerDialog(context),
+                ),
+              ],
+            ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -376,11 +392,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddCustomerDialog(context),
-        icon: const Icon(Icons.person_add),
-        label: Text(l10n.addCustomer),
-      ),
+      floatingActionButton: FloraprisePageHeader.isDesktop(context)
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _showAddCustomerDialog(context),
+              icon: const Icon(Icons.person_add),
+              label: Text(l10n.addCustomer),
+            ),
     );
   }
 

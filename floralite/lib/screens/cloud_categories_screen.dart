@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../data/repositories/cloud_product_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../providers/cloud_product_provider.dart';
+import '../widgets/app_header.dart';
+import '../widgets/floraprise_page_header.dart';
 
 class CloudCategoriesScreen extends StatefulWidget {
   const CloudCategoriesScreen({super.key});
@@ -228,8 +230,8 @@ class _CloudCategoriesScreenState extends State<CloudCategoriesScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cloud Categories'),
+      appBar: AppHeader(
+        title: isDesktop ? null : 'Categories',
         actions: [
           IconButton(
             onPressed: provider.isLoading ? null : provider.load,
@@ -238,11 +240,30 @@ class _CloudCategoriesScreenState extends State<CloudCategoriesScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _edit(),
-        child: const Icon(Icons.add),
+      floatingActionButton: isDesktop
+          ? null
+          : FloatingActionButton(
+              onPressed: () => _edit(),
+              child: const Icon(Icons.add),
+            ),
+      body: Column(
+        children: [
+          FloraprisePageHeader(
+            title: 'Categories',
+            subtitle: 'Organize your catalogue for faster daily work',
+            icon: Icons.category_rounded,
+            actions: [
+              FloraprisePageHeaderAction(
+                label: 'Add Category',
+                icon: Icons.add_rounded,
+                primary: true,
+                onPressed: () => _edit(),
+              ),
+            ],
+          ),
+          Expanded(child: content),
+        ],
       ),
-      body: content,
     );
   }
 }

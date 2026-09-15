@@ -40,7 +40,7 @@ class _RewardsSettingsScreenState extends State<RewardsSettingsScreen> {
   }
 
   Future<void> _load() async {
-    final settings = await _rewardManager.loadSettings();
+    final settings = await _rewardManager.loadSettings(forceRefresh: true);
     if (!mounted) return;
     setState(() {
       _enabled = settings.enabled;
@@ -70,12 +70,24 @@ class _RewardsSettingsScreenState extends State<RewardsSettingsScreen> {
       expiryDays: int.tryParse(_expiryDaysController.text.trim()) ??
           RewardSettings.defaults.expiryDays,
     );
-    await _rewardManager.saveSettings(settings);
-    if (!mounted) return;
-    setState(() => _saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Rewards settings saved')),
-    );
+
+    try {
+      await _rewardManager.saveSettings(settings);
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Rewards settings saved')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save rewards settings: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
   int _rupeesToPaise(String value) {

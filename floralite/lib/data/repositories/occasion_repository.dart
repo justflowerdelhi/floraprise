@@ -2,7 +2,9 @@ import '../database/app_database.dart';
 
 class OccasionContactRecord {
   final int id;
+  final String? cloudId;
   final int customerId;
+  final String? cloudCustomerId;
   final String customerName;
   final String customerPhone;
   final String recipientName;
@@ -19,7 +21,9 @@ class OccasionContactRecord {
 
   const OccasionContactRecord({
     required this.id,
+    this.cloudId,
     required this.customerId,
+    this.cloudCustomerId,
     required this.customerName,
     required this.customerPhone,
     required this.recipientName,
@@ -34,11 +38,42 @@ class OccasionContactRecord {
     required this.createdAt,
     required this.updatedAt,
   });
+
+  factory OccasionContactRecord.fromCloudJson(Map<String, dynamic> json) {
+    final contact = (json['contact'] ?? json['Contact'] ?? json) as Map<String, dynamic>;
+    final idStr = (contact['id'] ?? contact['Id'])?.toString() ?? '';
+    final custIdStr = (contact['customerId'] ?? contact['CustomerId'])?.toString() ?? '';
+    final custName = (json['customerName'] ?? json['CustomerName'] ?? contact['customerName'] ?? contact['CustomerName'])?.toString() ?? '';
+    final custPhone = (json['customerPhone'] ?? json['CustomerPhone'] ?? contact['customerPhone'] ?? contact['CustomerPhone'])?.toString() ?? '';
+    final dateStr = (contact['occasionDate'] ?? contact['OccasionDate'])?.toString() ?? '';
+    final parsedDate = DateTime.tryParse(dateStr) ?? DateTime.now();
+
+    return OccasionContactRecord(
+      id: int.tryParse(idStr) ?? idStr.hashCode,
+      cloudId: idStr,
+      customerId: int.tryParse(custIdStr) ?? custIdStr.hashCode,
+      cloudCustomerId: custIdStr,
+      customerName: custName,
+      customerPhone: custPhone,
+      recipientName: (contact['recipientName'] ?? contact['RecipientName'])?.toString() ?? '',
+      relationship: (contact['relationship'] ?? contact['Relationship'])?.toString() ?? '',
+      occasion: (contact['occasion'] ?? contact['Occasion'])?.toString() ?? '',
+      occasionDate: parsedDate,
+      recipientPhone: (contact['recipientPhone'] ?? contact['RecipientPhone'])?.toString() ?? '',
+      company: (contact['company'] ?? contact['Company'])?.toString() ?? '',
+      notes: (contact['notes'] ?? contact['Notes'])?.toString() ?? '',
+      reminderEnabled: (contact['reminderEnabled'] ?? contact['ReminderEnabled']) == true,
+      source: (contact['source'] ?? contact['Source'])?.toString() ?? 'Manual',
+      createdAt: (contact['createdAtUtc'] ?? contact['CreatedAtUtc'])?.toString() ?? '',
+      updatedAt: (contact['updatedAtUtc'] ?? contact['UpdatedAtUtc'])?.toString() ?? '',
+    );
+  }
 }
 
 class OccasionFollowUpRecord {
   final String sourceType;
   final int sourceId;
+  final String? cloudSourceId;
   final DateTime date;
   final String title;
   final String subtitle;
@@ -46,6 +81,7 @@ class OccasionFollowUpRecord {
   final String customerPhone;
   final String recipientPhone;
   final int? customerId;
+  final String? cloudCustomerId;
   final int? orderId;
   final bool isCompleted;
   final bool isManual;
@@ -53,6 +89,7 @@ class OccasionFollowUpRecord {
   const OccasionFollowUpRecord({
     required this.sourceType,
     required this.sourceId,
+    this.cloudSourceId,
     required this.date,
     required this.title,
     required this.subtitle,
@@ -60,6 +97,7 @@ class OccasionFollowUpRecord {
     required this.customerPhone,
     this.recipientPhone = '',
     required this.customerId,
+    this.cloudCustomerId,
     required this.orderId,
     required this.isCompleted,
     required this.isManual,

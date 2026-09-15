@@ -9,11 +9,9 @@ import 'package:floraprise/models/dashboard_summary.dart';
 import 'package:floraprise/models/license.dart';
 import 'package:floraprise/models/order_workspace_models.dart';
 import 'package:floraprise/models/storage_mode.dart';
-import 'package:floraprise/models/subscription.dart';
 import 'package:floraprise/providers/app_shell_controller.dart';
 import 'package:floraprise/providers/auth_provider.dart';
 import 'package:floraprise/providers/dashboard_provider.dart';
-import 'package:floraprise/providers/inventory_provider.dart';
 import 'package:floraprise/providers/license_provider.dart';
 import 'package:floraprise/providers/storage_mode_provider.dart';
 import 'package:floraprise/providers/subscription_provider.dart';
@@ -185,9 +183,9 @@ void main() {
   group('Botanical Canvas Decorators', () {
     testWidgets('BotanicalHeroPainter paints gracefully without error', (tester) async {
       await tester.pumpWidget(
-        CustomPaint(
-          size: const Size(800, 200),
-          painter: const BotanicalHeroPainter(),
+        const CustomPaint(
+          size: Size(800, 200),
+          painter: BotanicalHeroPainter(),
         ),
       );
       expect(find.byType(CustomPaint), findsOneWidget);
@@ -195,9 +193,9 @@ void main() {
 
     testWidgets('BotanicalPetalPainter paints gracefully without error', (tester) async {
       await tester.pumpWidget(
-        CustomPaint(
-          size: const Size(200, 200),
-          painter: const BotanicalPetalPainter(),
+        const CustomPaint(
+          size: Size(200, 200),
+          painter: BotanicalPetalPainter(),
         ),
       );
       expect(find.byType(CustomPaint), findsOneWidget);

@@ -1,6 +1,10 @@
+﻿import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../data/database/app_database.dart';
+import '../data/repositories/cloud_rewards_settings_repository.dart';
+import '../services/mobile_auth_service.dart';
+import '../services/storage_mode_service.dart';
 
 class RewardSettings {
   const RewardSettings({
@@ -39,10 +43,62 @@ class RewardManager {
       'rewards.maximum_redemption_percent';
   static const String _expiryDaysKey = 'rewards.expiry_days';
 
-  Future<RewardSettings> loadSettings() async {
+  final StorageModeService _storageModeService;
+  final MobileAuthService _authService;
+  final CloudRewardsSettingsRepository _cloudRepository;
+
+  RewardSettings? _cachedSettings;
+  DateTime? _lastCacheFetchTime;
+  static const Duration _cacheTtl = Duration(minutes: 10);
+
+  RewardManager({
+    StorageModeService? storageModeService,
+    MobileAuthService? authService,
+    CloudRewardsSettingsRepository? cloudRepository,
+  })  : _storageModeService = storageModeService ?? StorageModeService(),
+        _authService = authService ?? MobileAuthService(),
+        _cloudRepository = cloudRepository ?? CloudRewardsSettingsRepository();
+
+  Future<bool> get _isCloud async =>
+      kIsWeb || await _storageModeService.isCloud();
+
+  void invalidateCache() {
+    _cachedSettings = null;
+    _lastCacheFetchTime = null;
+  }
+
+  Future<RewardSettings> loadSettings({bool forceRefresh = false}) async {
+    if (await _isCloud) {
+      final now = DateTime.now();
+      if (!forceRefresh &&
+          _cachedSettings != null &&
+          _lastCacheFetchTime != null &&
+          now.difference(_lastCacheFetchTime!) < _cacheTtl) {
+        return _cachedSettings!;
+      }
+
+      final token = await _authService.getStoredAccessToken();
+      if (token != null && token.trim().isNotEmpty) {
+        try {
+          final fetched = await _cloudRepository.fetchSettings(
+            baseUrl: _authService.baseUrl,
+            accessToken: token,
+          );
+          _cachedSettings = fetched;
+          _lastCacheFetchTime = now;
+          return fetched;
+        } catch (_) {
+          if (_cachedSettings != null) {
+            return _cachedSettings!;
+          }
+        }
+      }
+      return _cachedSettings ?? RewardSettings.defaults;
+    }
+
     final db = await AppDatabase.instance.database;
     const defaults = RewardSettings.defaults;
-    return RewardSettings(
+    final loaded = RewardSettings(
       enabled: (await _readValue(db, _enabledKey)) != '0',
       earnSpendPaisePerPoint: _positiveInt(
         await _readValue(db, _earnSpendPaisePerPointKey),
@@ -56,7 +112,7 @@ class RewardManager {
         await _readValue(db, _pointValuePaiseKey),
         defaults.pointValuePaise,
       ),
-      maximumRedemptionPercent: _boundedPercent(
+      maximumRedemptionPercent: _percent(
         await _readValue(db, _maximumRedemptionPercentKey),
         defaults.maximumRedemptionPercent,
       ),
@@ -65,9 +121,27 @@ class RewardManager {
         defaults.expiryDays,
       ),
     );
+    _cachedSettings = loaded;
+    _lastCacheFetchTime = DateTime.now();
+    return loaded;
   }
 
   Future<void> saveSettings(RewardSettings settings) async {
+    if (await _isCloud) {
+      final token = await _authService.getStoredAccessToken();
+      if (token == null || token.trim().isEmpty) {
+        throw StateError('You must be logged in to save reward settings.');
+      }
+      final persisted = await _cloudRepository.saveSettings(
+        baseUrl: _authService.baseUrl,
+        accessToken: token,
+        settings: settings,
+      );
+      _cachedSettings = persisted;
+      _lastCacheFetchTime = DateTime.now();
+      return;
+    }
+
     final db = await AppDatabase.instance.database;
     await _writeValue(db, _enabledKey, settings.enabled ? '1' : '0');
     await _writeValue(
@@ -91,6 +165,8 @@ class RewardManager {
       settings.maximumRedemptionPercent.toString(),
     );
     await _writeValue(db, _expiryDaysKey, settings.expiryDays.toString());
+    _cachedSettings = settings;
+    _lastCacheFetchTime = DateTime.now();
   }
 
   int calculateEarnedPoints({
@@ -139,7 +215,8 @@ class RewardManager {
       whereArgs: [key],
       limit: 1,
     );
-    return rows.isEmpty ? null : rows.first['value'] as String?;
+    if (rows.isEmpty) return null;
+    return rows.first['value'] as String?;
   }
 
   Future<void> _writeValue(Database db, String key, String value) async {
@@ -154,21 +231,21 @@ class RewardManager {
     );
   }
 
-  int _positiveInt(String? raw, int fallback) {
-    final parsed = int.tryParse(raw ?? '');
-    return parsed == null || parsed <= 0 ? fallback : parsed;
+  int _positiveInt(String? raw, int defaultValue) {
+    final value = int.tryParse(raw ?? '');
+    if (value == null || value <= 0) return defaultValue;
+    return value;
   }
 
-  int _nonNegativeInt(String? raw, int fallback) {
-    final parsed = int.tryParse(raw ?? '');
-    return parsed == null || parsed < 0 ? fallback : parsed;
+  int _nonNegativeInt(String? raw, int defaultValue) {
+    final value = int.tryParse(raw ?? '');
+    if (value == null || value < 0) return defaultValue;
+    return value;
   }
 
-  int _boundedPercent(String? raw, int fallback) {
-    final parsed = int.tryParse(raw ?? '');
-    if (parsed == null) return fallback;
-    if (parsed < 0) return 0;
-    if (parsed > 100) return 100;
-    return parsed;
+  int _percent(String? raw, int defaultValue) {
+    final value = int.tryParse(raw ?? '');
+    if (value == null || value < 0 || value > 100) return defaultValue;
+    return value;
   }
 }

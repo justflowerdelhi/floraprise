@@ -48,6 +48,7 @@ class _ExpireBouquetScreenState extends State<ExpireBouquetScreen> {
     try {
       await _repository.expireBouquet(
         batchId: widget.batch.id,
+        cloudBatchId: widget.batch.cloudId,
         quantity: _quantity,
         reason: _reason,
       );

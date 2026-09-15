@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/share_branding.dart';
@@ -27,12 +29,20 @@ class _ShareBrandingSettingsScreenState
 
   ShareBrandingSettings? _settings;
   bool _isLoading = true;
+  bool _isSaving = false;
   String? _error;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -56,11 +66,39 @@ class _ShareBrandingSettingsScreenState
     }
   }
 
-  Future<void> _save(ShareBrandingSettings updated) async {
+  void _onSettingChanged(ShareBrandingSettings updated, {bool debounce = false}) {
     setState(() {
       _settings = updated;
     });
-    await _service.saveSettings(updated);
+
+    if (debounce) {
+      _debounceTimer?.cancel();
+      _debounceTimer = Timer(const Duration(milliseconds: 600), () {
+        _executeSave(updated);
+      });
+    } else {
+      _debounceTimer?.cancel();
+      _executeSave(updated);
+    }
+  }
+
+  Future<void> _executeSave(ShareBrandingSettings updated) async {
+    if (!mounted) return;
+    setState(() => _isSaving = true);
+    try {
+      await _service.saveSettings(updated);
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save branding settings: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
   @override
@@ -69,7 +107,22 @@ class _ShareBrandingSettingsScreenState
     final settings = _settings;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Share Branding')),
+      appBar: AppBar(
+        title: const Text('Share Branding'),
+        actions: [
+          if (_isSaving)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+        ],
+      ),
       body: SafeArea(
         top: false,
         child: _isLoading
@@ -101,20 +154,20 @@ class _ShareBrandingSettingsScreenState
                               title: 'Show Price',
                               value: settings!.showPrice,
                               onChanged: (value) =>
-                                  _save(settings.copyWith(showPrice: value)),
+                                  _onSettingChanged(settings.copyWith(showPrice: value)),
                             ),
                             const Divider(height: 1),
                             _switchTile(
                               title: 'Show Shop Name',
                               value: settings.showShopName,
                               onChanged: (value) =>
-                                  _save(settings.copyWith(showShopName: value)),
+                                  _onSettingChanged(settings.copyWith(showShopName: value)),
                             ),
                             const Divider(height: 1),
                             _switchTile(
                               title: 'Show Phone Number',
                               value: settings.showPhoneNumber,
-                              onChanged: (value) => _save(
+                              onChanged: (value) => _onSettingChanged(
                                   settings.copyWith(showPhoneNumber: value)),
                             ),
                             const Divider(height: 1),
@@ -122,7 +175,7 @@ class _ShareBrandingSettingsScreenState
                               title: 'Show Website',
                               value: settings.showWebsite,
                               onChanged: (value) =>
-                                  _save(settings.copyWith(showWebsite: value)),
+                                  _onSettingChanged(settings.copyWith(showWebsite: value)),
                             ),
                           ],
                         ),
@@ -151,7 +204,7 @@ class _ShareBrandingSettingsScreenState
                             _switchTile(
                               title: 'Enable Watermark',
                               value: settings.showWatermark,
-                              onChanged: (value) => _save(
+                              onChanged: (value) => _onSettingChanged(
                                   settings.copyWith(showWatermark: value)),
                             ),
                             const Divider(height: 1),
@@ -166,14 +219,14 @@ class _ShareBrandingSettingsScreenState
                                     _switchTile(
                                       title: 'Logo',
                                       value: settings.showLogo,
-                                      onChanged: (value) => _save(
+                                      onChanged: (value) => _onSettingChanged(
                                           settings.copyWith(showLogo: value)),
                                     ),
                                     const Divider(height: 1),
                                     _switchTile(
                                       title: 'Business Name',
                                       value: settings.showWatermarkBusinessName,
-                                      onChanged: (value) => _save(
+                                      onChanged: (value) => _onSettingChanged(
                                         settings.copyWith(
                                           showWatermarkBusinessName: value,
                                         ),
@@ -183,7 +236,7 @@ class _ShareBrandingSettingsScreenState
                                     _switchTile(
                                       title: 'City',
                                       value: settings.showWatermarkCity,
-                                      onChanged: (value) => _save(
+                                      onChanged: (value) => _onSettingChanged(
                                         settings.copyWith(
                                           showWatermarkCity: value,
                                         ),
@@ -212,8 +265,10 @@ class _ShareBrandingSettingsScreenState
                                       divisions: 8,
                                       label:
                                           '${(settings.watermarkOpacity * 100).round()}%',
-                                      onChanged: (value) => _save(settings
-                                          .copyWith(watermarkOpacity: value)),
+                                      onChanged: (value) => _onSettingChanged(
+                                        settings.copyWith(watermarkOpacity: value),
+                                        debounce: true,
+                                      ),
                                     ),
                                     const SizedBox(height: 8),
                                     const Text(
@@ -242,7 +297,7 @@ class _ShareBrandingSettingsScreenState
                                         ],
                                         selected: {settings.watermarkSize},
                                         onSelectionChanged: (selection) =>
-                                            _save(settings.copyWith(
+                                            _onSettingChanged(settings.copyWith(
                                           watermarkSize: selection.first,
                                         )),
                                       ),
@@ -264,7 +319,7 @@ class _ShareBrandingSettingsScreenState
                                           .toList(),
                                       onChanged: (value) {
                                         if (value != null) {
-                                          _save(settings.copyWith(
+                                          _onSettingChanged(settings.copyWith(
                                             watermarkPosition: value,
                                           ));
                                         }
@@ -298,7 +353,7 @@ class _ShareBrandingSettingsScreenState
                                     settings.footerColor.toARGB32() ==
                                         color.toARGB32();
                                 return InkWell(
-                                  onTap: () => _save(
+                                  onTap: () => _onSettingChanged(
                                       settings.copyWith(footerColor: color)),
                                   borderRadius: BorderRadius.circular(999),
                                   child: Container(

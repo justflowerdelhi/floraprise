@@ -403,13 +403,13 @@ abstract class AppLocalizations {
   /// No description provided for @takeAway.
   ///
   /// In en, this message translates to:
-  /// **'Take Away'**
+  /// **'Walk-in Sale'**
   String get takeAway;
 
   /// No description provided for @takeAwayDesc.
   ///
   /// In en, this message translates to:
-  /// **'Customer takes now'**
+  /// **'Customer takes the order now'**
   String get takeAwayDesc;
 
   /// No description provided for @pickupLater.

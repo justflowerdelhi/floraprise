@@ -6,7 +6,10 @@ import '../models/workspace_destinations.dart';
 import '../providers/app_shell_controller.dart';
 import '../providers/dashboard_provider.dart';
 import '../providers/subscription_provider.dart';
+import '../managers/business_settings_manager.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/business_identity.dart';
+import '../widgets/floraprise_brand.dart';
 import 'about_screen.dart';
 import 'associates_screen.dart';
 import 'attendance_home_screen.dart';
@@ -747,7 +750,7 @@ class _GracePeriodBanner extends StatelessWidget {
   }
 }
 
-class _DesktopNavigationSidebar extends StatelessWidget {
+class _DesktopNavigationSidebar extends StatefulWidget {
   const _DesktopNavigationSidebar({
     required this.currentRoute,
     required this.onDestinationSelected,
@@ -755,6 +758,43 @@ class _DesktopNavigationSidebar extends StatelessWidget {
 
   final String currentRoute;
   final ValueChanged<WorkspaceDestination> onDestinationSelected;
+
+  @override
+  State<_DesktopNavigationSidebar> createState() =>
+      _DesktopNavigationSidebarState();
+}
+
+class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
+  final BusinessSettingsManager _businessSettingsManager =
+      BusinessSettingsManager();
+  String _shopName = '';
+  String _businessSubtitle = '';
+  String _logoPath = '';
+
+  @override
+  void initState() {
+    super.initState();
+    BusinessSettingsManager.changeNotifier.addListener(_loadBusinessIdentity);
+    _loadBusinessIdentity();
+  }
+
+  @override
+  void dispose() {
+    BusinessSettingsManager.changeNotifier.removeListener(_loadBusinessIdentity);
+    super.dispose();
+  }
+
+  Future<void> _loadBusinessIdentity() async {
+    try {
+      final settings = await _businessSettingsManager.load();
+      if (!mounted) return;
+      setState(() {
+        _shopName = settings.shopName.trim();
+        _businessSubtitle = settings.subtitle.trim();
+        _logoPath = settings.logoPath.trim();
+      });
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -770,55 +810,39 @@ class _DesktopNavigationSidebar extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const FlorapriseBrand(
+                  iconSize: 24,
+                  wordmarkHeight: 19,
+                ),
+                const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
                   ),
-                  child: Icon(
-                    Icons.local_florist_rounded,
-                    size: 22,
-                    color: colorScheme.primary,
+                  decoration: BoxDecoration(
+                    color: const Color(0x1F2E7D32),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Pro Cloud',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF2E7D32),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'Floraprise',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0x1F2E7D32),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'Pro Cloud',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF2E7D32),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 14),
+                BusinessIdentity(
+                  name: _shopName,
+                  subtitle: _businessSubtitle,
+                  logoPath: _logoPath,
+                  logoSize: 36,
+                  nameFontSize: 13,
                 ),
               ],
             ),
@@ -879,9 +903,9 @@ class _DesktopNavigationSidebar extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final isHome = destination.route == '/dashboard';
     final isSelected = isHome
-        ? currentRoute == '/dashboard'
-        : (currentRoute == destination.route ||
-            currentRoute.startsWith('${destination.route}/'));
+      ? widget.currentRoute == '/dashboard'
+      : (widget.currentRoute == destination.route ||
+        widget.currentRoute.startsWith('${destination.route}/'));
 
     final iconData = (isSelected && destination.selectedIcon != null)
         ? destination.selectedIcon!
@@ -904,7 +928,7 @@ class _DesktopNavigationSidebar extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(8),
-            onTap: () => onDestinationSelected(destination),
+            onTap: () => widget.onDestinationSelected(destination),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               child: Row(

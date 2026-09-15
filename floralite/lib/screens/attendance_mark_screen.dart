@@ -342,6 +342,7 @@ class _AttendanceMarkScreenState extends State<AttendanceMarkScreen> {
 
       final input = AttendanceUpsertInput(
         staffId: staffId,
+        cloudStaffId: _staff?.cloudId ?? _attendance?.cloudStaffId,
         attendanceDate: _selectedDate,
         status: _status,
         clockIn: clockIn,

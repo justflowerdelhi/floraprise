@@ -45,7 +45,7 @@ class DashboardOrdersStream extends StatelessWidget {
       case 'take_away':
       case 'takeaway':
       default:
-        return 'Take Away';
+        return 'Walk-in Sale';
     }
   }
 

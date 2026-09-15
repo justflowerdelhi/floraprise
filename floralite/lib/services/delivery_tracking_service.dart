@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -273,6 +274,7 @@ class DeliveryTrackingService {
   ///
   /// Returns the cloud Delivery UUID if successful, null otherwise.
   Future<String?> resolveOrCreateCloudDeliveryId(int orderId) async {
+    if (kIsWeb) return null;
     debugPrint('[DeliveryService] resolveOrCreateCloudDeliveryId - Local Order ID: $orderId');
 
     final db = await AppDatabase.instance.database;
@@ -467,6 +469,9 @@ class DeliveryTrackingService {
   Future<Map<String, dynamic>> _postSyncAssignmentWithFreshClient(
     Map<String, Object?> body,
   ) async {
+    if (kIsWeb) {
+      return _postSyncAssignmentWeb(body);
+    }
     debugPrint('[DeliveryService] sync-assignment POST starting');
 
     final freshClient = HttpClient();
@@ -542,6 +547,59 @@ class DeliveryTrackingService {
       throw DeliveryTrackingException('Unexpected error: $e');
     } finally {
       freshClient.close();
+    }
+  }
+
+  Future<Map<String, dynamic>> _postSyncAssignmentWeb(
+    Map<String, Object?> body,
+  ) async {
+    final token = await _readAccessToken();
+    if (token == null || token.trim().isEmpty) {
+      throw const DeliveryTrackingException(
+        'Cloud delivery session is not available on this device.',
+      );
+    }
+    final uri = _uri('/api/v1/mobile/delivery/sync-assignment');
+    final client = http.Client();
+    try {
+      final request = http.Request('POST', uri);
+      request.headers['Content-Type'] = 'application/json';
+      request.headers['Accept'] = 'application/json';
+      request.headers['Authorization'] = 'Bearer $token';
+      request.body = jsonEncode(body);
+
+      final streamed = await client.send(request).timeout(const Duration(seconds: 20));
+      final responseBody = await streamed.stream.bytesToString();
+
+      if (streamed.statusCode == 401) {
+        final refreshed = await _auth.refreshAndBootstrap();
+        if (refreshed.accessToken.isNotEmpty) {
+          return _postSyncAssignmentWeb(body);
+        }
+      }
+
+      final decoded = responseBody.trim().isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(responseBody) as Map<String, dynamic>);
+
+      if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+        final serverMsg = _readString(_asMap(decoded['error']), 'message') ??
+            _readString(decoded, 'title') ??
+            _readString(decoded, 'detail') ??
+            responseBody;
+        throw DeliveryTrackingException('HTTP ${streamed.statusCode}: $serverMsg');
+      }
+
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return data.cast<String, dynamic>();
+      return decoded;
+    } on DeliveryTrackingException {
+      rethrow;
+    } on Object catch (e) {
+      throw DeliveryTrackingException('Delivery sync failed: $e');
+    } finally {
+      client.close();
     }
   }
 
@@ -1144,6 +1202,14 @@ class DeliveryTrackingService {
     bool retryOnUnauthorized = false,
     String? bearerToken,
   }) async {
+    if (kIsWeb) {
+      return _sendJsonWeb(
+        'GET',
+        path,
+        retryOnUnauthorized: retryOnUnauthorized,
+        bearerToken: bearerToken,
+      );
+    }
     final token = bearerToken ?? await _readAccessToken();
     final uri = _uri(path);
 
@@ -1250,6 +1316,15 @@ class DeliveryTrackingService {
     bool retryOnUnauthorized = false,
     String? bearerToken,
   }) async {
+    if (kIsWeb) {
+      return _sendJsonWeb(
+        method,
+        path,
+        body: body,
+        retryOnUnauthorized: retryOnUnauthorized,
+        bearerToken: bearerToken,
+      );
+    }
     final token = bearerToken ?? await _readAccessToken();
     if (token == null || token.trim().isEmpty) {
       throw const DeliveryTrackingException(
@@ -1311,6 +1386,9 @@ class DeliveryTrackingService {
 
   Future<Map<String, dynamic>> _getPublicJsonFromLink(
       String trackingLink) async {
+    if (kIsWeb) {
+      return _getPublicJsonFromLinkWeb(trackingLink);
+    }
     try {
       final uri = _publicTrackingPayloadUri(trackingLink);
       final request = await _httpClient.openUrl('GET', uri).timeout(
@@ -1346,6 +1424,120 @@ class DeliveryTrackingService {
       return decoded;
     } on SocketException {
       throw DeliveryTrackingException(_connectionFailureMessage());
+    }
+  }
+
+  Future<Map<String, dynamic>> _sendJsonWeb(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+    bool retryOnUnauthorized = false,
+    String? bearerToken,
+  }) async {
+    final token = bearerToken ?? await _readAccessToken();
+    if (token == null || token.trim().isEmpty) {
+      throw const DeliveryTrackingException(
+        'Cloud delivery session is not available on this device. Register the shop/device or use account recovery when cloud services are needed.',
+      );
+    }
+    final uri = _uri(path);
+    final client = http.Client();
+    try {
+      final request = http.Request(method, uri);
+      request.headers['Accept'] = 'application/json';
+      request.headers['Authorization'] = 'Bearer $token';
+      if (body != null) {
+        request.headers['Content-Type'] = 'application/json';
+        request.body = jsonEncode(body);
+      }
+      final streamed = await client.send(request).timeout(const Duration(seconds: 20));
+      final responseBody = await streamed.stream.bytesToString();
+
+      if (streamed.statusCode == 401 && retryOnUnauthorized) {
+        final refreshed = await _auth.refreshAndBootstrap();
+        if (refreshed.accessToken.isNotEmpty) {
+          return _sendJsonWeb(
+            method,
+            path,
+            body: body,
+            retryOnUnauthorized: false,
+            bearerToken: refreshed.accessToken,
+          );
+        }
+      }
+
+      final decoded = responseBody.trim().isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(responseBody) as Map<String, dynamic>);
+
+      if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              _readString(decoded, 'title') ??
+              _readString(decoded, 'detail') ??
+              'HTTP ${streamed.statusCode}',
+        );
+      }
+
+      final success = decoded['success'];
+      if (success is bool && !success) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              'Failed to load delivery data.',
+        );
+      }
+
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return data.cast<String, dynamic>();
+      return decoded;
+    } on DeliveryTrackingException {
+      rethrow;
+    } on Object catch (e) {
+      throw DeliveryTrackingException('Unexpected error: $e');
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<Map<String, dynamic>> _getPublicJsonFromLinkWeb(
+      String trackingLink) async {
+    final uri = _publicTrackingPayloadUri(trackingLink);
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', uri);
+      request.headers['Accept'] = 'application/json';
+      final streamed = await client.send(request).timeout(const Duration(seconds: 20));
+      final body = await streamed.stream.bytesToString();
+      final decoded = body.trim().isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(body) as Map<String, dynamic>);
+
+      if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              'Failed to load public tracking.',
+        );
+      }
+
+      final success = decoded['success'];
+      if (success is bool && !success) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              'Failed to load public tracking.',
+        );
+      }
+
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return data.cast<String, dynamic>();
+      return decoded;
+    } on DeliveryTrackingException {
+      rethrow;
+    } on Object {
+      throw DeliveryTrackingException(_connectionFailureMessage());
+    } finally {
+      client.close();
     }
   }
 

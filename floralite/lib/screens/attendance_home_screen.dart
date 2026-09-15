@@ -6,7 +6,9 @@ import '../data/repositories/attendance_repository.dart';
 import '../data/repositories/staff_repository.dart';
 import '../models/attendance.dart';
 import '../providers/attendance_provider.dart';
+import '../providers/cloud_staff_provider.dart';
 import '../providers/staff_provider.dart';
+import '../providers/storage_mode_provider.dart';
 import '../services/speech_recognition_service.dart';
 import '../widgets/voice_dictation_field_header.dart';
 
@@ -22,15 +24,22 @@ class _AttendanceHomeScreenState extends State<AttendanceHomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<StaffProvider>().loadStaff();
+      final isCloud = context.read<StorageModeProvider>().isCloud;
+      if (isCloud) {
+        context.read<CloudStaffProvider>().loadStaff();
+      } else {
+        context.read<StaffProvider>().loadStaff();
+      }
       context.read<AttendanceProvider>().loadAttendanceForDate(DateTime.now());
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final isCloud = context.watch<StorageModeProvider>().isCloud;
     final provider = context.watch<AttendanceProvider>();
     final staffProvider = context.watch<StaffProvider>();
+    final cloudStaffProvider = context.watch<CloudStaffProvider>();
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return Scaffold(
@@ -55,7 +64,13 @@ class _AttendanceHomeScreenState extends State<AttendanceHomeScreen> {
               const SizedBox(),
             const SizedBox(height: 8),
             Expanded(
-              child: _buildBody(provider, staffProvider, bottomInset),
+              child: _buildBody(
+                provider,
+                staffProvider,
+                cloudStaffProvider,
+                isCloud,
+                bottomInset,
+              ),
             ),
           ],
         ),
@@ -118,9 +133,13 @@ class _AttendanceHomeScreenState extends State<AttendanceHomeScreen> {
   Widget _buildBody(
     AttendanceProvider provider,
     StaffProvider staffProvider,
+    CloudStaffProvider cloudStaffProvider,
+    bool isCloud,
     double bottomInset,
   ) {
-    if (provider.isLoading || staffProvider.isLoading) {
+    final isStaffLoading =
+        isCloud ? cloudStaffProvider.isLoading : staffProvider.isLoading;
+    if (provider.isLoading || isStaffLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -135,7 +154,11 @@ class _AttendanceHomeScreenState extends State<AttendanceHomeScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                context.read<StaffProvider>().loadStaff();
+                if (isCloud) {
+                  context.read<CloudStaffProvider>().loadStaff();
+                } else {
+                  context.read<StaffProvider>().loadStaff();
+                }
                 provider.loadAttendanceForDate(provider.selectedDate);
               },
               child: const Text('Retry'),
@@ -145,7 +168,15 @@ class _AttendanceHomeScreenState extends State<AttendanceHomeScreen> {
       );
     }
 
-    final activeStaff = staffProvider.staff.where((s) => s.active).toList();
+    final List<Staff> activeStaff;
+    if (isCloud) {
+      activeStaff = cloudStaffProvider.staff
+          .where((s) => s.isActive)
+          .map((s) => s.toStaff())
+          .toList();
+    } else {
+      activeStaff = staffProvider.staff.where((s) => s.active).toList();
+    }
 
     if (activeStaff.isEmpty) {
       return Center(
@@ -173,10 +204,15 @@ class _AttendanceHomeScreenState extends State<AttendanceHomeScreen> {
       itemBuilder: (context, index) {
         final staff = activeStaff[index];
         final attendance = provider.attendanceList.firstWhere(
-          (a) => a.staffId == staff.id,
+          (a) =>
+              a.staffId == staff.id ||
+              (staff.cloudId != null && a.cloudStaffId == staff.cloudId),
           orElse: () => Attendance(
             id: 0,
             staffId: staff.id,
+            cloudStaffId: staff.cloudId,
+            staffName: staff.name,
+            staffRole: staff.role.displayName,
             attendanceDate: provider.selectedDate,
             status: AttendanceStatus.notMarked,
             createdAt: DateTime.now(),
@@ -679,6 +715,7 @@ class _AttendanceBottomSheetState extends State<AttendanceBottomSheet> {
 
       final input = AttendanceUpsertInput(
         staffId: widget.staff.id,
+        cloudStaffId: widget.staff.cloudId,
         attendanceDate: _selectedDate,
         status: _status,
         clockIn: clockIn,

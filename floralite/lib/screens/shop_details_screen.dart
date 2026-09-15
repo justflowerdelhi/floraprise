@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -396,9 +397,8 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
 
     final colorScheme = Theme.of(context).colorScheme;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
-    final hasLogo = _logoPath.trim().isNotEmpty;
-    final logoFile = hasLogo ? File(_logoPath) : null;
-    final logoExists = logoFile != null && logoFile.existsSync();
+    final hasLogo = _logoPath.trim().isNotEmpty && !kIsWeb;
+    final logoExists = hasLogo && File(_logoPath).existsSync();
 
     return Scaffold(
       appBar: AppBar(
@@ -493,7 +493,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                                 CircleAvatar(
                                   radius: 60,
                                   backgroundColor: Colors.grey.shade100,
-                                  backgroundImage: logoExists ? FileImage(logoFile) : null,
+                                  backgroundImage: logoExists ? FileImage(File(_logoPath)) : null,
                                   child: logoExists
                                       ? null
                                       : Column(

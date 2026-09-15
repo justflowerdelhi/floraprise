@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../database/app_database.dart';
 
 class ProductCategoryRecord {
@@ -22,6 +24,7 @@ class CategoryRepository {
   Future<List<ProductCategoryRecord>> listCategories({
     bool includeInactive = true,
   }) async {
+    if (kIsWeb) return const [];
     final db = await AppDatabase.instance.database;
     final where = <String>['deleted_at IS NULL'];
     final args = <Object?>[];
@@ -44,6 +47,7 @@ class CategoryRepository {
     required String name,
     required String defaultUnit,
   }) async {
+    if (kIsWeb) return null;
     final db = await AppDatabase.instance.database;
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
@@ -69,6 +73,7 @@ class CategoryRepository {
     required String name,
     required String defaultUnit,
   }) async {
+    if (kIsWeb) return null;
     final db = await AppDatabase.instance.database;
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
@@ -94,6 +99,7 @@ class CategoryRepository {
     required int id,
     required bool isActive,
   }) async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     await db.update(
       'product_categories',
@@ -107,6 +113,7 @@ class CategoryRepository {
   }
 
   Future<bool> isCategoryUsed(String categoryName) async {
+    if (kIsWeb) return false;
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery(
       '''
@@ -123,6 +130,7 @@ class CategoryRepository {
   }
 
   Future<bool> deleteCategoryIfUnused(int id) async {
+    if (kIsWeb) return false;
     final db = await AppDatabase.instance.database;
     final category = await getCategoryById(id);
     if (category == null) {
@@ -148,6 +156,7 @@ class CategoryRepository {
   }
 
   Future<ProductCategoryRecord?> getCategoryById(int id) async {
+    if (kIsWeb) return null;
     final db = await AppDatabase.instance.database;
     final rows = await db.query(
       'product_categories',

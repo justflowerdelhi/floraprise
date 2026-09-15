@@ -2,10 +2,12 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/repositories/occasion_repository.dart';
@@ -494,10 +496,23 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
   Future<void> _downloadSampleTemplate() async {
     try {
+      final csv = OccasionImportManager.buildSampleTemplateCsv();
+      if (kIsWeb) {
+        final uri = Uri.dataFromString(
+          csv,
+          mimeType: 'text/csv',
+          encoding: utf8,
+        );
+        await launchUrl(uri);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Template downloaded.')),
+        );
+        return;
+      }
       final dir = await getApplicationDocumentsDirectory();
       final path = p.join(dir.path, 'floraprise_occasions_template.csv');
-      await File(path)
-          .writeAsString(OccasionImportManager.buildSampleTemplateCsv());
+      await File(path).writeAsString(csv);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Template saved: $path')),
@@ -1216,6 +1231,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
     );
   }
 
+  static const String _customRelPrefKey = 'floraprise_custom_relationships';
+
   Future<File> _customRelationshipsFile() async {
     final dir = await getApplicationDocumentsDirectory();
     return File(p.join(dir.path, 'floraprise_custom_relationships.json'));
@@ -1223,6 +1240,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
   Future<void> _loadCustomRelationships() async {
     try {
+      if (kIsWeb) {
+        final prefs = await SharedPreferences.getInstance();
+        final values = prefs.getStringList(_customRelPrefKey);
+        if (values != null && mounted) {
+          _customRelationships.value = values;
+        }
+        return;
+      }
       final file = await _customRelationshipsFile();
       if (!await file.exists()) return;
       final decoded = jsonDecode(await file.readAsString());
@@ -1240,8 +1265,17 @@ class _RemindersScreenState extends State<RemindersScreen> {
   }
 
   Future<void> _saveCustomRelationships(List<String> relationships) async {
-    final file = await _customRelationshipsFile();
-    await file.writeAsString(jsonEncode(relationships));
+    try {
+      if (kIsWeb) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList(_customRelPrefKey, relationships);
+        return;
+      }
+      final file = await _customRelationshipsFile();
+      await file.writeAsString(jsonEncode(relationships));
+    } catch (_) {
+      // Ignore local preference write errors
+    }
   }
 
   Future<void> _showAddReminderDialog() async {

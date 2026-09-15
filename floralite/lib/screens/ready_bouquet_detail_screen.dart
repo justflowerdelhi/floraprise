@@ -7,9 +7,14 @@ import 'expire_bouquet_screen.dart';
 import 'refresh_bouquet_screen.dart';
 
 class ReadyBouquetDetailScreen extends StatefulWidget {
-  const ReadyBouquetDetailScreen({super.key, required this.productId});
+  const ReadyBouquetDetailScreen({
+    super.key,
+    required this.productId,
+    this.cloudProductId,
+  });
 
   final int productId;
+  final String? cloudProductId;
 
   @override
   State<ReadyBouquetDetailScreen> createState() =>
@@ -34,7 +39,10 @@ class _ReadyBouquetDetailScreenState extends State<ReadyBouquetDetailScreen> {
       _error = null;
     });
     try {
-      final batches = await _repository.listBatchesForProduct(widget.productId);
+      final batches = await _repository.listBatchesForProduct(
+        widget.productId,
+        cloudProductId: widget.cloudProductId,
+      );
       if (!mounted) return;
       setState(() {
         _batches = batches;

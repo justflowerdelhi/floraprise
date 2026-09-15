@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../data/repositories/associate_repository.dart';
+import '../data/repositories/cloud_associate_repository.dart';
 import '../managers/associate_manager.dart';
 import '../services/business_data_event_bus.dart';
+import 'storage_mode_provider.dart';
 
 enum AssociateSort {
   businessNameAsc,
@@ -10,10 +12,19 @@ enum AssociateSort {
 }
 
 class AssociateProvider extends ChangeNotifier {
-  AssociateProvider(this._associateManager, [this._businessDataEvents]);
+  AssociateProvider(
+    this._associateManager, [
+    this._businessDataEvents,
+    this._storageModeProvider,
+    this._cloudRepo,
+  ]);
 
   final AssociateManager _associateManager;
   final BusinessDataEventBus? _businessDataEvents;
+  final StorageModeProvider? _storageModeProvider;
+  final CloudAssociateRepository? _cloudRepo;
+
+  bool get isCloud => _storageModeProvider?.isCloud == true;
 
   List<AssociateRecord> _associates = [];
   bool _isLoading = false;
@@ -32,6 +43,18 @@ class AssociateProvider extends ChangeNotifier {
   bool get showActive => _showActive;
   bool get showInactive => _showInactive;
   AssociateSort get sort => _sort;
+
+  AssociateRecord? _findAssociate(int id) {
+    for (final a in _associates) {
+      if (a.id == id) return a;
+    }
+    return null;
+  }
+
+  String? _findCloudId(int id) {
+    final a = _findAssociate(id);
+    return a?.cloudId;
+  }
 
   List<AssociateRecord> get _filteredAssociates {
     var filtered = _associates;
@@ -87,7 +110,11 @@ class AssociateProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _associates = await _associateManager.getAllAssociates();
+      if (isCloud && _cloudRepo != null) {
+        _associates = await _cloudRepo!.getAll(includeDeleted: false);
+      } else {
+        _associates = await _associateManager.getAllAssociates();
+      }
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -127,7 +154,11 @@ class AssociateProvider extends ChangeNotifier {
 
   Future<void> createAssociate(AssociateUpsertInput input) async {
     try {
-      await _associateManager.createAssociate(input);
+      if (isCloud && _cloudRepo != null) {
+        await _cloudRepo!.create(input);
+      } else {
+        await _associateManager.createAssociate(input);
+      }
       await loadAssociates();
       _businessDataEvents?.publish(source: BusinessDataChangeSource.supplier);
     } catch (e) {
@@ -137,7 +168,12 @@ class AssociateProvider extends ChangeNotifier {
 
   Future<void> updateAssociate(int id, AssociateUpsertInput input) async {
     try {
-      await _associateManager.updateAssociate(id, input);
+      if (isCloud && _cloudRepo != null) {
+        final cloudId = _findCloudId(id) ?? id.toString();
+        await _cloudRepo!.update(cloudId, input);
+      } else {
+        await _associateManager.updateAssociate(id, input);
+      }
       await loadAssociates();
       _businessDataEvents?.publish(source: BusinessDataChangeSource.supplier);
     } catch (e) {
@@ -147,7 +183,12 @@ class AssociateProvider extends ChangeNotifier {
 
   Future<void> deactivateAssociate(int id) async {
     try {
-      await _associateManager.deactivateAssociate(id);
+      if (isCloud && _cloudRepo != null) {
+        final cloudId = _findCloudId(id) ?? id.toString();
+        await _cloudRepo!.deactivate(cloudId);
+      } else {
+        await _associateManager.deactivateAssociate(id);
+      }
       await loadAssociates();
       _businessDataEvents?.publish(source: BusinessDataChangeSource.supplier);
     } catch (e) {
@@ -157,7 +198,12 @@ class AssociateProvider extends ChangeNotifier {
 
   Future<void> reactivateAssociate(int id) async {
     try {
-      await _associateManager.reactivateAssociate(id);
+      if (isCloud && _cloudRepo != null) {
+        final cloudId = _findCloudId(id) ?? id.toString();
+        await _cloudRepo!.reactivate(cloudId);
+      } else {
+        await _associateManager.reactivateAssociate(id);
+      }
       await loadAssociates();
       _businessDataEvents?.publish(source: BusinessDataChangeSource.supplier);
     } catch (e) {
@@ -167,7 +213,12 @@ class AssociateProvider extends ChangeNotifier {
 
   Future<void> deleteAssociate(int id) async {
     try {
-      await _associateManager.deleteAssociate(id);
+      if (isCloud && _cloudRepo != null) {
+        final cloudId = _findCloudId(id) ?? id.toString();
+        await _cloudRepo!.delete(cloudId);
+      } else {
+        await _associateManager.deleteAssociate(id);
+      }
       await loadAssociates();
       _businessDataEvents?.publish(source: BusinessDataChangeSource.supplier);
     } catch (e) {
@@ -176,6 +227,9 @@ class AssociateProvider extends ChangeNotifier {
   }
 
   Future<int> getActiveCount() async {
+    if (isCloud && _cloudRepo != null) {
+      return _cloudRepo!.getActiveCount();
+    }
     return _associateManager.getActiveAssociateCount();
   }
 }

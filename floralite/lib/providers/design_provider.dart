@@ -1,12 +1,20 @@
 import 'package:flutter/foundation.dart';
 
+import '../data/repositories/cloud_design_repository.dart';
 import '../data/repositories/design_repository.dart';
 import '../models/design.dart';
+import 'storage_mode_provider.dart';
 
 class DesignProvider extends ChangeNotifier {
-  DesignProvider(this._designRepository);
+  DesignProvider(
+    this._designRepository, [
+    this._storageModeProvider,
+    this._cloudDesignRepository,
+  ]);
 
   final DesignRepository _designRepository;
+  final StorageModeProvider? _storageModeProvider;
+  final CloudDesignRepository? _cloudDesignRepository;
 
   List<DesignRecord> _designs = const [];
   bool _isLoading = false;
@@ -31,6 +39,7 @@ class DesignProvider extends ChangeNotifier {
   bool? get favouriteFilter => _favouriteFilter;
   int? get minPricePaise => _minPricePaise;
   int? get maxPricePaise => _maxPricePaise;
+  bool get isCloud => _storageModeProvider?.isCloud ?? false;
 
   Future<void> loadDesigns() async {
     _isLoading = true;
@@ -38,16 +47,29 @@ class DesignProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _designs = await _designRepository.listDesigns(
-        query: _searchQuery,
-        flower: _flowerFilter,
-        occasion: _occasionFilter,
-        color: _colorFilter,
-        status: _statusFilter,
-        favourite: _favouriteFilter,
-        minPricePaise: _minPricePaise,
-        maxPricePaise: _maxPricePaise,
-      );
+      if (isCloud && _cloudDesignRepository != null) {
+        _designs = await _cloudDesignRepository!.listDesigns(
+          query: _searchQuery,
+          flower: _flowerFilter,
+          occasion: _occasionFilter,
+          color: _colorFilter,
+          status: _statusFilter,
+          favourite: _favouriteFilter,
+          minPricePaise: _minPricePaise,
+          maxPricePaise: _maxPricePaise,
+        );
+      } else {
+        _designs = await _designRepository.listDesigns(
+          query: _searchQuery,
+          flower: _flowerFilter,
+          occasion: _occasionFilter,
+          color: _colorFilter,
+          status: _statusFilter,
+          favourite: _favouriteFilter,
+          minPricePaise: _minPricePaise,
+          maxPricePaise: _maxPricePaise,
+        );
+      }
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -109,16 +131,29 @@ class DesignProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _designRepository.create(
-        imagePath: imagePath,
-        description: description,
-        sellingPricePaise: sellingPricePaise,
-        flowers: flowers,
-        occasion: occasion,
-        color: color,
-        collection: collection,
-        notes: notes,
-      );
+      if (isCloud && _cloudDesignRepository != null) {
+        await _cloudDesignRepository!.create(
+          imagePath: imagePath,
+          description: description,
+          sellingPricePaise: sellingPricePaise,
+          flowers: flowers,
+          occasion: occasion,
+          color: color,
+          collection: collection,
+          notes: notes,
+        );
+      } else {
+        await _designRepository.create(
+          imagePath: imagePath,
+          description: description,
+          sellingPricePaise: sellingPricePaise,
+          flowers: flowers,
+          occasion: occasion,
+          color: color,
+          collection: collection,
+          notes: notes,
+        );
+      }
       await loadDesigns();
       return true;
     } catch (e) {
@@ -144,18 +179,39 @@ class DesignProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _designRepository.update(
-        id: id,
-        description: description,
-        sellingPricePaise: sellingPricePaise,
-        flowers: flowers,
-        occasion: occasion,
-        color: color,
-        collection: collection,
-        notes: notes,
-        replaceImagePath: replaceImagePath,
-        removeImage: removeImage,
-      );
+      if (isCloud && _cloudDesignRepository != null) {
+        final existing = _designs.cast<DesignRecord?>().firstWhere(
+              (d) => d?.id == id,
+              orElse: () => null,
+            );
+        if (existing?.cloudId != null) {
+          await _cloudDesignRepository!.update(
+            existing!.cloudId!,
+            imagePath: removeImage ? null : (replaceImagePath ?? existing.imagePath),
+            description: description,
+            sellingPricePaise: sellingPricePaise,
+            flowers: flowers,
+            occasion: occasion,
+            color: color,
+            collection: collection,
+            notes: notes,
+            isFavorite: existing.isFavorite,
+          );
+        }
+      } else {
+        await _designRepository.update(
+          id: id,
+          description: description,
+          sellingPricePaise: sellingPricePaise,
+          flowers: flowers,
+          occasion: occasion,
+          color: color,
+          collection: collection,
+          notes: notes,
+          replaceImagePath: replaceImagePath,
+          removeImage: removeImage,
+        );
+      }
       await loadDesigns();
       return true;
     } catch (e) {
@@ -170,7 +226,17 @@ class DesignProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _designRepository.softDelete(id);
+      if (isCloud && _cloudDesignRepository != null) {
+        final existing = _designs.cast<DesignRecord?>().firstWhere(
+              (d) => d?.id == id,
+              orElse: () => null,
+            );
+        if (existing?.cloudId != null) {
+          await _cloudDesignRepository!.delete(existing!.cloudId!);
+        }
+      } else {
+        await _designRepository.softDelete(id);
+      }
       await loadDesigns();
       return true;
     } catch (e) {
@@ -185,7 +251,11 @@ class DesignProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _designRepository.setFavourite(design.id, !design.isFavorite);
+      if (isCloud && _cloudDesignRepository != null && design.cloudId != null) {
+        await _cloudDesignRepository!.setFavorite(design.cloudId!, !design.isFavorite);
+      } else {
+        await _designRepository.setFavourite(design.id, !design.isFavorite);
+      }
       await loadDesigns();
     } catch (e) {
       _error = e.toString();
@@ -206,15 +276,30 @@ class DesignProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _designRepository.bulkCreate(
-        imagePaths: imagePaths,
-        sellingPricePaise: sellingPricePaise,
-        flowers: flowers,
-        occasion: occasion,
-        color: color,
-        collection: collection,
-        notes: notes,
-      );
+      if (isCloud && _cloudDesignRepository != null) {
+        for (final path in imagePaths) {
+          await _cloudDesignRepository!.create(
+            imagePath: path,
+            description: 'Imported design',
+            sellingPricePaise: sellingPricePaise,
+            flowers: flowers,
+            occasion: occasion,
+            color: color,
+            collection: collection,
+            notes: notes,
+          );
+        }
+      } else {
+        await _designRepository.bulkCreate(
+          imagePaths: imagePaths,
+          sellingPricePaise: sellingPricePaise,
+          flowers: flowers,
+          occasion: occasion,
+          color: color,
+          collection: collection,
+          notes: notes,
+        );
+      }
       await loadDesigns();
       return true;
     } catch (e) {

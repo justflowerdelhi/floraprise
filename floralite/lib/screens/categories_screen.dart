@@ -6,7 +6,9 @@ import '../data/repositories/product_repository.dart';
 import '../providers/category_provider.dart';
 import '../providers/storage_mode_provider.dart';
 import 'cloud_categories_screen.dart';
+import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/floraprise_page_header.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -102,8 +104,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     final provider = context.watch<CategoryProvider>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Categories'),
+      appBar: AppHeader(
+        title: FloraprisePageHeader.isDesktop(context) ? null : 'Categories',
         actions: [
           IconButton(
             tooltip: 'Refresh',
@@ -114,13 +116,32 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: _buildBody(provider, bottomInset),
+        child: Column(
+          children: [
+            FloraprisePageHeader(
+              title: 'Categories',
+              subtitle: 'Organize your catalogue for faster daily work',
+              icon: Icons.category_rounded,
+              actions: [
+                FloraprisePageHeaderAction(
+                  label: 'Add Category',
+                  icon: Icons.add_rounded,
+                  primary: true,
+                  onPressed: () => _showCategoryEditor(),
+                ),
+              ],
+            ),
+            Expanded(child: _buildBody(provider, bottomInset)),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCategoryEditor(),
-        icon: const Icon(Icons.add),
-        label: const Text('Add Category'),
-      ),
+      floatingActionButton: FloraprisePageHeader.isDesktop(context)
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _showCategoryEditor(),
+              icon: const Icon(Icons.add),
+              label: const Text('Add Category'),
+            ),
     );
   }
 

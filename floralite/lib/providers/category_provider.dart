@@ -33,7 +33,7 @@ class CategoryProvider extends ChangeNotifier {
   }
 
   Future<void> loadCategories({bool includeInactive = true}) async {
-    if (_disposed) return;
+    if (_disposed || kIsWeb) return;
     _isLoading = true;
     _error = null;
     _notifyIfActive();

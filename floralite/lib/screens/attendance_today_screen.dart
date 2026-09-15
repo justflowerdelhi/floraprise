@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../data/repositories/staff_repository.dart';
 import '../models/attendance.dart';
 import '../providers/attendance_provider.dart';
+import '../providers/cloud_staff_provider.dart';
 import '../providers/staff_provider.dart';
+import '../providers/storage_mode_provider.dart';
 
 class AttendanceTodayScreen extends StatefulWidget {
   const AttendanceTodayScreen({super.key});
@@ -26,15 +28,22 @@ class _AttendanceTodayScreenState extends State<AttendanceTodayScreen> {
           _filterStatus = args['filterStatus'] as AttendanceStatus;
         });
       }
-      context.read<StaffProvider>().loadStaff();
+      final isCloud = context.read<StorageModeProvider>().isCloud;
+      if (isCloud) {
+        context.read<CloudStaffProvider>().loadStaff();
+      } else {
+        context.read<StaffProvider>().loadStaff();
+      }
       context.read<AttendanceProvider>().loadAttendanceForDate(DateTime.now());
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final isCloud = context.watch<StorageModeProvider>().isCloud;
     final attendanceProvider = context.watch<AttendanceProvider>();
     final staffProvider = context.watch<StaffProvider>();
+    final cloudStaffProvider = context.watch<CloudStaffProvider>();
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return Scaffold(
@@ -80,7 +89,13 @@ class _AttendanceTodayScreenState extends State<AttendanceTodayScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: _buildBody(attendanceProvider, staffProvider, bottomInset),
+        child: _buildBody(
+          attendanceProvider,
+          staffProvider,
+          cloudStaffProvider,
+          isCloud,
+          bottomInset,
+        ),
       ),
     );
   }
@@ -88,13 +103,25 @@ class _AttendanceTodayScreenState extends State<AttendanceTodayScreen> {
   Widget _buildBody(
     AttendanceProvider attendanceProvider,
     StaffProvider staffProvider,
+    CloudStaffProvider cloudStaffProvider,
+    bool isCloud,
     double bottomInset,
   ) {
-    if (staffProvider.isLoading || attendanceProvider.isLoading) {
+    final isStaffLoading =
+        isCloud ? cloudStaffProvider.isLoading : staffProvider.isLoading;
+    if (isStaffLoading || attendanceProvider.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final activeStaff = staffProvider.staff.where((s) => s.active).toList();
+    final List<Staff> activeStaff;
+    if (isCloud) {
+      activeStaff = cloudStaffProvider.staff
+          .where((s) => s.isActive)
+          .map((s) => s.toStaff())
+          .toList();
+    } else {
+      activeStaff = staffProvider.staff.where((s) => s.active).toList();
+    }
     final filteredStaff = _filterStaff(activeStaff, attendanceProvider);
 
     if (filteredStaff.isEmpty) {
@@ -125,10 +152,15 @@ class _AttendanceTodayScreenState extends State<AttendanceTodayScreen> {
       itemBuilder: (context, index) {
         final staff = filteredStaff[index];
         final attendance = attendanceProvider.attendanceList.firstWhere(
-          (a) => a.staffId == staff.id,
+          (a) =>
+              a.staffId == staff.id ||
+              (staff.cloudId != null && a.cloudStaffId == staff.cloudId),
           orElse: () => Attendance(
             id: 0,
             staffId: staff.id,
+            cloudStaffId: staff.cloudId,
+            staffName: staff.name,
+            staffRole: staff.role.displayName,
             attendanceDate: attendanceProvider.selectedDate,
             status: AttendanceStatus.notMarked,
             createdAt: DateTime.now(),
@@ -145,10 +177,13 @@ class _AttendanceTodayScreenState extends State<AttendanceTodayScreen> {
 
     return staff.where((s) {
       final attendance = provider.attendanceList.firstWhere(
-        (a) => a.staffId == s.id,
+        (a) =>
+            a.staffId == s.id ||
+            (s.cloudId != null && a.cloudStaffId == s.cloudId),
         orElse: () => Attendance(
           id: 0,
           staffId: s.id,
+          cloudStaffId: s.cloudId,
           attendanceDate: provider.selectedDate,
           status: AttendanceStatus.notMarked,
           createdAt: DateTime.now(),

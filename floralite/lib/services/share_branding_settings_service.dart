@@ -1,11 +1,15 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../data/database/app_database.dart';
 import '../data/repositories/business_profile_repository.dart';
+import '../data/repositories/cloud_share_branding_settings_repository.dart';
 import '../managers/business_settings_manager.dart';
 import '../models/share_branding.dart';
+import 'mobile_auth_service.dart';
+import 'storage_mode_service.dart';
 
 class ShareBrandingSettingsService {
   static const String _showPriceKey = 'share_branding.show_price';
@@ -28,20 +32,69 @@ class ShareBrandingSettingsService {
   static const String _businessInstagramKey = 'business.instagram';
   static const String _businessFacebookKey = 'business.facebook';
 
+  static const ShareBrandingSettings _defaultSettings = ShareBrandingSettings(
+    showPrice: true,
+    showShopName: true,
+    showPhoneNumber: true,
+    showLogo: false,
+    showWatermark: true,
+    showWatermarkBusinessName: true,
+    showWatermarkCity: true,
+    watermarkOpacity: 0.72,
+    watermarkSize: WatermarkSize.medium,
+    watermarkPosition: WatermarkPosition.bottomCenter,
+    showWebsite: true,
+    footerColor: Color(0xCC1B5E20),
+  );
+
   final BusinessProfileRepository _businessProfileRepository;
   final BusinessSettingsManager _businessSettingsManager;
+  final StorageModeService _storageModeService;
+  final MobileAuthService _authService;
+  final CloudShareBrandingSettingsRepository _cloudRepository;
+
+  ShareBrandingSettings? _lastKnownSettings;
 
   ShareBrandingSettingsService({
     BusinessProfileRepository? businessProfileRepository,
     BusinessSettingsManager? businessSettingsManager,
+    StorageModeService? storageModeService,
+    MobileAuthService? authService,
+    CloudShareBrandingSettingsRepository? cloudRepository,
   })  : _businessProfileRepository =
             businessProfileRepository ?? BusinessProfileRepository(),
         _businessSettingsManager =
-            businessSettingsManager ?? BusinessSettingsManager();
+            businessSettingsManager ?? BusinessSettingsManager(),
+        _storageModeService = storageModeService ?? StorageModeService(),
+        _authService = authService ?? MobileAuthService(),
+        _cloudRepository =
+            cloudRepository ?? CloudShareBrandingSettingsRepository();
+
+  Future<bool> get _isCloud async =>
+      kIsWeb || await _storageModeService.isCloud();
 
   Future<ShareBrandingSettings> loadSettings() async {
+    if (await _isCloud) {
+      final token = await _authService.getStoredAccessToken();
+      if (token != null && token.trim().isNotEmpty) {
+        try {
+          final fetched = await _cloudRepository.fetchSettings(
+            baseUrl: _authService.baseUrl,
+            accessToken: token,
+          );
+          _lastKnownSettings = fetched;
+          return fetched;
+        } catch (_) {
+          if (_lastKnownSettings != null) {
+            return _lastKnownSettings!;
+          }
+        }
+      }
+      return _lastKnownSettings ?? _defaultSettings;
+    }
+
     final db = await AppDatabase.instance.database;
-    return ShareBrandingSettings(
+    final loaded = ShareBrandingSettings(
       showPrice: await _readBool(db, _showPriceKey, defaultValue: true),
       showShopName: await _readBool(db, _showShopNameKey, defaultValue: true),
       showPhoneNumber: await _readBool(db, _showPhoneKey, defaultValue: true),
@@ -75,9 +128,25 @@ class ShareBrandingSettingsService {
       footerColor:
           await _readColor(db, _footerColorKey, defaultValue: 0xCC1B5E20),
     );
+    _lastKnownSettings = loaded;
+    return loaded;
   }
 
   Future<void> saveSettings(ShareBrandingSettings settings) async {
+    if (await _isCloud) {
+      final token = await _authService.getStoredAccessToken();
+      if (token == null || token.trim().isEmpty) {
+        throw StateError('You must be logged in to save branding settings.');
+      }
+      final persisted = await _cloudRepository.saveSettings(
+        baseUrl: _authService.baseUrl,
+        accessToken: token,
+        settings: settings,
+      );
+      _lastKnownSettings = persisted;
+      return;
+    }
+
     final db = await AppDatabase.instance.database;
     await _writeBool(db, _showPriceKey, settings.showPrice);
     await _writeBool(db, _showShopNameKey, settings.showShopName);
@@ -108,10 +177,25 @@ class ShareBrandingSettingsService {
     await _writeBool(db, _showWebsiteKey, settings.showWebsite);
     await _writeValue(
         db, _footerColorKey, settings.footerColor.toARGB32().toString());
+    _lastKnownSettings = settings;
   }
 
   Future<ShareBrandingIdentity> loadBrandingIdentity() async {
     final profile = await _businessProfileRepository.getBusinessProfile();
+
+    if (await _isCloud) {
+      return ShareBrandingIdentity(
+        shopName: _trim(profile?.shopName),
+        phoneNumber: _trim(profile?.mobileNumber),
+        logoPath: '',
+        website: '',
+        instagram: '',
+        facebook: '',
+        address: _mergeAddress(profile),
+        city: _trim(profile?.city),
+      );
+    }
+
     final db = await AppDatabase.instance.database;
 
     final shopName = _trim(profile?.shopName);

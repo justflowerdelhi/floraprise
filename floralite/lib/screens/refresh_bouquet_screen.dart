@@ -55,19 +55,25 @@ class _RefreshBouquetScreenState extends State<RefreshBouquetScreen> {
         case 'replace':
           await _repository.refreshReplaceComponent(
             batchId: widget.batch.id,
+            cloudBatchId: widget.batch.cloudId,
             productId: product.id,
+            cloudProductId: product.cloudProductId,
             quantity: _quantity,
           );
         case 'add':
           await _repository.refreshAddComponent(
             batchId: widget.batch.id,
+            cloudBatchId: widget.batch.cloudId,
             productId: product.id,
+            cloudProductId: product.cloudProductId,
             quantity: _quantity,
           );
         case 'remove':
           await _repository.refreshRemoveComponent(
             batchId: widget.batch.id,
+            cloudBatchId: widget.batch.cloudId,
             productId: product.id,
+            cloudProductId: product.cloudProductId,
             quantity: _quantity,
             returnToInventory: _returnToInventory,
           );

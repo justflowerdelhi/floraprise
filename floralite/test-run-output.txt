@@ -1,0 +1,426 @@
+00:00 +0: loading C:/floraprise/floralite/test/api_base_url_test.dart
+00:00 +0: C:/floraprise/floralite/test/api_base_url_test.dart: resolveFlorapriseApiBaseUrl uses localhost fallback in debug on desktop platforms
+00:00 +1: C:/floraprise/floralite/test/api_base_url_test.dart: resolveFlorapriseApiBaseUrl uses production fallback in debug on Android
+00:00 +2: C:/floraprise/floralite/test/api_base_url_test.dart: resolveFlorapriseApiBaseUrl prefers explicit configuration over fallback values
+00:00 +3: C:/floraprise/floralite/test/api_base_url_test.dart: resolveFlorapriseApiBaseUrl uses production host outside debug mode
+00:00 +4: C:/floraprise/floralite/test/api_base_url_test.dart: resolveFlorapriseApiBaseUrl uses production fallback on Web even in debug mode on desktop platform
+00:00 +5: C:/floraprise/floralite/test/api_base_url_test.dart: resolveFlorapriseApiBaseUrl prefers explicit configuration over production fallback on Web
+00:00 +6: C:/floraprise/floralite/test/api_base_url_test.dart: resolveFlorapriseApiBaseUrl uses production host on Web outside debug mode
+00:00 +7: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: (setUpAll)
+00:00 +7: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:00 +8: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +9: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +10: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +11: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +12: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +13: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +14: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +15: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +16: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +17: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +18: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +19: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +20: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +21: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +22: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +23: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +24: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +25: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +26: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +27: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +28: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +29: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:01 +29: C:/floraprise/floralite/test/cloud_company_profile_repository_test.dart: fetchCompanyProfile uses http.Client and parses response without dart:io HttpClient
+[SHOP-CLOUD-DIAGNOSTIC] URL: https://api.test.floraprise.local/api/v1/mobile/company/profile
+[SHOP-CLOUD-DIAGNOSTIC] METHOD: GET
+[SHOP-CLOUD-DIAGNOSTIC] Authorization present: YES
+[SHOP-CLOUD-DIAGNOSTIC] JWT sub: <unavailable>
+[SHOP-CLOUD-DIAGNOSTIC] JWT company_id: <unavailable>
+[SHOP-CLOUD-DIAGNOSTIC] JWT exp: <unavailable>
+[SHOP-CLOUD-DIAGNOSTIC] Current time: 2026-09-15 18:22:31.172430Z
+[SHOP-CLOUD-DIAGNOSTIC] JWT expired: NO
+00:01 +30: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:02 +31: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:02 +32: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Cloud mode: renders globe visual indicator and displays authenticated company name
+00:02 +33: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Local Storage mode: does NOT render globe indicator
+00:02 +34: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Local Storage mode: does NOT render globe indicator
+00:02 +35: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Local Storage mode: does NOT render globe indicator
+00:02 +36: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Local Storage mode: does NOT render globe indicator
+00:02 +37: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Local Storage mode: does NOT render globe indicator
+00:02 +38: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Local Storage mode: does NOT render globe indicator
+00:02 +39: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Local Storage mode: does NOT render globe indicator
+00:02 +40: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: AppHeader - Cloud Globe Indicator & Shop Name In Local Storage mode: does NOT render globe indicator
+00:02 +41: C:/floraprise/floralite/test/app_header_cloud_web_icon_test.dart: (tearDownAll)
+00:03 +41: C:/floraprise/floralite/test/cloud_expense_repository_test.dart: cloud expense summary parses response and caches it
+00:03 +42: C:/floraprise/floralite/test/cloud_expense_repository_test.dart: cloud expense summary falls back to cache on failure, never SQLite
+00:03 +43: C:/floraprise/floralite/test/cloud_expense_repository_test.dart: cloud expense summary returns null when no cache and sender fails
+00:03 +44: C:/floraprise/floralite/test/cloud_finance_repository_test.dart: Cloud cash expense posts to accounting expenses with cash payment mode
+00:03 +45: C:/floraprise/floralite/test/cloud_finance_repository_test.dart: Cloud expense categories fall back to active standard choices when none are configured
+00:03 +46: C:/floraprise/floralite/test/cloud_finance_repository_test.dart: Cloud Day Close reads summary and posts counted cash using Cloud location
+00:03 +47: C:/floraprise/floralite/test/cloud_low_stock_repository_test.dart: cloud low stock parses products and caches them
+00:03 +48: C:/floraprise/floralite/test/cloud_low_stock_repository_test.dart: cloud low stock falls back to cache on failure
+00:03 +49: C:/floraprise/floralite/test/cloud_low_stock_repository_test.dart: cloud low stock returns empty list for zero-stock period
+00:03 +50: C:/floraprise/floralite/test/cloud_low_stock_repository_test.dart: CloudLowStockProduct detects lowStock and outOfStock conditions
+00:03 +51: C:/floraprise/floralite/test/cloud_low_stock_repository_test.dart: CloudLowStockRepository wrapper delegates to CloudInventoryRepository
+00:04 +52: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: (setUpAll)
+00:04 +52: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud mode loads Orders from API
+00:04 +53: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud mode opens detail using Cloud Guid
+00:04 +54: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud mode opens detail using Cloud Guid
+00:04 +55: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud mode opens detail using Cloud Guid
+00:04 +56: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud mode opens detail using Cloud Guid
+00:04 +57: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud mode opens detail using Cloud Guid
+00:04 +58: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud mode opens detail using Cloud Guid
+00:04 +59: C:/floraprise/floralite/test/cloud_order_status_report_test.dart: CloudOrderStatusRepository offline fallback: returns cached report when network fails
+[CloudOrderStatusRepository] Fetch failed (SocketException: No Internet Connection), attempting cache fallback
+00:04 +60: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Local mode still uses SQLite path through OrderManager
+00:04 +61: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud mode does not call local Orders manager
+00:04 +62: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud status action uses Cloud Guid and PATCH endpoint
+00:04 +63: C:/floraprise/floralite/test/cloud_pending_payments_repository_test.dart: pending payments summary parses the response and caches it
+00:04 +64: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud cancel action uses Cloud Guid and cancel endpoint
+00:04 +65: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud cancel action uses Cloud Guid and cancel endpoint
+00:04 +66: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud cancel action uses Cloud Guid and cancel endpoint
+00:04 +67: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud designer assignment posts Staff Guid and refreshes detail
+00:04 +68: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud driver assignment posts Cloud Guid and refreshes detail
+00:05 +69: C:/floraprise/floralite/test/cloud_product_input_cost_price_test.dart: CloudProductInput cost price toCreateJson omits costPrice when not provided
+00:05 +70: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud assignee lists come from Cloud staff APIs
+00:05 +71: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud assignee lists come from Cloud staff APIs
+00:05 +72: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud assignee lists come from Cloud staff APIs
+00:05 +73: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud assignee lists come from Cloud staff APIs
+00:05 +74: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud payment collection posts to Cloud payments endpoint
+00:05 +75: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud payment rejects non-positive amounts before any HTTP call
+00:05 +76: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Local mode blocks Cloud payment collection
+00:05 +77: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud edit hits details, items and financials endpoints by Guid
+00:05 +78: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud edit omits sections that were not changed
+00:05 +79: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Cloud edit rejects an empty item list before any HTTP call
+00:05 +80: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: authenticated company is required
+00:05 +81: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: authenticated company is required
+00:05 +82: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: authenticated company is required
+00:05 +83: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: authenticated company is required
+00:05 +84: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: authenticated company is required
+00:05 +85: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: authenticated company is required
+00:05 +86: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: authenticated company is required
+00:05 +87: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Local mode blocks Cloud assignment paths
+00:05 +88: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Local mode blocks Cloud assignment paths
+00:05 +89: C:/floraprise/floralite/test/cloud_orders_provider_test.dart: Local mode blocks Cloud assignment paths
+00:05 +90: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: active Cloud product creates one mapped local product
+00:05 +91: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: Cloud product without companyId imports under authenticated company
+00:06 +92: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: mapping is present immediately after creation
+00:06 +93: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: repeated sync does not create duplicates
+00:06 +94: C:/floraprise/floralite/test/cloud_profit_margin_repository_test.dart: cloud profit margin summary parses response and caches it
+00:06 +95: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: existing mapped local product is updated and ID remains unchanged
+00:06 +96: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: existing mapped local product is updated and ID remains unchanged
+00:06 +97: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: existing mapped local product is updated and ID remains unchanged
+00:06 +98: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: existing local current_qty is not overwritten
+00:06 +99: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: new local product gets initial Cloud stock
+00:06 +100: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: inactive Cloud product becomes inactive locally
+00:06 +101: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: inactive Cloud product becomes inactive locally
+00:06 +102: C:/floraprise/floralite/test/cloud_ready_bouquet_repository_test.dart: ReadyBouquetRepository delegates to CloudReadyBouquetRepository in cloud mode
+00:06 +103: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: missing Cloud product does not delete local mapped product
+00:06 +104: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: different company cannot import into current company
+00:06 +105: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: invalid Cloud UUID is skipped safely
+00:06 +106: C:/floraprise/floralite/test/cloud_remaining_reports_repository_test.dart: cloud rewards parses totals and ranked customers
+00:06 +107: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: Cloud API failure does not partially corrupt local catalog
+00:06 +108: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: Cloud API failure does not partially corrupt local catalog
+00:06 +109: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: Cloud API failure does not partially corrupt local catalog
+00:06 +110: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: CloudProductRepository.listProducts retrieves all paged results
+00:06 +111: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: sync imports multiple products and avoids SKU or name matching
+00:07 +112: C:/floraprise/floralite/test/cloud_product_local_catalog_sync_test.dart: (tearDownAll)
+00:07 +112: C:/floraprise/floralite/test/cloud_staff_test.dart: (setUpAll)
+00:07 +112: C:/floraprise/floralite/test/cloud_staff_test.dart: App roles map to Cloud roles without silent fallbacks
+00:07 +113: C:/floraprise/floralite/test/cloud_staff_test.dart: Cloud mode lists staff from the Cloud staff endpoint
+00:07 +114: C:/floraprise/floralite/test/cloud_staff_test.dart: Cloud mode lists staff from the Cloud staff endpoint
+00:07 +115: C:/floraprise/floralite/test/cloud_top_customers_repository_test.dart: cloud top customers accepts backend PascalCase contract
+00:07 +116: C:/floraprise/floralite/test/cloud_staff_test.dart: Search sends query, mapped role and active flag
+00:07 +117: C:/floraprise/floralite/test/cloud_staff_test.dart: Search sends query, mapped role and active flag
+00:07 +118: C:/floraprise/floralite/test/cloud_staff_test.dart: Role and status filters run over Cloud results
+00:07 +119: C:/floraprise/floralite/test/cloud_staff_test.dart: Create posts the Cloud role and reloads from Cloud
+00:07 +120: C:/floraprise/floralite/test/cloud_staff_test.dart: Update and activation toggles use the Cloud Guid
+00:08 +121: C:/floraprise/floralite/test/cloud_staff_test.dart: Unsupported roles never reach the Cloud API
+00:08 +122: C:/floraprise/floralite/test/cloud_vs_local_parity_regression_test.dart: Cloud vs Local Parity Regression Tests CloudProductProvider filters, sorts, and toggles favorites correctly
+00:08 +123: C:/floraprise/floralite/test/cloud_staff_test.dart: 403 writes surface a clean permission error
+00:08 +124: C:/floraprise/floralite/test/cloud_staff_test.dart: 403 writes surface a clean permission error
+00:08 +125: C:/floraprise/floralite/test/cloud_staff_test.dart: 403 writes surface a clean permission error
+00:08 +126: C:/floraprise/floralite/test/cloud_vs_local_parity_regression_test.dart: Cloud vs Local Parity Regression Tests NonCloudReportBanner displays primary device notice in Cloud mode
+00:08 +127: C:/floraprise/floralite/test/cloud_vs_local_parity_regression_test.dart: Cloud vs Local Parity Regression Tests NonCloudReportBanner displays primary device notice in Cloud mode
+00:08 +128: C:/floraprise/floralite/test/cloud_vs_local_parity_regression_test.dart: Cloud vs Local Parity Regression Tests NonCloudReportBanner displays primary device notice in Cloud mode
+00:08 +129: C:/floraprise/floralite/test/cloud_vs_local_parity_regression_test.dart: Cloud vs Local Parity Regression Tests NonCloudReportBanner displays primary device notice in Cloud mode
+00:10 +130: C:/floraprise/floralite/test/cloud_vs_local_parity_regression_test.dart: Cloud vs Local Parity Regression Tests NonCloudReportBanner displays primary device notice in Cloud mode
+00:13 +131: C:/floraprise/floralite/test/company_name_resolution_test.dart: Company Name Resolution - Local Mode returns saved local profile shop name when configured
+00:14 +132: C:/floraprise/floralite/test/company_name_resolution_test.dart: Company Name Resolution - Cloud Mode resolves company name from mobile_auth_company bootstrap cache and never defaults to "My Flower Shop"
+00:17 +133: C:/floraprise/floralite/test/customer_cloud_cache_test.dart: Customer Cloud & Cache Migration database contains cloud columns and indexes on customers and orders
+00:19 +134: C:/floraprise/floralite/test/company_name_resolution_test.dart: Company Name Resolution - Cloud Mode resolves full profile from cloud_company_profile cache
+00:19 +135: C:/floraprise/floralite/test/customer_cloud_cache_test.dart: Customer Cloud & Cache Migration onOpen migration adds columns to existing database without data loss
+00:22 +136: C:/floraprise/floralite/test/customer_cloud_cache_test.dart: Customer Cloud & Cache Migration onOpen migration adds columns to existing database without data loss
+00:22 +137: C:/floraprise/floralite/test/customer_cloud_cache_test.dart: Customer Cloud & Cache Migration onOpen migration adds columns to existing database without data loss
+00:23 +138: C:/floraprise/floralite/test/customer_cloud_lookup_service_test.dart: cache hit returns the tenant-scoped local customer without a Cloud call
+00:24 +139: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +140: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +141: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +142: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +143: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +144: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +145: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +146: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +147: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +148: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +149: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +150: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +151: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +152: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +153: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +154: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +155: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +156: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +157: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +158: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:24 +159: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +160: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +161: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +162: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +163: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +164: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +165: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +166: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +167: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +168: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +169: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +170: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +171: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +172: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +173: C:/floraprise/floralite/test/customer_profile_prefill_test.dart: New Order preserves local customer ID, name, and phone
+00:25 +174: C:/floraprise/floralite/test/dashboard_redesign_test.dart: DashboardHeroHeader Widget renders greeting, shop name, florist studio badge, and quick action buttons
+00:25 +175: C:/floraprise/floralite/test/draft_order_management_test.dart: opening POS starts blank even when a draft exists
+00:26 +176: C:/floraprise/floralite/test/draft_order_management_test.dart: opening POS starts blank even when a draft exists
+00:26 +177: C:/floraprise/floralite/test/draft_order_management_test.dart: opening POS starts blank even when a draft exists
+00:26 +178: C:/floraprise/floralite/test/dashboard_redesign_test.dart: DashboardAttentionSection Widget renders operational attention chips when items need florist care
+00:26 +179: C:/floraprise/floralite/test/dashboard_redesign_test.dart: DashboardAttentionSection Widget renders operational attention chips when items need florist care
+00:26 +180: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:26 +181: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:26 +182: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:26 +183: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:26 +184: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:26 +185: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:26 +186: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:26 +187: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:26 +188: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:26 +189: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:26 +190: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:26 +191: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:26 +192: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +193: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +194: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +195: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +196: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +197: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +198: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +199: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +200: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +201: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +202: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +203: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +204: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +205: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:27 +206: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:28 +207: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:28 +208: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:28 +209: C:/floraprise/floralite/test/expenses_bottom_sheet_test.dart: Add Expense bottom sheet opens and amount field is tappable
+00:28 +210: C:/floraprise/floralite/test/dashboard_redesign_test.dart: DashboardScreen Desktop vs Mobile Viewport Layout Mobile viewport (< 800px) preserves Workspaces grid fallback
+00:28 +211: C:/floraprise/floralite/test/dashboard_redesign_test.dart: DashboardScreen Desktop vs Mobile Viewport Layout Mobile viewport (< 800px) preserves Workspaces grid fallback
+00:28 +212: C:/floraprise/floralite/test/dashboard_redesign_test.dart: DashboardScreen Desktop vs Mobile Viewport Layout Mobile viewport (< 800px) preserves Workspaces grid fallback
+00:28 +213: C:/floraprise/floralite/test/pos_cloud_mapping_confirmation_test.dart: wrong-company mapping produces the same atomic rollback
+00:28 +214: C:/floraprise/floralite/test/pos_sale_sync_service_test.dart: pending outbox uploads successfully and marks completed
+00:28 +215: C:/floraprise/floralite/test/pos_sale_sync_service_test.dart: pending outbox uploads successfully and marks completed
+00:28 +216: C:/floraprise/floralite/test/pos_cloud_mapping_confirmation_test.dart: Cloud-selected product UUID is submitted without a SQLite product mapping
+00:28 +217: C:/floraprise/floralite/test/pos_sale_sync_service_test.dart: network failure preserves pending state and payload
+00:29 +218: C:/floraprise/floralite/test/pos_sync_outbox_migration_test.dart: version 41 database upgrades to version 44 without changing existing sales
+00:29 +219: C:/floraprise/floralite/test/pos_sync_outbox_migration_test.dart: version 41 database upgrades to version 44 without changing existing sales
+00:29 +220: C:/floraprise/floralite/test/pos_sync_outbox_migration_test.dart: version 41 database upgrades to version 44 without changing existing sales
+00:29 +221: C:/floraprise/floralite/test/pos_sync_outbox_migration_test.dart: version 41 database upgrades to version 44 without changing existing sales
+00:29 +222: C:/floraprise/floralite/test/pos_sync_outbox_migration_test.dart: version 41 database upgrades to version 44 without changing existing sales
+00:29 +223: C:/floraprise/floralite/test/pos_sync_outbox_migration_test.dart: version 41 database upgrades to version 44 without changing existing sales
+00:29 +224: C:/floraprise/floralite/test/pos_sale_sync_service_test.dart: malformed payload does not corrupt local sale or lose payload
+00:29 +225: C:/floraprise/floralite/test/pos_sale_sync_service_test.dart: (tearDownAll)
+00:29 +225: C:/floraprise/floralite/test/printer_provider_test.dart: permission UI context has required Material ancestors
+00:30 +226: C:/floraprise/floralite/test/printer_provider_test.dart: permission UI context has required Material ancestors
+00:30 +227: C:/floraprise/floralite/test/printer_provider_test.dart: permission UI context has required Material ancestors
+00:30 +228: C:/floraprise/floralite/test/product_cloud_linking_test.dart: cloud product mapping persists after database close and reopen
+00:30 +229: C:/floraprise/floralite/test/product_cloud_linking_test.dart: cloud product mapping persists after database close and reopen
+00:30 +230: C:/floraprise/floralite/test/product_cloud_linking_test.dart: cloud product mapping persists after database close and reopen
+00:30 +231: C:/floraprise/floralite/test/product_cloud_linking_test.dart: cloud product mapping persists after database close and reopen
+00:30 +232: C:/floraprise/floralite/test/product_cloud_linking_test.dart: cloud product mapping persists after database close and reopen
+00:30 +233: C:/floraprise/floralite/test/product_cloud_linking_test.dart: cloud product mapping persists after database close and reopen
+00:30 +234: C:/floraprise/floralite/test/product_cloud_linking_test.dart: cloud product mapping persists after database close and reopen
+00:30 +235: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +236: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +237: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +238: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +239: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +240: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +241: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +242: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +243: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +244: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +245: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +246: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +247: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +248: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +249: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:30 +250: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +251: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +252: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +253: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +254: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +255: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +256: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +257: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +258: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +259: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +260: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +261: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +262: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +263: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +264: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +265: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +266: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +267: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +268: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:31 +269: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +270: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +271: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +272: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +273: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +274: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +275: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +276: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +277: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +278: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +279: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +280: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +281: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +282: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:32 +283: C:/floraprise/floralite/test/product_management_regression_test.dart: add product dialog opens with valid dropdown values
+00:33 +284: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:33 +285: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:33 +286: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:33 +287: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +288: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +289: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +290: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +291: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +292: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +293: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +294: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +295: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +296: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +297: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +298: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +299: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +300: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +301: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +302: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +303: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +304: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +305: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +306: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +307: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +308: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +309: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +310: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +311: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +312: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +313: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +314: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +315: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +316: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +317: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +318: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +319: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +320: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +321: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders desktop sidebar on desktop viewport (>= 800px)
+00:34 +322: C:/floraprise/floralite/test/product_management_regression_test.dart: POS product query excludes inactive and deleted products
+00:35 +323: C:/floraprise/floralite/test/pro_web_products_categories_inventory_test.dart: Floraprise Pro Web Phase 1 — MainShellScreen Responsive Navigation renders bottom NavigationBar on mobile viewport (< 800px)
+00:35 +324: C:/floraprise/floralite/test/product_management_regression_test.dart: production accepts legacy finished product category for recipes
+00:35 +325: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sales renders the four primary options on desktop
+00:35 +326: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sales renders the four primary options on desktop
+00:36 +327: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sales renders the four primary options on desktop
+00:36 +328: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sales renders the four primary options on desktop
+00:36 +329: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sales renders the four primary options on desktop
+00:36 +330: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sales renders the four primary options on desktop
+00:36 +331: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sales renders the four primary options on desktop
+00:36 +332: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sales renders the four primary options on desktop
+00:37 +333: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sales renders the four primary options on desktop
+00:37 +334: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sales renders the four primary options on desktop
+00:37 +335: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sales renders the four primary options on desktop
+00:37 +336: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sales renders the four primary options on desktop
+00:37 +337: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:37 +338: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:37 +339: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:37 +340: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:37 +341: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:37 +342: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:37 +343: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:37 +344: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:37 +345: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:37 +346: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:37 +347: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:37 +348: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:37 +349: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+00:38 +350: C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart: SplashScreen defensive startup navigation navigates to /mobile-register if unexpected error occurs and user is unauthenticated
+SplashScreen: unexpected startup error: Bad state: Simulated storage mode initialization error
+#0      _FailingStorageModeService.getCurrentMode (file:///C:/floraprise/floralite/test/web_startup_sqlite_guards_test.dart:18:5)
+#1      StorageModeProvider.load (package:floraprise/providers/storage_mode_provider.dart:22:28)
+#2      StorageModeProvider.ensureLoaded (package:floraprise/providers/storage_mode_provider.dart:36:11)
+#3      _SplashScreenState._navigateToNextScreen (package:floraprise/presentation/splash/splash_screen.dart:52:33)
+#4      _SplashScreenState._initializeAndNavigate (package:floraprise/presentation/splash/splash_screen.dart:42:13)
+<asynchronous suspension>
+
+00:38 +351: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sale navigation still works
+00:38 +352: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sale navigation still works
+00:38 +353: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sale navigation still works
+00:38 +354: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sale navigation still works
+00:38 +355: C:/floraprise/floralite/test/walkin_sales_screen_test.dart: Walk-in Sale navigation still works
+00:38 +356: C:/floraprise/floralite/test/widget_test.dart: App builds root widget
+00:38 +357: C:/floraprise/floralite/test/widget_test.dart: App builds root widget
+00:38 +358: C:/floraprise/floralite/test/widget_test.dart: App builds root widget
+00:38 +359: C:/floraprise/floralite/test/widget_test.dart: App builds root widget
+00:39 +360: C:/floraprise/floralite/test/widget_test.dart: App builds root widget
+00:39 +361: C:/floraprise/floralite/test/workspace_navigation_sidebar_test.dart: MainShellScreen Desktop Sidebar vs Mobile Navigation Desktop mode displays sidebar with section headers and no bottom navigation
+00:40 +362: C:/floraprise/floralite/test/workspace_navigation_sidebar_test.dart: MainShellScreen Desktop Sidebar vs Mobile Navigation Desktop mode displays sidebar with section headers and no bottom navigation
+00:40 +363: C:/floraprise/floralite/test/workspace_navigation_sidebar_test.dart: MainShellScreen Desktop Sidebar vs Mobile Navigation Desktop mode displays sidebar with section headers and no bottom navigation
+00:40 +364: C:/floraprise/floralite/test/workspace_navigation_sidebar_test.dart: MainShellScreen Desktop Sidebar vs Mobile Navigation Desktop mode displays sidebar with section headers and no bottom navigation
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Floraprise": []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/floraprise/floralite/test/workspace_navigation_sidebar_test.dart:293:7)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/floraprise/floralite/test/workspace_navigation_sidebar_test.dart line 293
+The test description was:
+  Desktop mode displays sidebar with section headers and no bottom navigation
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:41 +364 -1: C:/floraprise/floralite/test/workspace_navigation_sidebar_test.dart: MainShellScreen Desktop Sidebar vs Mobile Navigation Desktop mode displays sidebar with section headers and no bottom navigation [E]
+  Test failed. See exception logs above.
+  The test description was: Desktop mode displays sidebar with section headers and no bottom navigation
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:41 +364 -1: C:/floraprise/floralite/test/workspace_navigation_sidebar_test.dart: MainShellScreen Desktop Sidebar vs Mobile Navigation Mobile mode displays bottom NavigationBar and no sidebar section headers
+00:41 +365 -1: C:/floraprise/floralite/test/workspace_navigation_sidebar_test.dart: (tearDownAll)
+00:41 +365 -1: Some tests failed.
+
+Failing tests:
+  C:/floraprise/floralite/test/workspace_navigation_sidebar_test.dart: MainShellScreen Desktop Sidebar vs Mobile Navigation Desktop mode displays sidebar with section headers and no bottom navigation

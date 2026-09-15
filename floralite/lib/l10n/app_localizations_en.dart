@@ -159,10 +159,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get howCustomerReceive => 'How will the customer receive the order?';
 
   @override
-  String get takeAway => 'Take Away';
+  String get takeAway => 'Walk-in Sale';
 
   @override
-  String get takeAwayDesc => 'Customer takes now';
+  String get takeAwayDesc => 'Customer takes the order now';
 
   @override
   String get pickupLater => 'Pickup Later';

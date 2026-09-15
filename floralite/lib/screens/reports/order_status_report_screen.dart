@@ -334,7 +334,7 @@ class _OrderStatusReportScreenState extends State<OrderStatusReportScreen> {
           ),
           const SizedBox(height: 12),
           _StatusRow(
-            label: 'Take Away',
+            label: 'Walk-in Sale',
             count: _takeAwayCount,
             color: Colors.teal,
             icon: Icons.shopping_bag_rounded,

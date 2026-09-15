@@ -1,14 +1,26 @@
 import 'package:flutter/foundation.dart';
 
-import '../data/repositories/occasion_repository.dart';
+import '../data/repositories/cloud_occasion_repository.dart';
 import '../data/repositories/customer_repository.dart';
+import '../data/repositories/occasion_repository.dart';
 import '../managers/occasion_manager.dart';
+import 'customer_provider.dart';
+import 'storage_mode_provider.dart';
 
 class OccasionProvider extends ChangeNotifier {
-  OccasionProvider(this._occasionManager, this._customerRepository);
+  OccasionProvider(
+    this._occasionManager,
+    this._customerRepository, [
+    this._storageModeProvider,
+    this._cloudOccasionRepository,
+    this._customerProvider,
+  ]);
 
   final OccasionManager _occasionManager;
   final CustomerRepository _customerRepository;
+  final StorageModeProvider? _storageModeProvider;
+  final CloudOccasionRepository? _cloudOccasionRepository;
+  final CustomerProvider? _customerProvider;
 
   bool _isLoading = false;
   bool _isBusy = false;
@@ -28,6 +40,7 @@ class OccasionProvider extends ChangeNotifier {
     festival: [],
   );
 
+  bool get isCloud => _storageModeProvider?.isCloud ?? false;
   bool get isLoading => _isLoading;
   bool get isBusy => _isBusy;
   String? get error => _error;
@@ -49,8 +62,13 @@ class OccasionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _relationships = await _occasionManager.relationshipMaster();
-      _occasions = await _occasionManager.occasionMaster();
+      if (isCloud && _cloudOccasionRepository != null) {
+        _relationships = _cloudOccasionRepository!.listRelationshipMaster();
+        _occasions = _cloudOccasionRepository!.listOccasionMaster();
+      } else {
+        _relationships = await _occasionManager.relationshipMaster();
+        _occasions = await _occasionManager.occasionMaster();
+      }
       await _loadFollowUps();
       _isLoading = false;
       notifyListeners();
@@ -103,18 +121,43 @@ class OccasionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _occasionManager.addOccasionContact(
-        customerId: customerId,
-        recipientName: recipientName,
-        relationship: relationship,
-        occasion: occasion,
-        occasionDate: occasionDate,
-        recipientPhone: recipientPhone,
-        company: company,
-        notes: notes,
-        reminderEnabled: reminderEnabled,
-        source: source,
-      );
+      if (isCloud && _cloudOccasionRepository != null) {
+        String? cloudCustId;
+        if (_customerProvider != null) {
+          for (final cust in _customerProvider!.customers) {
+            final rawId = cust['id'];
+            if (rawId == customerId || (rawId is String && rawId.hashCode == customerId)) {
+              cloudCustId = rawId.toString();
+              break;
+            }
+          }
+        }
+        await _cloudOccasionRepository!.createContact(
+          customerId: cloudCustId ?? customerId.toString(),
+          recipientName: recipientName,
+          relationship: relationship,
+          occasion: occasion,
+          occasionDate: occasionDate,
+          recipientPhone: recipientPhone,
+          company: company,
+          notes: notes,
+          reminderEnabled: reminderEnabled,
+          source: source,
+        );
+      } else {
+        await _occasionManager.addOccasionContact(
+          customerId: customerId,
+          recipientName: recipientName,
+          relationship: relationship,
+          occasion: occasion,
+          occasionDate: occasionDate,
+          recipientPhone: recipientPhone,
+          company: company,
+          notes: notes,
+          reminderEnabled: reminderEnabled,
+          source: source,
+        );
+      }
       await _loadFollowUps();
     } finally {
       _isBusy = false;
@@ -127,11 +170,19 @@ class OccasionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _occasionManager.markDone(
-        sourceType: record.sourceType,
-        sourceId: record.sourceId,
-        occurrenceDate: record.date,
-      );
+      if (isCloud && _cloudOccasionRepository != null) {
+        await _cloudOccasionRepository!.markDone(
+          sourceType: record.sourceType,
+          sourceId: record.cloudSourceId ?? record.sourceId.toString(),
+          occurrenceDate: record.date,
+        );
+      } else {
+        await _occasionManager.markDone(
+          sourceType: record.sourceType,
+          sourceId: record.sourceId,
+          occurrenceDate: record.date,
+        );
+      }
       await _loadFollowUps();
     } finally {
       _isBusy = false;
@@ -144,11 +195,19 @@ class OccasionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _occasionManager.snoozeTomorrow(
-        sourceType: record.sourceType,
-        sourceId: record.sourceId,
-        occurrenceDate: record.date,
-      );
+      if (isCloud && _cloudOccasionRepository != null) {
+        await _cloudOccasionRepository!.snoozeTomorrow(
+          sourceType: record.sourceType,
+          sourceId: record.cloudSourceId ?? record.sourceId.toString(),
+          occurrenceDate: record.date,
+        );
+      } else {
+        await _occasionManager.snoozeTomorrow(
+          sourceType: record.sourceType,
+          sourceId: record.sourceId,
+          occurrenceDate: record.date,
+        );
+      }
       await _loadFollowUps();
     } finally {
       _isBusy = false;
@@ -165,10 +224,16 @@ class OccasionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _occasionManager.deleteManualReminder(
-        contactId: record.sourceId,
-        occurrenceDate: record.date,
-      );
+      if (isCloud && _cloudOccasionRepository != null) {
+        await _cloudOccasionRepository!.deleteContact(
+          record.cloudSourceId ?? record.sourceId.toString(),
+        );
+      } else {
+        await _occasionManager.deleteManualReminder(
+          contactId: record.sourceId,
+          occurrenceDate: record.date,
+        );
+      }
       await _loadFollowUps();
     } finally {
       _isBusy = false;
@@ -179,7 +244,22 @@ class OccasionProvider extends ChangeNotifier {
   Future<int?> findCustomerIdByNameOrPhone({
     required String customerName,
     required String mobile,
-  }) {
+  }) async {
+    if (isCloud && _customerProvider != null) {
+      final normalized = mobile.replaceAll(RegExp(r'\D'), '');
+      for (final cust in _customerProvider!.customers) {
+        final custPhoneNorm =
+            (cust['phone'] as String? ?? '').replaceAll(RegExp(r'\D'), '');
+        final custName = (cust['name'] as String? ?? '').toLowerCase();
+        if ((normalized.isNotEmpty && custPhoneNorm.endsWith(normalized)) ||
+            (custName == customerName.trim().toLowerCase())) {
+          final rawId = cust['id'];
+          if (rawId is int) return rawId;
+          return rawId.toString().hashCode;
+        }
+      }
+      return null;
+    }
     return _occasionManager.findCustomerIdByNameOrPhone(
       customerName: customerName,
       mobile: mobile,
@@ -190,6 +270,17 @@ class OccasionProvider extends ChangeNotifier {
     required String name,
     required String phone,
   }) async {
+    if (isCloud && _customerProvider != null) {
+      await _customerProvider!.addCustomer(
+        phone: phone,
+        name: name,
+      );
+      final id = await findCustomerIdByNameOrPhone(
+        customerName: name,
+        mobile: phone,
+      );
+      return id ?? name.hashCode;
+    }
     final customer = await _customerRepository.create(
       name: name,
       phone: phone,
@@ -202,6 +293,9 @@ class OccasionProvider extends ChangeNotifier {
     required String recipientName,
     required String occasion,
   }) {
+    if (isCloud) {
+      return Future.value(null);
+    }
     return _occasionManager.findDuplicate(
       customerId: customerId,
       recipientName: recipientName,
@@ -210,16 +304,28 @@ class OccasionProvider extends ChangeNotifier {
   }
 
   Future<OccasionDashboardSummary> dashboardSummary(DateTime today) {
+    if (isCloud && _cloudOccasionRepository != null) {
+      return _cloudOccasionRepository!.getDashboardSummary(today);
+    }
     return _occasionManager.dashboardSummary(today);
   }
 
   Future<void> _loadFollowUps() async {
-    _screenData = await _occasionManager.screenData(
-      today: DateTime.now(),
-      search: _searchQuery,
-      filter: _selectedFilter,
-      specificDate: _selectedCalendarDate,
-    );
+    if (isCloud && _cloudOccasionRepository != null) {
+      _screenData = await _cloudOccasionRepository!.buildScreenData(
+        today: DateTime.now(),
+        search: _searchQuery,
+        filter: _selectedFilter,
+        specificDate: _selectedCalendarDate,
+      );
+    } else {
+      _screenData = await _occasionManager.screenData(
+        today: DateTime.now(),
+        search: _searchQuery,
+        filter: _selectedFilter,
+        specificDate: _selectedCalendarDate,
+      );
+    }
     _error = null;
   }
 }

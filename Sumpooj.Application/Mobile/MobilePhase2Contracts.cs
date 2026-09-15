@@ -291,3 +291,55 @@ public sealed record MobileCompanyProfileDto(
     bool IsActive,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc);
+
+public sealed record ShareBrandingSettingsDto(
+    Guid Id,
+    Guid CompanyId,
+    bool ShowPrice,
+    bool ShowShopName,
+    bool ShowPhoneNumber,
+    bool ShowWebsite,
+    bool ShowLogo,
+    bool ShowWatermark,
+    bool ShowWatermarkBusinessName,
+    bool ShowWatermarkCity,
+    double WatermarkOpacity,
+    string WatermarkSize,
+    string WatermarkPosition,
+    long FooterColorArgb,
+    DateTime CreatedAtUtc,
+    DateTime? UpdatedAtUtc);
+
+public sealed record UpdateShareBrandingSettingsRequest(
+    bool ShowPrice,
+    bool ShowShopName,
+    bool ShowPhoneNumber,
+    bool ShowWebsite,
+    bool ShowLogo,
+    bool ShowWatermark,
+    bool ShowWatermarkBusinessName,
+    bool ShowWatermarkCity,
+    double WatermarkOpacity,
+    string WatermarkSize,
+    string WatermarkPosition,
+    long FooterColorArgb);
+
+public sealed record RewardsSettingsDto(
+    Guid Id,
+    Guid CompanyId,
+    bool Enabled,
+    int EarnSpendPaisePerPoint,
+    int MinimumBillPaise,
+    int PointValuePaise,
+    int MaximumRedemptionPercent,
+    int ExpiryDays,
+    DateTime CreatedAtUtc,
+    DateTime? UpdatedAtUtc);
+
+public sealed record UpdateRewardsSettingsRequest(
+    bool Enabled,
+    int EarnSpendPaisePerPoint,
+    int MinimumBillPaise,
+    int PointValuePaise,
+    int MaximumRedemptionPercent,
+    int ExpiryDays);

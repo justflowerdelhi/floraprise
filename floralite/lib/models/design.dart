@@ -1,5 +1,6 @@
 class DesignRecord {
   final int id;
+  final String? cloudId;
   final String bouquetId;
   final String? imagePath;
   final String description;
@@ -16,6 +17,7 @@ class DesignRecord {
 
   const DesignRecord({
     required this.id,
+    this.cloudId,
     required this.bouquetId,
     required this.imagePath,
     required this.description,
@@ -84,6 +86,28 @@ class DesignRecord {
       isFavorite: (row['is_favorite'] as int? ?? 0) == 1,
       createdAt: row['created_at'] as String,
       updatedAt: row['updated_at'] as String,
+    );
+  }
+
+  factory DesignRecord.fromCloudJson(Map<String, dynamic> json) {
+    final guid = (json['id'] ?? json['Id'])?.toString() ?? '';
+    final idInt = int.tryParse(guid) ?? guid.hashCode;
+    return DesignRecord(
+      id: idInt,
+      cloudId: guid,
+      bouquetId: (json['bouquetId'] ?? json['BouquetId'])?.toString() ?? '',
+      imagePath: (json['imageReference'] ?? json['ImageReference'])?.toString(),
+      description: (json['description'] ?? json['Description'])?.toString() ?? '',
+      sellingPricePaise: json['sellingPricePaise'] ?? json['SellingPricePaise'] as int?,
+      flowers: (json['flowers'] ?? json['Flowers'])?.toString(),
+      occasion: (json['occasion'] ?? json['Occasion'])?.toString(),
+      color: (json['color'] ?? json['Color'])?.toString(),
+      collection: (json['collection'] ?? json['Collection'])?.toString(),
+      notes: (json['notes'] ?? json['Notes'])?.toString(),
+      status: (json['status'] ?? json['Status'])?.toString() ?? 'ready',
+      isFavorite: (json['isFavorite'] ?? json['IsFavorite']) == true,
+      createdAt: (json['createdAtUtc'] ?? json['CreatedAtUtc'] ?? json['createdAt'])?.toString() ?? '',
+      updatedAt: (json['updatedAtUtc'] ?? json['UpdatedAtUtc'] ?? json['updatedAt'])?.toString() ?? '',
     );
   }
 }

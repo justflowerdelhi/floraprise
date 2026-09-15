@@ -159,10 +159,10 @@ class AppLocalizationsGu extends AppLocalizations {
   String get howCustomerReceive => 'ગ્રાહક ઓર્ડર કેવી રીતે મેળવશે?';
 
   @override
-  String get takeAway => 'ટેક અવે';
+  String get takeAway => 'વૉક-ઇન સેલ';
 
   @override
-  String get takeAwayDesc => 'ગ્રાહક હવે લે છે';
+  String get takeAwayDesc => 'ગ્રાહક હવે ઓર્ડર લે છે';
 
   @override
   String get pickupLater => 'પિકઅપ પછી';

@@ -922,6 +922,9 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<decimal>("CardTotal")
                         .HasColumnType("numeric");
 
+                    b.Property<decimal>("CashExpenses")
+                        .HasColumnType("numeric");
+
                     b.Property<decimal>("CashTotal")
                         .HasColumnType("numeric");
 
@@ -1870,6 +1873,9 @@ namespace Sumpooj.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("OperatorName")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("ProducedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1885,6 +1891,12 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<string>("RecipeName")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("ReversalNote")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ReversedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -3889,6 +3901,10 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DefaultUnit")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -4581,6 +4597,59 @@ namespace Sumpooj.Infrastructure.Migrations
                     b.ToTable("RefundItems");
                 });
 
+            modelBuilder.Entity("Sumpooj.Domain.Entities.RewardsSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<int>("EarnSpendPaisePerPoint")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(10000);
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("ExpiryDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(365);
+
+                    b.Property<int>("MaximumRedemptionPercent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(20);
+
+                    b.Property<int>("MinimumBillPaise")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(30000);
+
+                    b.Property<int>("PointValuePaise")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(100);
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique();
+
+                    b.ToTable("RewardsSettings", (string)null);
+                });
+
             modelBuilder.Entity("Sumpooj.Domain.Entities.SalesOrder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4756,6 +4825,93 @@ namespace Sumpooj.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("SchedulerRecords");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.ShareBrandingSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<long>("FooterColorArgb")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(3424345632L);
+
+                    b.Property<bool>("ShowLogo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("ShowPhoneNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("ShowPrice")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("ShowShopName")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("ShowWatermark")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("ShowWatermarkBusinessName")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("ShowWatermarkCity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("ShowWebsite")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<double>("WatermarkOpacity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("double precision")
+                        .HasDefaultValue(0.71999999999999997);
+
+                    b.Property<string>("WatermarkPosition")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("bottomCenter");
+
+                    b.Property<string>("WatermarkSize")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("medium");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique();
+
+                    b.ToTable("ShareBrandingSettings", (string)null);
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.Shift", b =>
@@ -6058,11 +6214,29 @@ namespace Sumpooj.Infrastructure.Migrations
                         .HasForeignKey("RefundId");
                 });
 
+            modelBuilder.Entity("Sumpooj.Domain.Entities.RewardsSettings", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Sumpooj.Domain.Entities.SalesOrderItem", b =>
                 {
                     b.HasOne("Sumpooj.Domain.Entities.SalesOrder", null)
                         .WithMany("Items")
                         .HasForeignKey("SalesOrderId");
+                });
+
+            modelBuilder.Entity("Sumpooj.Domain.Entities.ShareBrandingSettings", b =>
+                {
+                    b.HasOne("Sumpooj.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Sumpooj.Domain.Entities.Staff", b =>

@@ -16,6 +16,7 @@ import 'customer_repository.dart';
 import 'inventory_repository.dart';
 import 'pos_sync_outbox_repository.dart';
 import '../../utils/order_display_utils.dart';
+import '../../services/web_draft_storage_service.dart';
 
 class OrderTotals {
   final int subtotalPaise;
@@ -116,12 +117,15 @@ class OrderRepository {
   OrderRepository({
     ProductCloudSyncabilityService? productCloudSyncabilityService,
     StorageModeService? storageModeService,
-  }) : _productCloudSyncabilityService =
+    WebDraftStorageService? webDraftStorage,
+  })  : _productCloudSyncabilityService =
             productCloudSyncabilityService ?? ProductCloudSyncabilityService(),
-        _storageModeService = storageModeService ?? StorageModeService();
+        _storageModeService = storageModeService ?? StorageModeService(),
+        _webDraftStorage = webDraftStorage ?? WebDraftStorageService();
 
   final ProductCloudSyncabilityService _productCloudSyncabilityService;
   final StorageModeService _storageModeService;
+  final WebDraftStorageService _webDraftStorage;
 
   static const List<String> customerStatisticsStatuses = [
     'confirmed',
@@ -176,6 +180,9 @@ class OrderRepository {
   }
 
   Future<WalkInSession?> getLatestDraft(FulfilmentType type) async {
+    if (kIsWeb) {
+      return _webDraftStorage.getLatestDraft(type);
+    }
     final db = await AppDatabase.instance.database;
     final fulfilment = _fulfilmentToDb(type);
 
@@ -195,6 +202,9 @@ class OrderRepository {
   }
 
   Future<WalkInSession?> getDraftById(int id) async {
+    if (kIsWeb) {
+      return _webDraftStorage.getDraftById(id);
+    }
     final db = await AppDatabase.instance.database;
     final rows = await db.query(
       'orders',
@@ -211,7 +221,9 @@ class OrderRepository {
   }
 
   Future<List<DraftOrderSummary>> listDraftOrders({String query = ''}) async {
-    if (kIsWeb) return const [];
+    if (kIsWeb) {
+      return _webDraftStorage.listDraftOrders(query: query);
+    }
     final db = await AppDatabase.instance.database;
     final whereParts = <String>['o.status = ?'];
     final whereArgs = <Object?>['draft'];
@@ -252,7 +264,9 @@ class OrderRepository {
   }
 
   Future<int> countDraftOrders() async {
-    if (kIsWeb) return 0;
+    if (kIsWeb) {
+      return _webDraftStorage.countDraftOrders();
+    }
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery(
       "SELECT COUNT(*) AS count FROM orders WHERE status = 'draft'",
@@ -261,6 +275,9 @@ class OrderRepository {
   }
 
   Future<void> deleteDraft(int id) async {
+    if (kIsWeb) {
+      return _webDraftStorage.deleteDraft(id);
+    }
     final db = await AppDatabase.instance.database;
     await db.transaction<void>((txn) async {
       final existing = await txn.query(
@@ -386,6 +403,14 @@ class OrderRepository {
     required int? customerId,
     String? cloudCustomerId,
   }) async {
+    if (kIsWeb) {
+      return _webDraftStorage.upsertDraft(
+        session: session,
+        totals: totals,
+        customerId: customerId,
+        cloudCustomerId: cloudCustomerId,
+      );
+    }
     final db = await AppDatabase.instance.database;
     final now = DateTime.now().toIso8601String();
     final orderNo = 'DRAFT-${DateTime.now().millisecondsSinceEpoch}';
@@ -504,6 +529,9 @@ class OrderRepository {
   }
 
   Future<String> getOrCreatePosClientSyncId(int orderId) async {
+    if (kIsWeb) {
+      return _webDraftStorage.getOrCreatePosClientSyncId(orderId);
+    }
     final db = await AppDatabase.instance.database;
     return db.transaction<String>((txn) async {
       final rows = await txn.query(

@@ -61,6 +61,7 @@ extension StaffRoleExtension on StaffRole {
 
 class Staff {
   final int id;
+  final String? cloudId;
   final String staffCode;
   final String name;
   final String phone;
@@ -83,6 +84,7 @@ class Staff {
 
   const Staff({
     required this.id,
+    this.cloudId,
     required this.staffCode,
     required this.name,
     required this.phone,
@@ -103,6 +105,33 @@ class Staff {
     required this.createdAt,
     required this.updatedAt,
   });
+
+  factory Staff.fromCloudData({
+    required String id,
+    required String name,
+    String? phone,
+    String? email,
+    StaffRole? role,
+    bool isActive = true,
+    DateTime? createdAt,
+  }) {
+    final parsedId = int.tryParse(id) ?? id.hashCode.abs();
+    final code =
+        id.length >= 6 ? id.substring(0, 6).toUpperCase() : id.toUpperCase();
+    return Staff(
+      id: parsedId,
+      cloudId: id,
+      staffCode: 'CLOUD-$code',
+      name: name,
+      phone: phone ?? '',
+      sameAsPhone: true,
+      email: email,
+      role: role ?? StaffRole.other,
+      active: isActive,
+      createdAt: createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
 }
 
 class StaffUpsertInput {

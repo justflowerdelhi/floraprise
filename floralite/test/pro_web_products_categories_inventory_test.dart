@@ -33,6 +33,7 @@ import 'package:floraprise/services/mobile_auth_service.dart';
 import 'package:floraprise/services/printer/printer_manager.dart';
 import 'package:floraprise/services/storage_mode_service.dart';
 import 'package:floraprise/services/subscription_service.dart';
+import 'package:floraprise/widgets/floraprise_brand.dart';
 
 class _MockStorageModeService extends StorageModeService {
   StorageMode _mode = StorageMode.cloud;
@@ -278,6 +279,7 @@ void main() {
       expect(find.text('SALES & ORDERS'), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
       expect(find.text('Pro Cloud'), findsOneWidget);
+      expect(find.byType(FlorapriseBrand), findsOneWidget);
     });
 
     testWidgets('renders bottom NavigationBar on mobile viewport (< 800px)', (tester) async {

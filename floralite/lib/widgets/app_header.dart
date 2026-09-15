@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import '../managers/business_settings_manager.dart';
 import '../providers/storage_mode_provider.dart';
 import '../services/storage_mode_service.dart';
+import 'business_identity.dart';
 
 class AppHeader extends StatefulWidget implements PreferredSizeWidget {
   const AppHeader({
@@ -34,6 +35,8 @@ class _AppHeaderState extends State<AppHeader> {
       BusinessSettingsManager();
   final StorageModeService _storageModeService = StorageModeService();
   String _shopName = '';
+  String _businessSubtitle = '';
+  String _logoPath = '';
   bool _isCloud = false;
 
   @override
@@ -60,6 +63,8 @@ class _AppHeaderState extends State<AppHeader> {
     setState(() {
       _isCloud = isCloud;
       _shopName = settings.shopName.trim();
+      _businessSubtitle = settings.subtitle.trim();
+      _logoPath = settings.logoPath.trim();
     });
   }
 
@@ -81,19 +86,18 @@ class _AppHeaderState extends State<AppHeader> {
       titleSpacing: widget.showBackButton ? 0 : 16,
       title: Row(
         children: [
-          Image.asset('assets/icon.png', width: 28, height: 28),
-          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (isDefaultTitle)
-                  Image.asset(
-                    'assets/floraprise-title.png',
-                    height: 22,
-                    fit: BoxFit.contain,
-                    alignment: Alignment.centerLeft,
+                  BusinessIdentity(
+                    name: _shopName,
+                    subtitle: _businessSubtitle,
+                    logoPath: _logoPath,
+                    logoSize: 32,
+                    nameFontSize: 14,
                   )
                 else
                   Text(
@@ -103,15 +107,6 @@ class _AppHeaderState extends State<AppHeader> {
                     style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: colorScheme.onSurface,
-                    ),
-                  ),
-                if (_shopName.isNotEmpty)
-                  Text(
-                    _shopName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
               ],

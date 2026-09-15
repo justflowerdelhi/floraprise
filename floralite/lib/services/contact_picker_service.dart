@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart';
@@ -21,6 +22,9 @@ class ContactPickerService {
       FlutterNativeContactPicker();
 
   static Future<PickedContact?> pickContact(BuildContext context) async {
+    if (kIsWeb) {
+      return _showManualContactEntryDialog(context);
+    }
     final permissionGranted = await _ensurePermission(context);
     if (!permissionGranted) return null;
     if (!context.mounted) return null;
@@ -133,6 +137,77 @@ class ContactPickerService {
   static void _showMessage(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
+    );
+  }
+
+  static Future<PickedContact?> _showManualContactEntryDialog(
+    BuildContext context,
+  ) async {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    return showDialog<PickedContact>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add Contact Details'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Contact Name',
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                validator: (val) {
+                  if ((val ?? '').trim().isEmpty) {
+                    return 'Please enter a name';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Mobile Number',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
+                validator: (val) {
+                  final normalized = normalizeMobile(val ?? '');
+                  if (normalized.length < 10) {
+                    return 'Please enter a valid 10-digit mobile number';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, null),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              final name = nameController.text.trim();
+              final mobile = normalizeMobile(phoneController.text);
+              Navigator.pop(
+                dialogContext,
+                PickedContact(name: name, mobile: mobile),
+              );
+            },
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -244,6 +244,11 @@ class WalkInManager {
       );
 
       await syncService.submitPayload(payload);
+      if (session.draftOrderId != null) {
+        try {
+          await _orderManager.deleteDraft(session.draftOrderId!);
+        } catch (_) {}
+      }
       return ConfirmOrderResult(
         orderId: payload['localOrderId'] as int,
         grandTotalPaise: totals.grandTotalPaise,

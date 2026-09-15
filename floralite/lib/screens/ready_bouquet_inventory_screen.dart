@@ -156,7 +156,10 @@ class _ReadyBouquetInventoryScreenState
   Future<void> _openDetail(ReadyBouquetSummary item) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ReadyBouquetDetailScreen(productId: item.productId),
+        builder: (_) => ReadyBouquetDetailScreen(
+          productId: item.productId,
+          cloudProductId: item.cloudProductId,
+        ),
       ),
     );
     _load();

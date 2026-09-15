@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../database/app_database.dart';
+import '../../services/storage_mode_service.dart';
+import 'cloud_ready_bouquet_repository.dart';
 
 enum ReadyBouquetStatus {
   fresh,
@@ -12,6 +14,7 @@ enum ReadyBouquetStatus {
 
 class ReadyBouquetSummary {
   final int productId;
+  final String? cloudProductId;
   final String productName;
   final String unit;
   final int currentStock;
@@ -23,6 +26,7 @@ class ReadyBouquetSummary {
 
   const ReadyBouquetSummary({
     required this.productId,
+    this.cloudProductId,
     required this.productName,
     required this.unit,
     required this.currentStock,
@@ -36,11 +40,15 @@ class ReadyBouquetSummary {
 
 class ReadyBouquetBatch {
   final int id;
+  final String? cloudId;
   final int finishedProductId;
+  final String? cloudFinishedProductId;
   final String productName;
   final String unit;
   final int? recipeId;
+  final String? cloudRecipeId;
   final int? productionId;
+  final String? cloudProductionId;
   final int initialQuantity;
   final int remainingQuantity;
   final int shelfLifeDays;
@@ -54,11 +62,15 @@ class ReadyBouquetBatch {
 
   const ReadyBouquetBatch({
     required this.id,
+    this.cloudId,
     required this.finishedProductId,
+    this.cloudFinishedProductId,
     required this.productName,
     required this.unit,
     required this.recipeId,
+    this.cloudRecipeId,
     this.productionId,
+    this.cloudProductionId,
     required this.initialQuantity,
     required this.remainingQuantity,
     required this.shelfLifeDays,
@@ -74,9 +86,12 @@ class ReadyBouquetBatch {
 
 class RefreshEventRecord {
   final int id;
+  final String? cloudId;
   final int batchId;
+  final String? cloudBatchId;
   final String actionType;
   final int productId;
+  final String? cloudProductId;
   final String productName;
   final int quantity;
   final int wastageQuantity;
@@ -86,9 +101,12 @@ class RefreshEventRecord {
 
   const RefreshEventRecord({
     required this.id,
+    this.cloudId,
     required this.batchId,
+    this.cloudBatchId,
     required this.actionType,
     required this.productId,
+    this.cloudProductId,
     required this.productName,
     required this.quantity,
     required this.wastageQuantity,
@@ -99,6 +117,17 @@ class RefreshEventRecord {
 }
 
 class ReadyBouquetRepository {
+  ReadyBouquetRepository({
+    StorageModeService? storageModeService,
+    CloudReadyBouquetRepository? cloudRepository,
+  })  : _storageModeService = storageModeService ?? StorageModeService(),
+        _cloudRepository = cloudRepository ?? CloudReadyBouquetRepository();
+
+  final StorageModeService _storageModeService;
+  final CloudReadyBouquetRepository _cloudRepository;
+
+  Future<bool> get _isCloud async => kIsWeb || await _storageModeService.isCloud();
+
   static ReadyBouquetStatus computeStatus({
     required DateTime producedAt,
     required DateTime? lastRefreshAt,
@@ -120,6 +149,9 @@ class ReadyBouquetRepository {
   }
 
   Future<List<ReadyBouquetSummary>> listReadyBouquets() async {
+    if (await _isCloud) {
+      return _cloudRepository.listReadyBouquets();
+    }
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery('''
       SELECT
@@ -185,7 +217,13 @@ class ReadyBouquetRepository {
     }).toList();
   }
 
-  Future<List<ReadyBouquetBatch>> listBatchesForProduct(int finishedProductId) async {
+  Future<List<ReadyBouquetBatch>> listBatchesForProduct(
+    int finishedProductId, {
+    String? cloudProductId,
+  }) async {
+    if (await _isCloud) {
+      return _cloudRepository.listBatchesForProduct(cloudProductId ?? finishedProductId);
+    }
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery('''
       SELECT
@@ -213,7 +251,10 @@ class ReadyBouquetRepository {
     return rows.map(_mapBatchRow).toList();
   }
 
-  Future<ReadyBouquetBatch?> getBatch(int batchId) async {
+  Future<ReadyBouquetBatch?> getBatch(int batchId, {String? cloudBatchId}) async {
+    if (await _isCloud) {
+      return _cloudRepository.getBatch(cloudBatchId ?? batchId);
+    }
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery('''
       SELECT
@@ -241,7 +282,10 @@ class ReadyBouquetRepository {
     return _mapBatchRow(rows.first);
   }
 
-  Future<List<RefreshEventRecord>> listRefreshEvents(int batchId) async {
+  Future<List<RefreshEventRecord>> listRefreshEvents(int batchId, {String? cloudBatchId}) async {
+    if (await _isCloud) {
+      return _cloudRepository.listRefreshEvents(cloudBatchId ?? batchId);
+    }
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery('''
       SELECT
@@ -276,10 +320,19 @@ class ReadyBouquetRepository {
 
   Future<void> expireBouquet({
     required int batchId,
+    String? cloudBatchId,
     required int quantity,
     required String reason,
     String? note,
   }) async {
+    if (await _isCloud) {
+      return _cloudRepository.expireBouquet(
+        batchId: cloudBatchId ?? batchId,
+        quantity: quantity,
+        reason: reason,
+        note: note,
+      );
+    }
     if (quantity <= 0) {
       throw StateError('Quantity must be greater than zero');
     }
@@ -332,11 +385,23 @@ class ReadyBouquetRepository {
 
   Future<void> refreshReplaceComponent({
     required int batchId,
+    String? cloudBatchId,
     required int productId,
+    String? cloudProductId,
     required int quantity,
     String? reason,
     String? note,
   }) async {
+    if (await _isCloud) {
+      return _cloudRepository.refreshBouquet(
+        batchId: cloudBatchId ?? batchId,
+        actionType: 'replace',
+        productId: cloudProductId ?? productId,
+        quantity: quantity,
+        reason: reason,
+        note: note,
+      );
+    }
     if (quantity <= 0) throw StateError('Quantity must be greater than zero');
     final db = await AppDatabase.instance.database;
     await db.transaction((txn) async {
@@ -364,11 +429,23 @@ class ReadyBouquetRepository {
 
   Future<void> refreshAddComponent({
     required int batchId,
+    String? cloudBatchId,
     required int productId,
+    String? cloudProductId,
     required int quantity,
     String? reason,
     String? note,
   }) async {
+    if (await _isCloud) {
+      return _cloudRepository.refreshBouquet(
+        batchId: cloudBatchId ?? batchId,
+        actionType: 'add',
+        productId: cloudProductId ?? productId,
+        quantity: quantity,
+        reason: reason,
+        note: note,
+      );
+    }
     if (quantity <= 0) throw StateError('Quantity must be greater than zero');
     final db = await AppDatabase.instance.database;
     await db.transaction((txn) async {
@@ -394,12 +471,25 @@ class ReadyBouquetRepository {
 
   Future<void> refreshRemoveComponent({
     required int batchId,
+    String? cloudBatchId,
     required int productId,
+    String? cloudProductId,
     required int quantity,
     required bool returnToInventory,
     String? reason,
     String? note,
   }) async {
+    if (await _isCloud) {
+      return _cloudRepository.refreshBouquet(
+        batchId: cloudBatchId ?? batchId,
+        actionType: 'remove',
+        productId: cloudProductId ?? productId,
+        quantity: quantity,
+        returnToInventory: returnToInventory,
+        reason: reason,
+        note: note,
+      );
+    }
     if (quantity <= 0) throw StateError('Quantity must be greater than zero');
     final db = await AppDatabase.instance.database;
     await db.transaction((txn) async {
@@ -443,7 +533,9 @@ class ReadyBouquetRepository {
   }
 
   Future<List<ReadyBouquetSummary>> getAttentionBouquets() async {
-    if (kIsWeb) return const [];
+    if (await _isCloud) {
+      return _cloudRepository.getAttentionBouquets();
+    }
     final all = await listReadyBouquets();
     return all
         .where((b) =>

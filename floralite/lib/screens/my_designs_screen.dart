@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +16,7 @@ import '../services/design_share_image_service.dart';
 import '../services/share_branding_settings_service.dart';
 import '../services/speech_recognition_service.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/safe_platform_image.dart';
 import '../widgets/voice_dictation_field_header.dart';
 
 enum _DesignShareOption {
@@ -305,15 +308,9 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
                       topLeft: Radius.circular(16),
                       topRight: Radius.circular(16),
                     ),
-                    child: Image.file(
-                      File(design.imagePath!),
+                    child: SafePlatformImageView(
+                      imagePath: design.imagePath,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Icon(Icons.image_not_supported_outlined,
-                              size: 48),
-                        );
-                      },
                     ),
                   )
                 : const Center(
@@ -558,10 +555,12 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
         SnackBar(content: Text('Unable to share design: $error')),
       );
     } finally {
-      for (final path in temporaryFiles) {
-        final file = File(path);
-        if (await file.exists()) {
-          await file.delete();
+      if (!kIsWeb) {
+        for (final path in temporaryFiles) {
+          final file = File(path);
+          if (await file.exists()) {
+            await file.delete();
+          }
         }
       }
     }
@@ -649,10 +648,12 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
         SnackBar(content: Text('Unable to share catalog: $error')),
       );
     } finally {
-      for (final path in temporaryFiles) {
-        final file = File(path);
-        if (await file.exists()) {
-          await file.delete();
+      if (!kIsWeb) {
+        for (final path in temporaryFiles) {
+          final file = File(path);
+          if (await file.exists()) {
+            await file.delete();
+          }
         }
       }
     }
@@ -816,7 +817,16 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
     final images = await ImagePicker().pickMultiImage(imageQuality: 85);
     if (!mounted || images.isEmpty) return;
 
-    final selectedPaths = images.map((image) => image.path).toList();
+    final List<String> selectedPaths;
+    if (kIsWeb) {
+      selectedPaths = await Future.wait(images.map((img) async {
+        final bytes = await img.readAsBytes();
+        return 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      }));
+    } else {
+      selectedPaths = images.map((image) => image.path).toList();
+    }
+    if (!mounted) return;
     List<String> importPaths = selectedPaths;
     if (selectedPaths.length > 100) {
       importPaths = selectedPaths.take(100).toList();
@@ -1070,10 +1080,19 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
                 imageQuality: 85,
               );
               if (image == null) return;
-              setDialogState(() {
-                imagePath = image.path;
-                removeImage = false;
-              });
+              if (kIsWeb) {
+                final bytes = await image.readAsBytes();
+                final dataUri = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                setDialogState(() {
+                  imagePath = dataUri;
+                  removeImage = false;
+                });
+              } else {
+                setDialogState(() {
+                  imagePath = image.path;
+                  removeImage = false;
+                });
+              }
             }
 
             return AlertDialog(
@@ -1092,13 +1111,9 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: imagePath != null && !removeImage
-                          ? Image.file(
-                              File(imagePath!),
+                          ? SafePlatformImageView(
+                              imagePath: imagePath,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Center(
-                                    child: Text('Image unavailable'));
-                              },
                             )
                           : const Center(child: Icon(Icons.photo, size: 40)),
                     ),
@@ -1377,8 +1392,8 @@ class _BulkImportReviewScreenState extends State<_BulkImportReviewScreen> {
                 itemBuilder: (context, index) {
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      File(widget.imagePaths[index]),
+                    child: SafePlatformImageView(
+                      imagePath: widget.imagePaths[index],
                       fit: BoxFit.cover,
                     ),
                   );

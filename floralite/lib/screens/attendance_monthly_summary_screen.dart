@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../data/repositories/staff_repository.dart';
 import '../models/attendance.dart';
 import '../providers/attendance_provider.dart';
+import '../providers/cloud_staff_provider.dart';
 import '../providers/staff_provider.dart';
+import '../providers/storage_mode_provider.dart';
 
 class AttendanceMonthlySummaryScreen extends StatefulWidget {
   const AttendanceMonthlySummaryScreen({super.key});
@@ -21,16 +23,33 @@ class _AttendanceMonthlySummaryScreenState extends State<AttendanceMonthlySummar
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<StaffProvider>().loadStaff();
+      final isCloud = context.read<StorageModeProvider>().isCloud;
+      if (isCloud) {
+        context.read<CloudStaffProvider>().loadStaff();
+      } else {
+        context.read<StaffProvider>().loadStaff();
+      }
       _loadSummary();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final isCloud = context.watch<StorageModeProvider>().isCloud;
     final staffProvider = context.watch<StaffProvider>();
+    final cloudStaffProvider = context.watch<CloudStaffProvider>();
     final attendanceProvider = context.watch<AttendanceProvider>();
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+
+    final List<Staff> activeStaff;
+    if (isCloud) {
+      activeStaff = cloudStaffProvider.staff
+          .where((s) => s.isActive)
+          .map((s) => s.toStaff())
+          .toList();
+    } else {
+      activeStaff = staffProvider.staff.where((s) => s.active).toList();
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -47,7 +66,7 @@ class _AttendanceMonthlySummaryScreenState extends State<AttendanceMonthlySummar
         child: Column(
           children: [
             _buildMonthHeader(),
-            _buildStaffFilter(staffProvider),
+            _buildStaffFilter(activeStaff),
             const SizedBox(height: 16),
             Expanded(
               child: _buildBody(attendanceProvider, staffProvider, bottomInset),
@@ -92,9 +111,7 @@ class _AttendanceMonthlySummaryScreenState extends State<AttendanceMonthlySummar
     );
   }
 
-  Widget _buildStaffFilter(StaffProvider staffProvider) {
-    final activeStaff = staffProvider.staff.where((s) => s.active).toList();
-    
+  Widget _buildStaffFilter(List<Staff> activeStaff) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: DropdownButtonFormField<Staff?>(
@@ -344,6 +361,7 @@ class _AttendanceMonthlySummaryScreenState extends State<AttendanceMonthlySummar
         _selectedStaff!.id,
         startDate,
         endDate,
+        _selectedStaff!.cloudId,
       );
     } else {
       attendanceProvider.loadAttendanceForDate(DateTime.now());

@@ -48,7 +48,7 @@ class ProductProvider extends ChangeNotifier {
   }
 
   Future<void> loadProducts() async {
-    if (_disposed) return;
+    if (_disposed || kIsWeb) return;
     _isLoading = true;
     _error = null;
     _notifyIfActive();

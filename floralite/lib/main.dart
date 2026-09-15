@@ -8,17 +8,23 @@ import 'package:app_links/app_links.dart';
 import 'data/repositories/customer_repository.dart';
 import 'data/repositories/category_repository.dart';
 import 'data/repositories/design_repository.dart';
+import 'data/repositories/cloud_design_repository.dart';
 import 'data/repositories/inventory_repository.dart';
 import 'data/repositories/cloud_inventory_repository.dart';
 import 'data/repositories/job_repository.dart';
 import 'data/repositories/order_repository.dart';
 import 'data/repositories/order_workflow_repository.dart';
 import 'data/repositories/occasion_repository.dart';
+import 'data/repositories/cloud_occasion_repository.dart';
 import 'data/repositories/scheduler_repository.dart';
+import 'data/repositories/cloud_scheduler_repository.dart';
 import 'data/repositories/purchase_repository.dart';
+import 'data/repositories/cloud_purchase_repository.dart';
 import 'data/repositories/associate_repository.dart';
+import 'data/repositories/cloud_associate_repository.dart';
 import 'data/repositories/staff_repository.dart';
 import 'data/repositories/attendance_repository.dart';
+import 'data/repositories/cloud_attendance_repository.dart';
 import 'screens/my_designs_screen.dart';
 import 'screens/walkin_sales_screen.dart';
 import 'screens/orders_screen.dart';
@@ -327,6 +333,8 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
           create: (context) => SchedulerProvider(
             schedulerManager,
             context.read<BusinessDataEventBus>(),
+            context.read<StorageModeProvider>(),
+            CloudSchedulerRepository(auth: mobileAuthService),
           ),
         ),
         ChangeNotifierProvider(
@@ -337,8 +345,20 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) => OccasionProvider(occasionManager, customerRepository)
-            ..loadInitial(),
+          create: (context) => CustomerProvider(
+            customerManager,
+            context.read<StorageModeProvider>(),
+            context.read<BusinessDataEventBus>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => OccasionProvider(
+            occasionManager,
+            customerRepository,
+            context.read<StorageModeProvider>(),
+            CloudOccasionRepository(auth: mobileAuthService),
+            context.read<CustomerProvider>(),
+          )..loadInitial(),
         ),
         ChangeNotifierProvider(
           create: (context) => InventoryProvider(
@@ -349,17 +369,14 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
           )..loadProducts(),
         ),
         ChangeNotifierProvider(
-          create: (context) => CustomerProvider(
-            customerManager,
-            context.read<StorageModeProvider>(),
-            context.read<BusinessDataEventBus>(),
-          ),
-        ),
-        ChangeNotifierProvider(
           create: (_) => CategoryProvider(categoryManager)..loadCategories(),
         ),
         ChangeNotifierProvider(
-          create: (_) => DesignProvider(designRepository),
+          create: (context) => DesignProvider(
+            designRepository,
+            context.read<StorageModeProvider>(),
+            CloudDesignRepository(auth: mobileAuthService),
+          ),
         ),
         ChangeNotifierProvider(
           create: (_) => ProductProvider(ProductRepository())..loadProducts(),
@@ -374,12 +391,17 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
           create: (context) => PurchaseProvider(
             purchaseManager,
             context.read<BusinessDataEventBus>(),
+            context.read<StorageModeProvider>(),
+            CloudPurchaseRepository(auth: mobileAuthService),
+            CloudInventoryRepository(auth: mobileAuthService),
           ),
         ),
         ChangeNotifierProvider(
           create: (context) => AssociateProvider(
             associateManager,
             context.read<BusinessDataEventBus>(),
+            context.read<StorageModeProvider>(),
+            CloudAssociateRepository(auth: mobileAuthService),
           ),
         ),
         ChangeNotifierProvider(
@@ -391,7 +413,11 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) => AttendanceProvider(AttendanceRepository()),
+          create: (context) => AttendanceProvider(
+            AttendanceRepository(),
+            context.read<StorageModeProvider>(),
+            CloudAttendanceRepository(auth: mobileAuthService),
+          ),
         ),
       ],
       child: Consumer<LanguageProvider>(

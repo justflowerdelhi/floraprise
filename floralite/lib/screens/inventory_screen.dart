@@ -12,6 +12,7 @@ import '../utils/locale_formatter.dart';
 import '../widgets/app_header.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/floraprise_page_header.dart';
 import '../widgets/quantity_input_stepper.dart';
 import '../widgets/voice_dictation_field_header.dart';
 
@@ -60,7 +61,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
     return Scaffold(
       appBar: AppHeader(
-        title: l10n.inventoryTitle,
+        title: FloraprisePageHeader.isDesktop(context)
+            ? null
+            : l10n.inventoryTitle,
         actions: [
           IconButton(
             icon: const Icon(Icons.mic_outlined),
@@ -83,6 +86,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
         top: false,
         child: Column(
           children: [
+            FloraprisePageHeader(
+              title: l10n.inventoryTitle,
+              subtitle: 'Keep your flowers, materials and stock under control',
+              icon: Icons.inventory_2_rounded,
+              actions: [
+                FloraprisePageHeaderAction(
+                  label: 'Stock In',
+                  icon: Icons.mic_rounded,
+                  primary: true,
+                  onPressed: () => Navigator.pushNamed(
+                    context,
+                    '/inventory/voice-entry',
+                  ),
+                ),
+              ],
+            ),
             // Low Stock Summary
             Container(
               width: double.infinity,

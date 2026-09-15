@@ -66,6 +66,7 @@ class OnboardingManager {
   }
 
   Future<void> resetOnboarding() async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     const keys = <String>[
       _completedKey,
@@ -83,6 +84,15 @@ class OnboardingManager {
   }
 
   Future<OnboardingChecklist> getChecklist() async {
+    if (kIsWeb) {
+      return const OnboardingChecklist(
+        shopSetup: true,
+        starterCatalogue: true,
+        firstCustomer: true,
+        firstSale: true,
+        printerTest: true,
+      );
+    }
     final db = await AppDatabase.instance.database;
 
     final customerRows = await db.rawQuery(
@@ -102,6 +112,7 @@ class OnboardingManager {
   }
 
   Future<bool> _readBool(String key, {required bool defaultValue}) async {
+    if (kIsWeb) return defaultValue;
     final db = await AppDatabase.instance.database;
     final rows = await db.query(
       'settings',
@@ -115,6 +126,7 @@ class OnboardingManager {
   }
 
   Future<void> _writeBool(String key, bool value) async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     await db.insert(
       'settings',

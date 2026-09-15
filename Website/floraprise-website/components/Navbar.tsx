@@ -16,8 +16,8 @@ export default function Header() {
           <Image
             src="/floraprise-title.png"
             alt="Floraprise"
-            width={120}
-            height={40}
+            width={150}
+            height={50}
             priority
             className="brand-wordmark"
           />

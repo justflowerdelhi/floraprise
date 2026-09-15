@@ -38,6 +38,7 @@ class SchedulerService {
   bool _initialized = false;
 
   Future<void> initialize() async {
+    if (kIsWeb) return;
     if (_initialized) return;
 
     tz.initializeTimeZones();
@@ -72,6 +73,7 @@ class SchedulerService {
   }
 
   Future<void> scheduleTask(int taskId) async {
+    if (kIsWeb) return;
     await initialize();
     final task = await _repository.getTask(taskId);
     if (task == null) return;
@@ -124,6 +126,7 @@ class SchedulerService {
     int taskId, {
     bool clearReminderState = true,
   }) async {
+    if (kIsWeb) return;
     await initialize();
     for (var index = 0; index < 290; index++) {
       await _notifications.cancel(_notificationId(taskId, index));
@@ -138,6 +141,7 @@ class SchedulerService {
   }
 
   Future<void> rescheduleTask(int taskId) async {
+    if (kIsWeb) return;
     debugPrint('Scheduler: rescheduled task $taskId');
     await scheduleTask(taskId);
   }
@@ -155,6 +159,7 @@ class SchedulerService {
   }
 
   Future<void> markCompleted(int taskId) async {
+    if (kIsWeb) return;
     await cancelTask(taskId);
     await _repository.updateReminderState(
       taskId: taskId,
@@ -166,6 +171,7 @@ class SchedulerService {
   }
 
   Future<void> snoozeTask(int taskId, Duration duration) async {
+    if (kIsWeb) return;
     final nextReminder = DateTime.now().add(duration);
     await cancelTask(taskId, clearReminderState: false);
     await _repository.updateReminderState(
@@ -178,6 +184,7 @@ class SchedulerService {
   }
 
   Future<void> handleNotificationResponse(NotificationResponse response) async {
+    if (kIsWeb) return;
     final payload = response.payload;
     if (payload == null || payload.trim().isEmpty) return;
     final decoded = jsonDecode(payload) as Map<String, dynamic>;

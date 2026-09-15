@@ -7,8 +7,10 @@ import '../providers/cloud_product_provider.dart';
 import '../providers/printer_provider.dart';
 import '../services/cloud_product_local_catalog_sync_service.dart';
 import '../services/sku_generator_service.dart';
+import '../widgets/app_header.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/floraprise_page_header.dart';
 import 'bouquet_builder_screen.dart';
 
 class CloudProductsScreen extends StatefulWidget {
@@ -187,8 +189,8 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
     final provider = context.watch<CloudProductProvider>();
     final isDesktop = MediaQuery.sizeOf(context).width >= 800;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cloud Products'),
+      appBar: AppHeader(
+        title: isDesktop ? null : 'Products',
         actions: [
           PopupMenuButton<ProductSort>(
             icon: const Icon(Icons.sort),
@@ -234,12 +236,28 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _editProduct(),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: isDesktop
+          ? null
+          : FloatingActionButton(
+              onPressed: () => _editProduct(),
+              child: const Icon(Icons.add),
+            ),
       body: Column(
         children: [
+          FloraprisePageHeader(
+            title: 'Products',
+            subtitle: 'Manage your flower catalogue and pricing',
+            icon: Icons.local_florist_rounded,
+            actions: [
+              FloraprisePageHeaderAction(
+                label: 'Add Product',
+                icon: Icons.add_rounded,
+                primary: true,
+                onPressed: () => _editProduct(),
+              ),
+            ],
+            decorationAlignment: Alignment.centerLeft,
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: TextField(

@@ -1,11 +1,10 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/design.dart';
 import '../providers/design_provider.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/safe_platform_image.dart';
 
 class FilteredDesignsScreen extends StatefulWidget {
   final String filterType;
@@ -121,8 +120,8 @@ class _DesignCard extends StatelessWidget {
                               topLeft: Radius.circular(16),
                               topRight: Radius.circular(16),
                             ),
-                            child: Image.file(
-                              File(design.imagePath!),
+                            child: SafePlatformImageView(
+                              imagePath: design.imagePath,
                               fit: BoxFit.cover,
                             ),
                           )

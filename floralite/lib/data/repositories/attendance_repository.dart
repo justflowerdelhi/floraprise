@@ -3,6 +3,7 @@ import '../../models/attendance.dart';
 
 class AttendanceUpsertInput {
   final int staffId;
+  final String? cloudStaffId;
   final DateTime attendanceDate;
   final AttendanceStatus status;
   final DateTime? clockIn;
@@ -12,6 +13,7 @@ class AttendanceUpsertInput {
 
   const AttendanceUpsertInput({
     required this.staffId,
+    this.cloudStaffId,
     required this.attendanceDate,
     required this.status,
     this.clockIn,

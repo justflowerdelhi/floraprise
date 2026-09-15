@@ -29,6 +29,7 @@ class LanguageManager {
   }
 
   Future<void> saveLanguage(String languageCode) async {
+    if (kIsWeb) return;
     final normalizedLanguageCode = _normalizeLanguageCode(languageCode);
     final db = await AppDatabase.instance.database;
     await db.rawInsert(
@@ -38,6 +39,7 @@ class LanguageManager {
   }
 
   Future<void> clearLanguage() async {
+    if (kIsWeb) return;
     final db = await AppDatabase.instance.database;
     await db.rawDelete('DELETE FROM settings WHERE key = ?', ['language']);
   }

@@ -15,6 +15,8 @@ class BusinessSettings {
     required this.gstRegistered,
     required this.shopName,
     required this.ownerName,
+    this.subtitle = '',
+    this.logoPath = '',
     required this.phone,
     required this.address,
     required this.defaultDeliveryChargePaise,
@@ -24,6 +26,8 @@ class BusinessSettings {
 
   final String shopName;
   final String ownerName;
+  final String subtitle;
+  final String logoPath;
   final String phone;
   final String address;
   final bool gstRegistered;
@@ -78,6 +82,8 @@ class BusinessSettingsManager {
           return BusinessSettings(
             shopName: cloudProfile.name.trim(),
             ownerName: '',
+            subtitle: cloudProfile.shortDescription?.trim() ?? '',
+            logoPath: '',
             phone: cloudProfile.phone?.trim() ?? '',
             address: cloudProfile.address?.trim() ?? '',
             gstRegistered: taxId.isNotEmpty,
@@ -90,6 +96,8 @@ class BusinessSettingsManager {
       return const BusinessSettings(
         shopName: 'Floraprise',
         ownerName: '',
+        subtitle: '',
+        logoPath: '',
         phone: '',
         address: '',
         gstRegistered: false,
@@ -108,6 +116,8 @@ class BusinessSettingsManager {
         return BusinessSettings(
           shopName: cloudProfile.name.trim(),
           ownerName: '',
+          subtitle: cloudProfile.shortDescription?.trim() ?? '',
+          logoPath: '',
           phone: cloudProfile.phone?.trim() ?? '',
           address: cloudProfile.address?.trim() ?? '',
           gstRegistered: taxId.isNotEmpty,
@@ -125,6 +135,8 @@ class BusinessSettingsManager {
       return BusinessSettings(
         shopName: profile.shopName,
         ownerName: profile.ownerName,
+        subtitle: '',
+        logoPath: await getLogoPath(),
         phone: profile.mobileNumber,
         address: profile.address ?? '',
         gstRegistered: profile.gstRegistered,
@@ -154,6 +166,8 @@ class BusinessSettingsManager {
     return BusinessSettings(
       shopName: _fallback(shopName, 'My Flower Shop'),
       ownerName: _fallback(ownerName, ''),
+      subtitle: '',
+      logoPath: await getLogoPath(),
       phone: _fallback(phone, ''),
       address: _fallback(address, ''),
       gstRegistered: gstRegistered,

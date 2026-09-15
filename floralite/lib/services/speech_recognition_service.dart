@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
@@ -61,11 +62,13 @@ class SpeechRecognitionService {
       return false;
     }
 
-    final hasPermission = await _speech.hasPermission;
-    if (!hasPermission) {
-      _startFailureMessage =
-          'Microphone permission is missing for speech recognition.';
-      return false;
+    if (!kIsWeb) {
+      final hasPermission = await _speech.hasPermission;
+      if (!hasPermission) {
+        _startFailureMessage =
+            'Microphone permission is missing for speech recognition.';
+        return false;
+      }
     }
 
     final isAvailable = _speech.isAvailable;
@@ -251,6 +254,7 @@ class SpeechRecognitionService {
   }
 
   Future<bool> _ensureRuntimePermission() async {
+    if (kIsWeb) return true;
     final granted = await FirstUsePermissionService.ensurePermission(
       context: _context,
       flowKey: 'microphone.voice_entry',

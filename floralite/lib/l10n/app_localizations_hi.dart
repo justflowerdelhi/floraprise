@@ -159,10 +159,10 @@ class AppLocalizationsHi extends AppLocalizations {
   String get howCustomerReceive => 'ग्राहक ऑर्डर कैसे प्राप्त करेगा?';
 
   @override
-  String get takeAway => 'टेक अवे';
+  String get takeAway => 'वॉक-इन सेल';
 
   @override
-  String get takeAwayDesc => 'ग्राहक अभी लेता है';
+  String get takeAwayDesc => 'ग्राहक अभी ऑर्डर लेता है';
 
   @override
   String get pickupLater => 'पिकअप बाद में';

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +12,7 @@ class FirstUsePermissionService {
     required String title,
     required String body,
   }) async {
+    if (kIsWeb) return true;
     final shouldExplain = await _shouldExplain(flowKey);
     if (!context.mounted) {
       return false;
@@ -40,6 +42,7 @@ class FirstUsePermissionService {
     required String body,
     required String permanentlyDeniedMessage,
   }) async {
+    if (kIsWeb) return true;
     final status = await permission.status;
     if (status.isGranted || status.isLimited) {
       return true;

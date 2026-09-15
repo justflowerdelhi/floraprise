@@ -44,6 +44,8 @@ public class SumpoojDbContext
     public DbSet<Delivery> Deliveries => Set<Delivery>();
     public DbSet<DriverLocation> DriverLocations => Set<DriverLocation>();
     public DbSet<DeliverySettings> DeliverySettings => Set<DeliverySettings>();
+    public DbSet<ShareBrandingSettings> ShareBrandingSettings => Set<ShareBrandingSettings>();
+    public DbSet<RewardsSettings> RewardsSettings => Set<RewardsSettings>();
     public DbSet<DriverAnalytics> DriverAnalytics => Set<DriverAnalytics>();
     public DbSet<Staff> Staff => Set<Staff>();
     public DbSet<Event> Events => Set<Event>();

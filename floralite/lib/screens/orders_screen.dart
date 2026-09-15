@@ -5,6 +5,7 @@ import '../models/order_workspace_models.dart';
 import '../providers/order_provider.dart';
 import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/floraprise_page_header.dart';
 import 'order_detail_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -62,7 +63,7 @@ class _OrdersScreenState extends State<OrdersScreen>
 
     return Scaffold(
       appBar: AppHeader(
-        title: l10n.orders,
+        title: FloraprisePageHeader.isDesktop(context) ? null : l10n.orders,
         bottom: TabBar(
           controller: _tabController,
           tabs: [
@@ -78,6 +79,23 @@ class _OrdersScreenState extends State<OrdersScreen>
         top: false,
         child: Column(
           children: [
+            FloraprisePageHeader(
+              title: l10n.orders,
+              subtitle: 'Manage orders, payments and fulfilment',
+              icon: Icons.receipt_long_rounded,
+              actions: [
+                FloraprisePageHeaderAction(
+                  label: l10n.newOrder,
+                  icon: Icons.add_rounded,
+                  primary: true,
+                  onPressed: () => Navigator.pushNamed(
+                    context,
+                    '/walkin-sales',
+                  ),
+                ),
+              ],
+              variant: FloraprisePageHeaderVariant.compact,
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Row(
@@ -314,11 +332,13 @@ class _OrdersScreenState extends State<OrdersScreen>
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.pushNamed(context, '/walkin-sales'),
-        icon: const Icon(Icons.add),
-        label: Text(l10n.newOrder),
-      ),
+      floatingActionButton: FloraprisePageHeader.isDesktop(context)
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => Navigator.pushNamed(context, '/walkin-sales'),
+              icon: const Icon(Icons.add),
+              label: Text(l10n.newOrder),
+            ),
     );
   }
 

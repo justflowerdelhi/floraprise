@@ -7,6 +7,7 @@ import 'package:floraprise/providers/dashboard_provider.dart';
 import 'package:floraprise/providers/subscription_provider.dart';
 import 'package:floraprise/screens/main_shell_screen.dart';
 import 'package:floraprise/services/subscription_service.dart';
+import 'package:floraprise/widgets/floraprise_brand.dart';
 import 'package:provider/provider.dart';
 
 import 'package:floraprise/l10n/app_localizations.dart';
@@ -290,7 +291,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify branding in desktop sidebar
-      expect(find.text('Floraprise'), findsWidgets);
+      expect(find.byType(FlorapriseBrand), findsOneWidget);
       expect(find.text('Pro Cloud'), findsOneWidget);
 
       // Verify section headers appear in desktop sidebar

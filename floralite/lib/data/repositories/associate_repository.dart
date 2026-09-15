@@ -87,6 +87,7 @@ extension AssociateTypeExtension on AssociateType {
 
 class AssociateRecord {
   final int id;
+  final String? cloudId;
   final String associateCode;
   final String businessName;
   final String? contactPerson;
@@ -108,6 +109,7 @@ class AssociateRecord {
 
   const AssociateRecord({
     required this.id,
+    this.cloudId,
     required this.associateCode,
     required this.businessName,
     this.contactPerson,
@@ -127,6 +129,62 @@ class AssociateRecord {
     required this.updatedAt,
     this.deletedAt,
   });
+
+  factory AssociateRecord.fromCloudJson(Map<String, dynamic> json) {
+    final idStr = (json['id'] ?? json['Id'])?.toString() ?? '';
+    final code = (json['associateCode'] ?? json['AssociateCode'] ?? 'ASC').toString();
+    final bName = (json['businessName'] ?? json['BusinessName'] ?? '').toString();
+    final cPerson = (json['contactPerson'] ?? json['ContactPerson'])?.toString();
+    final phone = (json['phone'] ?? json['Phone'] ?? '').toString();
+    final whatsapp = (json['whatsapp'] ?? json['Whatsapp'])?.toString();
+    final email = (json['email'] ?? json['Email'])?.toString();
+    final city = (json['city'] ?? json['City'] ?? '').toString();
+    final state = (json['state'] ?? json['State'])?.toString();
+    final pincode = (json['pincode'] ?? json['Pincode'] ?? '').toString();
+    final address = (json['address'] ?? json['Address'])?.toString();
+    final gst = (json['gstNumber'] ?? json['GstNumber'])?.toString();
+    final website = (json['website'] ?? json['Website'])?.toString();
+    final notes = (json['notes'] ?? json['Notes'])?.toString();
+    final active = (json['isActive'] ?? json['IsActive']) == true;
+    final created = (json['createdAtUtc'] ?? json['CreatedAtUtc'])?.toString() ??
+        DateTime.now().toIso8601String();
+    final updated =
+        (json['updatedAtUtc'] ?? json['UpdatedAtUtc'])?.toString() ?? created;
+    final deleted = (json['deletedAtUtc'] ?? json['DeletedAtUtc'])?.toString();
+
+    List<AssociateType> typesList = const [AssociateType.other];
+    final rawTypes = json['types'] ?? json['Types'];
+    if (rawTypes is List) {
+      typesList = rawTypes
+          .map((t) => AssociateTypeExtension.fromStorageValue(t.toString().trim()))
+          .toList();
+    } else if (rawTypes is String) {
+      typesList = AssociateRecord.parseTypes(rawTypes);
+    }
+
+    return AssociateRecord(
+      id: int.tryParse(idStr) ?? idStr.hashCode.abs(),
+      cloudId: idStr,
+      associateCode: code,
+      businessName: bName,
+      contactPerson: cPerson,
+      phone: phone,
+      whatsapp: whatsapp,
+      email: email,
+      city: city,
+      state: state,
+      pincode: pincode,
+      address: address,
+      gstNumber: gst,
+      website: website,
+      notes: notes,
+      types: typesList.isEmpty ? const [AssociateType.other] : typesList,
+      isActive: active,
+      createdAt: created,
+      updatedAt: updated,
+      deletedAt: deleted,
+    );
+  }
 
   String get typesDisplay {
     return types.map((t) => t.displayName).join(', ');
