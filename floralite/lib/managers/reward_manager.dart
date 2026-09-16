@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../data/database/app_database.dart';
@@ -77,9 +77,9 @@ class RewardManager {
         return _cachedSettings!;
       }
 
-      final token = await _authService.getStoredAccessToken();
-      if (token != null && token.trim().isNotEmpty) {
-        try {
+      try {
+        final token = await _authService.getStoredAccessToken();
+        if (token != null && token.trim().isNotEmpty) {
           final fetched = await _cloudRepository.fetchSettings(
             baseUrl: _authService.baseUrl,
             accessToken: token,
@@ -87,10 +87,10 @@ class RewardManager {
           _cachedSettings = fetched;
           _lastCacheFetchTime = now;
           return fetched;
-        } catch (_) {
-          if (_cachedSettings != null) {
-            return _cachedSettings!;
-          }
+        }
+      } catch (_) {
+        if (_cachedSettings != null) {
+          return _cachedSettings!;
         }
       }
       return _cachedSettings ?? RewardSettings.defaults;
@@ -128,7 +128,12 @@ class RewardManager {
 
   Future<void> saveSettings(RewardSettings settings) async {
     if (await _isCloud) {
-      final token = await _authService.getStoredAccessToken();
+      String? token;
+      try {
+        token = await _authService.getStoredAccessToken();
+      } catch (_) {
+        throw StateError('You must be logged in to save reward settings.');
+      }
       if (token == null || token.trim().isEmpty) {
         throw StateError('You must be logged in to save reward settings.');
       }

@@ -173,8 +173,28 @@ public sealed class MobileSettingsControllerTests
  Assert.False(getDto.Enabled);
  Assert.Equal(8000, getDto.EarnSpendPaisePerPoint);
  Assert.Equal(25000, getDto.MinimumBillPaise);
- Assert.Equal(200, getDto.PointValuePaise);
- }
+        Assert.Equal(200, getDto.PointValuePaise);
+    }
+
+    [Fact]
+    public async Task PutRewards_WhenZeroPercentRedemption_Succeeds()
+    {
+        await using var db = CreateDb();
+        var controller = Controller(db);
+
+        var request = new UpdateRewardsSettingsRequest(
+            Enabled: true,
+            EarnSpendPaisePerPoint: 10000,
+            MinimumBillPaise: 30000,
+            PointValuePaise: 100,
+            MaximumRedemptionPercent: 0,
+            ExpiryDays: 365);
+
+        var result = await controller.UpdateRewards(request, CancellationToken.None);
+        var dto = AssertOk<RewardsSettingsDto>(result);
+
+        Assert.Equal(0, dto.MaximumRedemptionPercent);
+    }
 
  [Theory]
  [InlineData(0, 100, 100, 20, 365)]

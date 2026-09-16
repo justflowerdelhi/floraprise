@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
@@ -134,7 +134,12 @@ class ShareBrandingSettingsService {
 
   Future<void> saveSettings(ShareBrandingSettings settings) async {
     if (await _isCloud) {
-      final token = await _authService.getStoredAccessToken();
+      String? token;
+      try {
+        token = await _authService.getStoredAccessToken();
+      } catch (_) {
+        throw StateError('You must be logged in to save branding settings.');
+      }
       if (token == null || token.trim().isEmpty) {
         throw StateError('You must be logged in to save branding settings.');
       }
