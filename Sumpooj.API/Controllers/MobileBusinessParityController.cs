@@ -39,8 +39,19 @@ public class OccasionContactsController : MobileParityControllerBase
         if (from.HasValue) rows = rows.Where(x => x.OccasionDate >= from.Value.ToUniversalTime().Date);
         if (to.HasValue) rows = rows.Where(x => x.OccasionDate <= to.Value.ToUniversalTime().Date);
         if (!string.IsNullOrWhiteSpace(occasion)) rows = rows.Where(x => x.Occasion.ToLower().Contains(occasion.Trim().ToLower()));
-        if (!string.IsNullOrWhiteSpace(query)) { var q = query.Trim().ToLower(); rows = rows.Where(x => x.RecipientName.ToLower().Contains(q) || x.Relationship.ToLower().Contains(q) || x.Occasion.ToLower().Contains(q) || x.RecipientPhone.Contains(q)); }
-        return Ok(await WithCustomer(rows).OrderBy(x => x.Contact.OccasionDate).ThenBy(x => x.Contact.RecipientName).ToListAsync());
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var q = query.Trim().ToLower();
+            rows = rows.Where(x => x.RecipientName.ToLower().Contains(q) || x.Relationship.ToLower().Contains(q) || x.Occasion.ToLower().Contains(q) || x.RecipientPhone.Contains(q));
+        }
+
+        var results = await (
+            from contact in rows
+            join customer in Db.Customers on contact.CustomerId equals customer.Id
+            orderby contact.OccasionDate, contact.RecipientName
+            select new OccasionContactResponse(contact, customer.Name, customer.Phone)
+        ).ToListAsync();
+        return Ok(results);
     }
 
     [HttpGet("{id:guid}")]
