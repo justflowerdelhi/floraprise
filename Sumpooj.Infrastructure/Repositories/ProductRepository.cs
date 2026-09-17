@@ -56,7 +56,11 @@ public class ProductRepository : IProductRepository
 
     public async Task UpdateAsync(Product product)
     {
-        _db.Products.Update(product);
+        var entry = _db.Entry(product);
+        if (entry.State == EntityState.Detached)
+        {
+            _db.Products.Update(product);
+        }
         await _db.SaveChangesAsync();
     }
 
@@ -205,7 +209,9 @@ GROUP BY c.table_name";
             q = q.Where(p =>
                 p.Name.ToLower().Contains(query) ||
                 p.Sku.ToLower().Contains(query) ||
-                (p.Description != null && p.Description.ToLower().Contains(query)));
+                (p.Description != null && p.Description.ToLower().Contains(query)) ||
+                (p.Barcode != null && p.Barcode.ToLower().Contains(query)) ||
+                _db.Barcodes.Any(b => b.ProductId == p.Id && b.Value.ToLower().Contains(query)));
         }
 
         if (!string.IsNullOrWhiteSpace(productType))
@@ -315,5 +321,6 @@ GROUP BY c.table_name";
     public Task<Product?> GetByBarcodeAsync(string barcode)
         => _db.Products
             .Include(p => p.ProductCategoryRef)
-            .FirstOrDefaultAsync(p => p.Barcode == barcode);
+            .Include(p => p.TaxRule)
+            .FirstOrDefaultAsync(p => p.Barcode == barcode || _db.Barcodes.Any(b => b.ProductId == p.Id && b.Value == barcode));
 }

@@ -402,13 +402,29 @@ class CustomerRepository {
     String query, {
     String? companyId,
     bool includeUnassigned = false,
+    List<String>? purchasedCategories,
   }) async {
     final db = await AppDatabase.instance.database;
     final tenantClause = _tenantWhereClause(
       companyId,
       includeUnassigned: includeUnassigned,
     );
-    final whereArgs = <Object>['%$query%', '%$query%'];
+
+    final whereArgs = <Object>[];
+    String categoryJoin = '';
+    String categoryWhere = '';
+
+    if (purchasedCategories != null && purchasedCategories.isNotEmpty) {
+      categoryJoin = '''
+        INNER JOIN orders cat_o ON cat_o.customer_id = c.id AND cat_o.status NOT IN ('cancelled', 'draft')
+        INNER JOIN order_lines cat_ol ON cat_ol.order_id = cat_o.id
+        INNER JOIN products cat_p ON cat_p.id = cat_ol.product_id
+      ''';
+      categoryWhere = 'AND LOWER(cat_p.category) IN (${purchasedCategories.map((_) => 'LOWER(?)').join(', ')})';
+      whereArgs.addAll(purchasedCategories);
+    }
+
+    whereArgs.addAll(['%$query%', '%$query%']);
     if (companyId != null && companyId.trim().isNotEmpty) {
       whereArgs.add(companyId.trim());
     }
@@ -416,7 +432,9 @@ class CustomerRepository {
     final rows = await db.rawQuery(
       '''
       $_baseSelect
+      $categoryJoin
       WHERE c.deleted_at IS NULL
+        $categoryWhere
         AND (c.name LIKE ? OR c.phone LIKE ?)
         $tenantClause
       GROUP BY c.id
@@ -426,6 +444,24 @@ class CustomerRepository {
     );
 
     return rows.map(_mapCustomerRow).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getPurchaseInsights(int customerId) async {
+    final db = await AppDatabase.instance.database;
+    final rows = await db.rawQuery('''
+      SELECT
+        p.category as categoryName,
+        COUNT(DISTINCT o.id) as orderCount,
+        SUM(ol.line_total_paise) as totalAmountSpentPaise,
+        MAX(o.created_at) as lastPurchaseDate
+      FROM orders o
+      JOIN order_lines ol ON o.id = ol.order_id
+      JOIN products p ON ol.product_id = p.id
+      WHERE o.customer_id = ? AND o.status NOT IN ('cancelled', 'draft')
+      GROUP BY LOWER(p.category)
+      ORDER BY totalAmountSpentPaise DESC
+    ''', [customerId]);
+    return rows;
   }
 
   Future<int> getTodayBirthdayCount({

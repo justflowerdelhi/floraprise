@@ -74,7 +74,7 @@ class CloudCustomerException implements Exception {
   String toString() => message;
 }
 
-typedef CloudCustomerHttpSender = Future<Map<String, dynamic>> Function(
+typedef CloudCustomerHttpSender = Future<dynamic> Function(
   String method,
   Uri uri, {
   Map<String, dynamic>? body,
@@ -91,8 +91,8 @@ class CloudCustomerRepository {
   final CloudCustomerHttpSender? _sender;
   final Map<String, CloudCustomerStatistics> _statisticsCache = {};
 
-  Future<List<CloudCustomer>> getAll({String? query}) async {
-    final queryParameters = <String, String>{
+  Future<List<CloudCustomer>> getAll({String? query, List<String>? purchasedCategories}) async {
+    final queryParameters = <String, dynamic>{
       'page': '1',
       'pageSize': '500',
     };
@@ -102,13 +102,19 @@ class CloudCustomerRepository {
       queryParameters['query'] = trimmedQuery;
     }
 
+    if (purchasedCategories != null && purchasedCategories.isNotEmpty) {
+      for (var i = 0; i < purchasedCategories.length; i++) {
+        queryParameters['purchasedCategories[$i]'] = purchasedCategories[i];
+      }
+    }
+
     final response = await _send(
       'GET',
       Uri.parse('${_auth.baseUrl}/api/customers/search')
-          .replace(queryParameters: queryParameters),
+          .replace(queryParameters: queryParameters.map((k, v) => MapEntry(k, v.toString()))),
     );
 
-    final rawItems = response['items'] ?? response['Items'] ?? [];
+    final rawItems = response is Map ? (response['items'] ?? response['Items'] ?? []) : [];
     if (rawItems is! List) return const [];
 
     return rawItems
@@ -133,11 +139,11 @@ class CloudCustomerRepository {
       ),
     );
 
-    if (response.isEmpty || _readString(response, 'id').isEmpty) {
+    if (response is Map && (response.isEmpty || _readString(response as Map<String, dynamic>, 'id').isEmpty)) {
       return null;
     }
 
-    return CloudCustomer.fromJson(response);
+    return CloudCustomer.fromJson(response as Map<String, dynamic>);
   }
 
   Future<CloudCustomerStatistics?> getStatistics(
@@ -161,15 +167,45 @@ class CloudCustomerRepository {
           '${Uri.encodeComponent(normalizedCustomerId)}/statistics',
         ),
       );
-      if (response.isEmpty) {
+      if (response is Map && response.isEmpty) {
         return cached;
       }
 
-      final stats = CloudCustomerStatistics.fromJson(response);
+      final stats = CloudCustomerStatistics.fromJson(response as Map<String, dynamic>);
       _statisticsCache[cacheKey] = stats;
       return stats;
     } catch (_) {
       return cached;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getPurchaseInsights(String cloudCustomerId) async {
+    final normalizedCustomerId = cloudCustomerId.trim();
+    if (normalizedCustomerId.isEmpty) return [];
+
+    try {
+      final response = await _send(
+        'GET',
+        Uri.parse(
+          '${_auth.baseUrl}/api/v1/mobile/customers/'
+          '${Uri.encodeComponent(normalizedCustomerId)}/purchase-insights',
+        ),
+      );
+
+      if (response is List) {
+        return List<Map<String, dynamic>>.from(response);
+      } else if (response is Map && response.containsKey('items') && response['items'] is List) {
+        return List<Map<String, dynamic>>.from(response['items']);
+      } else if (response is Map && response.isEmpty) {
+         return [];
+      } else if (response is Map && (response.containsKey('categoryName') || response.containsKey('CategoryName'))) {
+         return [Map<String, dynamic>.from(response)];
+      }
+
+      // Attempt to handle cases where the returned type might not be mapped properly by _decode
+      return [];
+    } catch (_) {
+      return [];
     }
   }
 
@@ -186,7 +222,7 @@ class CloudCustomerRepository {
       },
     );
 
-    final returnedId = _readString(response, 'id').trim();
+    final returnedId = response is Map ? _readString(response as Map<String, dynamic>, 'id').trim() : '';
     if (returnedId.isNotEmpty) return returnedId;
 
     final created = await findByPhone(phone);
@@ -225,7 +261,7 @@ class CloudCustomerRepository {
     );
   }
 
-  Future<Map<String, dynamic>> _send(
+  Future<dynamic> _send(
     String method,
     Uri uri, {
     Map<String, dynamic>? body,
@@ -289,10 +325,10 @@ class CloudCustomerRepository {
             : _decode(responseBody);
 
         if (statusCode < 200 || statusCode >= 300) {
-          final message = decoded['message'] ??
+          final message = decoded is Map ? (decoded['message'] ??
               decoded['detail'] ??
               decoded['title'] ??
-              decoded['error'];
+              decoded['error']) : null;
 
           throw CloudCustomerException(
             message?.toString() ??
@@ -317,12 +353,10 @@ class CloudCustomerRepository {
     throw const CloudCustomerException('Cloud customer request failed.');
   }
 
-  static Map<String, dynamic> _decode(String text) {
+  static dynamic _decode(String text) {
     try {
       final value = jsonDecode(text);
-      return value is Map
-          ? Map<String, dynamic>.from(value)
-          : <String, dynamic>{};
+      return value;
     } catch (_) {
       return <String, dynamic>{};
     }

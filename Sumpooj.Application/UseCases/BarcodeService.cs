@@ -102,12 +102,24 @@ public class BarcodeService
         var value = request.Barcode?.Trim() ?? string.Empty;
 
         var match = value.Length == 0 ? null : await _barcodeRepo.GetByCompanyAndValueAsync(companyId, value);
-        if (match == null)
+        Product? product = null;
+        string? foundByType = null;
+
+        if (match != null)
         {
-            return new SearchBarcodeResponse { Found = false, SearchedTypes = searchedTypes };
+            product = await _productRepo.GetByIdAsync(companyId, match.ProductId);
+            foundByType = match.Type == BarcodeType.Manufacturer ? "MANUFACTURER" : "INTERNAL";
+        }
+        else if (value.Length > 0)
+        {
+            var p = await _productRepo.GetByBarcodeAsync(value);
+            if (p != null && p.CompanyId == companyId)
+            {
+                product = p;
+                foundByType = "MANUFACTURER";
+            }
         }
 
-        var product = await _productRepo.GetByIdAsync(companyId, match.ProductId);
         if (product == null || (!request.IncludeOutOfStock && product.StockQuantity <= 0))
         {
             return new SearchBarcodeResponse { Found = false, SearchedTypes = searchedTypes };
@@ -125,9 +137,9 @@ public class BarcodeService
                 Unit = product.UnitOfMeasure.ToString(),
                 UnitPrice = product.RetailPrice,
                 StockLevel = product.StockQuantity,
-                ExternalBarcode = allBarcodes.FirstOrDefault(b => b.Type == BarcodeType.Manufacturer)?.Value,
+                ExternalBarcode = allBarcodes.FirstOrDefault(b => b.Type == BarcodeType.Manufacturer)?.Value ?? product.Barcode,
                 InternalBarcode = allBarcodes.FirstOrDefault(b => b.Type == BarcodeType.Internal)?.Value,
-                FoundByType = match.Type == BarcodeType.Manufacturer ? "MANUFACTURER" : "INTERNAL"
+                FoundByType = foundByType ?? "MANUFACTURER"
             },
             SearchedTypes = searchedTypes
         };

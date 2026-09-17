@@ -199,6 +199,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       appBar: const AppHeader(),
       body: SafeArea(
         child: SingleChildScrollView(
+          primary: true,
           padding: EdgeInsets.fromLTRB(
             isDesktop ? 28 : 16,
             isDesktop ? 20 : 12,

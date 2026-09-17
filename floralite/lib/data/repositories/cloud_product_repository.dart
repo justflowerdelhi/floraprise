@@ -74,14 +74,20 @@ class CloudProduct {
   final DateTime? updatedAtUtc;
 
   factory CloudProduct.fromJson(Map<String, dynamic> json) {
+    final rawBarcode = _nullableString(json, 'barcode');
+    final rawMfg = _nullableString(json, 'manufacturerBarcode');
+    final rawInt = _nullableString(json, 'internalBarcode');
+    final effectiveMfg = rawMfg ?? rawBarcode;
+    final effectiveBarcode = rawBarcode ?? rawMfg ?? rawInt;
+
     return CloudProduct(
       id: _string(json, 'id'),
       companyId: _string(json, 'companyId'),
       name: _string(json, 'name'),
       sku: _string(json, 'sku'),
-      barcode: _nullableString(json, 'barcode'),
-      manufacturerBarcode: _nullableString(json, 'manufacturerBarcode'),
-      internalBarcode: _nullableString(json, 'internalBarcode'),
+      barcode: effectiveBarcode,
+      manufacturerBarcode: effectiveMfg,
+      internalBarcode: rawInt,
       brand: _nullableString(json, 'brand'),
       description: _nullableString(json, 'description'),
       category: _string(json, 'category', fallback: 'Other'),
@@ -181,8 +187,9 @@ class CloudProductInput {
         // Omitted entirely when blank so the backend's default (0) applies
         // instead of sending a JSON null into a non-nullable field.
         if (costPrice != null) 'costPrice': costPrice,
-        // Backend's Barcode field represents the Manufacturer barcode.
+        // Backend's Barcode and ManufacturerBarcode fields
         'barcode': manufacturerBarcode,
+        'manufacturerBarcode': manufacturerBarcode,
         'description': description,
         'trackInventory': trackInventory,
         'trackBatch': trackBatch,
@@ -201,6 +208,7 @@ class CloudProductInput {
         'productName': name,
         'categoryId': categoryId,
         'barcode': manufacturerBarcode,
+        'manufacturerBarcode': manufacturerBarcode,
         'description': description,
         'retailPrice': retailPrice,
         // Omitted when blank so the backend's UpdateProductRequest.CostPrice

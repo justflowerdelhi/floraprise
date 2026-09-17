@@ -35,10 +35,13 @@ public class RazorpayGateway : BasePaymentGateway
 
     public override async Task<CreatePaymentResultDto> CreatePaymentAsync(CreatePaymentDto request, PaymentTransaction transaction)
     {
+        var amountInPaise = (long)Math.Round(request.Amount * 100, MidpointRounding.AwayFromZero);
+        var currency = string.IsNullOrWhiteSpace(request.Currency) ? Currency : request.Currency;
+
         var orderRequest = new
         {
-            amount = (int)(request.Amount * 100), // Razorpay expects amount in paise
-            currency = request.Currency,
+            amount = amountInPaise, // Razorpay expects amount in paise
+            currency = currency,
             receipt = transaction.TransactionRef,
             notes = request.Metadata ?? new Dictionary<string, string>()
         };
@@ -65,9 +68,9 @@ public class RazorpayGateway : BasePaymentGateway
             AdditionalData: new Dictionary<string, object>
             {
                 ["key"] = PublicKey,
-                ["amount"] = (int)(request.Amount * 100),
-                ["currency"] = request.Currency,
-                ["name"] = Config?.Company?.Name ?? "FloraEdge",
+                ["amount"] = amountInPaise,
+                ["currency"] = currency,
+                ["name"] = Config?.Company?.Name ?? "Floraprise",
                 ["order_id"] = orderId
             }
         );
@@ -75,12 +78,28 @@ public class RazorpayGateway : BasePaymentGateway
 
     public override async Task<VerifyPaymentResultDto> VerifyPaymentAsync(VerifyPaymentDto request)
     {
+        // Check order ID from AdditionalData
+        string? razorpayOrderId = null;
+        if (request.AdditionalData != null)
+        {
+            if (request.AdditionalData.TryGetValue("razorpay_order_id", out var rOid))
+                razorpayOrderId = rOid;
+            else if (request.AdditionalData.TryGetValue("order_id", out var oid))
+                razorpayOrderId = oid;
+        }
+
+        if (string.IsNullOrEmpty(razorpayOrderId) || string.IsNullOrEmpty(request.GatewayPaymentId))
+        {
+            return new VerifyPaymentResultDto(false, GatewayPaymentStatus.Failed, "Missing order ID or payment ID", null);
+        }
+
         // Verify signature
-        var payload = $"{request.AdditionalData?["razorpay_order_id"]}|{request.GatewayPaymentId}";
+        var payload = $"{razorpayOrderId}|{request.GatewayPaymentId}";
         var expectedSignature = ComputeHmacSha256(payload, SecretKey);
 
         if (request.GatewaySignature != expectedSignature)
         {
+            Logger.LogWarning("Invalid Razorpay signature for order {OrderId}, payment {PaymentId}", razorpayOrderId, request.GatewayPaymentId);
             return new VerifyPaymentResultDto(false, GatewayPaymentStatus.Failed, "Invalid signature", null);
         }
 
@@ -113,9 +132,10 @@ public class RazorpayGateway : BasePaymentGateway
 
     public override async Task<RefundResultDto> RefundAsync(PaymentTransaction transaction, decimal amount, string? reason)
     {
+        var refundAmountInPaise = (long)Math.Round(amount * 100, MidpointRounding.AwayFromZero);
         var refundRequest = new
         {
-            amount = (int)(amount * 100),
+            amount = refundAmountInPaise,
             notes = new { reason = reason ?? "Customer requested refund" }
         };
 
@@ -151,14 +171,33 @@ public class RazorpayGateway : BasePaymentGateway
         var eventType = data.GetProperty("event").GetString();
         var paymentEntity = data.GetProperty("payload").GetProperty("payment").GetProperty("entity");
 
+        var webhookData = new Dictionary<string, object>();
+        if (paymentEntity.TryGetProperty("fee", out var feeEl) && feeEl.ValueKind == JsonValueKind.Number)
+        {
+            webhookData["fee"] = feeEl.GetDecimal() / 100m;
+        }
+        if (paymentEntity.TryGetProperty("method", out var mEl))
+            webhookData["method"] = mEl.GetString() ?? "";
+        if (paymentEntity.TryGetProperty("vpa", out var vpaEl))
+            webhookData["vpa"] = vpaEl.GetString() ?? "";
+        if (paymentEntity.TryGetProperty("card", out var cardEl) && cardEl.ValueKind == JsonValueKind.Object)
+        {
+            if (cardEl.TryGetProperty("last4", out var l4))
+                webhookData["card_last4"] = l4.GetString() ?? "";
+            if (cardEl.TryGetProperty("network", out var net))
+                webhookData["card_brand"] = net.GetString() ?? "";
+        }
+
+        var amountInPaise = paymentEntity.GetProperty("amount").GetDecimal();
+
         return Task.FromResult<WebhookEventDto?>(new WebhookEventDto(
             EventType: eventType ?? "unknown",
             PaymentId: paymentEntity.GetProperty("id").GetString(),
             OrderId: paymentEntity.TryGetProperty("order_id", out var oid) ? oid.GetString() : null,
             NewStatus: MapEventToStatus(eventType),
-            Amount: paymentEntity.GetProperty("amount").GetDecimal() / 100,
+            Amount: amountInPaise / 100m,
             Currency: paymentEntity.GetProperty("currency").GetString(),
-            Data: null
+            Data: webhookData
         ));
     }
 

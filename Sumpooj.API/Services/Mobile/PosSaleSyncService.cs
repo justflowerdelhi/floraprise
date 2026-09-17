@@ -271,10 +271,7 @@ public sealed class PosSaleSyncService : IPosSaleSyncService
         if (!string.IsNullOrWhiteSpace(request.Order.CardMessage)) order.SetCardMessage(request.Order.CardMessage);
         if (!string.IsNullOrWhiteSpace(request.Order.DeliverySlot)) order.SetTimeSlot(request.Order.DeliverySlot);
 
-        var orderTime = request.Order.ConfirmedAt.HasValue
-            ? request.Order.ConfirmedAt.Value.TimeOfDay
-            : (request.Order.ScheduledAt.HasValue ? request.Order.ScheduledAt.Value.TimeOfDay : TimeSpan.Zero);
-        order.SetOrderDate(businessDate.Add(orderTime));
+        order.SetOrderDate(businessDate);
 
         order.Confirm();
         return order;

@@ -182,16 +182,16 @@ public class CloudReportingFilterTests
         var controller = new CrmController(db, new TenantContext(companyId));
 
         var sorted = Unwrap<PagedResult<CrmCustomerDto>>(
-            await controller.GetCustomers(new CrmCustomerListRequest(null, 1, 1, "lifetimeValue")));
+            await controller.GetCustomers(new CrmCustomerListRequest(null, null, 1, 1, "lifetimeValue")));
         Assert.Equal(3, sorted.TotalCount);
         Assert.Equal("Big Spender", Assert.Single(sorted.Items).Name);
 
         var secondPage = Unwrap<PagedResult<CrmCustomerDto>>(
-            await controller.GetCustomers(new CrmCustomerListRequest(null, 2, 1, "lifetimeValue")));
+            await controller.GetCustomers(new CrmCustomerListRequest(null, null, 2, 1, "lifetimeValue")));
         Assert.Equal("Small Spender", Assert.Single(secondPage.Items).Name);
 
         var defaultOrder = Unwrap<PagedResult<CrmCustomerDto>>(
-            await controller.GetCustomers(new CrmCustomerListRequest(null, 1, 10)));
+            await controller.GetCustomers(new CrmCustomerListRequest(null, null, 1, 10)));
         Assert.Equal(3, defaultOrder.Items.Count);
     }
 

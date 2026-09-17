@@ -79,6 +79,9 @@ public class ProductListDto
     public Guid Id { get; set; }
     public string Name { get; set; } = default!;
     public string Sku { get; set; } = default!;
+    public string? Barcode { get; set; }
+    public string? ManufacturerBarcode { get; set; }
+    public string? InternalBarcode { get; set; }
     public string ProductType { get; set; } = default!;
     public string Category { get; set; } = default!;
     public Guid? CategoryId { get; set; }

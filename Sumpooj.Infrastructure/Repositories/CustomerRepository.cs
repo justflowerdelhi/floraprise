@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Domain.Entities;
 using Sumpooj.Infrastructure.Persistence;
@@ -16,12 +16,31 @@ public class CustomerRepository : ICustomerRepository
 
     public async Task<(List<Customer>, int)> SearchAsync(
         string? query,
+        List<string>? purchasedCategories,
         int page,
         int pageSize)
     {
         var q = _db.Customers
             .AsNoTracking()
             .Where(c => c.IsActive);
+
+        if (purchasedCategories != null && purchasedCategories.Count > 0)
+        {
+            var parsedEnums = new List<ProductCategory>();
+            foreach (var cat in purchasedCategories)
+            {
+                if (Enum.TryParse<ProductCategory>(cat, true, out var parsed))
+                {
+                    parsedEnums.Add(parsed);
+                }
+            }
+            var categoriesLower = purchasedCategories.Select(c => c.ToLower()).ToList();
+
+            q = q.Where(c => _db.Orders.Any(o => o.CustomerId == c.Id && o.IsActive &&
+                o.Items.Any(oi => _db.Products.Any(p => p.Id == oi.ProductId &&
+                    (parsedEnums.Contains(p.Category) ||
+                     (p.ProductCategoryRef != null && categoriesLower.Contains(p.ProductCategoryRef.Name.ToLower())))))));
+        }
 
         if (!string.IsNullOrWhiteSpace(query))
         {

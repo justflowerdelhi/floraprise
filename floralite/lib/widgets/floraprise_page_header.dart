@@ -171,12 +171,14 @@ class FloraprisePageHeaderAction extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.primary = false,
+    this.tooltip,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback? onPressed;
   final bool primary;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -184,27 +186,30 @@ class FloraprisePageHeaderAction extends StatelessWidget {
         ? const Color(0xFF173522)
         : Colors.white.withValues(alpha: 0.94);
 
-    return FilledButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 17),
-      label: Text(label),
-      style: FilledButton.styleFrom(
-        foregroundColor: foregroundColor,
-        backgroundColor: primary
-            ? const Color(0xFFE2C48D)
-            : Colors.white.withValues(alpha: 0.11),
-        disabledBackgroundColor: Colors.white.withValues(alpha: 0.06),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        textStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(
-            color: primary
-                ? const Color(0xFFE2C48D)
-                : Colors.white.withValues(alpha: 0.20),
+    return Tooltip(
+      message: tooltip ?? label,
+      child: FilledButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 17),
+        label: Text(label),
+        style: FilledButton.styleFrom(
+          foregroundColor: foregroundColor,
+          backgroundColor: primary
+              ? const Color(0xFFE2C48D)
+              : Colors.white.withValues(alpha: 0.11),
+          disabledBackgroundColor: Colors.white.withValues(alpha: 0.06),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          textStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(
+              color: primary
+                  ? const Color(0xFFE2C48D)
+                  : Colors.white.withValues(alpha: 0.20),
+            ),
           ),
         ),
       ),

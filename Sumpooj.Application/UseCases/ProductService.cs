@@ -49,9 +49,14 @@ public class ProductService
             request.Page,
             request.PageSize);
 
+        var productIds = items.Select(p => p.Id).ToList();
+        var barcodesByProductId = (await _barcodeRepo.GetByProductIdsAsync(productIds))
+            .GroupBy(b => b.ProductId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
         return new PagedResult<ProductListDto>
         {
-            Items = items.Select(ToListDto).ToList(),
+            Items = items.Select(p => ToListDto(p, barcodesByProductId.GetValueOrDefault(p.Id))).ToList(),
             TotalCount = total,
             Page = request.Page,
             PageSize = request.PageSize
@@ -112,8 +117,12 @@ public class ProductService
             product.SetTaxRuleId(request.TaxRuleId.Value);
         }
 
+        // ── Barcodes: Internal is always generated; Manufacturer is optional ──
+        // request.ManufacturerBarcode (or legacy request.Barcode) represents the manufacturer/external barcode.
+        var manufacturerValue = (request.ManufacturerBarcode ?? request.Barcode)?.Trim();
+
         // Set additional properties
-        product.UpdateBasicInfo(request.ProductName, request.Sku, request.Barcode, request.Brand, request.Description);
+        product.UpdateBasicInfo(request.ProductName, request.Sku, string.IsNullOrEmpty(manufacturerValue) ? null : manufacturerValue, request.Brand, request.Description);
         product.UpdatePricing(request.RetailPrice, request.CostPrice, request.WholesalePrice, request.WeddingEventPrice);
         product.SetUnitOfMeasure(ParseEnum<UnitOfMeasure>(request.UnitOfMeasure, UnitOfMeasure.Stem));
         product.SetTaxCategory(ParseEnum<TaxCategory>(request.TaxCategory, TaxCategory.Standard));
@@ -160,11 +169,6 @@ public class ProductService
             product.Deactivate();
         }
 
-        // ── Barcodes: Internal is always generated; Manufacturer is optional ──
-        // request.Barcode has always represented the manufacturer/external
-        // barcode (see BarcodeService.SearchAsync historical ExternalBarcode
-        // mapping), so it is treated as the Manufacturer barcode here.
-        var manufacturerValue = request.Barcode?.Trim();
         if (!string.IsNullOrEmpty(manufacturerValue) &&
             await _barcodeRepo.ValueExistsAsync(_tenant.CompanyId.Value, manufacturerValue))
         {
@@ -222,29 +226,36 @@ public class ProductService
             product.SetTaxRuleId(request.TaxRuleId.Value);
         }
 
-        if (request.ProductName != null || request.Barcode != null || request.Brand != null || request.Description != null)
+        var manufacturerBarcodeParam = request.ManufacturerBarcode ?? request.Barcode;
+        if (request.ProductName != null || manufacturerBarcodeParam != null || request.Brand != null || request.Description != null)
         {
+            var updatedBarcode = manufacturerBarcodeParam != null
+                ? (string.IsNullOrWhiteSpace(manufacturerBarcodeParam) ? null : manufacturerBarcodeParam.Trim())
+                : product.Barcode;
+
             product.UpdateBasicInfo(
                 request.ProductName ?? product.Name,
                 product.Sku,
-                request.Barcode ?? product.Barcode,
+                updatedBarcode,
                 request.Brand ?? product.Brand,
                 request.Description ?? product.Description);
         }
 
-        // request.Barcode represents the Manufacturer barcode (see CreateAsync).
+        // request.ManufacturerBarcode / request.Barcode represents the Manufacturer barcode.
         // Upsert the authoritative Barcode row without touching the Internal one.
-        if (request.Barcode != null)
+        if (manufacturerBarcodeParam != null)
         {
-            var companyId = _tenant.CompanyId!.Value;
-            var value = request.Barcode.Trim();
-            var existingManufacturer = (await _barcodeRepo.GetByProductIdAsync(product.Id))
-                .FirstOrDefault(b => b.Type == BarcodeType.Manufacturer);
+            var companyId = product.CompanyId != Guid.Empty ? product.CompanyId : (_tenant.CompanyId ?? Guid.Empty);
+            var value = manufacturerBarcodeParam.Trim();
+            var existingBarcodes = await _barcodeRepo.GetByProductIdAsync(product.Id);
+            var existingManufacturer = existingBarcodes.FirstOrDefault(b => b.Type == BarcodeType.Manufacturer);
 
             if (value.Length == 0)
             {
-                // Explicitly cleared: leave the row as-is: an empty legacy field
-                // isn't a strong enough signal to delete a persisted barcode.
+                if (existingManufacturer != null)
+                {
+                    await _barcodeRepo.DeleteAsync(existingManufacturer);
+                }
             }
             else if (existingManufacturer != null)
             {
@@ -258,9 +269,13 @@ public class ProductService
             }
             else
             {
-                if (await _barcodeRepo.ValueExistsAsync(companyId, value))
-                    throw new InvalidOperationException($"Barcode '{value}' is already assigned to another product.");
-                await _barcodeRepo.AddAsync(new Barcode(companyId, product.Id, BarcodeType.Manufacturer, value));
+                var existingMatchingBarcode = existingBarcodes.FirstOrDefault(b => b.Value == value);
+                if (existingMatchingBarcode == null)
+                {
+                    if (await _barcodeRepo.ValueExistsAsync(companyId, value))
+                        throw new InvalidOperationException($"Barcode '{value}' is already assigned to another product.");
+                    await _barcodeRepo.AddAsync(new Barcode(companyId, product.Id, BarcodeType.Manufacturer, value));
+                }
             }
         }
 
@@ -401,27 +416,45 @@ public class ProductService
     public async Task<List<ProductListDto>> GetLowStockProductsAsync()
     {
         var products = await _repo.GetLowStockProductsAsync(RequireCompanyId());
-        return products.Select(ToListDto).ToList();
+        var productIds = products.Select(p => p.Id).ToList();
+        var barcodesByProductId = (await _barcodeRepo.GetByProductIdsAsync(productIds))
+            .GroupBy(b => b.ProductId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        return products.Select(p => ToListDto(p, barcodesByProductId.GetValueOrDefault(p.Id))).ToList();
     }
 
     public async Task<List<ProductListDto>> GetReorderProductsAsync()
     {
         var products = await _repo.GetProductsNeedingReorderAsync(RequireCompanyId());
-        return products.Select(ToListDto).ToList();
+        var productIds = products.Select(p => p.Id).ToList();
+        var barcodesByProductId = (await _barcodeRepo.GetByProductIdsAsync(productIds))
+            .GroupBy(b => b.ProductId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        return products.Select(p => ToListDto(p, barcodesByProductId.GetValueOrDefault(p.Id))).ToList();
     }
 
     private Guid RequireCompanyId() => _tenant.CompanyId
         ?? throw new UnauthorizedAccessException("Company context required");
 
-    private static ProductDto ToDto(Product p, List<Barcode>? barcodes = null) => new()
+    private static ProductListDto ToListDto(Product p) => ToListDto(p, null);
+
+    private static ProductDto ToDto(Product p, List<Barcode>? barcodes = null)
     {
-        Id = p.Id,
-        Name = p.Name,
-        Sku = p.Sku,
-        ManufacturerBarcode = barcodes?.FirstOrDefault(b => b.Type == BarcodeType.Manufacturer)?.Value,
-        InternalBarcode = barcodes?.FirstOrDefault(b => b.Type == BarcodeType.Internal)?.Value,
-        Barcode = p.Barcode,
-        Brand = p.Brand,
+        var mfgBarcode = barcodes?.FirstOrDefault(b => b.Type == BarcodeType.Manufacturer)?.Value ?? p.Barcode;
+        var intBarcode = barcodes?.FirstOrDefault(b => b.Type == BarcodeType.Internal)?.Value;
+        var primaryBarcode = p.Barcode ?? mfgBarcode ?? intBarcode;
+
+        return new()
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Sku = p.Sku,
+            ManufacturerBarcode = mfgBarcode,
+            InternalBarcode = intBarcode,
+            Barcode = primaryBarcode,
+            Brand = p.Brand,
         ProductType = p.ProductType.ToString(),
         Category = p.Category.ToString(),
         CategoryId = p.CategoryId,
@@ -463,28 +496,39 @@ public class ProductService
         CreatedAtUtc = p.CreatedAtUtc,
         UpdatedAtUtc = p.UpdatedAtUtc
     };
+    }
 
-    private static ProductListDto ToListDto(Product p) => new()
+    private static ProductListDto ToListDto(Product p, List<Barcode>? barcodes = null)
     {
-        Id = p.Id,
-        Name = p.Name,
-        Sku = p.Sku,
-        ProductType = p.ProductType.ToString(),
-        Category = p.Category.ToString(),
-        CategoryId = p.CategoryId,
-        CategoryName = p.ProductCategoryRef?.Name,
-        TaxRuleId = p.TaxRuleId,
-        TaxRuleName = p.TaxRule?.Name,
-        RetailPrice = p.RetailPrice,
-        CostPrice = p.CostPrice,
-        StockQuantity = p.StockQuantity,
-        TrackInventory = p.TrackInventory,
-        TrackBatch = p.TrackBatch,
-        IsActive = p.IsActive,
-        IsLowStock = p.IsLowStock(),
-        IsPerishable = p.ProductCategoryRef?.IsPerishable ?? false,
-        ShelfLifeDays = p.ShelfLifeDays
-    };
+        var mfgBarcode = barcodes?.FirstOrDefault(b => b.Type == BarcodeType.Manufacturer)?.Value ?? p.Barcode;
+        var intBarcode = barcodes?.FirstOrDefault(b => b.Type == BarcodeType.Internal)?.Value;
+        var primaryBarcode = p.Barcode ?? mfgBarcode ?? intBarcode;
+
+        return new()
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Sku = p.Sku,
+            Barcode = primaryBarcode,
+            ManufacturerBarcode = mfgBarcode,
+            InternalBarcode = intBarcode,
+            ProductType = p.ProductType.ToString(),
+            Category = p.Category.ToString(),
+            CategoryId = p.CategoryId,
+            CategoryName = p.ProductCategoryRef?.Name,
+            TaxRuleId = p.TaxRuleId,
+            TaxRuleName = p.TaxRule?.Name,
+            RetailPrice = p.RetailPrice,
+            CostPrice = p.CostPrice,
+            StockQuantity = p.StockQuantity,
+            TrackInventory = p.TrackInventory,
+            TrackBatch = p.TrackBatch,
+            IsActive = p.IsActive,
+            IsLowStock = p.IsLowStock(),
+            IsPerishable = p.ProductCategoryRef?.IsPerishable ?? false,
+            ShelfLifeDays = p.ShelfLifeDays
+        };
+    }
 
     private static T ParseEnum<T>(string? value, T defaultValue) where T : struct, Enum
     {

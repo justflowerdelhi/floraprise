@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sumpooj.Application.Authorization;
@@ -88,6 +88,42 @@ public class CustomersController : ControllerBase
     {
         await _service.ReactivateAsync(id);
         return NoContent();
+    }
+
+    [HttpGet("{id:guid}/purchase-insights")]
+    public async Task<IActionResult> GetPurchaseInsights(Guid id)
+    {
+        var cid = CompanyId;
+        var customer = await _db.Customers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.CompanyId == cid && c.Id == id && c.IsActive);
+        if (customer == null) return NotFound();
+
+        var query = from o in _db.Orders.AsNoTracking()
+                    where o.CompanyId == cid && o.CustomerId == id && o.IsActive
+                    from oi in o.Items
+                    join p in _db.Products.AsNoTracking() on oi.ProductId equals p.Id
+                    select new
+                    {
+                        OrderId = o.Id,
+                        OrderDate = o.OrderDate,
+                        CategoryName = p.ProductCategoryRef != null ? p.ProductCategoryRef.Name : p.Category.ToString(),
+                        Total = oi.TotalPrice
+                    };
+
+        var insights = await query
+            .GroupBy(x => x.CategoryName)
+            .Select(g => new
+            {
+                CategoryName = g.Key ?? "Other",
+                OrderCount = g.Select(x => x.OrderId).Distinct().Count(),
+                TotalAmountSpent = g.Sum(x => x.Total),
+                LastPurchaseDate = g.Max(x => x.OrderDate)
+            })
+            .OrderByDescending(x => x.TotalAmountSpent)
+            .ToListAsync();
+
+        return Ok(insights);
     }
 
     /// <summary>

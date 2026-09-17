@@ -68,6 +68,50 @@ public sealed class MobileCustomersController : MobileApiControllerBase
         }
     }
 
+    [HttpGet("{customerId:guid}/purchase-insights")]
+    public async Task<IActionResult> GetPurchaseInsights(Guid customerId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var companyId = GetCompanyId();
+
+            var customer = await _db.Customers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.CompanyId == companyId && c.Id == customerId && c.IsActive, cancellationToken);
+            if (customer == null) return NotFound();
+
+            var query = from o in _db.Orders.AsNoTracking()
+                        where o.CompanyId == companyId && o.CustomerId == customerId && o.IsActive
+                        from oi in o.Items
+                        join p in _db.Products.AsNoTracking() on oi.ProductId equals p.Id
+                        select new
+                        {
+                            OrderId = o.Id,
+                            OrderDate = o.OrderDate,
+                            CategoryName = p.ProductCategoryRef != null ? p.ProductCategoryRef.Name : p.Category.ToString(),
+                            Total = oi.TotalPrice
+                        };
+
+            var insights = await query
+                .GroupBy(x => x.CategoryName)
+                .Select(g => new
+                {
+                    CategoryName = g.Key ?? "Other",
+                    OrderCount = g.Select(x => x.OrderId).Distinct().Count(),
+                    TotalAmountSpentPaise = (long)(g.Sum(x => x.Total) * 100m),
+                    LastPurchaseDate = g.Max(x => x.OrderDate)
+                })
+                .OrderByDescending(x => x.TotalAmountSpentPaise)
+                .ToListAsync(cancellationToken);
+
+            return Ok(insights);
+        }
+        catch (Exception ex)
+        {
+            return ProblemFromException(ex);
+        }
+    }
+
     private static int ToPaise(decimal amount) =>
         decimal.Round(amount * 100m, 0, MidpointRounding.AwayFromZero) is var rounded
             ? (int)rounded

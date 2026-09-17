@@ -99,7 +99,7 @@ public sealed class PaymentIdentityResolutionTests : IDisposable
     {
         var payments = new PaymentRepository(_db);
         var orders = new OrderRepository(_db);
-        return new PaymentsController(new PaymentService(payments, orders), new TestTenantContext(_companyId), null!)
+        return new PaymentsController(new PaymentService(payments, orders), new TestTenantContext(_companyId), null!, null!)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } }
         };

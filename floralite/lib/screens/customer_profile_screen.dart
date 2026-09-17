@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/common_widgets.dart';
+import '../providers/customer_provider.dart';
 
-class CustomerProfileScreen extends StatelessWidget {
+class CustomerProfileScreen extends StatefulWidget {
   final String customerId;
   final String name;
   final String phone;
@@ -31,9 +33,33 @@ class CustomerProfileScreen extends StatelessWidget {
   });
 
   @override
+  State<CustomerProfileScreen> createState() => _CustomerProfileScreenState();
+}
+
+class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
+  List<Map<String, dynamic>>? _purchaseInsights;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInsights();
+  }
+
+  Future<void> _loadInsights() async {
+    try {
+      final provider = context.read<CustomerProvider>();
+      final insights = await provider.getPurchaseInsights(widget.customerId);
+      if (mounted) {
+        setState(() {
+          _purchaseInsights = insights;
+        });
+      }
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final hasPendingPayment = pendingPayment != '₹0';
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final l10n = AppLocalizations.of(context)!;
 
@@ -55,7 +81,7 @@ class CustomerProfileScreen extends StatelessWidget {
                       radius: 50,
                       backgroundColor: colorScheme.primaryContainer,
                       child: Text(
-                        name[0],
+                        widget.name[0],
                         style: TextStyle(
                           color: colorScheme.primary,
                           fontWeight: FontWeight.bold,
@@ -65,7 +91,7 @@ class CustomerProfileScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      name,
+                      widget.name,
                       style:
                           Theme.of(context).textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
@@ -73,7 +99,7 @@ class CustomerProfileScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      phone,
+                      widget.phone,
                       style: TextStyle(
                         color: Colors.grey.shade600,
                         fontSize: 16,
@@ -88,7 +114,7 @@ class CustomerProfileScreen extends StatelessWidget {
                   Expanded(
                     child: _buildStatCard(
                       label: l10n.totalOrders,
-                      value: '$totalOrders',
+                      value: '${widget.totalOrders}',
                       icon: Icons.shopping_bag,
                       color: colorScheme.primary,
                     ),
@@ -97,9 +123,9 @@ class CustomerProfileScreen extends StatelessWidget {
                   Expanded(
                     child: _buildStatCard(
                       label: l10n.pendingPayment,
-                      value: pendingPayment,
+                      value: widget.pendingPayment,
                       icon: Icons.account_balance_wallet,
-                      color: hasPendingPayment ? Colors.red : Colors.green,
+                      color: widget.pendingPayment != '₹0' ? Colors.red : Colors.green,
                     ),
                   ),
                 ],
@@ -110,7 +136,7 @@ class CustomerProfileScreen extends StatelessWidget {
                   Expanded(
                     child: _buildStatCard(
                       label: 'Reward Balance',
-                      value: '$rewardPoints',
+                      value: '${widget.rewardPoints}',
                       icon: Icons.redeem,
                       color: Colors.green,
                     ),
@@ -119,7 +145,7 @@ class CustomerProfileScreen extends StatelessWidget {
                   Expanded(
                     child: _buildStatCard(
                       label: 'Lifetime Earned',
-                      value: '$lifetimeRewardPoints',
+                      value: '${widget.lifetimeRewardPoints}',
                       icon: Icons.stars,
                       color: colorScheme.primary,
                     ),
@@ -139,21 +165,24 @@ class CustomerProfileScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _buildDetailRow(Icons.phone, l10n.phoneNumber, phone),
+                    _buildDetailRow(Icons.phone, l10n.phoneNumber, widget.phone),
                     const SizedBox(height: 12),
-                    _buildDetailRow(Icons.cake, l10n.birthdayMonth, birthday),
+                    _buildDetailRow(Icons.cake, l10n.birthdayMonth, widget.birthday),
                     const SizedBox(height: 12),
                     _buildDetailRow(
-                        Icons.shopping_bag, l10n.lastOrder, lastOrder),
+                        Icons.shopping_bag, l10n.lastOrder, widget.lastOrder),
                     const SizedBox(height: 12),
                     _buildDetailRow(Icons.redeem, 'Lifetime Redeemed',
-                        '$redeemedRewardPoints Points'),
+                        '${widget.redeemedRewardPoints} Points'),
                     const SizedBox(height: 12),
                     _buildDetailRow(Icons.history, 'Last Reward Activity',
-                        lastRewardActivity),
+                        widget.lastRewardActivity),
                   ],
                 ),
               ),
+              const SizedBox(height: 24),
+              if (_purchaseInsights != null)
+                _buildPurchaseInsightsCard(_purchaseInsights!),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -163,9 +192,9 @@ class CustomerProfileScreen extends StatelessWidget {
                       context,
                       '/walkin-sales',
                       arguments: {
-                        'prefillCustomerId': customerId,
-                        'prefillCustomerName': name,
-                        'prefillCustomerPhone': phone,
+                        'prefillCustomerId': widget.customerId,
+                        'prefillCustomerName': widget.name,
+                        'prefillCustomerPhone': widget.phone,
                       },
                     );
                   },
@@ -225,6 +254,84 @@ class CustomerProfileScreen extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPurchaseInsightsCard(List<Map<String, dynamic>> insights) {
+    if (insights.isEmpty) {
+      return AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Purchase Insights',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('No purchase history found.'),
+          ],
+        ),
+      );
+    }
+
+    final categories = insights.map((e) => (e['categoryName'] ?? e['CategoryName']).toString()).join(', ');
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Purchase Insights',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildDetailRow(Icons.category, 'Categories Purchased', categories),
+          const SizedBox(height: 16),
+          const Divider(),
+          ...insights.map((item) {
+            final name = (item['categoryName'] ?? item['CategoryName']).toString();
+            final count = item['orderCount'] ?? item['OrderCount'];
+            final spentPaise = item['totalAmountSpentPaise'] ?? item['TotalAmountSpentPaise'] ?? (item['totalAmountSpent'] != null ? ((item['totalAmountSpent'] as num) * 100).toInt() : (item['TotalAmountSpent'] != null ? ((item['TotalAmountSpent'] as num) * 100).toInt() : 0));
+            final dateRaw = (item['lastPurchaseDate'] ?? item['LastPurchaseDate'])?.toString();
+
+            String dateFormatted = '-';
+            if (dateRaw != null) {
+              final d = DateTime.tryParse(dateRaw);
+              if (d != null) {
+                dateFormatted = '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+              }
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(top: 12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Orders: $count', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      Text('Spent: ₹${(spentPaise / 100).toStringAsFixed(0)}', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      Text('Last: $dateFormatted', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );

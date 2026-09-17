@@ -54,11 +54,22 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
 
   Future<void> _editProduct({CloudProduct? product}) async {
     final provider = context.read<CloudProductProvider>();
+    final activeCategories = provider.categories.where((c) => c.isActive).toList();
+    final categories = List<CloudCategory>.from(activeCategories);
+    if (product?.categoryId != null) {
+      final existingCat = provider.categories
+          .where((c) => c.id == product!.categoryId)
+          .firstOrNull;
+      if (existingCat != null &&
+          !categories.any((c) => c.id == existingCat.id)) {
+        categories.add(existingCat);
+      }
+    }
     final result = await showDialog<CloudProductInput>(
       context: context,
       builder: (_) => _CloudProductDialog(
         product: product,
-        categories: provider.categories.where((c) => c.isActive).toList(),
+        categories: categories,
       ),
     );
     if (result == null || !mounted) return;
@@ -528,7 +539,11 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
     _retail = TextEditingController(text: product?.retailPrice.toString() ?? '');
     _cost = TextEditingController(text: product?.costPrice.toString() ?? '');
     _description = TextEditingController(text: product?.description ?? '');
-    _categoryId = product?.categoryId ?? (widget.categories.isEmpty ? null : widget.categories.first.id);
+    final categoryExists = product?.categoryId != null &&
+        widget.categories.any((c) => c.id == product!.categoryId);
+    _categoryId = categoryExists
+        ? product!.categoryId
+        : (widget.categories.isEmpty ? null : widget.categories.first.id);
 
     final initialCat = widget.categories.where((c) => c.id == _categoryId).firstOrNull;
     if (product != null) {
@@ -602,179 +617,258 @@ class _CloudProductDialogState extends State<_CloudProductDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isWide = screenWidth >= 640;
+    final dialogWidth =
+        isWide ? 580.0 : (screenWidth - 48.0).clamp(280.0, 580.0);
+
     return AlertDialog(
-      title: Text(widget.product == null ? 'Add Cloud Product' : 'Edit Cloud Product'),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
+      title: Text(
+          widget.product == null ? 'Add Cloud Product' : 'Edit Cloud Product'),
+      content: SizedBox(
+        width: dialogWidth,
         child: SingleChildScrollView(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth >= 480;
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isWide)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _field(_name, 'Name')),
-                        const SizedBox(width: 12),
-                        Expanded(child: _skuField()),
-                      ],
-                    )
-                  else ...[
-                    _field(_name, 'Name'),
-                    _skuField(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (isWide)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _field(_name, 'Name')),
+                    const SizedBox(width: 12),
+                    Expanded(child: _skuField()),
                   ],
-                  if (isWide)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (widget.categories.isNotEmpty)
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _categoryId,
-                              decoration: const InputDecoration(labelText: 'Category'),
-                              items: widget.categories
-                                  .map((category) => DropdownMenuItem(value: category.id, child: Text(category.name)))
-                                  .toList(),
-                              onChanged: _onCategoryChanged,
-                            ),
-                          ),
-                        if (widget.categories.isNotEmpty) const SizedBox(width: 12),
-                        Expanded(
+                )
+              else ...[
+                _field(_name, 'Name'),
+                _skuField(),
+              ],
+              if (widget.categories.isNotEmpty) ...[
+                if (isWide)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
                           child: DropdownButtonFormField<String>(
-                            key: ValueKey('unit-wide-$_unit'),
-                            initialValue: _unit,
-                            decoration: const InputDecoration(labelText: 'Unit'),
-                            items: _units.map((unit) => DropdownMenuItem(value: unit, child: Text(unit))).toList(),
-                            onChanged: (value) => setState(() => _unit = value ?? 'Stem'),
+                            key: ValueKey('cat-$_categoryId'),
+                            initialValue: _categoryId,
+                            decoration:
+                                const InputDecoration(labelText: 'Category'),
+                            items: widget.categories
+                                .map((category) => DropdownMenuItem(
+                                      value: category.id,
+                                      child: Text(category.name),
+                                    ))
+                                .toList(),
+                            onChanged: _onCategoryChanged,
                           ),
                         ),
-                      ],
-                    )
-                  else ...[
-                    if (widget.categories.isNotEmpty)
-                      DropdownButtonFormField<String>(
-                        initialValue: _categoryId,
-                        decoration: const InputDecoration(labelText: 'Category'),
-                        items: widget.categories
-                            .map((category) => DropdownMenuItem(value: category.id, child: Text(category.name)))
-                            .toList(),
-                        onChanged: _onCategoryChanged,
                       ),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey('unit-narrow-$_unit'),
-                      initialValue: _unit,
-                      decoration: const InputDecoration(labelText: 'Unit'),
-                      items: _units.map((unit) => DropdownMenuItem(value: unit, child: Text(unit))).toList(),
-                      onChanged: (value) => setState(() => _unit = value ?? 'Stem'),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  if (isWide)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _field(_retail, 'Selling price', numeric: true)),
-                        const SizedBox(width: 12),
-                        Expanded(child: _field(_cost, 'Purchase price (optional)', numeric: true)),
-                      ],
-                    )
-                  else ...[
-                    _field(_retail, 'Selling price', numeric: true),
-                    _field(_cost, 'Purchase price (optional)', numeric: true),
-                  ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey('unit-$_unit'),
+                            initialValue: _unit,
+                            decoration:
+                                const InputDecoration(labelText: 'Unit'),
+                            items: _units
+                                .map((unit) => DropdownMenuItem(
+                                      value: unit,
+                                      child: Text(unit),
+                                    ))
+                                .toList(),
+                            onChanged: (value) =>
+                                setState(() => _unit = value ?? 'Stem'),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else ...[
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: TextField(
-                      controller: _barcode,
-                      decoration: InputDecoration(
-                        labelText: 'Manufacturer Barcode',
-                        suffixIcon: IconButton(
-                          tooltip: 'Scan Manufacturer Barcode',
-                          icon: const Icon(Icons.qr_code_scanner),
-                          onPressed: () async {
-                            final scanned = await showCameraBarcodeScanner(
-                              context,
-                              title: 'Scan Manufacturer Barcode',
-                            );
-                            if (scanned == null || scanned.isEmpty) return;
-                            _barcode.text = scanned;
-                          },
-                        ),
-                      ),
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey('cat-$_categoryId'),
+                      initialValue: _categoryId,
+                      decoration:
+                          const InputDecoration(labelText: 'Category'),
+                      items: widget.categories
+                          .map((category) => DropdownMenuItem(
+                                value: category.id,
+                                child: Text(category.name),
+                              ))
+                          .toList(),
+                      onChanged: _onCategoryChanged,
                     ),
                   ),
-                  if (widget.product != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'FloraPrise Barcode'),
-                        child: Text(widget.product!.internalBarcode ?? 'Not generated yet'),
-                      ),
-                    )
-                  else
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 8),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'A FloraPrise barcode will be generated automatically once this product is saved.',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey('unit-$_unit'),
+                      initialValue: _unit,
+                      decoration: const InputDecoration(labelText: 'Unit'),
+                      items: _units
+                          .map((unit) => DropdownMenuItem(
+                                value: unit,
+                                child: Text(unit),
+                              ))
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => _unit = value ?? 'Stem'),
+                    ),
+                  ),
+                ],
+              ] else ...[
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'No categories available. Please add categories before creating products.',
+                    style: TextStyle(color: Colors.orange, fontSize: 13),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('unit-$_unit'),
+                    initialValue: _unit,
+                    decoration: const InputDecoration(labelText: 'Unit'),
+                    items: _units
+                        .map((unit) => DropdownMenuItem(
+                              value: unit,
+                              child: Text(unit),
+                            ))
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => _unit = value ?? 'Stem'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              if (isWide)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                        child: _field(_retail, 'Selling price', numeric: true)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: _field(_cost, 'Purchase price (optional)',
+                            numeric: true)),
+                  ],
+                )
+              else ...[
+                _field(_retail, 'Selling price', numeric: true),
+                _field(_cost, 'Purchase price (optional)', numeric: true),
+              ],
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextField(
+                  controller: _barcode,
+                  decoration: InputDecoration(
+                    labelText: 'Manufacturer Barcode',
+                    suffixIcon: IconButton(
+                      tooltip: 'Scan Manufacturer Barcode',
+                      icon: const Icon(Icons.qr_code_scanner),
+                      onPressed: () async {
+                        final scanned = await showCameraBarcodeScanner(
+                          context,
+                          title: 'Scan Manufacturer Barcode',
+                        );
+                        if (scanned == null || scanned.isEmpty) return;
+                        _barcode.text = scanned;
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              if (widget.product != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: InputDecorator(
+                    decoration:
+                        const InputDecoration(labelText: 'FloraPrise Barcode'),
+                    child: Text(
+                        widget.product!.internalBarcode ?? 'Not generated yet'),
+                  ),
+                )
+              else
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'A FloraPrise barcode will be generated automatically once this product is saved.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
+                ),
+              _field(_description, 'Description'),
+              if (isWide)
+                Row(
+                  children: [
+                    Expanded(
+                      child: SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: _trackInventory,
+                        title: const Text('Track inventory'),
+                        onChanged: (value) =>
+                            setState(() => _trackInventory = value),
                       ),
                     ),
-                  _field(_description, 'Description'),
-                  if (isWide)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            value: _trackInventory,
-                            title: const Text('Track inventory'),
-                            onChanged: (value) => setState(() => _trackInventory = value),
-                          ),
-                        ),
-                        Expanded(
-                          child: SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            value: _trackBatch,
-                            title: const Text('Track batches'),
-                            onChanged: (value) => setState(() => _trackBatch = value),
-                          ),
-                        ),
-                      ],
-                    )
-                  else ...[
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      value: _trackInventory,
-                      title: const Text('Track inventory'),
-                      onChanged: (value) => setState(() => _trackInventory = value),
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      value: _trackBatch,
-                      title: const Text('Track batches'),
-                      onChanged: (value) => setState(() => _trackBatch = value),
+                    Expanded(
+                      child: SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: _trackBatch,
+                        title: const Text('Track batches'),
+                        onChanged: (value) =>
+                            setState(() => _trackBatch = value),
+                      ),
                     ),
                   ],
-                  if (_formError != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(_formError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                    ),
-                ],
-              );
-            },
+                )
+              else ...[
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _trackInventory,
+                  title: const Text('Track inventory'),
+                  onChanged: (value) =>
+                      setState(() => _trackInventory = value),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _trackBatch,
+                  title: const Text('Track batches'),
+                  onChanged: (value) => setState(() => _trackBatch = value),
+                ),
+              ],
+              if (_formError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    _formError!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
       actions: [
-        TextButton(onPressed: _isSaving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton(onPressed: _isSaving ? null : _save, child: const Text('Save')),
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isSaving ? null : _save,
+          child: const Text('Save'),
+        ),
       ],
     );
   }

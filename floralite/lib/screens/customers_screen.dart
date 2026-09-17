@@ -437,6 +437,20 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   (value) => provider.setTotalOrdersFilter(value),
                   ['all', '1-5', '5-10', '10+'],
                 ),
+                _buildMultiFilterTile(
+                  'Purchased Category',
+                  provider.purchasedCategoriesFilter,
+                  (value) {
+                    final current = List<String>.from(provider.purchasedCategoriesFilter);
+                    if (current.contains(value)) {
+                      current.remove(value);
+                    } else {
+                      current.add(value);
+                    }
+                    provider.setPurchasedCategoriesFilter(current);
+                  },
+                  ['Flowers', 'Gifts', 'Cakes', 'Bakery', 'Stationery', 'Plants', 'Other'],
+                ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -490,6 +504,34 @@ class _CustomersScreenState extends State<CustomersScreen> {
             };
             return FilterChip(
               label: Text(label),
+              selected: isSelected,
+              onSelected: (_) => onSelected(option),
+              selectedColor: Theme.of(context).colorScheme.primaryContainer,
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildMultiFilterTile(
+    String title,
+    List<String> selectedValues,
+    Function(String) onSelected,
+    List<String> options,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: options.map((option) {
+            final isSelected = selectedValues.contains(option);
+            return FilterChip(
+              label: Text(option),
               selected: isSelected,
               onSelected: (_) => onSelected(option),
               selectedColor: Theme.of(context).colorScheme.primaryContainer,

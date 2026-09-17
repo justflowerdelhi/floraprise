@@ -35,15 +35,43 @@ public class ProductsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateProductRequest request)
     {
-        var id = await _service.CreateAsync(request);
-        return CreatedAtAction(nameof(Get), new { id }, new { id });
+        try
+        {
+            var id = await _service.CreateAsync(request);
+            return CreatedAtAction(nameof(Get), new { id }, new { id });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            var message = ex.InnerException?.Message ?? ex.Message;
+            return StatusCode(500, new { message });
+        }
     }
 
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductRequest request)
     {
-        await _service.UpdateAsync(id, request);
-        return NoContent();
+        try
+        {
+            await _service.UpdateAsync(id, request);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            var message = ex.InnerException?.Message ?? ex.Message;
+            return StatusCode(500, new { message });
+        }
     }
 
     [HttpGet("validate-sku")]

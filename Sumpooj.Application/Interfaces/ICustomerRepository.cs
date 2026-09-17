@@ -12,6 +12,7 @@ public interface ICustomerRepository
 
     Task<(List<Customer> Items, int TotalCount)> SearchAsync(
         string? query,
+        List<string>? purchasedCategories,
         int page,
         int pageSize);
 }

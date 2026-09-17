@@ -10,6 +10,8 @@ class CustomerManager {
   final CustomerRepository _customerRepository;
   final CustomerCloudLookupService? _cloudLookup;
 
+  CustomerRepository get customerRepository => _customerRepository;
+
   String normalizePhone(String raw) {
     final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.length >= 10) {

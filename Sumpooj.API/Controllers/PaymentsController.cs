@@ -15,15 +15,18 @@ public class PaymentsController : ControllerBase
     private readonly PaymentService _paymentService;
     private readonly ITenantContext _tenantContext;
     private readonly IPaymentTransactionRepository _transactionRepo;
+    private readonly GatewayPaymentService _gatewayPaymentService;
 
     public PaymentsController(
         PaymentService paymentService,
         ITenantContext tenantContext,
-        IPaymentTransactionRepository transactionRepo)
+        IPaymentTransactionRepository transactionRepo,
+        GatewayPaymentService gatewayPaymentService)
     {
         _paymentService = paymentService;
         _tenantContext = tenantContext;
         _transactionRepo = transactionRepo;
+        _gatewayPaymentService = gatewayPaymentService;
     }
 
     private Guid CompanyId => _tenantContext.CompanyId 
@@ -98,8 +101,24 @@ public class PaymentsController : ControllerBase
     [HttpPost("verify")]
     public async Task<IActionResult> VerifyPayment([FromBody] VerifyPaymentRequest request)
     {
-        // Verify payment with gateway - returns status
-        return Ok(new { verified = true, transactionId = request.TransactionId, status = "completed" });
+        var txRef = !string.IsNullOrWhiteSpace(request.TransactionRef)
+            ? request.TransactionRef
+            : request.TransactionId ?? string.Empty;
+
+        var dto = new VerifyPaymentDto(
+            TransactionRef: txRef,
+            GatewayPaymentId: request.GatewayPaymentId ?? request.GatewayId,
+            GatewaySignature: request.GatewaySignature,
+            AdditionalData: request.AdditionalData
+        );
+
+        var result = await _gatewayPaymentService.VerifyPaymentAsync(dto);
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
     }
 
     [HttpPost("refund")]
@@ -157,8 +176,12 @@ public class CardDetailsRequest
 
 public class VerifyPaymentRequest
 {
-    public string TransactionId { get; set; } = default!;
+    public string? TransactionId { get; set; }
+    public string? TransactionRef { get; set; }
     public string? GatewayId { get; set; }
+    public string? GatewayPaymentId { get; set; }
+    public string? GatewaySignature { get; set; }
+    public Dictionary<string, string>? AdditionalData { get; set; }
 }
 
 public class RefundPaymentRequest

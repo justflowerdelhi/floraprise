@@ -24,12 +24,14 @@ class CustomerProvider extends ChangeNotifier {
   String _searchQuery = '';
   String _filterPendingPayment = 'all';
   String _filterTotalOrders = 'all';
+  List<String> _filterPurchasedCategories = [];
 
   List<Map<String, dynamic>> get customers => _filteredCustomers;
   bool get isLoading => _isLoading;
   String? get error => _error;
   String get pendingPaymentFilter => _filterPendingPayment;
   String get totalOrdersFilter => _filterTotalOrders;
+  List<String> get purchasedCategoriesFilter => _filterPurchasedCategories;
 
   bool get _cloud => _storageModeProvider.isCloud;
 
@@ -153,6 +155,7 @@ class CustomerProvider extends ChangeNotifier {
       if (_cloud) {
         final rows = await _cloudRepository.getAll(
           query: _searchQuery,
+          purchasedCategories: _filterPurchasedCategories.isNotEmpty ? _filterPurchasedCategories : null,
         );
         final statsList = await Future.wait(
           rows.map((c) => _cloudRepository.getStatistics(c.id)),
@@ -162,7 +165,10 @@ class CustomerProvider extends ChangeNotifier {
           (i) => _cloudMap(rows[i], stats: statsList[i]),
         );
       } else {
-        final rows = await _customerManager.getAllCustomers();
+        final rows = await _customerManager.customerRepository.search(
+          _searchQuery,
+          purchasedCategories: _filterPurchasedCategories.isNotEmpty ? _filterPurchasedCategories : null,
+        );
 
         _customers = rows
             .map(
@@ -224,10 +230,23 @@ class CustomerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setPurchasedCategoriesFilter(List<String> v) {
+    _filterPurchasedCategories = List.from(v);
+
+    // We must reload since sqlite/API filtering is needed for categories
+    loadCustomers();
+  }
+
   void clearFilters() {
     _filterPendingPayment = 'all';
     _filterTotalOrders = 'all';
-    notifyListeners();
+
+    if (_filterPurchasedCategories.isNotEmpty) {
+       _filterPurchasedCategories.clear();
+       loadCustomers();
+    } else {
+       notifyListeners();
+    }
   }
 
   Future<CustomerRecord?> lookupByPhone(String phone) {
@@ -272,6 +291,18 @@ class CustomerProvider extends ChangeNotifier {
       'lastOrderDate': stats.lastOrderAt,
       'pendingPaymentPaise': stats.pendingPaymentPaise,
     };
+  }
+
+  Future<List<Map<String, dynamic>>> getPurchaseInsights(String customerId) async {
+    try {
+      if (_cloud) {
+        return await _cloudRepository.getPurchaseInsights(customerId);
+      } else {
+        return await _customerManager.customerRepository.getPurchaseInsights(int.parse(customerId));
+      }
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<void> refresh() => loadCustomers();

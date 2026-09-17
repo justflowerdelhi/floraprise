@@ -126,6 +126,9 @@ var jwtIssuer = builder.Configuration["Jwt:Issuer"]
                 ?? Environment.GetEnvironmentVariable("Jwt__Issuer")
                 ?? throw new InvalidOperationException("JWT Issuer missing. Provide Jwt:Issuer, Jwt__Issuer, or JWT_ISSUER.");
 
+// Payment Master Key security check (Mandatory in Production)
+BasePaymentGateway.ValidateConfiguration(builder.Environment.IsProduction());
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

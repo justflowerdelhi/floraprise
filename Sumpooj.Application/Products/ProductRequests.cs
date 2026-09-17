@@ -6,6 +6,8 @@ public class CreateProductRequest
     public string ProductName { get; set; } = default!;
     public string Sku { get; set; } = default!;
     public string? Barcode { get; set; }
+    public string? ManufacturerBarcode { get; set; }
+    public string? InternalBarcode { get; set; }
 
     // Classification
     public string ProductType { get; set; } = "fresh_flower";
@@ -88,6 +90,8 @@ public class UpdateProductRequest
     public string? ProductName { get; set; }
     public Guid? CategoryId { get; set; }
     public string? Barcode { get; set; }
+    public string? ManufacturerBarcode { get; set; }
+    public string? InternalBarcode { get; set; }
     public string? Brand { get; set; }
     public string? Description { get; set; }
     public List<string>? Tags { get; set; }

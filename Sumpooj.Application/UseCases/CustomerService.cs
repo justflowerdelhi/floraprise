@@ -22,6 +22,7 @@ public partial class CustomerService
     {
         var (items, total) = await _repo.SearchAsync(
             request.Query,
+            request.PurchasedCategories,
             request.Page,
             request.PageSize);
 

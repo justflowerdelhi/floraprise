@@ -261,4 +261,207 @@ public class BarcodeArchitectureTests
         Assert.Equal("NEW-MFR", barcodesAfter.Single(b => b.Type == BarcodeType.Manufacturer).Value);
         Assert.Equal(internalBefore, barcodesAfter.Single(b => b.Type == BarcodeType.Internal).Value);
     }
+
+    [Fact]
+    public async Task SearchAsync_ReturnsProductListDto_WithPopulatedBarcodes()
+    {
+        var dbName = "Barcode_" + Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var h = CreateHarness(dbName, companyId);
+        var categoryId = await CreateCategoryAsync(h.Db, companyId, "Cat");
+        var productId = await h.ProductService.CreateAsync(BuildCreateRequest(categoryId, "SKU-DTO-1", "VL0085425688009"));
+
+        var result = await h.ProductService.SearchAsync(new ProductSearchRequest { Query = "SKU-DTO-1" });
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(productId, item.Id);
+        Assert.Equal("VL0085425688009", item.ManufacturerBarcode);
+        Assert.Equal("VL0085425688009", item.Barcode);
+        Assert.NotNull(item.InternalBarcode);
+        Assert.StartsWith("FL", item.InternalBarcode);
+    }
+
+    [Fact]
+    public async Task SearchAsync_FindsProductByManufacturerBarcodeQuery()
+    {
+        var dbName = "Barcode_" + Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var h = CreateHarness(dbName, companyId);
+        var categoryId = await CreateCategoryAsync(h.Db, companyId, "Cat");
+        var productId = await h.ProductService.CreateAsync(BuildCreateRequest(categoryId, "SKU-FIND-1", "VL0085425688009"));
+
+        var result = await h.ProductService.SearchAsync(new ProductSearchRequest { Query = "VL0085425688009" });
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(productId, item.Id);
+        Assert.Equal("VL0085425688009", item.ManufacturerBarcode);
+    }
+
+    [Fact]
+    public async Task SearchAsync_FindsProductByInternalBarcodeQuery()
+    {
+        var dbName = "Barcode_" + Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var h = CreateHarness(dbName, companyId);
+        var categoryId = await CreateCategoryAsync(h.Db, companyId, "Cat");
+        var productId = await h.ProductService.CreateAsync(BuildCreateRequest(categoryId, "SKU-FIND-2"));
+        var internalBarcode = (await h.BarcodeRepo.GetByProductIdAsync(productId)).Single(b => b.Type == BarcodeType.Internal).Value;
+
+        var result = await h.ProductService.SearchAsync(new ProductSearchRequest { Query = internalBarcode });
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(productId, item.Id);
+        Assert.Equal(internalBarcode, item.InternalBarcode);
+    }
+
+    [Fact]
+    public async Task GetAsync_ReturnsProductDto_WithPopulatedManufacturerBarcode()
+    {
+        var dbName = "Barcode_" + Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var h = CreateHarness(dbName, companyId);
+        var categoryId = await CreateCategoryAsync(h.Db, companyId, "Cat");
+        var productId = await h.ProductService.CreateAsync(BuildCreateRequest(categoryId, "SKU-GET-1", "8906081923646"));
+
+        var dto = await h.ProductService.GetAsync(productId);
+
+        Assert.NotNull(dto);
+        Assert.Equal(productId, dto.Id);
+        Assert.Equal("8906081923646", dto.ManufacturerBarcode);
+        Assert.Equal("8906081923646", dto.Barcode);
+        Assert.NotNull(dto.InternalBarcode);
+        Assert.StartsWith("FL", dto.InternalBarcode);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithManufacturerBarcodeProperty_PersistsAndReturnsInGetAsync()
+    {
+        var dbName = "Barcode_" + Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var h = CreateHarness(dbName, companyId);
+        var categoryId = await CreateCategoryAsync(h.Db, companyId, "Cat");
+        var productId = await h.ProductService.CreateAsync(BuildCreateRequest(categoryId, "SKU-UPD-MFR"));
+
+        // Verify initially no manufacturer barcode
+        var initialDto = await h.ProductService.GetAsync(productId);
+        Assert.NotNull(initialDto);
+        Assert.Null(initialDto.ManufacturerBarcode);
+
+        // Update product using ManufacturerBarcode property
+        await h.ProductService.UpdateAsync(productId, new UpdateProductRequest
+        {
+            ManufacturerBarcode = "8906081923646"
+        });
+
+        // Reopen product via GetAsync (same flow as Web Edit Product dialog)
+        var updatedDto = await h.ProductService.GetAsync(productId);
+        Assert.NotNull(updatedDto);
+        Assert.Equal("8906081923646", updatedDto.ManufacturerBarcode);
+        Assert.Equal("8906081923646", updatedDto.Barcode);
+
+        // Verify POS barcode search finds the updated product
+        var searchResult = await h.BarcodeService.SearchAsync(companyId, new SearchBarcodeRequest
+        {
+            Barcode = "8906081923646",
+            IncludeOutOfStock = true
+        });
+        Assert.True(searchResult.Found);
+        Assert.Equal(productId, searchResult.Product!.ProductId);
+        Assert.Equal("8906081923646", searchResult.Product.ExternalBarcode);
+    }
+
+    [Fact]
+    public async Task ProductRepository_GetByBarcodeAsync_FindsProductByManufacturerBarcode()
+    {
+        var dbName = "Barcode_" + Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var h = CreateHarness(dbName, companyId);
+        var categoryId = await CreateCategoryAsync(h.Db, companyId, "Cat");
+        var productId = await h.ProductService.CreateAsync(BuildCreateRequest(categoryId, "SKU-REPO-1", "8906081923646"));
+
+        var foundProduct = await h.ProductRepo.GetByBarcodeAsync("8906081923646");
+        Assert.NotNull(foundProduct);
+        Assert.Equal(productId, foundProduct.Id);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_SavingSameBarcodeTwice_IsIdempotentAndDoesNotDuplicate()
+    {
+        var dbName = "Barcode_" + Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var h = CreateHarness(dbName, companyId);
+        var categoryId = await CreateCategoryAsync(h.Db, companyId, "Cat");
+        var productId = await h.ProductService.CreateAsync(BuildCreateRequest(categoryId, "SKU-IDEMP-1"));
+
+        // 1st Save with 8906081923646
+        await h.ProductService.UpdateAsync(productId, new UpdateProductRequest
+        {
+            ProductName = "Custom Test Product",
+            CategoryId = categoryId,
+            Barcode = "8906081923646",
+            ManufacturerBarcode = "8906081923646",
+            RetailPrice = 100
+        });
+
+        var barcodesFirst = await h.BarcodeRepo.GetByProductIdAsync(productId);
+        Assert.Single(barcodesFirst, b => b.Type == BarcodeType.Manufacturer && b.Value == "8906081923646");
+
+        // 2nd Save with the exact same barcode
+        await h.ProductService.UpdateAsync(productId, new UpdateProductRequest
+        {
+            ProductName = "Custom Test Product",
+            CategoryId = categoryId,
+            Barcode = "8906081923646",
+            ManufacturerBarcode = "8906081923646",
+            RetailPrice = 120
+        });
+
+        // Assert no duplicate rows created
+        var barcodesSecond = await h.BarcodeRepo.GetByProductIdAsync(productId);
+        Assert.Single(barcodesSecond, b => b.Type == BarcodeType.Manufacturer && b.Value == "8906081923646");
+
+        var dto = await h.ProductService.GetAsync(productId);
+        Assert.NotNull(dto);
+        Assert.Equal("8906081923646", dto.ManufacturerBarcode);
+        Assert.Equal("8906081923646", dto.Barcode);
+        Assert.Equal(120, dto.RetailPrice);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_LegacyProductWithOnlyProductBarcode_UpdatesSeamlessly()
+    {
+        var dbName = "Barcode_" + Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var h = CreateHarness(dbName, companyId);
+        var categoryId = await CreateCategoryAsync(h.Db, companyId, "Cat");
+
+        // Seed a legacy product directly without Barcodes table rows
+        var legacyProduct = new Product(companyId, "Legacy Flower", "LEG-01", ProductType.SingleFlower, ProductCategory.Other, 50, 20, "Desc");
+        legacyProduct.SetCategoryId(categoryId);
+        legacyProduct.UpdateBasicInfo("Legacy Flower", "LEG-01", "8906081923646", null, "Desc");
+        h.Db.Products.Add(legacyProduct);
+        await h.Db.SaveChangesAsync();
+
+        // Reopen legacy product
+        var legacyDto = await h.ProductService.GetAsync(legacyProduct.Id);
+        Assert.NotNull(legacyDto);
+        Assert.Equal("8906081923646", legacyDto.ManufacturerBarcode);
+        Assert.Equal("8906081923646", legacyDto.Barcode);
+
+        // Save legacy product with the same barcode
+        await h.ProductService.UpdateAsync(legacyProduct.Id, new UpdateProductRequest
+        {
+            ProductName = "Legacy Flower",
+            CategoryId = categoryId,
+            Barcode = "8906081923646",
+            ManufacturerBarcode = "8906081923646",
+            RetailPrice = 60
+        });
+
+        var updatedDto = await h.ProductService.GetAsync(legacyProduct.Id);
+        Assert.NotNull(updatedDto);
+        Assert.Equal("8906081923646", updatedDto.ManufacturerBarcode);
+        Assert.Equal("8906081923646", updatedDto.Barcode);
+        Assert.Equal(60, updatedDto.RetailPrice);
+    }
 }

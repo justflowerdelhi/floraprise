@@ -133,6 +133,7 @@ import 'screens/delivery_workspace_screen.dart';
 import 'screens/live_delivery_tracking_screen.dart';
 import 'screens/driver_delivery_screen.dart';
 import 'screens/payment_history_screen.dart';
+import 'screens/payment_settings_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -552,6 +553,8 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
                   const _SubscriptionGate(child: ShareBrandingSettingsScreen()),
               '/rewards-settings': (context) =>
                   const _SubscriptionGate(child: RewardsSettingsScreen()),
+              '/payment-settings': (context) =>
+                  const _SubscriptionGate(child: PaymentSettingsScreen()),
               '/about': (context) => const AboutScreen(),
               '/my-designs': (context) =>
                   const _SubscriptionGate(child: MyDesignsScreen()),

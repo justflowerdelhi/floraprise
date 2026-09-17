@@ -18,6 +18,13 @@ public class BarcodeRepository : IBarcodeRepository
     public Task<List<Barcode>> GetByProductIdAsync(Guid productId)
         => _db.Barcodes.Where(b => b.ProductId == productId).ToListAsync();
 
+    public Task<List<Barcode>> GetByProductIdsAsync(IEnumerable<Guid> productIds)
+    {
+        var idList = productIds.Distinct().ToList();
+        if (idList.Count == 0) return Task.FromResult(new List<Barcode>());
+        return _db.Barcodes.Where(b => idList.Contains(b.ProductId)).ToListAsync();
+    }
+
     public Task<Barcode?> GetByCompanyAndValueAsync(Guid companyId, string value)
         => _db.Barcodes.FirstOrDefaultAsync(b => b.CompanyId == companyId && b.Value == value);
 
@@ -49,7 +56,22 @@ public class BarcodeRepository : IBarcodeRepository
 
     public async Task UpdateAsync(Barcode barcode)
     {
-        _db.Barcodes.Update(barcode);
+        var entry = _db.Entry(barcode);
+        if (entry.State == EntityState.Detached)
+        {
+            _db.Barcodes.Update(barcode);
+        }
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task DeleteAsync(Barcode barcode)
+    {
+        var entry = _db.Entry(barcode);
+        if (entry.State == EntityState.Detached)
+        {
+            _db.Barcodes.Attach(barcode);
+        }
+        _db.Barcodes.Remove(barcode);
         await _db.SaveChangesAsync();
     }
 }

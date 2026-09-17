@@ -767,6 +767,7 @@ class _DesktopNavigationSidebar extends StatefulWidget {
 class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
   final BusinessSettingsManager _businessSettingsManager =
       BusinessSettingsManager();
+  final ScrollController _sidebarScrollController = ScrollController();
   String _shopName = '';
   String _businessSubtitle = '';
   String _logoPath = '';
@@ -780,6 +781,7 @@ class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
 
   @override
   void dispose() {
+    _sidebarScrollController.dispose();
     BusinessSettingsManager.changeNotifier.removeListener(_loadBusinessIdentity);
     super.dispose();
   }
@@ -850,8 +852,10 @@ class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
           const Divider(height: 1, thickness: 1),
           Expanded(
             child: Scrollbar(
+              controller: _sidebarScrollController,
               thumbVisibility: true,
               child: SingleChildScrollView(
+                controller: _sidebarScrollController,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

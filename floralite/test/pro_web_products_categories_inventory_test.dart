@@ -391,6 +391,152 @@ void main() {
       expect(find.byType(ListView), findsWidgets);
       expect(find.text('Red Rose Dutch'), findsOneWidget);
     });
+
+    testWidgets('opens Add Product dialog on mobile via FAB without layout exceptions', (tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final cloudProductProvider = CloudProductProvider(_buildMockCloudProductRepo());
+      await cloudProductProvider.load();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: cloudProductProvider),
+            ChangeNotifierProvider(
+              create: (_) => PrinterProvider(PrinterManager(repository: PrinterRepository())),
+            ),
+          ],
+          child: const MaterialApp(
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: CloudProductsScreen(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // On mobile (< 800px), FAB is visible
+      final fab = find.byType(FloatingActionButton);
+      expect(fab, findsOneWidget);
+
+      await tester.tap(fab);
+      await tester.pumpAndSettle();
+
+      // Dialog renders successfully without RenderBox or layout assertion errors
+      expect(find.text('Add Cloud Product'), findsOneWidget);
+      expect(find.text('Name'), findsOneWidget);
+      expect(find.text('SKU'), findsOneWidget);
+      expect(find.text('Selling price'), findsOneWidget);
+      expect(find.text('Save'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+
+      // Close dialog cleanly
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add Cloud Product'), findsNothing);
+    });
+
+    testWidgets('opens Add Product dialog on desktop via header action without layout exceptions', (tester) async {
+      tester.view.physicalSize = const Size(1024, 768);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final cloudProductProvider = CloudProductProvider(_buildMockCloudProductRepo());
+      await cloudProductProvider.load();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: cloudProductProvider),
+            ChangeNotifierProvider(
+              create: (_) => PrinterProvider(PrinterManager(repository: PrinterRepository())),
+            ),
+          ],
+          child: const MaterialApp(
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: CloudProductsScreen(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // On desktop (>= 800px), header action button is visible
+      final addBtn = find.widgetWithText(FilledButton, 'Add Product');
+      expect(addBtn, findsOneWidget);
+
+      await tester.tap(addBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add Cloud Product'), findsOneWidget);
+      expect(find.text('Save'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add Cloud Product'), findsNothing);
+    });
+
+    testWidgets('opens Edit Product dialog with existing data without layout exceptions', (tester) async {
+      tester.view.physicalSize = const Size(1024, 768);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final cloudProductProvider = CloudProductProvider(_buildMockCloudProductRepo());
+      await cloudProductProvider.load();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: cloudProductProvider),
+            ChangeNotifierProvider(
+              create: (_) => PrinterProvider(PrinterManager(repository: PrinterRepository())),
+            ),
+          ],
+          child: const MaterialApp(
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: CloudProductsScreen(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final editBtn = find.byTooltip('Edit');
+      expect(editBtn, findsOneWidget);
+
+      await tester.tap(editBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Cloud Product'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Red Rose Dutch'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Cloud Product'), findsNothing);
+    });
   });
 
   group('Floraprise Pro Web Phase 1 — Categories Responsive Adaptation', () {

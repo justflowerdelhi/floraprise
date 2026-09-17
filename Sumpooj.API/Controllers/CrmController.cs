@@ -37,6 +37,13 @@ public class CrmController : ControllerBase
             .AsNoTracking()
             .Where(c => c.CompanyId == companyId && c.IsActive);
 
+        if (request.PurchasedCategories != null && request.PurchasedCategories.Count > 0)
+        {
+            var categoriesLower = request.PurchasedCategories.Select(c => c.ToLower()).ToList();
+            query = query.Where(c => _db.Orders.Any(o => o.CustomerId == c.Id && o.IsActive &&
+                                                 o.Items.Any(oi => _db.Products.Any(p => p.Id == oi.ProductId && categoriesLower.Contains((p.ProductCategoryRef != null ? p.ProductCategoryRef.Name : p.Category.ToString()).ToLower())))));
+        }
+
         if (!string.IsNullOrWhiteSpace(request.Query))
         {
             var search = request.Query.Trim().ToLower();
@@ -416,7 +423,7 @@ public class CrmController : ControllerBase
         };
 }
 
-public sealed record CrmCustomerListRequest(string? Query, int Page = 1, int PageSize = 50, string? SortBy = null);
+public sealed record CrmCustomerListRequest(string? Query, [FromQuery] List<string>? PurchasedCategories, int Page = 1, int PageSize = 50, string? SortBy = null);
 
 public sealed record CrmCustomer360Response(
     CrmCustomerDto Customer,
