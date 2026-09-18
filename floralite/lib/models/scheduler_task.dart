@@ -139,11 +139,12 @@ class SchedulerTask {
         (e) => e.name.toLowerCase() == statStr.toLowerCase(),
         orElse: () => TaskStatus.pending,
       ),
-      scheduledAt: DateTime.tryParse(schedStr) ?? DateTime.now(),
-      nextReminderAt: reminderStr != null ? DateTime.tryParse(reminderStr) : null,
-      deadlineAt: deadStr != null ? DateTime.tryParse(deadStr) : null,
-      startedAt: startStr != null ? DateTime.tryParse(startStr) : null,
-      completedAt: compStr != null ? DateTime.tryParse(compStr) : null,
+      scheduledAt: (DateTime.tryParse(schedStr) ?? DateTime.now()).toLocal(),
+      nextReminderAt:
+          reminderStr != null ? DateTime.tryParse(reminderStr)?.toLocal() : null,
+      deadlineAt: deadStr != null ? DateTime.tryParse(deadStr)?.toLocal() : null,
+      startedAt: startStr != null ? DateTime.tryParse(startStr)?.toLocal() : null,
+      completedAt: compStr != null ? DateTime.tryParse(compStr)?.toLocal() : null,
       notes: (json['notes'] ?? json['Notes'])?.toString(),
       linkedCustomerId: custIdStr != null ? (int.tryParse(custIdStr) ?? custIdStr.hashCode) : null,
       cloudLinkedCustomerId: custIdStr,
@@ -158,8 +159,8 @@ class SchedulerTask {
       sourceRef: (json['sourceRef'] ?? json['SourceRef'])?.toString(),
       requiresConfirmation: (json['requiresConfirmation'] ?? json['RequiresConfirmation']) == true,
       requiresAlarm: (json['requiresAlarm'] ?? json['RequiresAlarm']) == true,
-      createdAt: DateTime.tryParse(createdStr) ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(updatedStr) ?? DateTime.now(),
+      createdAt: (DateTime.tryParse(createdStr) ?? DateTime.now()).toLocal(),
+      updatedAt: (DateTime.tryParse(updatedStr) ?? DateTime.now()).toLocal(),
     );
   }
 

@@ -58,6 +58,7 @@ public sealed class MobileAuthController : MobileApiControllerBase
 
             var email = request.Email.Trim();
             var mobile = request.Mobile.Trim();
+
             if (await IsDuplicateCompanyRegistrationAsync(request.CompanyName, mobile, cancellationToken))
             {
                 const string message = "This company is already registered with Floraprise.";
@@ -69,66 +70,47 @@ public sealed class MobileAuthController : MobileApiControllerBase
                         message
                     },
                     title = "Company already registered",
-                    detail = $"DUPLICATE_COMPANY: {message}"
+                    detail = $"DUPLICATE_COMPANY: {message}",
+                    errorCode = "DUPLICATE_COMPANY",
+                    message
                 });
             }
 
-            _logger.LogInformation("[Mobile Register] Checking for existing email: {Email}", email);
-            var existingByEmail = await _userManager.FindByEmailAsync(email);
-
-            _logger.LogInformation("[Mobile Register] Checking for existing phone: {Mobile}", mobile);
-            var existingByPhone = await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == mobile, cancellationToken);
-
-            _logger.LogInformation("[Mobile Register] Creating company for: {CompanyName}", request.CompanyName);
-            var existingUser = existingByEmail ?? existingByPhone;
-            if (existingUser != null)
+            if (await IsDuplicatePhoneRegistrationAsync(mobile, cancellationToken))
             {
-                var existingCompanyId = existingUser.CompanyId ?? Guid.Empty;
-                if (existingCompanyId == Guid.Empty)
-                    throw new InvalidOperationException("Existing mobile account is missing company information.");
-
-                _logger.LogInformation("[Mobile Register] Existing user found. Restoring mobile registration for companyId: {CompanyId}, deviceId: {DeviceId}", existingCompanyId, request.DeviceId);
-                var identifier = string.IsNullOrWhiteSpace(existingUser.Email) ? mobile : existingUser.Email;
-                var restoredLoginResponse = await _mobileClientService.LoginAsync(
-                    new MobileApiLoginRequest(
-                        CompanyId: existingCompanyId,
-                        Identifier: identifier,
-                        Password: request.Password,
-                        DeviceId: request.DeviceId,
-                        Platform: request.Platform,
-                        Manufacturer: request.Manufacturer,
-                        Model: request.Model,
-                        OsVersion: request.OsVersion,
-                        AppVersion: request.AppVersion,
-                        PushToken: request.PushToken,
-                        IpAddress: request.IpAddress),
-                    new RegisterMobileCustomerRequest(
-                        CompanyId: existingCompanyId,
-                        BusinessName: request.CompanyName.Trim(),
-                        OwnerName: request.OwnerName.Trim(),
-                        Mobile: mobile,
-                        Email: email,
-                        City: request.City.Trim(),
-                        State: null,
-                        Country: "IN",
-                        FullName: request.OwnerName.Trim(),
-                        DeviceId: request.DeviceId,
-                        Platform: request.Platform,
-                        Manufacturer: request.Manufacturer,
-                        Model: request.Model,
-                        OsVersion: request.OsVersion,
-                        AppVersion: request.AppVersion,
-                        PushToken: request.PushToken,
-                        IpAddress: request.IpAddress,
-                        IdentityUserId: existingUser.Id,
-                        ActorUserId: existingUser.Id),
-                    cancellationToken);
-
-                _logger.LogInformation("[Mobile Register] Existing registration restored successfully for email: {Email}", identifier);
-                return Ok(restoredLoginResponse);
+                const string message = "Phone number already in use. Please use a different phone number.";
+                return Conflict(new
+                {
+                    error = new
+                    {
+                        code = "PHONE_ALREADY_IN_USE",
+                        message
+                    },
+                    title = "Phone number already in use",
+                    detail = $"PHONE_ALREADY_IN_USE: {message}",
+                    errorCode = "PHONE_ALREADY_IN_USE",
+                    message
+                });
             }
 
-            _logger.LogInformation("[Mobile Register] Creating new company");
+            if (await IsDuplicateEmailRegistrationAsync(email, cancellationToken))
+            {
+                const string message = "This email is already registered. Please use a different email or log in.";
+                return Conflict(new
+                {
+                    error = new
+                    {
+                        code = "EMAIL_ALREADY_IN_USE",
+                        message
+                    },
+                    title = "Email already registered",
+                    detail = $"EMAIL_ALREADY_IN_USE: {message}",
+                    errorCode = "EMAIL_ALREADY_IN_USE",
+                    message
+                });
+            }
+
+            _logger.LogInformation("[Mobile Register] Creating new company for: {CompanyName}", request.CompanyName);
             var company = new Domain.Entities.Company(
                 name: request.CompanyName.Trim(),
                 region: "IN",
@@ -251,6 +233,38 @@ public sealed class MobileAuthController : MobileApiControllerBase
         return candidates.Any(c =>
             NormalizeCompanyName(c.Name) == normalizedName &&
             NormalizeIndianBusinessPhone(c.Phone) == normalizedPhone);
+    }
+
+    private async Task<bool> IsDuplicatePhoneRegistrationAsync(
+        string businessPhone,
+        CancellationToken cancellationToken)
+    {
+        var rawPhone = (businessPhone ?? string.Empty).Trim();
+        var normalizedPhone = NormalizeIndianBusinessPhone(businessPhone);
+        if (string.IsNullOrWhiteSpace(rawPhone) && string.IsNullOrWhiteSpace(normalizedPhone))
+            return false;
+
+        var users = await _userManager.Users
+            .AsNoTracking()
+            .Where(u => u.PhoneNumber != null || u.UserName != null)
+            .Select(u => new { u.PhoneNumber, u.UserName })
+            .ToListAsync(cancellationToken);
+
+        return users.Any(u =>
+            (!string.IsNullOrWhiteSpace(u.PhoneNumber) && (u.PhoneNumber == rawPhone || NormalizeIndianBusinessPhone(u.PhoneNumber) == normalizedPhone)) ||
+            (!string.IsNullOrWhiteSpace(u.UserName) && (u.UserName == rawPhone || NormalizeIndianBusinessPhone(u.UserName) == normalizedPhone)));
+    }
+
+    private async Task<bool> IsDuplicateEmailRegistrationAsync(
+        string email,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return false;
+
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        var user = await _userManager.FindByEmailAsync(normalizedEmail);
+        return user != null;
     }
 
     private static string NormalizeCompanyName(string? value)

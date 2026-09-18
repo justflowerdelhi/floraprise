@@ -201,7 +201,9 @@ public sealed record MobileDeviceAuthorizationResponse(string DeviceId, bool Aut
 public enum MobilePaymentGatewayType
 {
     Razorpay = 1,
-    Stripe = 2
+    Stripe = 2,
+    PayPal = 3,
+    PayU = 4
 }
 
 public sealed record CreateSubscriptionOrderRequest(

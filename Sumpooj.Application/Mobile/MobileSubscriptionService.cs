@@ -106,17 +106,6 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
         var device = await _devices.GetByDeviceIdAsync(request.CompanyId, user.Id, request.DeviceId);
         if (device == null)
         {
-            var subscriptionForLimit = await _subscriptions.GetByUserIdAsync(request.CompanyId, user.Id);
-            var planForLimit = subscriptionForLimit?.SubscriptionPlan ?? plan;
-            var maxAllowedDevices = planForLimit.PlanType == MobilePlanType.Pro ? 3 : planForLimit.MaximumDevices;
-            var activeDeviceCount = await _devices.CountActiveByUserAsync(request.CompanyId, user.Id);
-            if (activeDeviceCount >= maxAllowedDevices)
-            {
-                _logger.LogWarning("[MobileSubscription] Device limit reached. User: {UserId}, Active: {Count}, Max: {Max}, Plan: {Plan}",
-                    user.Id, activeDeviceCount, maxAllowedDevices, planForLimit.Code);
-                throw new InvalidOperationException($"Maximum {maxAllowedDevices} devices are already active for this account.");
-            }
-
             _logger.LogInformation("[MobileSubscription] Creating new MobileDevice for userId: {UserId}, deviceId: {DeviceId}", user.Id, request.DeviceId);
             device = new MobileDevice(
                 companyId: request.CompanyId,
@@ -139,16 +128,6 @@ public sealed class MobileSubscriptionService : IMobileSubscriptionService
             _logger.LogInformation("[MobileSubscription] MobileDevice found with ID: {DeviceId}, updating", device.Id);
             if (device.Status != MobileDeviceStatus.Active)
             {
-                var subscriptionForLimit = await _subscriptions.GetByUserIdAsync(request.CompanyId, user.Id);
-                var planForLimit = subscriptionForLimit?.SubscriptionPlan ?? plan;
-                var maxAllowedDevices = planForLimit.PlanType == MobilePlanType.Pro ? 3 : planForLimit.MaximumDevices;
-                var activeDeviceCount = await _devices.CountActiveByUserAsync(request.CompanyId, user.Id);
-                if (activeDeviceCount >= maxAllowedDevices)
-                {
-                    _logger.LogWarning("[MobileSubscription] Device limit reached on reactivating device. User: {UserId}, Active: {Count}, Max: {Max}, Plan: {Plan}",
-                        user.Id, activeDeviceCount, maxAllowedDevices, planForLimit.Code);
-                    throw new InvalidOperationException($"Maximum {maxAllowedDevices} devices are already active for this account.");
-                }
                 device.Activate(request.ActorUserId);
             }
 

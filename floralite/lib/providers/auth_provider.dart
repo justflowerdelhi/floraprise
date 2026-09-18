@@ -262,13 +262,13 @@ class AuthProvider extends ChangeNotifier {
       case 'account_disabled':
         return 'Your account is disabled. Please contact support.';
       case 'email_exists':
-        return 'This email is already registered.';
-      case 'mobile_exists':
-        return 'This mobile number is already registered.';
+      case 'EMAIL_ALREADY_IN_USE':
       case 'DUPLICATE_EMAIL':
         return 'This email is already registered.';
+      case 'PHONE_ALREADY_IN_USE':
       case 'DUPLICATE_PHONE':
-        return 'This mobile number is already registered.';
+      case 'mobile_exists':
+        return 'Phone number already in use. Please use a different phone number.';
       case 'DUPLICATE_COMPANY':
         return 'This company is already registered with Floraprise.';
       default:

@@ -232,6 +232,8 @@ builder.Services.AddScoped<IMobileClientService, MobileClientService>();
 builder.Services.AddScoped<IPosSaleSyncService, PosSaleSyncService>();
 builder.Services.AddScoped<ISubscriptionPaymentGateway, RazorpaySubscriptionPaymentGateway>();
 builder.Services.AddScoped<ISubscriptionPaymentGateway, StripeSubscriptionPaymentGateway>();
+builder.Services.AddScoped<ISubscriptionPaymentGateway, PayPalSubscriptionPaymentGateway>();
+builder.Services.AddScoped<ISubscriptionPaymentGateway, PayUSubscriptionPaymentGateway>();
 builder.Services.AddScoped<ISubscriptionPaymentGatewayFactory, SubscriptionPaymentGatewayFactory>();
 
 // AI Services

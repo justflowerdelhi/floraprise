@@ -3,14 +3,43 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../managers/business_settings_manager.dart';
+import '../models/fiscal_profile.dart';
 import '../models/subscription.dart';
 import '../providers/subscription_provider.dart';
 import '../services/mobile_auth_service.dart';
 import '../widgets/common_widgets.dart';
 import 'payment_history_screen.dart';
 
-class SubscriptionScreen extends StatelessWidget {
-  const SubscriptionScreen({super.key});
+class SubscriptionScreen extends StatefulWidget {
+  const SubscriptionScreen({super.key, this.fiscalProfile});
+
+  final FiscalProfile? fiscalProfile;
+
+  @override
+  State<SubscriptionScreen> createState() => _SubscriptionScreenState();
+}
+
+class _SubscriptionScreenState extends State<SubscriptionScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<SubscriptionProvider>().retryPendingVerification();
+    }
+  }
 
   Future<void> _manageSubscription(BuildContext context) async {
     // Razorpay subscriptions are managed through the app
@@ -21,7 +50,12 @@ class SubscriptionScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _showRenewOptions(BuildContext context) async {
+  Future<void> _showRenewOptions(
+    BuildContext context, {
+    FiscalProfile? profile,
+  }) async {
+    final fiscal = profile ?? widget.fiscalProfile ?? BusinessSettingsManager.activeFiscalProfile;
+    final paidPlans = SubscriptionPlans.paidForProfile(fiscal);
     final plan = await showModalBottomSheet<SubscriptionPlan>(
       context: context,
       useSafeArea: true,
@@ -43,12 +77,12 @@ class SubscriptionScreen extends StatelessWidget {
               style: TextStyle(color: Colors.grey.shade700),
             ),
             const SizedBox(height: 12),
-            for (final config in SubscriptionPlans.paid) ...[
+            for (final config in paidPlans) ...[
               _PlanOptionTile(
                 config: config,
                 onTap: () => Navigator.pop(sheetContext, config.plan),
               ),
-              if (config != SubscriptionPlans.paid.last) const Divider(),
+              if (config != paidPlans.last) const Divider(),
             ],
           ],
         ),
@@ -85,6 +119,7 @@ class SubscriptionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resolvedFiscal = widget.fiscalProfile ?? BusinessSettingsManager.activeFiscalProfile;
     return Consumer<SubscriptionProvider>(
       builder: (context, provider, child) {
         final access = provider.access;
@@ -104,14 +139,15 @@ class SubscriptionScreen extends StatelessWidget {
             child: lockedLayout
                 ? _LockedSubscriptionBody(
                     provider: provider,
-                    onRenew: () => _showRenewOptions(context),
+                    onRenew: () => _showRenewOptions(context, profile: resolvedFiscal),
                     onSupport: () => _showSupport(context),
                   )
                 : _StatusSubscriptionBody(
                     provider: provider,
                     state: state,
-                    onRenew: () => _showRenewOptions(context),
-                    onUpgrade: () => _showRenewOptions(context),
+                    profile: resolvedFiscal,
+                    onRenew: () => _showRenewOptions(context, profile: resolvedFiscal),
+                    onUpgrade: () => _showRenewOptions(context, profile: resolvedFiscal),
                     onManage: () => _manageSubscription(context),
                     onPaymentHistory: () => _openPaymentHistory(context),
                     onSupport: () => _showSupport(context),
@@ -228,6 +264,7 @@ class _StatusSubscriptionBody extends StatelessWidget {
     required this.onManage,
     required this.onPaymentHistory,
     required this.onSupport,
+    this.profile,
   });
 
   final SubscriptionProvider provider;
@@ -237,6 +274,7 @@ class _StatusSubscriptionBody extends StatelessWidget {
   final VoidCallback onManage;
   final VoidCallback onPaymentHistory;
   final VoidCallback onSupport;
+  final FiscalProfile? profile;
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +326,7 @@ class _StatusSubscriptionBody extends StatelessWidget {
         const SizedBox(height: 16),
         const _CloudSubscriptionSnapshotCard(),
         const SizedBox(height: 16),
-        const _PlanSummarySection(),
+        _PlanSummarySection(profile: profile),
         const SizedBox(height: 16),
         Row(
           children: [
@@ -353,7 +391,9 @@ class _StatusSubscriptionBody extends StatelessWidget {
 }
 
 class _PlanSummarySection extends StatelessWidget {
-  const _PlanSummarySection();
+  const _PlanSummarySection({this.profile});
+
+  final FiscalProfile? profile;
 
   static const _features = [
     'POS',
@@ -376,6 +416,9 @@ class _PlanSummarySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fiscal = profile ?? BusinessSettingsManager.activeFiscalProfile;
+    final paidPlans = SubscriptionPlans.paidForProfile(fiscal);
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -390,9 +433,9 @@ class _PlanSummarySection extends StatelessWidget {
             style: TextStyle(color: Colors.grey.shade700),
           ),
           const SizedBox(height: 12),
-          for (final config in SubscriptionPlans.paid) ...[
-            _PlanDetails(config: config),
-            if (config != SubscriptionPlans.paid.last)
+          for (final config in paidPlans) ...[
+            _PlanDetails(config: config, allPlans: paidPlans),
+            if (config != paidPlans.last)
               const SizedBox(height: 12),
           ],
           const SizedBox(height: 16),
@@ -421,9 +464,31 @@ class _PlanSummarySection extends StatelessWidget {
 }
 
 class _PlanDetails extends StatelessWidget {
-  const _PlanDetails({required this.config});
+  const _PlanDetails({
+    required this.config,
+    this.allPlans = const [],
+  });
 
   final SubscriptionPlanConfig config;
+  final List<SubscriptionPlanConfig> allPlans;
+
+  String _getSavingsText() {
+    final quarterlyList =
+        allPlans.where((p) => p.plan == SubscriptionPlan.quarterly);
+    final quarterly = quarterlyList.isNotEmpty
+        ? quarterlyList.first
+        : SubscriptionPlans.byPlanForCountry(
+            SubscriptionPlan.quarterly,
+            config.currencyCode,
+          );
+    final savingsPaise = (2 * quarterly.pricePaise) - config.pricePaise;
+    final savingsMajor = (savingsPaise / 100).round();
+    final formatted = NumberFormat('#,##0', 'en_US').format(savingsMajor);
+    if (config.currencyCode == 'AED' || config.currencySymbol == 'AED') {
+      return 'Save AED $formatted compared to renewing Quarterly twice.';
+    }
+    return 'Save ${config.currencySymbol}$formatted compared to renewing Quarterly twice.';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -475,7 +540,7 @@ class _PlanDetails extends StatelessWidget {
           Text(config.description),
           if (config.plan == SubscriptionPlan.halfYearly) ...[
             const SizedBox(height: 4),
-            const Text('Save ₹999 compared to renewing Quarterly twice.'),
+            Text(_getSavingsText()),
           ],
           if (config.plan == SubscriptionPlan.annual) ...[
             const SizedBox(height: 4),

@@ -602,7 +602,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   String _formatTaskTime(SchedulerTask task) {
-    final value = task.effectiveReminderAt;
+    final value = task.effectiveReminderAt.toLocal();
     final hour = value.hour.toString().padLeft(2, '0');
     final minute = value.minute.toString().padLeft(2, '0');
     return '${value.day}/${value.month} $hour:$minute • ${_taskPriorityLabel(task.priority)}';

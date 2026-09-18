@@ -253,7 +253,10 @@ void main() {
       expect(html, contains('#INV-1001'));
       expect(html, contains('Cashier:'));
       expect(html, contains('John Doe'));
-      expect(html, contains('Pooja Sharma (9876543210)'));
+      expect(html, contains('Customer:'));
+      expect(html, contains('Pooja Sharma'));
+      expect(html, contains('Phone:'));
+      expect(html, contains('9876543210'));
     });
 
     test('8. WebReceiptPrintService formats POS Bill HTML containing line items with names, quantities, rates, and amounts', () async {
@@ -349,7 +352,8 @@ void main() {
       expect(html, contains('9811122233'));
       expect(html, contains('Flat 402, Sunshine Heights'));
       expect(html, contains('Near City Hospital'));
-      expect(html, contains('PIN: 110001'));
+      expect(html, contains('Pincode:'));
+      expect(html, contains('110001'));
       expect(html, contains('Ananya Sen'));
       expect(html, contains('Please do not ring bell, leave at door.'));
       expect(html, contains('PRODUCT CHECKLIST:'));

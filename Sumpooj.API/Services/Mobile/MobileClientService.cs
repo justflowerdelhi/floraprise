@@ -671,12 +671,21 @@ public sealed class MobileClientService : IMobileClientService
         if (!targetPlan.IsActive || targetPlan.IsDeleted)
             throw new InvalidOperationException("Selected subscription plan is not active.");
 
-        var serverAmount = ResolvePlanAmount(targetPlan, request.BillingCycle);
+        var company = await _db.Companies.AsNoTracking().FirstOrDefaultAsync(x => x.Id == companyId, cancellationToken);
+        var expectedPricing = SubscriptionCountryPricing.ResolvePricingWithFallback(company?.Region, company?.CurrencyCode, request.BillingCycle);
+
+        var targetGateway = expectedPricing.Gateway;
+        if (expectedPricing.Gateway == MobilePaymentGatewayType.PayU && request.Gateway == MobilePaymentGatewayType.Razorpay)
+        {
+            targetGateway = MobilePaymentGatewayType.Razorpay;
+        }
+
         var serverRequest = request with
         {
-            Amount = serverAmount,
+            Gateway = targetGateway,
+            Amount = expectedPricing.Amount,
             PlanCode = targetPlan.Code,
-            Currency = string.IsNullOrWhiteSpace(request.Currency) ? "INR" : request.Currency.Trim().ToUpperInvariant()
+            Currency = expectedPricing.Currency
         };
 
         var gateway = _paymentGatewayFactory.Resolve(serverRequest.Gateway);
@@ -810,7 +819,7 @@ public sealed class MobileClientService : IMobileClientService
             ?? throw new KeyNotFoundException("Subscription not found for payment transaction.");
 
         var requestedPlanCode = string.IsNullOrWhiteSpace(request.PlanCode)
-            ? subscription.SubscriptionPlan?.Code ?? "ANNUAL"
+            ? (subscription.SubscriptionPlan?.Code is null or "MOBILE_TRIAL" ? "PRO" : subscription.SubscriptionPlan.Code)
             : request.PlanCode.Trim().ToUpperInvariant();
 
         var targetPlan = await _subscriptionPlans.GetByCodeAsync(requestedPlanCode)
@@ -819,20 +828,30 @@ public sealed class MobileClientService : IMobileClientService
         if (!targetPlan.IsActive || targetPlan.IsDeleted)
             throw new InvalidOperationException("Selected subscription plan is not active.");
 
-        if (!PaymentMatchesPlanPrice(targetPlan, request.BillingCycle, tx.Amount))
+        var company = await _db.Companies.AsNoTracking().FirstOrDefaultAsync(x => x.Id == companyId, cancellationToken);
+        var effectiveBillingCycle = request.BillingCycle;
+        if (string.IsNullOrWhiteSpace(effectiveBillingCycle))
+        {
+            var matched = SubscriptionCountryPricing.MatchPlanByAmount(company?.Region ?? company?.CurrencyCode, tx.Amount, tx.Currency);
+            effectiveBillingCycle = matched?.BillingCycle ?? "annual";
+        }
+
+        if (!SubscriptionCountryPricing.MatchesPrice(company?.Region ?? company?.CurrencyCode, effectiveBillingCycle, tx.Amount, tx.Currency))
             throw new InvalidOperationException("Payment amount does not match the selected subscription plan.");
 
-        if (subscription.SubscriptionPlanId != targetPlan.Id)
-            subscription.ChangePlan(targetPlan.Id, mobileUserId);
+        var actorId = mobileUserId == Guid.Empty ? subscription.MobileUserId : mobileUserId;
 
-        var months = BillingCycleToMonths(request.BillingCycle ?? "annual");
+        if (subscription.SubscriptionPlanId != targetPlan.Id)
+            subscription.ChangePlan(targetPlan.Id, actorId);
+
+        var days = SubscriptionCountryPricing.BillingCycleToDays(effectiveBillingCycle);
         var start = subscription.EndUtc.HasValue && subscription.EndUtc > DateTime.UtcNow
             ? subscription.EndUtc.Value
             : DateTime.UtcNow;
-        var end = start.AddMonths(months);
+        var end = start.AddDays(days);
 
-        subscription.Activate(start, end, true, mobileUserId);
-        subscription.MarkValidated(DateTime.UtcNow, mobileUserId);
+        subscription.Activate(start, end, true, actorId);
+        subscription.MarkValidated(DateTime.UtcNow, actorId);
 
         var licenses = await _db.MobileLicenses
             .Where(x => x.CompanyId == companyId && x.MobileSubscriptionId == subscription.Id && !x.IsDeleted)
@@ -840,8 +859,8 @@ public sealed class MobileClientService : IMobileClientService
 
         foreach (var license in licenses)
         {
-            license.Activate(mobileUserId);
-            license.SetExpiry(end, mobileUserId);
+            license.Activate(actorId);
+            license.SetExpiry(end, actorId);
         }
     }
 
@@ -891,11 +910,11 @@ public sealed class MobileClientService : IMobileClientService
 
         subscription.ChangePlan(targetPlan.Id, mobileUserId);
 
-        var months = BillingCycleToMonths(request.BillingCycle);
+        var days = SubscriptionCountryPricing.BillingCycleToDays(request.BillingCycle);
         var start = subscription.EndUtc.HasValue && subscription.EndUtc > DateTime.UtcNow
             ? subscription.EndUtc.Value
             : DateTime.UtcNow;
-        var end = start.AddMonths(months);
+        var end = start.AddDays(days);
         subscription.Activate(start, end, true, mobileUserId);
 
         await _uow.SaveChangesAsync(cancellationToken);

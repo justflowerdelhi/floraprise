@@ -523,6 +523,92 @@ public sealed class MobileAuthLoginTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task Register_WithDuplicatePhone_ReturnsConflictWithPhoneAlreadyInUse()
+    {
+        await EnsureCompanyAdminRoleAsync();
+        await SeedCompanyUserAsync(); // Existing user has PhoneNumber = "9876543210"
+
+        var request = RegisterRequest(
+            companyName: "New Blossom Boutique",
+            mobile: "9876543210",
+            email: "newblossom@example.com");
+
+        var result = await _controller.Register(request, CancellationToken.None);
+
+        var conflict = Assert.IsType<ConflictObjectResult>(result);
+        var json = System.Text.Json.JsonSerializer.Serialize(conflict.Value);
+        Assert.Contains("PHONE_ALREADY_IN_USE", json);
+        Assert.Contains("Phone number already in use. Please use a different phone number.", json);
+    }
+
+    [Fact]
+    public async Task Register_WithDuplicatePhoneWithPrefix_ReturnsConflictWithPhoneAlreadyInUse()
+    {
+        await EnsureCompanyAdminRoleAsync();
+        await SeedCompanyUserAsync(); // Existing user has PhoneNumber = "9876543210"
+
+        var request = RegisterRequest(
+            companyName: "Another Blossom Shop",
+            mobile: "+919876543210",
+            email: "anotherblossom@example.com");
+
+        var result = await _controller.Register(request, CancellationToken.None);
+
+        var conflict = Assert.IsType<ConflictObjectResult>(result);
+        var json = System.Text.Json.JsonSerializer.Serialize(conflict.Value);
+        Assert.Contains("PHONE_ALREADY_IN_USE", json);
+        Assert.Contains("Phone number already in use. Please use a different phone number.", json);
+    }
+
+    [Fact]
+    public async Task Register_WithDuplicateEmail_ReturnsConflictWithEmailAlreadyInUse()
+    {
+        await EnsureCompanyAdminRoleAsync();
+        await SeedCompanyUserAsync(); // Existing user has Email = "owner@example.com"
+
+        var request = RegisterRequest(
+            companyName: "Unique Florist Shop",
+            mobile: "9123456780",
+            email: "owner@example.com");
+
+        var result = await _controller.Register(request, CancellationToken.None);
+
+        var conflict = Assert.IsType<ConflictObjectResult>(result);
+        var json = System.Text.Json.JsonSerializer.Serialize(conflict.Value);
+        Assert.Contains("EMAIL_ALREADY_IN_USE", json);
+    }
+
+    [Fact]
+    public async Task Register_WithUniqueDetails_Succeeds()
+    {
+        await EnsureCompanyAdminRoleAsync();
+
+        var request = RegisterRequest(
+            companyName: "Brand New Unique Florist",
+            mobile: "9111222333",
+            email: "brandnew@unique-florist.local");
+
+        var result = await _controller.Register(request, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<MobileAuthTokenResponse>(ok.Value);
+        Assert.False(string.IsNullOrWhiteSpace(response.AccessToken));
+    }
+
+    [Fact]
+    public async Task Login_WithInvalidPassword_ReturnsUnauthorized()
+    {
+        await EnsureCompanyAdminRoleAsync();
+        var (company, user, _) = await SeedCompanyUserAsync();
+
+        var request = LoginRequest(user.Email!, "WrongPassword@123", company.Id);
+        var result = await _controller.Login(request, CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, problem.StatusCode);
+    }
+
     private static MobileApiRegisterRequest RegisterRequest(string companyName, string mobile, string email)
     {
         return new MobileApiRegisterRequest(

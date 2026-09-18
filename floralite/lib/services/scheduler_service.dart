@@ -251,9 +251,10 @@ class SchedulerService {
     if (task.requiresAlarm && task.priority == TaskPriority.urgent) {
       return 'Critical task requires attention now.';
     }
+    final localTime = task.effectiveReminderAt.toLocal();
     return task.notes?.trim().isNotEmpty == true
         ? task.notes!.trim()
-        : 'Scheduled for ${task.effectiveReminderAt.hour.toString().padLeft(2, '0')}:${task.effectiveReminderAt.minute.toString().padLeft(2, '0')}';
+        : 'Scheduled for ${localTime.hour.toString().padLeft(2, '0')}:${localTime.minute.toString().padLeft(2, '0')}';
   }
 
   int _notificationId(int taskId, int offset) => taskId * 1000 + offset;

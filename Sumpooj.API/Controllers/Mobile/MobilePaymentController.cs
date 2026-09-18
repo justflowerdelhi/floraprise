@@ -17,12 +17,18 @@ public sealed class MobilePaymentController : MobileApiControllerBase
 {
     private readonly IMobileClientService _mobileClientService;
     private readonly IConfiguration _configuration;
+    private readonly ISubscriptionPaymentGatewayFactory _paymentGatewayFactory;
 
-    public MobilePaymentController(IMobileClientService mobileClientService, ITenantContext tenantContext, IConfiguration configuration)
+    public MobilePaymentController(
+        IMobileClientService mobileClientService,
+        ITenantContext tenantContext,
+        IConfiguration configuration,
+        ISubscriptionPaymentGatewayFactory paymentGatewayFactory)
         : base(tenantContext)
     {
         _mobileClientService = mobileClientService;
         _configuration = configuration;
+        _paymentGatewayFactory = paymentGatewayFactory;
     }
 
     /// <summary>
@@ -160,10 +166,131 @@ public sealed class MobilePaymentController : MobileApiControllerBase
         }
     }
 
+    /// <summary>
+    /// Handles PayPal webhook notifications for mobile subscription payments.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("webhook/paypal", Name = "MobilePayment_PayPalWebhook")]
+    [ProducesResponseType(typeof(PaymentCallbackResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> PayPalWebhook(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var authAlgo = Request.Headers["PAYPAL-AUTH-ALGO"].FirstOrDefault() ?? Request.Headers["paypal-auth-algo"].FirstOrDefault();
+            var certUrl = Request.Headers["PAYPAL-CERT-URL"].FirstOrDefault() ?? Request.Headers["paypal-cert-url"].FirstOrDefault();
+            var transmissionId = Request.Headers["PAYPAL-TRANSMISSION-ID"].FirstOrDefault() ?? Request.Headers["paypal-transmission-id"].FirstOrDefault();
+            var transmissionSig = Request.Headers["PAYPAL-TRANSMISSION-SIG"].FirstOrDefault() ?? Request.Headers["paypal-transmission-sig"].FirstOrDefault();
+            var transmissionTime = Request.Headers["PAYPAL-TRANSMISSION-TIME"].FirstOrDefault() ?? Request.Headers["paypal-transmission-time"].FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(authAlgo) ||
+                string.IsNullOrWhiteSpace(certUrl) ||
+                string.IsNullOrWhiteSpace(transmissionId) ||
+                string.IsNullOrWhiteSpace(transmissionSig) ||
+                string.IsNullOrWhiteSpace(transmissionTime))
+            {
+                return Unauthorized();
+            }
+
+            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
+            var rawBody = await reader.ReadToEndAsync(cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(rawBody))
+                return BadRequest();
+
+            var paypalGateway = _paymentGatewayFactory.Resolve(MobilePaymentGatewayType.PayPal) as PayPalSubscriptionPaymentGateway;
+            if (paypalGateway == null)
+                return Unauthorized();
+
+            var isSignatureValid = await paypalGateway.VerifyWebhookSignatureAsync(
+                rawBody,
+                authAlgo,
+                certUrl,
+                transmissionId,
+                transmissionSig,
+                transmissionTime,
+                cancellationToken);
+
+            if (!isSignatureValid)
+                return Unauthorized();
+
+            using var doc = JsonDocument.Parse(rawBody);
+            var root = doc.RootElement;
+            var eventType = root.TryGetProperty("event_type", out var typeNode) ? typeNode.GetString() ?? string.Empty : string.Empty;
+
+            var resource = root.TryGetProperty("resource", out var resNode) ? resNode : default;
+            var gatewayOrderId = string.Empty;
+            var gatewayPaymentId = string.Empty;
+
+            if (resource.ValueKind == JsonValueKind.Object)
+            {
+                // For checkout order events, resource.id is the order ID
+                if (resource.TryGetProperty("id", out var idNode))
+                {
+                    gatewayOrderId = idNode.GetString() ?? string.Empty;
+                }
+
+                // For payment capture events, supplementary_data or custom_id may contain order_id
+                if (resource.TryGetProperty("supplementary_data", out var suppNode) &&
+                    suppNode.TryGetProperty("related_ids", out var relNode) &&
+                    relNode.TryGetProperty("order_id", out var orderIdNode))
+                {
+                    gatewayOrderId = orderIdNode.GetString() ?? gatewayOrderId;
+                    gatewayPaymentId = idNode.GetString() ?? string.Empty;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(gatewayOrderId))
+                return BadRequest();
+
+            var normalizedStatus = eventType switch
+            {
+                "CHECKOUT.ORDER.APPROVED" => "paid",
+                "PAYMENT.CAPTURE.COMPLETED" => "paid",
+                "PAYMENT.CAPTURE.DENIED" => "failed",
+                "PAYMENT.CAPTURE.REFUNDED" => "refunded",
+                _ => "pending"
+            };
+
+            var callbackRequest = new PaymentCallbackRequest(
+                Gateway: MobilePaymentGatewayType.PayPal,
+                TransactionRef: string.Empty,
+                GatewayOrderId: gatewayOrderId,
+                GatewayPaymentId: gatewayPaymentId,
+                Status: normalizedStatus,
+                Signature: transmissionSig,
+                PlanCode: null,
+                BillingCycle: null,
+                Metadata: null);
+
+            var response = await _mobileClientService.PaymentCallbackAsync(
+                companyId: GetCompanyIdOrEmpty(),
+                mobileUserId: Guid.Empty,
+                request: callbackRequest,
+                cancellationToken: cancellationToken);
+
+            return Ok(response);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized();
+        }
+        catch (Exception ex)
+        {
+            return ProblemFromException(ex);
+        }
+    }
+
     private Guid GetCompanyIdOrEmpty()
     {
-        var raw = RouteData.Values["companyId"]?.ToString();
-        return Guid.TryParse(raw, out var companyId) ? companyId : Guid.Empty;
+        if (RouteData?.Values != null && RouteData.Values.TryGetValue("companyId", out var raw) && raw != null)
+        {
+            return Guid.TryParse(raw.ToString(), out var companyId) ? companyId : Guid.Empty;
+        }
+        return Guid.Empty;
     }
 
     /// <summary>

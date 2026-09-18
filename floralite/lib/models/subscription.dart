@@ -1,3 +1,7 @@
+import 'package:intl/intl.dart';
+
+import 'fiscal_profile.dart';
+
 enum SubscriptionState {
   active,
   gracePeriod,
@@ -74,6 +78,8 @@ class SubscriptionPlanConfig {
     required this.durationDays,
     required this.pricePaise,
     required this.productId,
+    this.currencyCode = 'INR',
+    this.currencySymbol = '₹',
     this.description = '',
     this.badge,
     this.recommended = false,
@@ -84,6 +90,8 @@ class SubscriptionPlanConfig {
   final String name;
   final int durationDays;
   final int pricePaise;
+  final String currencyCode;
+  final String currencySymbol;
   final String productId;
   final String description;
   final String? badge;
@@ -92,19 +100,33 @@ class SubscriptionPlanConfig {
   Duration get duration => Duration(days: durationDays);
   bool get isTrial => plan == SubscriptionPlan.trial;
   bool get isPaid => pricePaise > 0;
-  String get priceLabel =>
-      pricePaise == 0 ? '₹0' : '₹${(pricePaise / 100).toStringAsFixed(0)}';
+
+  String get priceLabel {
+    if (pricePaise == 0) {
+      if (currencyCode == 'AED' || currencySymbol == 'AED') return 'AED 0';
+      return '${currencySymbol}0';
+    }
+    final majorAmount = (pricePaise / 100).round();
+    final formatted = NumberFormat('#,##0', 'en_US').format(majorAmount);
+    if (currencyCode == 'AED' || currencySymbol == 'AED') {
+      return 'AED $formatted';
+    }
+    return '$currencySymbol$formatted';
+  }
 }
 
 class SubscriptionPlans {
   const SubscriptionPlans._();
 
+  // India (Default / Fallback)
   static const trial = SubscriptionPlanConfig(
     plan: SubscriptionPlan.trial,
     id: 'trial',
     name: 'Free Trial',
     durationDays: 7,
     pricePaise: 0,
+    currencyCode: 'INR',
+    currencySymbol: '₹',
     productId: 'floraprise_trial',
     description: '7 Days',
   );
@@ -115,6 +137,8 @@ class SubscriptionPlans {
     name: 'Quarterly Plan',
     durationDays: 90,
     pricePaise: 499900,
+    currencyCode: 'INR',
+    currencySymbol: '₹',
     productId: 'floraprise_quarterly',
     description: '90 Days',
   );
@@ -125,6 +149,8 @@ class SubscriptionPlans {
     name: 'Half Yearly Plan',
     durationDays: 180,
     pricePaise: 899900,
+    currencyCode: 'INR',
+    currencySymbol: '₹',
     productId: 'floraprise_half_yearly',
     description: '180 Days',
   );
@@ -135,6 +161,8 @@ class SubscriptionPlans {
     name: 'Annual Plan',
     durationDays: 365,
     pricePaise: 1499900,
+    currencyCode: 'INR',
+    currencySymbol: '₹',
     productId: 'floraprise_annual',
     description: '365 Days',
     badge: '⭐ MOST POPULAR',
@@ -143,6 +171,167 @@ class SubscriptionPlans {
 
   static const all = [trial, quarterly, halfYearly, annual];
   static const paid = [quarterly, halfYearly, annual];
+
+  // USA Plans
+  static const _usaTrial = SubscriptionPlanConfig(
+    plan: SubscriptionPlan.trial,
+    id: 'trial',
+    name: 'Free Trial',
+    durationDays: 7,
+    pricePaise: 0,
+    currencyCode: 'USD',
+    currencySymbol: r'$',
+    productId: 'floraprise_trial',
+    description: '7 Days',
+  );
+
+  static const _usaQuarterly = SubscriptionPlanConfig(
+    plan: SubscriptionPlan.quarterly,
+    id: 'quarterly',
+    name: 'Quarterly Plan',
+    durationDays: 90,
+    pricePaise: 17900,
+    currencyCode: 'USD',
+    currencySymbol: r'$',
+    productId: 'floraprise_quarterly',
+    description: '90 Days',
+  );
+
+  static const _usaHalfYearly = SubscriptionPlanConfig(
+    plan: SubscriptionPlan.halfYearly,
+    id: 'half_yearly',
+    name: 'Half Yearly Plan',
+    durationDays: 180,
+    pricePaise: 32900,
+    currencyCode: 'USD',
+    currencySymbol: r'$',
+    productId: 'floraprise_half_yearly',
+    description: '180 Days',
+  );
+
+  static const _usaAnnual = SubscriptionPlanConfig(
+    plan: SubscriptionPlan.annual,
+    id: 'annual',
+    name: 'Annual Plan',
+    durationDays: 365,
+    pricePaise: 59900,
+    currencyCode: 'USD',
+    currencySymbol: r'$',
+    productId: 'floraprise_annual',
+    description: '365 Days',
+    badge: '⭐ MOST POPULAR',
+    recommended: true,
+  );
+
+  static const _usaPlans = [
+    _usaTrial,
+    _usaQuarterly,
+    _usaHalfYearly,
+    _usaAnnual,
+  ];
+
+  // UAE Plans
+  static const _uaeTrial = SubscriptionPlanConfig(
+    plan: SubscriptionPlan.trial,
+    id: 'trial',
+    name: 'Free Trial',
+    durationDays: 7,
+    pricePaise: 0,
+    currencyCode: 'AED',
+    currencySymbol: 'AED',
+    productId: 'floraprise_trial',
+    description: '7 Days',
+  );
+
+  static const _uaeQuarterly = SubscriptionPlanConfig(
+    plan: SubscriptionPlan.quarterly,
+    id: 'quarterly',
+    name: 'Quarterly Plan',
+    durationDays: 90,
+    pricePaise: 64900,
+    currencyCode: 'AED',
+    currencySymbol: 'AED',
+    productId: 'floraprise_quarterly',
+    description: '90 Days',
+  );
+
+  static const _uaeHalfYearly = SubscriptionPlanConfig(
+    plan: SubscriptionPlan.halfYearly,
+    id: 'half_yearly',
+    name: 'Half Yearly Plan',
+    durationDays: 180,
+    pricePaise: 119900,
+    currencyCode: 'AED',
+    currencySymbol: 'AED',
+    productId: 'floraprise_half_yearly',
+    description: '180 Days',
+  );
+
+  static const _uaeAnnual = SubscriptionPlanConfig(
+    plan: SubscriptionPlan.annual,
+    id: 'annual',
+    name: 'Annual Plan',
+    durationDays: 365,
+    pricePaise: 219900,
+    currencyCode: 'AED',
+    currencySymbol: 'AED',
+    productId: 'floraprise_annual',
+    description: '365 Days',
+    badge: '⭐ MOST POPULAR',
+    recommended: true,
+  );
+
+  static const _uaePlans = [
+    _uaeTrial,
+    _uaeQuarterly,
+    _uaeHalfYearly,
+    _uaeAnnual,
+  ];
+
+  /// Returns country-specific subscription plan configs.
+  /// Supported: 'IN' (India), 'US' (USA), 'AE' (UAE).
+  /// Falls back to India defaults for null or unrecognized country codes.
+  static List<SubscriptionPlanConfig> forCountry(String? countryCode) {
+    final normalized = countryCode?.trim().toUpperCase();
+    switch (normalized) {
+      case 'US':
+      case 'USA':
+      case 'UNITED STATES':
+        return _usaPlans;
+      case 'AE':
+      case 'ARE':
+      case 'UAE':
+        return _uaePlans;
+      case 'IN':
+      case 'IND':
+      case 'INDIA':
+      default:
+        return all;
+    }
+  }
+
+  /// Returns paid subscription plans for a country.
+  static List<SubscriptionPlanConfig> paidForCountry(String? countryCode) {
+    return forCountry(countryCode).where((config) => config.isPaid).toList();
+  }
+
+  /// Returns country-specific subscription plan configs from a FiscalProfile.
+  static List<SubscriptionPlanConfig> forProfile(FiscalProfile? profile) {
+    return forCountry(profile?.countryCode);
+  }
+
+  /// Returns paid subscription plans for a FiscalProfile.
+  static List<SubscriptionPlanConfig> paidForProfile(FiscalProfile? profile) {
+    return paidForCountry(profile?.countryCode);
+  }
+
+  /// Resolves a plan config for a specific plan and country code.
+  static SubscriptionPlanConfig byPlanForCountry(
+    SubscriptionPlan plan,
+    String? countryCode,
+  ) {
+    return forCountry(countryCode).firstWhere((config) => config.plan == plan);
+  }
 
   static SubscriptionPlanConfig byPlan(SubscriptionPlan plan) {
     return all.firstWhere((config) => config.plan == plan);

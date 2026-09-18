@@ -8,10 +8,13 @@ import '../services/mobile_auth_service.dart';
 import '../services/subscription_service.dart';
 
 class SubscriptionProvider extends ChangeNotifier {
-  SubscriptionProvider(this._service);
+  SubscriptionProvider(
+    this._service, {
+    MobileAuthService? mobileAuthService,
+  }) : _mobileAuthService = mobileAuthService ?? MobileAuthService();
 
   final SubscriptionService _service;
-  final MobileAuthService _mobileAuthService = MobileAuthService();
+  final MobileAuthService _mobileAuthService;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   SubscriptionAccess? _access;
@@ -257,6 +260,21 @@ class SubscriptionProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> retryPendingVerification() async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _refreshRemotePolicyAndSubscription();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshSubscription() async {
+    await retryPendingVerification();
+  }
+
   Future<void> startPurchase(SubscriptionPlan plan) async {
     _isLoading = true;
     _message = null;
@@ -264,9 +282,11 @@ class SubscriptionProvider extends ChangeNotifier {
     try {
       _access = await _service.startPurchase(plan);
       await _refreshLicensePolicy();
-      _message = _access!.state == SubscriptionState.active
-          ? 'Subscription activated.'
-          : 'Unable to start subscription. Please try again.';
+      if (_access!.state == SubscriptionState.active) {
+        _message = 'Subscription activated.';
+      } else {
+        _message = null;
+      }
     } catch (e) {
       _message = 'Unable to start subscription. Please try again.';
     } finally {

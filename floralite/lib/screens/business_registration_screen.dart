@@ -95,6 +95,20 @@ class _BusinessRegistrationScreenState
         return;
       }
 
+      if (provider.errorCode == 'PHONE_ALREADY_IN_USE' ||
+          provider.errorCode == 'DUPLICATE_PHONE' ||
+          provider.errorCode == 'mobile_exists') {
+        await _showDuplicatePhoneDialog(provider.friendlyMessage);
+        return;
+      }
+
+      if (provider.errorCode == 'EMAIL_ALREADY_IN_USE' ||
+          provider.errorCode == 'DUPLICATE_EMAIL' ||
+          provider.errorCode == 'email_exists') {
+        await _showDuplicateEmailDialog(provider.friendlyMessage);
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(provider.friendlyMessage),
@@ -158,6 +172,58 @@ class _BusinessRegistrationScreenState
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showDuplicatePhoneDialog(String message) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Phone Number Already Registered'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              setState(() {
+                _loginMode = true;
+                _loginIdentifierController.text = _mobileController.text.trim();
+              });
+            },
+            child: const Text('Log In Instead'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Use Different Number'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showDuplicateEmailDialog(String message) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Email Already Registered'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              setState(() {
+                _loginMode = true;
+                _loginIdentifierController.text = _emailController.text.trim();
+              });
+            },
+            child: const Text('Log In Instead'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Use Different Email'),
           ),
         ],
       ),

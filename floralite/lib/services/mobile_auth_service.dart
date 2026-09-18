@@ -320,6 +320,8 @@ class MobileAuthService {
   Future<Map<String, dynamic>> createSubscriptionOrder(
     String planId, {
     String billingCycle = 'annual',
+    int? gateway,
+    String? returnUrl,
   }) async {
     final token = await _secureStorage.read(key: _accessTokenKey);
     if (token == null || token.trim().isEmpty) {
@@ -364,13 +366,13 @@ class MobileAuthService {
     final decoded = await _postJson(
       '/api/v1/mobile/payment/subscription-order',
       {
-        'gateway': 1,
+        'gateway': gateway ?? 1,
         'subscriptionId': subscriptionId,
         'amount': amount,
         'currency': ((plan['currency'] ?? 'INR').toString()).toUpperCase(),
         'planCode': (plan['code'] ?? '').toString(),
         'billingCycle': billingCycle,
-        'returnUrl': null,
+        'returnUrl': returnUrl,
       },
       bearerToken: token,
     );
@@ -394,9 +396,10 @@ class MobileAuthService {
     required String transactionRef,
     required String gatewayOrderId,
     required String paymentId,
-    required String signature,
+    String? signature,
     required String planCode,
     required String billingCycle,
+    int? gateway,
   }) async {
     final token = await _secureStorage.read(key: _accessTokenKey);
     if (token == null || token.trim().isEmpty) {
@@ -409,7 +412,7 @@ class MobileAuthService {
     return _postJson(
       '/api/v1/mobile/payment/verify',
       {
-        'gateway': 1,
+        'gateway': gateway ?? 1,
         'transactionRef': transactionRef,
         'gatewayOrderId': gatewayOrderId,
         'gatewayPaymentId': paymentId,
@@ -831,37 +834,47 @@ class MobileAuthService {
   }
 
   (String, String) _extractError(Map<String, dynamic> decoded) {
+    final rootCode = _readString(decoded, 'errorCode') ?? _readString(decoded, 'code');
+    final rootMessage = _readString(decoded, 'message');
+
+    final errorMap = _readMap(decoded, 'error');
+    final nestedCode = errorMap != null
+        ? (_readString(errorMap, 'code') ?? _readString(errorMap, 'errorCode'))
+        : null;
+    final nestedMessage = errorMap != null
+        ? (_readString(errorMap, 'message') ?? _readString(errorMap, 'detail'))
+        : null;
+
     final detail = _readString(decoded, 'detail');
     final title = _readString(decoded, 'title');
 
-    // Extract error code from detail if it contains a prefix like "DUPLICATE_EMAIL:"
-    String? errorCode;
-    String? errorMessage;
+    String? parsedCode = rootCode ?? nestedCode;
+    String? parsedMessage = rootMessage ?? nestedMessage;
 
     if (detail != null && detail.trim().isNotEmpty) {
       final detailTrimmed = detail.trim();
       final colonIndex = detailTrimmed.indexOf(':');
       if (colonIndex > 0) {
-        errorCode = detailTrimmed.substring(0, colonIndex).trim();
-        errorMessage = detailTrimmed.substring(colonIndex + 1).trim();
-        return (errorCode, errorMessage);
+        final extractedCode = detailTrimmed.substring(0, colonIndex).trim();
+        final extractedMsg = detailTrimmed.substring(colonIndex + 1).trim();
+        parsedCode ??= extractedCode;
+        if (parsedMessage == null || parsedMessage.trim().isEmpty) {
+          parsedMessage = extractedMsg;
+        }
+      } else if (parsedMessage == null || parsedMessage.trim().isEmpty) {
+        parsedMessage = detailTrimmed;
       }
-      return ('request_failed', detailTrimmed);
     }
 
-    if (title != null && title.trim().isNotEmpty) {
-      return ('request_failed', title.trim());
+    if (parsedMessage == null || parsedMessage.trim().isEmpty) {
+      if (title != null && title.trim().isNotEmpty) {
+        parsedMessage = title.trim();
+      } else {
+        parsedMessage = 'Request failed. Please try again.';
+      }
     }
 
-    final errorMap = _readMap(decoded, 'error');
-    if (errorMap != null) {
-      final code = _readString(errorMap, 'code') ?? 'request_failed';
-      final message = _readString(errorMap, 'message') ??
-          'Request failed. Please try again.';
-      return (code, message);
-    }
-
-    return ('request_failed', 'Request failed. Please try again.');
+    return (parsedCode ?? 'request_failed', parsedMessage.trim());
   }
 
   Map<String, dynamic> _extractData(Map<String, dynamic> decoded) {

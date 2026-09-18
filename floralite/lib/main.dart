@@ -213,6 +213,23 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
         '/driver-delivery',
         arguments: {'token': token},
       );
+      return;
+    }
+
+    final isPaymentReturn = uri.scheme == 'https' &&
+        (uri.host == 'floraprise.com' ||
+            uri.host == 'www.floraprise.com' ||
+            uri.host == 'api.floraprise.com') &&
+        uri.path.startsWith('/mobile/payment');
+
+    if (isPaymentReturn && _navigatorKey.currentContext != null) {
+      try {
+        final subProvider = Provider.of<SubscriptionProvider>(
+          _navigatorKey.currentContext!,
+          listen: false,
+        );
+        unawaited(subProvider.retryPendingVerification());
+      } catch (_) {}
     }
   }
 

@@ -202,13 +202,8 @@ void main() {
             body: Builder(
               builder: (context) => ElevatedButton(
                 onPressed: () async {
-                  returnedCode = await Navigator.of(context).push<String>(
-                    MaterialPageRoute(
-                      builder: (_) => const CameraBarcodeScannerPage(
-                        title: 'Scan Barcode',
-                      ),
-                    ),
-                  );
+                  returnedCode =
+                      await Navigator.of(context).push<String>(createTestRoute());
                 },
                 child: const Text('Open Scanner'),
               ),
@@ -218,7 +213,8 @@ void main() {
       );
 
       await tester.tap(find.text('Open Scanner'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
       final state = tester
           .state<CameraBarcodeScannerPageState>(find.byType(CameraBarcodeScannerPage));
@@ -250,13 +246,8 @@ void main() {
             body: Builder(
               builder: (context) => ElevatedButton(
                 onPressed: () async {
-                  returnedCode = await Navigator.of(context).push<String>(
-                    MaterialPageRoute(
-                      builder: (_) => const CameraBarcodeScannerPage(
-                        title: 'Scan Barcode',
-                      ),
-                    ),
-                  );
+                  returnedCode =
+                      await Navigator.of(context).push<String>(createTestRoute());
                 },
                 child: const Text('Open Scanner'),
               ),
@@ -266,7 +257,8 @@ void main() {
       );
 
       await tester.tap(find.text('Open Scanner'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
       final state = tester
           .state<CameraBarcodeScannerPageState>(find.byType(CameraBarcodeScannerPage));

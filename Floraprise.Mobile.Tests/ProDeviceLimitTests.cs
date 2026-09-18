@@ -102,7 +102,7 @@ public sealed class ProDeviceLimitTests : IDisposable
     }
 
     [Fact]
-    public async Task ProAccount_AllowsThreeActiveDevices_AndRejectsFourthDevice()
+    public async Task ProAccount_AllowsMultipleDevices_FourthAndBeyondSucceed()
     {
         var seeded = await SeedCompanyUserAsync();
 
@@ -121,15 +121,17 @@ public sealed class ProDeviceLimitTests : IDisposable
         var login3 = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "device-web-003", "WEB"));
         Assert.NotNull(login3.AccessToken);
 
-        // Verify all 3 devices are active
+        // Device 4 (e.g. Pro Web in Edge / another computer) -> succeeds without quota error
+        var login4 = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "device-fourth-004", "WEB"));
+        Assert.NotNull(login4.AccessToken);
+
+        // Device 5 (e.g. Android tablet) -> succeeds without quota error
+        var login5 = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "device-fifth-005", "ANDROID"));
+        Assert.NotNull(login5.AccessToken);
+
+        // Verify all 5 devices are active in database
         var activeDevices = await _db.MobileDevices.Where(d => d.CompanyId == seeded.Company.Id && d.Status == MobileDeviceStatus.Active).ToListAsync();
-        Assert.Equal(3, activeDevices.Count);
-
-        // Device 4 -> rejected with clear limit message
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "device-fourth-004", "ANDROID")));
-
-        Assert.Contains("Maximum 3 devices are already active for this account.", ex.Message);
+        Assert.Equal(5, activeDevices.Count);
     }
 
     [Fact]
@@ -151,7 +153,7 @@ public sealed class ProDeviceLimitTests : IDisposable
     }
 
     [Fact]
-    public async Task RevokingDevice_AllowsNewDeviceRegistration()
+    public async Task DeactivatingAndReactivatingDevice_SucceedsSeamlessly()
     {
         var seeded = await SeedCompanyUserAsync();
 
@@ -160,41 +162,36 @@ public sealed class ProDeviceLimitTests : IDisposable
 
         await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "device-2", "ANDROID"));
         await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "device-3", "WEB"));
-
-        // 4th device rejected
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "device-4", "ANDROID")));
+        await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "device-4", "WEB"));
 
         // Revoke / deactivate device-1
         var dev1 = await _db.MobileDevices.FirstAsync(d => d.DeviceId == "device-1");
         dev1.Revoke(null);
         await _db.SaveChangesAsync();
 
-        // 4th device can now log in successfully
-        var login4 = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "device-4", "ANDROID"));
-        Assert.NotNull(login4.AccessToken);
+        // Reactivate device-1 by logging in again
+        var login1Reactivate = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "device-1", "ANDROID"));
+        Assert.NotNull(login1Reactivate.AccessToken);
 
-        var activeDevices = await _db.MobileDevices.Where(d => d.CompanyId == seeded.Company.Id && d.Status == MobileDeviceStatus.Active).ToListAsync();
-        Assert.Equal(3, activeDevices.Count);
+        var refreshedDev1 = await _db.MobileDevices.FirstAsync(d => d.DeviceId == "device-1");
+        Assert.Equal(MobileDeviceStatus.Active, refreshedDev1.Status);
     }
 
     [Fact]
-    public async Task TenantIsolation_DevicesOfOneTenant_DoNotAffectAnotherTenantDeviceLimit()
+    public async Task TenantIsolation_MultipleDevicesAcrossTenants_OperateIndependently()
     {
         var tenantA = await SeedCompanyUserAsync("Tenant A Florist", "9111111111", "a@example.com");
         var tenantB = await SeedCompanyUserAsync("Tenant B Florist", "9222222222", "b@example.com");
 
-        // Tenant A logs in 3 devices on Pro
+        // Tenant A logs in 4 devices on Pro
         await _clientService.LoginAsync(MakeLoginRequest(tenantA.User.Email!, tenantA.Password, "dev-a-1", "ANDROID"));
         await UpgradeToProAsync(tenantA.Company.Id);
         await _clientService.LoginAsync(MakeLoginRequest(tenantA.User.Email!, tenantA.Password, "dev-a-2", "ANDROID"));
         await _clientService.LoginAsync(MakeLoginRequest(tenantA.User.Email!, tenantA.Password, "dev-a-3", "WEB"));
+        var a4 = await _clientService.LoginAsync(MakeLoginRequest(tenantA.User.Email!, tenantA.Password, "dev-a-4", "ANDROID"));
+        Assert.NotNull(a4.AccessToken);
 
-        // Tenant A 4th device rejected
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _clientService.LoginAsync(MakeLoginRequest(tenantA.User.Email!, tenantA.Password, "dev-a-4", "ANDROID")));
-
-        // Tenant B can register and log in their own devices independently
+        // Tenant B can register and log in 4 of their own devices independently
         var b1 = await _clientService.LoginAsync(MakeLoginRequest(tenantB.User.Email!, tenantB.Password, "dev-b-1", "ANDROID"));
         Assert.NotNull(b1.AccessToken);
         await UpgradeToProAsync(tenantB.Company.Id);
@@ -205,24 +202,93 @@ public sealed class ProDeviceLimitTests : IDisposable
         var b3 = await _clientService.LoginAsync(MakeLoginRequest(tenantB.User.Email!, tenantB.Password, "dev-b-3", "WEB"));
         Assert.NotNull(b3.AccessToken);
 
-        Assert.Equal(3, await _db.MobileDevices.CountAsync(d => d.CompanyId == tenantA.Company.Id && d.Status == MobileDeviceStatus.Active));
-        Assert.Equal(3, await _db.MobileDevices.CountAsync(d => d.CompanyId == tenantB.Company.Id && d.Status == MobileDeviceStatus.Active));
+        var b4 = await _clientService.LoginAsync(MakeLoginRequest(tenantB.User.Email!, tenantB.Password, "dev-b-4", "WEB"));
+        Assert.NotNull(b4.AccessToken);
+
+        Assert.Equal(4, await _db.MobileDevices.CountAsync(d => d.CompanyId == tenantA.Company.Id && d.Status == MobileDeviceStatus.Active));
+        Assert.Equal(4, await _db.MobileDevices.CountAsync(d => d.CompanyId == tenantB.Company.Id && d.Status == MobileDeviceStatus.Active));
     }
 
     [Fact]
-    public async Task BasicOrTrialPlan_PreservesOriginalDeviceLimitOfTwo()
+    public async Task MultiDevice_SessionAndRefreshTokenWorkflow_WorksIndependentlyPerDevice()
     {
-        var seeded = await SeedCompanyUserAsync("Basic Florist", "9333333333", "basic@example.com");
+        var seeded = await SeedCompanyUserAsync();
 
-        // Basic / trial user logs in 2 devices
-        await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "basic-dev-1", "ANDROID"));
-        await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "basic-dev-2", "WEB"));
+        var login1 = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "dev-session-1", "ANDROID"));
+        var login2 = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "dev-session-2", "WEB"));
+        var login3 = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "dev-session-3", "WEB"));
+        var login4 = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "dev-session-4", "ANDROID"));
 
-        // 3rd device on Basic/Trial is rejected with 2 devices message
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "basic-dev-3", "ANDROID")));
+        Assert.NotNull(login1.RefreshToken);
+        Assert.NotNull(login2.RefreshToken);
+        Assert.NotNull(login3.RefreshToken);
+        Assert.NotNull(login4.RefreshToken);
 
-        Assert.Contains("Maximum 2 devices are already active for this account.", ex.Message);
+        // Refresh token on device 1
+        var refreshed1 = await _clientService.RefreshAsync(new MobileApiRefreshRequest(login1.RefreshToken));
+        Assert.NotNull(refreshed1.AccessToken);
+        Assert.NotNull(refreshed1.RefreshToken);
+        Assert.NotEqual(login1.RefreshToken, refreshed1.RefreshToken);
+
+        // Refresh token on device 4
+        var refreshed4 = await _clientService.RefreshAsync(new MobileApiRefreshRequest(login4.RefreshToken));
+        Assert.NotNull(refreshed4.AccessToken);
+        Assert.NotNull(refreshed4.RefreshToken);
+        Assert.NotEqual(login4.RefreshToken, refreshed4.RefreshToken);
+
+        // Verify device 2 and device 3 sessions remain active with their original refresh tokens
+        Assert.True((await _db.DeviceSessions.SingleAsync(x => x.RefreshToken == login2.RefreshToken)).IsActive(DateTime.UtcNow));
+        Assert.True((await _db.DeviceSessions.SingleAsync(x => x.RefreshToken == login3.RefreshToken)).IsActive(DateTime.UtcNow));
+    }
+
+    [Fact]
+    public async Task MultiDevice_InvalidCredentials_ThrowsUnauthorizedException()
+    {
+        var seeded = await SeedCompanyUserAsync();
+
+        // 3 valid logins
+        await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "dev-sec-1", "ANDROID"));
+        await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "dev-sec-2", "WEB"));
+        await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "dev-sec-3", "WEB"));
+
+        // 4th login with incorrect password -> UnauthorizedAccessException
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, "WrongPassword@123", "dev-sec-4", "ANDROID")));
+    }
+
+    [Fact]
+    public async Task MultiDevice_LicenseAndHeartbeatValidation_WorksForEachDevice()
+    {
+        var seeded = await SeedCompanyUserAsync();
+
+        var login1 = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "dev-val-1", "ANDROID"));
+        var login2 = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "dev-val-2", "WEB"));
+        var login3 = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "dev-val-3", "WEB"));
+        var login4 = await _clientService.LoginAsync(MakeLoginRequest(seeded.User.Email!, seeded.Password, "dev-val-4", "ANDROID"));
+
+        // Heartbeat for dev 1
+        var hb1 = await _subscriptionService.HeartbeatAsync(new MobileHeartbeatRequest(
+            seeded.Company.Id,
+            login1.MobileUserId,
+            "dev-val-1",
+            "1.0.0",
+            "127.0.0.1",
+            DateTime.UtcNow,
+            seeded.User.Id));
+        Assert.True(hb1.AllowsAccess);
+        Assert.Equal(MobileLicenseStatus.Active, hb1.LicenseStatus);
+
+        // Heartbeat for dev 4
+        var hb4 = await _subscriptionService.HeartbeatAsync(new MobileHeartbeatRequest(
+            seeded.Company.Id,
+            login4.MobileUserId,
+            "dev-val-4",
+            "1.0.0",
+            "127.0.0.1",
+            DateTime.UtcNow,
+            seeded.User.Id));
+        Assert.True(hb4.AllowsAccess);
+        Assert.Equal(MobileLicenseStatus.Active, hb4.LicenseStatus);
     }
 
     [Fact]

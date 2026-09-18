@@ -176,11 +176,12 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
       speechRecognition: SpeechRecognitionService(),
     );
     notesDictationController.bindController(notesController);
-    DateTime selectedDate = existing?.scheduledAt ?? provider.selectedDate;
+    DateTime selectedDate =
+        (existing?.scheduledAt ?? provider.selectedDate).toLocal();
     bool useTime = existing != null;
     TimeOfDay selectedTime = existing == null
         ? const TimeOfDay(hour: 9, minute: 0)
-        : TimeOfDay.fromDateTime(existing.scheduledAt);
+        : TimeOfDay.fromDateTime(existing.scheduledAt.toLocal());
     TaskPriority priority = existing?.priority ?? TaskPriority.normal;
     bool requiresAlarm = existing?.requiresAlarm ?? false;
 
@@ -600,19 +601,24 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
   }
 
   bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
+    final la = a.toLocal();
+    final lb = b.toLocal();
+    return la.year == lb.year && la.month == lb.month && la.day == lb.day;
   }
 
   String _formatTime(DateTime value) {
-    final hour =
-        value.hour == 0 ? 12 : (value.hour > 12 ? value.hour - 12 : value.hour);
-    final minute = value.minute.toString().padLeft(2, '0');
-    final meridiem = value.hour >= 12 ? 'PM' : 'AM';
+    final local = value.toLocal();
+    final hour = local.hour == 0
+        ? 12
+        : (local.hour > 12 ? local.hour - 12 : local.hour);
+    final minute = local.minute.toString().padLeft(2, '0');
+    final meridiem = local.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $meridiem';
   }
 
   String _formatDateTime(DateTime value) {
-    return '${value.day}/${value.month}/${value.year} ${_formatTime(value)}';
+    final local = value.toLocal();
+    return '${local.day}/${local.month}/${local.year} ${_formatTime(local)}';
   }
 
   IconData _iconForType(TaskType type) {

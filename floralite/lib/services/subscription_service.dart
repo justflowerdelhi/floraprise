@@ -4,10 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/database/app_database.dart';
 import '../models/subscription.dart';
 import 'mobile_auth_service.dart';
+
+typedef SubscriptionUrlLauncher = Future<bool> Function(
+  Uri uri, {
+  LaunchMode mode,
+  String? webOnlyWindowName,
+});
 
 abstract class SubscriptionVerificationClient {
   Future<LicenseVerificationResult> verify(SubscriptionRecord record);
@@ -53,13 +60,28 @@ class RazorpaySubscriptionClient implements SubscriptionVerificationClient {
     required MobileAuthService mobileAuthService,
     required SubscriptionSecureStore secureStore,
     Razorpay? razorpay,
+    SubscriptionUrlLauncher? urlLauncher,
   })  : _mobileAuthService = mobileAuthService,
         _secureStore = secureStore,
-        _razorpay = razorpay ?? Razorpay();
+        _razorpay = razorpay ?? Razorpay(),
+        _urlLauncher = urlLauncher ?? _defaultUrlLauncher;
 
   final MobileAuthService _mobileAuthService;
   final SubscriptionSecureStore _secureStore;
   final Razorpay _razorpay;
+  final SubscriptionUrlLauncher _urlLauncher;
+
+  static Future<bool> _defaultUrlLauncher(
+    Uri uri, {
+    LaunchMode mode = LaunchMode.platformDefault,
+    String? webOnlyWindowName,
+  }) async {
+    return launchUrl(
+      uri,
+      mode: mode,
+      webOnlyWindowName: webOnlyWindowName,
+    );
+  }
 
   static const _pendingTransactionRefKey = 'subscription_pending_tx_ref';
   static const _pendingGatewayOrderIdKey = 'subscription_pending_gateway_order';
@@ -67,6 +89,7 @@ class RazorpaySubscriptionClient implements SubscriptionVerificationClient {
   static const _pendingBillingCycleKey = 'subscription_pending_billing_cycle';
   static const _pendingPaymentIdKey = 'subscription_pending_payment_id';
   static const _pendingSignatureKey = 'subscription_pending_signature';
+  static const _pendingGatewayKey = 'subscription_pending_gateway';
 
   @override
   Future<LicenseVerificationResult> verify(SubscriptionRecord record) async {
@@ -126,6 +149,8 @@ class RazorpaySubscriptionClient implements SubscriptionVerificationClient {
     final billingCycle = await _secureStore.read(_pendingBillingCycleKey);
     final paymentId = await _secureStore.read(_pendingPaymentIdKey);
     final signature = await _secureStore.read(_pendingSignatureKey);
+    final gatewayStr = await _secureStore.read(_pendingGatewayKey);
+    final gateway = int.tryParse(gatewayStr ?? '') ?? 1;
 
     if ([
       transactionRef,
@@ -133,7 +158,6 @@ class RazorpaySubscriptionClient implements SubscriptionVerificationClient {
       planCode,
       billingCycle,
       paymentId,
-      signature
     ].any((value) => value == null || value.trim().isEmpty)) {
       return const LicenseVerificationResult.unverified();
     }
@@ -143,9 +167,10 @@ class RazorpaySubscriptionClient implements SubscriptionVerificationClient {
         transactionRef: transactionRef!,
         gatewayOrderId: gatewayOrderId!,
         paymentId: paymentId!,
-        signature: signature!,
+        signature: signature,
         planCode: planCode!,
         billingCycle: billingCycle!,
+        gateway: gateway,
       );
 
       final verified = verifyResponse['verified'] == true ||
@@ -201,11 +226,108 @@ class RazorpaySubscriptionClient implements SubscriptionVerificationClient {
           : _resolveString(clientPayload, 'currency');
       final keyId = _resolveCheckoutKey(response, clientPayload);
 
+      final gatewayName = _resolveString(clientPayload, 'gateway').toLowerCase();
+      final gatewayVal = response['gateway'];
+      final isPayPal = gatewayName == 'paypal' || gatewayVal == 3;
+      final isPayU = gatewayName == 'payu' || gatewayVal == 4;
+
       if (gatewayOrderId.isEmpty ||
           transactionRef.isEmpty ||
           amount == null ||
-          currency.isEmpty ||
-          keyId.isEmpty) {
+          currency.isEmpty) {
+        return const LicenseVerificationResult.unverified();
+      }
+
+      if (isPayPal) {
+        final approvalUrl =
+            _resolveString(clientPayload, 'approvalUrl').isNotEmpty
+                ? _resolveString(clientPayload, 'approvalUrl')
+                : _resolveString(response, 'approvalUrl');
+
+        if (approvalUrl.isEmpty) {
+          return const LicenseVerificationResult.unverified();
+        }
+
+        final approvalUri = Uri.tryParse(approvalUrl);
+        if (approvalUri == null || !approvalUri.hasScheme) {
+          return const LicenseVerificationResult.unverified();
+        }
+
+        await _storePendingVerification(
+          transactionRef: transactionRef,
+          gatewayOrderId: gatewayOrderId,
+          paymentId: gatewayOrderId,
+          signature: '',
+          planCode: _resolveString(planData, 'code'),
+          billingCycle: selectedBillingCycle,
+          gateway: 3,
+        );
+
+        bool launched = false;
+        try {
+          if (kIsWeb) {
+            launched = await _urlLauncher(
+              approvalUri,
+              mode: LaunchMode.platformDefault,
+              webOnlyWindowName: '_blank',
+            );
+          } else {
+            launched = await _urlLauncher(
+              approvalUri,
+              mode: LaunchMode.externalApplication,
+            );
+          }
+        } catch (_) {
+          launched = false;
+        }
+
+        if (!launched) {
+          return const LicenseVerificationResult.unverified();
+        }
+
+        // Return unverified with pending transaction recorded in secure store.
+        // Payer completes approval in PayPal web session. Verification executes upon:
+        // 1. Authoritative backend PayPal webhook (PAYMENT.CAPTURE.COMPLETED)
+        // 2. Foreground app return / resume via retryPendingVerification()
+        return const LicenseVerificationResult.unverified();
+      }
+
+      if (isPayU) {
+        await _storePendingVerification(
+          transactionRef: transactionRef,
+          gatewayOrderId: gatewayOrderId,
+          paymentId: gatewayOrderId,
+          signature: '',
+          planCode: _resolveString(planData, 'code'),
+          billingCycle: selectedBillingCycle,
+          gateway: 4,
+        );
+
+        final verifyResponse = await _mobileAuthService.verifySubscriptionPayment(
+          transactionRef: transactionRef,
+          gatewayOrderId: gatewayOrderId,
+          paymentId: gatewayOrderId,
+          signature: null,
+          planCode: _resolveString(planData, 'code'),
+          billingCycle: selectedBillingCycle,
+          gateway: 4,
+        );
+
+        final verified = verifyResponse['verified'] == true ||
+            _resolveString(verifyResponse, 'status').toLowerCase() == 'paid';
+        if (!verified) {
+          return const LicenseVerificationResult.unverified();
+        }
+
+        final updated = await _mobileAuthService.getCurrentSubscription();
+        await _clearPendingVerification();
+        return _verificationResultFromCurrent(
+          updated,
+          fallbackPlanCode: _resolveString(planData, 'code'),
+        );
+      }
+
+      if (keyId.isEmpty) {
         return const LicenseVerificationResult.unverified();
       }
 
@@ -245,6 +367,7 @@ class RazorpaySubscriptionClient implements SubscriptionVerificationClient {
             signature: signature,
             planCode: _resolveString(planData, 'code'),
             billingCycle: selectedBillingCycle,
+            gateway: 1,
           );
 
           final verifyResponse =
@@ -255,6 +378,7 @@ class RazorpaySubscriptionClient implements SubscriptionVerificationClient {
             signature: signature,
             planCode: _resolveString(planData, 'code'),
             billingCycle: selectedBillingCycle,
+            gateway: 1,
           );
 
           final verified = verifyResponse['verified'] == true ||
@@ -314,16 +438,18 @@ class RazorpaySubscriptionClient implements SubscriptionVerificationClient {
     required String transactionRef,
     required String gatewayOrderId,
     required String paymentId,
-    required String signature,
+    required String? signature,
     required String planCode,
     required String billingCycle,
+    int gateway = 1,
   }) async {
     await _secureStore.write(_pendingTransactionRefKey, transactionRef);
     await _secureStore.write(_pendingGatewayOrderIdKey, gatewayOrderId);
     await _secureStore.write(_pendingPaymentIdKey, paymentId);
-    await _secureStore.write(_pendingSignatureKey, signature);
+    await _secureStore.write(_pendingSignatureKey, signature ?? '');
     await _secureStore.write(_pendingPlanCodeKey, planCode);
     await _secureStore.write(_pendingBillingCycleKey, billingCycle);
+    await _secureStore.write(_pendingGatewayKey, gateway.toString());
   }
 
   Future<void> _clearPendingVerification() async {
@@ -333,6 +459,7 @@ class RazorpaySubscriptionClient implements SubscriptionVerificationClient {
     await _secureStore.write(_pendingSignatureKey, '');
     await _secureStore.write(_pendingPlanCodeKey, '');
     await _secureStore.write(_pendingBillingCycleKey, '');
+    await _secureStore.write(_pendingGatewayKey, '');
   }
 
   LicenseVerificationResult _verificationResultFromCurrent(
@@ -486,6 +613,7 @@ class SubscriptionService {
     SubscriptionVerificationClient? razorpayClient,
     SubscriptionVerificationClient? licenseClient,
     SubscriptionSecureStore? secureStore,
+    SubscriptionUrlLauncher? urlLauncher,
     DateTime Function()? now,
   })  : _secureStore = secureStore ?? const FlutterSubscriptionSecureStore(),
         _razorpayClient = razorpayClient ??
@@ -493,6 +621,7 @@ class SubscriptionService {
               mobileAuthService: mobileAuthService ?? MobileAuthService(),
               secureStore:
                   secureStore ?? const FlutterSubscriptionSecureStore(),
+              urlLauncher: urlLauncher,
             ),
         _licenseClient = licenseClient ?? const FlorapriseLicenseClient(),
         _now = now ?? DateTime.now;
