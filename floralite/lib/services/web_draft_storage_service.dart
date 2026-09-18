@@ -92,7 +92,7 @@ class WebDraftStorageService {
         'quantity': l.quantity,
         'unit_price_paise': l.unitPricePaise,
         'gst_percent': l.gstPercent,
-        'gst_calculation_type': l.gstCalculationType.name,
+        'gst_calculation_type': l.gstCalculationType?.name,
         'discount_paise': l.discountPaise,
         'discount_type': l.discountType,
         'discount_value': l.discountValue,

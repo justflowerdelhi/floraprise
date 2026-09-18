@@ -42,6 +42,7 @@ class ReceiptBuilder {
 
   Future<void> _header(EscPosBuilder builder, PrinterConfig settings) async {
     final business = await _businessSettingsManager.load();
+    final fiscal = business.resolvedFiscalProfile;
     builder.text(
       business.shopName.trim().isEmpty ? 'FLORAPRISE' : business.shopName,
       align: EscPosAlign.center,
@@ -55,8 +56,9 @@ class ReceiptBuilder {
     if (business.phone.trim().isNotEmpty) {
       builder.text('Phone: ${business.phone}', align: EscPosAlign.center);
     }
-    if (business.gstRegistered && business.gstNumber.trim().isNotEmpty) {
-      builder.text('GSTIN: ${business.gstNumber}', align: EscPosAlign.center);
+    if (fiscal.taxEnabled && business.gstNumber.trim().isNotEmpty) {
+      builder.text('${fiscal.taxIdentifierLabel}: ${business.gstNumber.trim()}',
+          align: EscPosAlign.center);
     }
     builder.separator();
   }
@@ -67,6 +69,10 @@ class ReceiptBuilder {
     PrinterConfig settings,
   ) async {
     await _header(builder, settings);
+    final business = await _businessSettingsManager.load();
+    final fiscal = business.resolvedFiscalProfile;
+    final symbol = fiscal.currencySymbol;
+
     builder.text('POS BILL', align: EscPosAlign.center, bold: true);
     builder.row('Invoice', _string(payload, 'invoiceNumber', 'order_no'));
     builder.row('Date', _string(payload, 'dateTime', 'printed_at'));
@@ -81,19 +87,25 @@ class ReceiptBuilder {
       builder.columns([
         _string(item, 'name', 'product_name'),
         _string(item, 'qty', 'quantity'),
-        _money(_int(item, 'ratePaise', 'unit_price_paise')),
-        _money(_int(item, 'totalPaise', 'line_total_paise')),
+        _money(_int(item, 'ratePaise', 'unit_price_paise'), symbol),
+        _money(_int(item, 'totalPaise', 'line_total_paise'), symbol),
       ], widths);
     }
     builder.separator();
     builder.row('Basic Amount',
-        _money(_int(payload, 'basicAmountPaise', 'subtotal_paise')));
+        _money(_int(payload, 'basicAmountPaise', 'subtotal_paise'), symbol));
     builder.row('Discount',
-        _money(_int(payload, 'discountPaise', 'discount_total_paise')));
-    builder.row(
-        'GST Amount', _money(_int(payload, 'gstPaise', 'gst_total_paise')));
+        _money(_int(payload, 'discountPaise', 'discount_total_paise'), symbol));
+    final taxLabel = _string(payload, 'taxLabel');
+    final rowTaxLabel = taxLabel.isNotEmpty
+        ? taxLabel
+        : (fiscal.taxEnabled ? '${fiscal.taxLabel} Amount' : 'Tax Amount');
+    final taxPaise = _int(payload, 'gstPaise', 'gst_total_paise');
+    if (fiscal.taxEnabled || taxPaise > 0) {
+      builder.row(rowTaxLabel, _money(taxPaise, symbol));
+    }
     builder.row('Grand Total',
-        _money(_int(payload, 'grandTotalPaise', 'grand_total_paise')),
+        _money(_int(payload, 'grandTotalPaise', 'grand_total_paise'), symbol),
         bold: true);
     final paymentSummary = _list(payload['paymentSummary']);
     if (paymentSummary.isNotEmpty) {
@@ -102,10 +114,10 @@ class ReceiptBuilder {
       for (final row in paymentSummary) {
         final method = _string(row, 'method');
         final amount = _int(row, 'amountPaise');
-        builder.row(method, _money(amount));
+        builder.row(method, _money(amount, symbol));
       }
-      builder.row('Paid', _money(_int(payload, 'paidPaise')));
-      builder.row('Outstanding', _money(_int(payload, 'outstandingPaise')));
+      builder.row('Paid', _money(_int(payload, 'paidPaise'), symbol));
+      builder.row('Outstanding', _money(_int(payload, 'outstandingPaise'), symbol));
     } else {
       builder.row('Payment', _string(payload, 'paymentMode', 'payment_mode'));
     }
@@ -125,12 +137,14 @@ class ReceiptBuilder {
     PrinterConfig settings,
   ) async {
     final business = await _businessSettingsManager.load();
+    final fiscal = business.resolvedFiscalProfile;
     _shopHeader(
       builder,
       business.shopName,
       business.address,
       business.phone,
-      gstNumber: business.gstRegistered ? business.gstNumber : '',
+      taxNumber: fiscal.taxEnabled ? business.gstNumber : '',
+      taxLabel: fiscal.taxIdentifierLabel,
     );
     builder.separator('=');
     builder.text('DELIVERY CHALLAN', align: EscPosAlign.center, bold: true);
@@ -369,11 +383,14 @@ class ReceiptBuilder {
     }
   }
 
-  String _money(int paise) => 'Rs ${(paise / 100).toStringAsFixed(2)}';
+  String _money(int paise, [String? symbol]) {
+    final sym = symbol ?? BusinessSettingsManager.activeFiscalProfile.currencySymbol;
+    return '$sym ${(paise / 100).toStringAsFixed(2)}';
+  }
 
   void _shopHeader(
       EscPosBuilder builder, String shopName, String address, String phone,
-      {String gstNumber = ''}) {
+      {String taxNumber = '', String taxLabel = 'GSTIN'}) {
     builder.text(
       shopName.trim().isEmpty ? 'FLORAPRISE' : shopName,
       align: EscPosAlign.center,
@@ -387,8 +404,8 @@ class ReceiptBuilder {
     if (phone.trim().isNotEmpty) {
       builder.text('Phone: $phone', align: EscPosAlign.center);
     }
-    if (gstNumber.trim().isNotEmpty) {
-      builder.text('GSTIN: $gstNumber', align: EscPosAlign.center);
+    if (taxNumber.trim().isNotEmpty) {
+      builder.text('$taxLabel: $taxNumber', align: EscPosAlign.center);
     }
     builder.separator();
   }

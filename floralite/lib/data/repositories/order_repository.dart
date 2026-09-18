@@ -9,9 +9,11 @@ import '../../models/walk_in_enums.dart';
 import '../../models/walk_in_line_item.dart';
 import '../../models/walk_in_session.dart';
 import '../database/app_database.dart';
+import '../../managers/business_settings_manager.dart';
 import '../../managers/reward_manager.dart';
 import '../../services/product_cloud_syncability_service.dart';
 import '../../services/storage_mode_service.dart';
+import '../../services/tax_calculation_engine.dart';
 import 'customer_repository.dart';
 import 'inventory_repository.dart';
 import 'pos_sync_outbox_repository.dart';
@@ -486,13 +488,21 @@ class OrderRepository {
             where: 'order_id = ?', whereArgs: [orderId]);
       }
 
+      final profile = BusinessSettingsManager.activeFiscalProfile;
       for (final line in session.lines) {
         final subtotal = line.unitPricePaise * line.quantity;
         final discountedAmount = subtotal - line.discountPaise;
-        final breakup = calculateGstLineBreakup(
+        final effectiveRate = line.gstPercent != null
+            ? line.gstPercent!.toDouble()
+            : profile.taxRatePercent;
+        final effectiveInclusive = line.gstCalculationType != null
+            ? (line.gstCalculationType == GstCalculationType.inclusive)
+            : profile.taxInclusive;
+        final result = TaxCalculationEngine.calculate(
           amountPaise: discountedAmount,
-          gstPercent: line.gstPercent,
-          calculationType: line.gstCalculationType,
+          taxRatePercent: effectiveRate,
+          isTaxInclusive: effectiveInclusive,
+          taxEnabled: profile.taxEnabled,
         );
 
         await txn.insert('order_lines', {
@@ -503,13 +513,13 @@ class OrderRepository {
           'description': line.description,
           'qty': line.quantity,
           'unit_price_paise': line.unitPricePaise,
-          'gst_percent': line.gstPercent,
+          'gst_percent': effectiveRate.round(),
           'discount_paise': line.discountPaise,
           'discount_type': line.discountType,
           'discount_value': line.discountValue,
-          'line_subtotal_paise': breakup.basicAmountPaise,
-          'line_gst_paise': breakup.gstAmountPaise,
-          'line_total_paise': breakup.totalAmountPaise,
+          'line_subtotal_paise': result.netAmountPaise,
+          'line_gst_paise': result.taxAmountPaise,
+          'line_total_paise': result.totalAmountPaise,
           'source': line.source,
         });
       }
@@ -1426,13 +1436,21 @@ class OrderRepository {
       await txn.delete('order_payments',
           where: 'order_id = ?', whereArgs: [orderId]);
 
+      final profile = BusinessSettingsManager.activeFiscalProfile;
       for (final line in session.lines) {
         final subtotal = line.unitPricePaise * line.quantity;
         final discountedAmount = subtotal - line.discountPaise;
-        final breakup = calculateGstLineBreakup(
+        final effectiveRate = line.gstPercent != null
+            ? line.gstPercent!.toDouble()
+            : profile.taxRatePercent;
+        final effectiveInclusive = line.gstCalculationType != null
+            ? (line.gstCalculationType == GstCalculationType.inclusive)
+            : profile.taxInclusive;
+        final result = TaxCalculationEngine.calculate(
           amountPaise: discountedAmount,
-          gstPercent: line.gstPercent,
-          calculationType: line.gstCalculationType,
+          taxRatePercent: effectiveRate,
+          isTaxInclusive: effectiveInclusive,
+          taxEnabled: profile.taxEnabled,
         );
 
         await txn.insert('order_lines', {
@@ -1442,13 +1460,13 @@ class OrderRepository {
           'description': line.description,
           'qty': line.quantity,
           'unit_price_paise': line.unitPricePaise,
-          'gst_percent': line.gstPercent,
+          'gst_percent': effectiveRate.round(),
           'discount_paise': line.discountPaise,
           'discount_type': line.discountType,
           'discount_value': line.discountValue,
-          'line_subtotal_paise': breakup.basicAmountPaise,
-          'line_gst_paise': breakup.gstAmountPaise,
-          'line_total_paise': breakup.totalAmountPaise,
+          'line_subtotal_paise': result.netAmountPaise,
+          'line_gst_paise': result.taxAmountPaise,
+          'line_total_paise': result.totalAmountPaise,
           'source': line.source,
         });
       }

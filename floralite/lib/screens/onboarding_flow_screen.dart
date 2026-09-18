@@ -12,6 +12,7 @@ import '../managers/onboarding_manager.dart';
 import '../managers/onboarding_setup_manager.dart';
 import '../managers/business_settings_manager.dart';
 import '../l10n/app_localizations.dart';
+import '../models/fiscal_profile.dart';
 import '../models/license.dart';
 import '../models/storage_mode.dart';
 import '../providers/auth_provider.dart';
@@ -41,6 +42,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   bool _recommendedSetup = true;
   bool _sameNumberForWhatsApp = true;
   bool _gstRegistered = false;
+  String _selectedCountryCode = 'IN';
   String _logoPath = '';
   bool _isPreparing = false;
   bool _setupFailed = false;
@@ -54,10 +56,13 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   final TextEditingController _ownerNameController = TextEditingController();
   final TextEditingController _whatsAppController = TextEditingController();
   final TextEditingController _gstNumberController = TextEditingController();
+  final TextEditingController _taxRateController =
+      TextEditingController(text: '18.0');
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _cityController = TextEditingController();
   final VoiceDictationController _addressDictationController =
       VoiceDictationController(
+
     speechRecognition: SpeechRecognitionService(),
   );
 
@@ -76,11 +81,13 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     _ownerNameController.dispose();
     _whatsAppController.dispose();
     _gstNumberController.dispose();
+    _taxRateController.dispose();
     _addressController.dispose();
     _cityController.dispose();
     _addressDictationController.dispose();
     super.dispose();
   }
+
 
   Future<void> _loadPersistedLogo() async {
     final savedLogoPath = await _businessSettingsManager.getLogoPath();
@@ -343,7 +350,61 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
             l10n.onboardingBusinessSetup,
             style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
+          const Text(
+            'Country',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              ChoiceChip(
+                label: const Text('🇮🇳 India'),
+                selected: _selectedCountryCode == 'IN',
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _selectedCountryCode = 'IN';
+                      _taxRateController.text = '18.0';
+                      _gstRegistered = false;
+                      _gstNumberController.clear();
+                    });
+                  }
+                },
+              ),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: const Text('🇦🇪 UAE'),
+                selected: _selectedCountryCode == 'AE',
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _selectedCountryCode = 'AE';
+                      _taxRateController.text = '5.0';
+                      _gstRegistered = false;
+                      _gstNumberController.clear();
+                    });
+                  }
+                },
+              ),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: const Text('🇺🇸 USA'),
+                selected: _selectedCountryCode == 'US',
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _selectedCountryCode = 'US';
+                      _taxRateController.text = '0';
+                      _gstRegistered = true;
+                      _gstNumberController.clear();
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           TextField(
             controller: _shopNameController,
             textCapitalization: TextCapitalization.words,
@@ -401,43 +462,109 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
             ),
           ],
           const SizedBox(height: 12),
-          Text(
-            l10n.onboardingGstRegisteredRequired,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              ChoiceChip(
-                label: Text(l10n.yes),
-                selected: _gstRegistered,
-                onSelected: (value) {
-                  if (!value) return;
-                  setState(() => _gstRegistered = true);
-                },
-              ),
-              const SizedBox(width: 10),
-              ChoiceChip(
-                label: Text(l10n.no),
-                selected: !_gstRegistered,
-                onSelected: (value) {
-                  if (!value) return;
-                  setState(() {
-                    _gstRegistered = false;
-                    _gstNumberController.clear();
-                  });
-                },
+          if (_selectedCountryCode == 'IN') ...[
+            Text(
+              l10n.onboardingGstRegisteredRequired,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                ChoiceChip(
+                  label: Text(l10n.yes),
+                  selected: _gstRegistered,
+                  onSelected: (value) {
+                    if (!value) return;
+                    setState(() => _gstRegistered = true);
+                  },
+                ),
+                const SizedBox(width: 10),
+                ChoiceChip(
+                  label: Text(l10n.no),
+                  selected: !_gstRegistered,
+                  onSelected: (value) {
+                    if (!value) return;
+                    setState(() {
+                      _gstRegistered = false;
+                      _gstNumberController.clear();
+                    });
+                  },
+                ),
+              ],
+            ),
+            if (_gstRegistered) ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: _gstNumberController,
+                textCapitalization: TextCapitalization.characters,
+                decoration:
+                    InputDecoration(labelText: l10n.onboardingGstNumber),
               ),
             ],
-          ),
-          if (_gstRegistered) ...[
+          ] else if (_selectedCountryCode == 'AE') ...[
+            const Text(
+              'Are you VAT registered?',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                ChoiceChip(
+                  label: Text(l10n.yes),
+                  selected: _gstRegistered,
+                  onSelected: (value) {
+                    if (!value) return;
+                    setState(() => _gstRegistered = true);
+                  },
+                ),
+                const SizedBox(width: 10),
+                ChoiceChip(
+                  label: Text(l10n.no),
+                  selected: !_gstRegistered,
+                  onSelected: (value) {
+                    if (!value) return;
+                    setState(() {
+                      _gstRegistered = false;
+                      _gstNumberController.clear();
+                    });
+                  },
+                ),
+              ],
+            ),
+            if (_gstRegistered) ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: _gstNumberController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'Tax Registration Number (TRN)',
+                ),
+              ),
+            ],
+          ] else if (_selectedCountryCode == 'US') ...[
+            const Text(
+              'Sales Tax Setup',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _taxRateController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Sales Tax Rate (%)',
+                helperText: 'Enter applicable rate (e.g. 8.25 or 0 for 0%)',
+              ),
+            ),
             const SizedBox(height: 10),
             TextField(
               controller: _gstNumberController,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(labelText: l10n.onboardingGstNumber),
+              decoration: const InputDecoration(
+                labelText: 'Tax ID / EIN (Optional)',
+              ),
             ),
           ],
+
           const SizedBox(height: 18),
           _buildLogoPicker(l10n),
           const SizedBox(height: 12),
@@ -841,6 +968,22 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
       final email = _buildProvisioningEmail(mobile);
       final password = _buildProvisioningPassword(mobile);
 
+      final preset = CountryPresets.forCountry(_selectedCountryCode);
+      final double taxRate = _selectedCountryCode == 'US'
+          ? (double.tryParse(_taxRateController.text.trim()) ?? 0.0)
+          : preset.taxRatePercent;
+      final bool taxEnabled = _selectedCountryCode == 'US'
+          ? (taxRate > 0 || _gstNumberController.text.trim().isNotEmpty)
+          : _gstRegistered;
+
+      final fiscalProfile = preset.copyWith(
+        taxEnabled: taxEnabled,
+        taxRatePercent: taxRate,
+        taxIdentifier: _gstNumberController.text.trim().isNotEmpty
+            ? _gstNumberController.text.trim()
+            : null,
+      );
+
       await _setupManager.runSetup(
         installRecommended: _recommendedSetup,
         languageCode: languageCode,
@@ -856,6 +999,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
           logoPath: _logoPath,
           address: _addressController.text.trim(),
           city: _cityController.text.trim(),
+          fiscalProfile: fiscalProfile,
         ),
         onStageDone: (stage) async {
           if (!mounted) return;
@@ -863,6 +1007,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
           await Future<void>.delayed(const Duration(milliseconds: 350));
         },
       );
+
 
       if (!mounted) return;
 
@@ -1010,10 +1155,22 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
       _showMessage(l10n.onboardingWhatsappRequiredError);
       return;
     }
-    if (_gstRegistered && _gstNumberController.text.trim().isEmpty) {
+    if (_selectedCountryCode == 'IN' && _gstRegistered && _gstNumberController.text.trim().isEmpty) {
       _showMessage(l10n.onboardingGstRequiredError);
       return;
     }
+    if (_selectedCountryCode == 'AE' && _gstRegistered && _gstNumberController.text.trim().isEmpty) {
+      _showMessage('TRN is required when VAT registered');
+      return;
+    }
+    if (_selectedCountryCode == 'US') {
+      final parsedRate = double.tryParse(_taxRateController.text.trim());
+      if (parsedRate == null || parsedRate < 0 || parsedRate.isNaN || parsedRate.isInfinite) {
+        _showMessage('Please enter a valid tax rate (0 or higher)');
+        return;
+      }
+    }
+
 
     _goTo(3);
   }

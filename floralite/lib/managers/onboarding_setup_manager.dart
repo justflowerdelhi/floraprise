@@ -4,6 +4,7 @@ import '../data/repositories/category_repository.dart';
 import '../data/repositories/inventory_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../data/repositories/staff_repository.dart';
+import '../models/fiscal_profile.dart';
 import 'business_settings_manager.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -27,6 +28,7 @@ class BusinessSetupInput {
     required this.logoPath,
     required this.address,
     required this.city,
+    this.fiscalProfile,
   });
 
   final String shopName;
@@ -39,7 +41,9 @@ class BusinessSetupInput {
   final String logoPath;
   final String address;
   final String city;
+  final FiscalProfile? fiscalProfile;
 }
+
 
 class OnboardingSetupManager {
   final CategoryRepository _categoryRepository = CategoryRepository();
@@ -265,6 +269,16 @@ class OnboardingSetupManager {
       gstRegistered: input.gstRegistered,
       gstNumber: input.gstRegistered ? input.gstNumber : null,
     );
+
+    final fiscalProfileToSave = input.fiscalProfile ??
+        CountryPresets.india().copyWith(
+          taxEnabled: input.gstRegistered,
+          taxIdentifier: input.gstRegistered && input.gstNumber.trim().isNotEmpty
+              ? input.gstNumber.trim()
+              : null,
+        );
+    await _settingsManager.setFiscalProfile(fiscalProfileToSave);
+
 
     final db = await AppDatabase.instance.database;
     final now = DateTime.now().toIso8601String();

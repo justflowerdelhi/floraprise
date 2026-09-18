@@ -13,6 +13,7 @@ import '../managers/business_settings_manager.dart';
 import '../managers/pricing_manager.dart';
 import '../data/repositories/order_repository.dart';
 import '../data/repositories/product_repository.dart';
+import '../models/fiscal_profile.dart';
 import '../models/gst_calculation_type.dart';
 import '../models/order_workspace_models.dart';
 import '../models/payment_split.dart';
@@ -89,6 +90,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
   String? _selectedPayment;
   Map<String, int> _splitPaymentAllocationsPaise = <String, int>{};
   _CustomerInfo? _customerInfo;
+  FiscalProfile _fiscalProfile = CountryPresets.india();
   bool _gstRegistered = true;
   String _shopName = '';
   String _businessPhone = '';
@@ -132,6 +134,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
       final settings = await _businessSettingsManager.load();
       if (!mounted) return;
       setState(() {
+        _fiscalProfile = settings.resolvedFiscalProfile;
         _gstRegistered = settings.gstRegistered;
         _shopName = settings.shopName.trim();
         _businessPhone = settings.phone.trim();
@@ -167,6 +170,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
         billDiscountType: _billDiscountType,
         billDiscountValue: _billDiscountValue,
         rewardDiscountPaise: _rewardDiscountAmountPaise,
+        fiscalProfile: _fiscalProfile,
       );
 
   List<WalkInLineItem> get _walkInLines => _products
@@ -180,7 +184,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
           discountPaise: product.discountValue ?? 0,
           discountType: product.discountType,
           discountValue: product.discountValue,
-          gstPercent: _gstRegistered ? product.gstPercent : 0,
+          gstPercent: _fiscalProfile.taxEnabled ? product.gstPercent : 0,
           gstCalculationType: product.gstCalculationType,
           source: product.source,
         ),
@@ -804,6 +808,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
           orderTotalPaise: _totalAmountPaise,
           formatPaise: (paise) => _formatPaise(context, paise),
           initialAmountsPaise: _splitPaymentAllocationsPaise,
+          currencySymbol: _fiscalProfile.currencySymbol,
         );
         if (result == null || !mounted) return;
 
@@ -882,12 +887,12 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
                 ],
               ),
               const SizedBox(height: 4),
-              if (_gstRegistered)
+              if (_fiscalProfile.taxEnabled && _gstAmountPaise > 0)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      l10n.gst,
+                      _fiscalProfile.taxLabel,
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
@@ -1321,7 +1326,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
     final amountController = TextEditingController(
       text: initialAmount == null
           ? ''
-          : initialAmount.replaceAll('₹', '').replaceAll(',', '').trim(),
+          : initialAmount.replaceAll(RegExp(r'[^\d.]'), '').trim(),
     );
     var saveAsDesign = false;
 
@@ -1382,9 +1387,9 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
                     TextField(
                       controller: amountController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Amount',
-                        prefixText: '₹',
+                        prefixText: '${_fiscalProfile.currencySymbol} ',
                       ),
                     ),
                     if (showSaveAsDesign && attachmentPath != null) ...[
@@ -1413,8 +1418,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
                         : descriptionController.text.trim();
                     final amountRupees = int.tryParse(
                           amountController.text
-                              .replaceAll('₹', '')
-                              .replaceAll(',', '')
+                              .replaceAll(RegExp(r'[^\d.]'), '')
                               .trim(),
                         ) ??
                         0;
@@ -1444,10 +1448,14 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
                           trackInventory: trackInventory,
                           designId: description,
                           quantity: 1,
-                          price: '₹$amountRupees',
-                          gstPercent:
-                              _gstRegistered ? (gstPercentOverride ?? 12) : 0,
-                          gstCalculationType: GstCalculationType.inclusive,
+                          price: '${_fiscalProfile.currencySymbol}$amountRupees',
+                          gstPercent: _fiscalProfile.taxEnabled
+                              ? (gstPercentOverride ??
+                                  _fiscalProfile.taxRatePercent.round())
+                              : 0,
+                          gstCalculationType: _fiscalProfile.taxInclusive
+                              ? GstCalculationType.inclusive
+                              : GstCalculationType.exclusive,
                           source: source,
                           attachmentPath: attachmentPath,
                           note: note,
@@ -1684,6 +1692,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
           source: product.source,
         ),
         lineSubtotalPaise: lineSubtotal,
+        currencySymbol: _fiscalProfile.currencySymbol,
       ),
     );
 
@@ -1713,6 +1722,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
         subtotalPaise: _subtotalPaise,
         currentDiscountType: _billDiscountType,
         currentDiscountValue: _billDiscountValue,
+        currencySymbol: _fiscalProfile.currencySymbol,
       ),
     );
 
@@ -2051,7 +2061,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
       return 0;
     }
 
-    final sanitized = value.replaceAll('₹', '').replaceAll(',', '').trim();
+    final sanitized = value.replaceAll(RegExp(r'[^\d.]'), '').trim();
     final parsed = double.tryParse(sanitized) ?? 0;
     return (parsed * 100).round();
   }
@@ -2102,6 +2112,7 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
       'basicAmountPaise': _subtotalPaise,
       'discountPaise': _billDiscountPaise,
       'gstPaise': _gstAmountPaise,
+      'taxLabel': '${_fiscalProfile.taxLabel} Amount',
       'roundOffPaise': _orderTotals.roundOffPaise,
       'grandTotalPaise': _totalAmountPaise,
       'paymentMode': _selectedPayment ?? 'Pending',
@@ -2253,8 +2264,8 @@ class _TakeAwayScreenState extends State<TakeAwayScreen> {
       '${l10n.subtotal}: ${_formatPaise(context, _subtotalPaise)}',
       if (_billDiscountType != null && _billDiscountValue != null)
         '${l10n.billDiscount}: ${DiscountService.getDiscountDisplayText(discountType: _billDiscountType!, discountValue: _billDiscountValue!)}',
-      if (_gstRegistered)
-        '${l10n.gst}: ${_formatPaise(context, _gstAmountPaise)}',
+      if (_fiscalProfile.taxEnabled && _gstAmountPaise > 0)
+        '${_fiscalProfile.taxLabel}: ${_formatPaise(context, _gstAmountPaise)}',
       '${l10n.grandTotal}: ${_formatPaise(context, _totalAmountPaise)}',
       buildRewardWhatsAppText(rewardSummary),
     ];
@@ -2273,8 +2284,8 @@ class _ProductItem {
   final String? discount;
   final String? discountType;
   final int? discountValue;
-  final int gstPercent;
-  final GstCalculationType gstCalculationType;
+  final int? gstPercent;
+  final GstCalculationType? gstCalculationType;
   final String source;
   final String? attachmentPath;
   final String? note;
@@ -2290,8 +2301,8 @@ class _ProductItem {
     this.discount,
     this.discountType,
     this.discountValue,
-    this.gstPercent = 12,
-    this.gstCalculationType = GstCalculationType.inclusive,
+    this.gstPercent,
+    this.gstCalculationType,
     this.source = 'manual',
     this.attachmentPath,
     this.note,

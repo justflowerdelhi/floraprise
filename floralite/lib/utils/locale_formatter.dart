@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../managers/business_settings_manager.dart';
+import '../models/fiscal_profile.dart';
+
 /// Utility class for locale-based formatting of dates, times, currencies, and numbers.
 class LocaleFormatter {
   /// Format a date according to the current locale.
@@ -23,17 +26,50 @@ class LocaleFormatter {
     return DateFormat.Hm(locale.languageCode).format(dateTime);
   }
 
-  /// Format a currency amount in INR according to the current locale.
-  static String formatCurrency(BuildContext context, int paise) {
-    final locale = Localizations.localeOf(context);
-    final rupees = paise / 100.0;
+  /// Format a currency amount according to the active FiscalProfile or current locale.
+  static String formatCurrency(
+    BuildContext context,
+    int paise, {
+    FiscalProfile? profile,
+  }) {
+    final active = profile ?? BusinessSettingsManager.activeFiscalProfile;
+    final amount = paise / 100.0;
     return NumberFormat.currency(
-      locale: locale.languageCode == 'hi' ? 'hi_IN' : 
-                locale.languageCode == 'gu' ? 'gu_IN' : 'en_IN',
-      symbol: '₹',
+      locale: active.locale,
+      symbol: active.currencySymbol,
       decimalDigits: 2,
-    ).format(rupees);
+    ).format(amount);
   }
+
+  /// Format integer minor units (paise/cents/fils) using a FiscalProfile.
+  static String formatCurrencyWithProfile(
+    int minorUnits, {
+    BuildContext? context,
+    FiscalProfile? profile,
+  }) {
+    final active = profile ?? BusinessSettingsManager.activeFiscalProfile;
+    return formatMinorUnits(
+      minorUnits,
+      symbol: active.currencySymbol,
+      locale: active.locale,
+    );
+  }
+
+  /// Format an arbitrary integer minor-unit amount given currency symbol and locale.
+  static String formatMinorUnits(
+    int minorUnits, {
+    String symbol = '₹',
+    String locale = 'en_IN',
+    int decimalDigits = 2,
+  }) {
+    final amount = minorUnits / 100.0;
+    return NumberFormat.currency(
+      locale: locale,
+      symbol: symbol,
+      decimalDigits: decimalDigits,
+    ).format(amount);
+  }
+
 
   /// Format a number according to the current locale.
   static String formatNumber(BuildContext context, num number) {

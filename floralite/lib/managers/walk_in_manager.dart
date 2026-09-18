@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/fiscal_profile.dart';
 import '../models/gst_calculation_type.dart';
 import '../models/payment_split.dart';
 import '../models/order_workspace_models.dart';
@@ -8,8 +9,10 @@ import '../models/walk_in_line_item.dart';
 import '../models/walk_in_session.dart';
 import '../services/discount_service.dart';
 import '../services/pos_sale_sync_service.dart';
+import '../services/tax_calculation_engine.dart';
 import '../data/repositories/customer_repository.dart';
 import '../data/repositories/order_repository.dart';
+import 'business_settings_manager.dart';
 import 'customer_manager.dart';
 import 'inventory_manager.dart';
 import 'order_manager.dart';
@@ -359,10 +362,12 @@ class WalkInManager {
     required CustomerRecord? ensuredCustomer,
     required String clientSyncId,
     required DateTime now,
+    FiscalProfile? fiscalProfile,
   }) {
     final orderNo = cloudPosOrderNumber(clientSyncId);
     final lineSnapshots = <Map<String, dynamic>>[];
     final inventorySnapshots = <Map<String, dynamic>>[];
+    final profile = fiscalProfile ?? BusinessSettingsManager.activeFiscalProfile;
 
     for (var i = 0; i < session.lines.length; i++) {
       final line = session.lines[i];
@@ -384,10 +389,19 @@ class WalkInManager {
             )
           : line.discountPaise;
       final discounted = lineSubtotal - lineDiscount;
-      final breakup = calculateGstLineBreakup(
+
+      final effectiveRate = line.gstPercent != null
+          ? line.gstPercent!.toDouble()
+          : profile.taxRatePercent;
+      final effectiveInclusive = line.gstCalculationType != null
+          ? (line.gstCalculationType == GstCalculationType.inclusive)
+          : profile.taxInclusive;
+
+      final result = TaxCalculationEngine.calculate(
         amountPaise: discounted,
-        gstPercent: line.gstPercent,
-        calculationType: line.gstCalculationType,
+        taxRatePercent: effectiveRate,
+        isTaxInclusive: effectiveInclusive,
+        taxEnabled: profile.taxEnabled,
       );
 
       lineSnapshots.add({
@@ -400,13 +414,13 @@ class WalkInManager {
         'description': line.description,
         'qty': line.quantity.round(),
         'unit_price_paise': line.unitPricePaise.round(),
-        'gst_percent': line.gstPercent,
+        'gst_percent': effectiveRate.round(),
         'discount_type': line.discountType,
         'discount_value': line.discountValue,
         'discount_paise': lineDiscount.round(),
-        'line_subtotal_paise': breakup.basicAmountPaise.round(),
-        'line_gst_paise': breakup.gstAmountPaise.round(),
-        'line_total_paise': discounted.round(),
+        'line_subtotal_paise': result.netAmountPaise.round(),
+        'line_gst_paise': result.taxAmountPaise.round(),
+        'line_total_paise': result.totalAmountPaise.round(),
         'source': line.source,
       });
 

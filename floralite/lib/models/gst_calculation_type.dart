@@ -1,3 +1,5 @@
+import '../services/tax_calculation_engine.dart';
+
 enum GstCalculationType {
   inclusive,
   exclusive;
@@ -42,30 +44,16 @@ GstLineBreakup calculateGstLineBreakup({
   required int gstPercent,
   required GstCalculationType calculationType,
 }) {
-  final safeAmount = amountPaise < 0 ? 0 : amountPaise;
-  final safeGst = gstPercent < 0 ? 0 : gstPercent;
-  if (safeAmount == 0 || safeGst == 0) {
-    return GstLineBreakup(
-      basicAmountPaise: safeAmount,
-      gstAmountPaise: 0,
-      totalAmountPaise: safeAmount,
-    );
-  }
+  final result = TaxCalculationEngine.calculate(
+    amountPaise: amountPaise,
+    taxRatePercent: gstPercent.toDouble(),
+    isTaxInclusive: calculationType == GstCalculationType.inclusive,
+  );
 
-  switch (calculationType) {
-    case GstCalculationType.inclusive:
-      final basic = (safeAmount * 100 / (100 + safeGst)).round();
-      return GstLineBreakup(
-        basicAmountPaise: basic,
-        gstAmountPaise: safeAmount - basic,
-        totalAmountPaise: safeAmount,
-      );
-    case GstCalculationType.exclusive:
-      final gst = (safeAmount * safeGst / 100).round();
-      return GstLineBreakup(
-        basicAmountPaise: safeAmount,
-        gstAmountPaise: gst,
-        totalAmountPaise: safeAmount + gst,
-      );
-  }
+  return GstLineBreakup(
+    basicAmountPaise: result.netAmountPaise,
+    gstAmountPaise: result.taxAmountPaise,
+    totalAmountPaise: result.totalAmountPaise,
+  );
 }
+

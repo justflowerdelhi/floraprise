@@ -65,6 +65,7 @@ Future<SplitPaymentAllocationResult?> showSplitPaymentAllocationSheet({
   required int orderTotalPaise,
   required String Function(int paise) formatPaise,
   Map<String, int>? initialAmountsPaise,
+  String currencySymbol = '₹',
 }) {
   return showModalBottomSheet<SplitPaymentAllocationResult>(
     context: context,
@@ -74,6 +75,7 @@ Future<SplitPaymentAllocationResult?> showSplitPaymentAllocationSheet({
       orderTotalPaise: orderTotalPaise,
       formatPaise: formatPaise,
       initialAmountsPaise: initialAmountsPaise ?? const <String, int>{},
+      currencySymbol: currencySymbol,
     ),
   );
 }
@@ -83,11 +85,13 @@ class _SplitPaymentSheet extends StatefulWidget {
     required this.orderTotalPaise,
     required this.formatPaise,
     required this.initialAmountsPaise,
+    this.currencySymbol = '₹',
   });
 
   final int orderTotalPaise;
   final String Function(int paise) formatPaise;
   final Map<String, int> initialAmountsPaise;
+  final String currencySymbol;
 
   @override
   State<_SplitPaymentSheet> createState() => _SplitPaymentSheetState();
@@ -292,8 +296,8 @@ class _SplitPaymentSheetState extends State<_SplitPaymentSheet> {
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 textAlign: TextAlign.right,
-                decoration: const InputDecoration(
-                  prefixText: '₹ ',
+                decoration: InputDecoration(
+                  prefixText: '${widget.currencySymbol} ',
                   isDense: true,
                 ),
                 onChanged: (_) => setState(() {}),

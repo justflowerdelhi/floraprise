@@ -5,11 +5,13 @@ import '../services/discount_service.dart';
 class LineItemDiscountDialog extends StatefulWidget {
   final WalkInLineItem item;
   final int lineSubtotalPaise;
+  final String currencySymbol;
 
   const LineItemDiscountDialog({
     super.key,
     required this.item,
     required this.lineSubtotalPaise,
+    this.currencySymbol = '₹',
   });
 
   @override
@@ -101,19 +103,19 @@ class _LineItemDiscountDialogState extends State<LineItemDiscountDialog> {
         children: [
           Text('Item: ${widget.item.description}'),
           const SizedBox(height: 4),
-          Text('Amount: ₹${lineAmount.toStringAsFixed(2)}'),
+          Text('Amount: ${widget.currencySymbol}${lineAmount.toStringAsFixed(2)}'),
           const SizedBox(height: 16),
           const Text('Discount Type'),
           const SizedBox(height: 8),
           SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(
+            segments: [
+              const ButtonSegment(
                 value: 'percentage',
                 label: Text('%'),
               ),
               ButtonSegment(
                 value: 'fixed',
-                label: Text('₹'),
+                label: Text(widget.currencySymbol),
               ),
             ],
             selected: {_discountType},
@@ -127,7 +129,9 @@ class _LineItemDiscountDialogState extends State<LineItemDiscountDialog> {
           ),
           const SizedBox(height: 16),
           Text(
-            _discountType == 'percentage' ? 'Discount (%)' : 'Discount (₹)',
+            _discountType == 'percentage'
+                ? 'Discount (%)'
+                : 'Discount (${widget.currencySymbol})',
           ),
           const SizedBox(height: 8),
           TextField(
@@ -136,7 +140,7 @@ class _LineItemDiscountDialogState extends State<LineItemDiscountDialog> {
             decoration: InputDecoration(
               hintText: _discountType == 'percentage' ? 'e.g., 10' : 'e.g., 50',
               errorText: _error,
-              suffix: Text(_discountType == 'percentage' ? '%' : '₹'),
+              suffix: Text(_discountType == 'percentage' ? '%' : widget.currencySymbol),
             ),
             onChanged: (_) => setState(() => _error = null),
           ),

@@ -1,8 +1,11 @@
 import '../data/repositories/order_repository.dart';
+import '../managers/business_settings_manager.dart';
+import '../models/fiscal_profile.dart';
 import '../models/payment_split.dart';
 import '../models/gst_calculation_type.dart';
 import '../models/walk_in_line_item.dart';
 import '../services/discount_service.dart';
+import '../services/tax_calculation_engine.dart';
 
 class PricingValidation {
   final bool isValid;
@@ -18,7 +21,9 @@ class PricingManager {
     int? billDiscountValue,
     int deliveryChargePaise = 0,
     int rewardDiscountPaise = 0,
+    FiscalProfile? fiscalProfile,
   }) {
+    final profile = fiscalProfile ?? BusinessSettingsManager.activeFiscalProfile;
     var grossSubtotal = 0;
     var lineDiscountTotal = 0;
     var taxableSubtotal = 0;
@@ -38,16 +43,25 @@ class PricingManager {
               : line.discountPaise;
 
       final discountedAmount = lineSubtotal - lineDiscount;
-      final breakup = calculateGstLineBreakup(
+
+      final effectiveRate = line.gstPercent != null
+          ? line.gstPercent!.toDouble()
+          : profile.taxRatePercent;
+      final effectiveInclusive = line.gstCalculationType != null
+          ? (line.gstCalculationType == GstCalculationType.inclusive)
+          : profile.taxInclusive;
+
+      final result = TaxCalculationEngine.calculate(
         amountPaise: discountedAmount,
-        gstPercent: line.gstPercent,
-        calculationType: line.gstCalculationType,
+        taxRatePercent: effectiveRate,
+        isTaxInclusive: effectiveInclusive,
+        taxEnabled: profile.taxEnabled,
       );
 
       grossSubtotal += lineSubtotal;
       lineDiscountTotal += lineDiscount;
-      taxableSubtotal += breakup.basicAmountPaise;
-      gstTotal += breakup.gstAmountPaise;
+      taxableSubtotal += result.netAmountPaise;
+      gstTotal += result.taxAmountPaise;
     }
 
     // Calculate bill discount using DiscountService

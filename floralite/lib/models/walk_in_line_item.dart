@@ -7,8 +7,8 @@ class WalkInLineItem {
   final String description;
   final int quantity;
   final int unitPricePaise;
-  final int gstPercent;
-  final GstCalculationType gstCalculationType;
+  final int? gstPercent;
+  final GstCalculationType? gstCalculationType;
   final int discountPaise;
   final String? discountType;
   final int? discountValue;
@@ -21,17 +21,19 @@ class WalkInLineItem {
     required this.description,
     required this.quantity,
     required this.unitPricePaise,
-    this.gstPercent = 12,
-    this.gstCalculationType = GstCalculationType.inclusive,
+    this.gstPercent,
+    this.gstCalculationType,
     this.discountPaise = 0,
     this.discountType,
     this.discountValue,
-    required this.source,
+    this.source = 'manual',
   });
 
   WalkInLineItem copyWith({
     int? quantity,
     int? unitPricePaise,
+    int? gstPercent,
+    GstCalculationType? gstCalculationType,
     int? discountPaise,
     String? discountType,
     int? discountValue,
@@ -43,8 +45,8 @@ class WalkInLineItem {
       description: description,
       quantity: quantity ?? this.quantity,
       unitPricePaise: unitPricePaise ?? this.unitPricePaise,
-      gstPercent: gstPercent,
-      gstCalculationType: gstCalculationType,
+      gstPercent: gstPercent ?? this.gstPercent,
+      gstCalculationType: gstCalculationType ?? this.gstCalculationType,
       discountPaise: discountPaise ?? this.discountPaise,
       discountType: discountType ?? this.discountType,
       discountValue: discountValue ?? this.discountValue,

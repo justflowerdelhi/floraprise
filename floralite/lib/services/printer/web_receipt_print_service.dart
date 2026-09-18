@@ -18,13 +18,20 @@ class WebReceiptPrintService {
     PrinterPaperWidth paperWidth = PrinterPaperWidth.mm80,
   }) async {
     final business = await _businessSettingsManager.load();
+    final fiscal = business.resolvedFiscalProfile;
+    final currencySymbol = fiscal.currencySymbol;
+    final taxIdLabel = fiscal.taxIdentifierLabel;
+    final taxLabel = _string(payload, 'taxLabel', 'tax_label').isNotEmpty
+        ? _string(payload, 'taxLabel', 'tax_label')
+        : fiscal.taxLabel;
+
     final shopName = business.shopName.trim().isEmpty
         ? 'FLORAPRISE'
         : business.shopName.trim();
     final address = business.address.trim();
     final phone = business.phone.trim();
     final gstin =
-        business.gstRegistered ? business.gstNumber.trim() : '';
+        business.gstRegistered ? business.gstNumber.trim() : (fiscal.taxIdentifier ?? '');
 
     final invoiceNumber = _string(payload, 'invoiceNumber', 'order_no');
     final dateTime = _string(payload, 'dateTime', 'printed_at');
@@ -76,20 +83,19 @@ class WebReceiptPrintService {
       ..writeln('  padding: 4px;')
       ..writeln('}')
       ..writeln('.center { text-align: center; }')
-      ..writeln('.right { text-align: right; }')
       ..writeln('.bold { font-weight: bold; }')
       ..writeln('.title { font-size: 15px; font-weight: bold; margin: 2px 0; text-align: center; }')
       ..writeln('.subtitle { font-size: 13px; font-weight: bold; margin: 2px 0; text-align: center; }')
       ..writeln('.sep { border-top: 1px dashed #000; margin: 4px 0; }')
       ..writeln('.double-sep { border-top: 2px dashed #000; margin: 4px 0; }')
       ..writeln('.row { display: flex; justify-content: space-between; margin: 1px 0; }')
+      ..writeln('.grand-total { font-size: 13px; margin: 3px 0; }')
       ..writeln('table { width: 100%; border-collapse: collapse; margin: 3px 0; }')
-      ..writeln('th { border-bottom: 1px dashed #000; padding: 2px 0; font-size: 11px; text-align: left; }')
-      ..writeln('td { padding: 2px 0; font-size: 11px; vertical-align: top; }')
+      ..writeln('th { border-bottom: 1px dashed #000; padding: 2px 0; font-size: 11px; }')
+      ..writeln('td { padding: 2px 0; font-size: 11px; }')
       ..writeln('th.r, td.r { text-align: right; }')
       ..writeln('th.c, td.c { text-align: center; }')
-      ..writeln('.grand-total { font-size: 13px; font-weight: bold; margin: 3px 0; }')
-      ..writeln('.footer { text-align: center; margin-top: 6px; font-size: 11px; }')
+      ..writeln('.footer { text-align: center; margin-top: 8px; font-size: 11px; }')
       ..writeln('</style>')
       ..writeln('</head>')
       ..writeln('<body>')
@@ -103,7 +109,7 @@ class WebReceiptPrintService {
       buffer.writeln('<div class="center">Phone: ${_escapeHtml(phone)}</div>');
     }
     if (gstin.isNotEmpty) {
-      buffer.writeln('<div class="center">GSTIN: ${_escapeHtml(gstin)}</div>');
+      buffer.writeln('<div class="center">${_escapeHtml(taxIdLabel)}: ${_escapeHtml(gstin)}</div>');
     }
 
     buffer
@@ -120,13 +126,13 @@ class WebReceiptPrintService {
       buffer.writeln('<div class="row"><span>Cashier:</span><span>${_escapeHtml(cashier)}</span></div>');
     }
     if (customerName.isNotEmpty) {
-      final custDisplay = customerPhone.isNotEmpty
-          ? '${_escapeHtml(customerName)} (${_escapeHtml(customerPhone)})'
-          : _escapeHtml(customerName);
-      buffer.writeln('<div class="row"><span>Customer:</span><span>$custDisplay</span></div>');
+      buffer.writeln('<div class="row"><span>Customer:</span><span>${_escapeHtml(customerName)}</span></div>');
+    }
+    if (customerPhone.isNotEmpty) {
+      buffer.writeln('<div class="row"><span>Phone:</span><span>${_escapeHtml(customerPhone)}</span></div>');
     }
 
-    // Line items table
+    // Items Table
     buffer
       ..writeln('<div class="sep"></div>')
       ..writeln('<table>')
@@ -143,8 +149,8 @@ class WebReceiptPrintService {
         '<tr>'
         '<td>${_escapeHtml(name)}</td>'
         '<td class="c">${_escapeHtml(qty)}</td>'
-        '<td class="r">${_money(ratePaise)}</td>'
-        '<td class="r">${_money(totalPaise)}</td>'
+        '<td class="r">${_money(ratePaise, currencySymbol)}</td>'
+        '<td class="r">${_money(totalPaise, currencySymbol)}</td>'
         '</tr>',
       );
     }
@@ -156,23 +162,23 @@ class WebReceiptPrintService {
 
     // Totals
     if (basicAmountPaise > 0) {
-      buffer.writeln('<div class="row"><span>Basic Amount:</span><span>${_money(basicAmountPaise)}</span></div>');
+      buffer.writeln('<div class="row"><span>Basic Amount:</span><span>${_money(basicAmountPaise, currencySymbol)}</span></div>');
     }
     if (discountPaise > 0) {
-      buffer.writeln('<div class="row"><span>Discount:</span><span>-${_money(discountPaise)}</span></div>');
+      buffer.writeln('<div class="row"><span>Discount:</span><span>-${_money(discountPaise, currencySymbol)}</span></div>');
     }
     if (gstPaise > 0) {
-      buffer.writeln('<div class="row"><span>GST Amount:</span><span>${_money(gstPaise)}</span></div>');
+      buffer.writeln('<div class="row"><span>${_escapeHtml(taxLabel)} Amount:</span><span>${_money(gstPaise, currencySymbol)}</span></div>');
     }
     if (roundOffPaise != 0) {
       final sign = roundOffPaise > 0 ? '+' : '';
-      buffer.writeln('<div class="row"><span>Round Off:</span><span>$sign${_money(roundOffPaise)}</span></div>');
+      buffer.writeln('<div class="row"><span>Round Off:</span><span>$sign${_money(roundOffPaise, currencySymbol)}</span></div>');
     }
 
     buffer.writeln(
       '<div class="row grand-total bold">'
       '<span>Grand Total:</span>'
-      '<span>${_money(grandTotalPaise)}</span>'
+      '<span>${_money(grandTotalPaise, currencySymbol)}</span>'
       '</div>',
     );
 
@@ -184,16 +190,16 @@ class WebReceiptPrintService {
       for (final p in paymentSummary) {
         final method = _string(p, 'method');
         final amount = _int(p, 'amountPaise');
-        buffer.writeln('<div class="row"><span>${_escapeHtml(method)}:</span><span>${_money(amount)}</span></div>');
+        buffer.writeln('<div class="row"><span>${_escapeHtml(method)}:</span><span>${_money(amount, currencySymbol)}</span></div>');
       }
       if (paidPaise > 0) {
-        buffer.writeln('<div class="row"><span>Paid:</span><span>${_money(paidPaise)}</span></div>');
+        buffer.writeln('<div class="row"><span>Paid:</span><span>${_money(paidPaise, currencySymbol)}</span></div>');
       }
       if (changePaise > 0) {
-        buffer.writeln('<div class="row"><span>Change:</span><span>${_money(changePaise)}</span></div>');
+        buffer.writeln('<div class="row"><span>Change:</span><span>${_money(changePaise, currencySymbol)}</span></div>');
       }
       if (outstandingPaise > 0) {
-        buffer.writeln('<div class="row bold"><span>Outstanding:</span><span>${_money(outstandingPaise)}</span></div>');
+        buffer.writeln('<div class="row bold"><span>Outstanding:</span><span>${_money(outstandingPaise, currencySymbol)}</span></div>');
       }
     } else if (paymentMode.isNotEmpty) {
       buffer.writeln('<div class="row"><span>Payment:</span><span>${_escapeHtml(paymentMode)}</span></div>');
@@ -234,13 +240,16 @@ class WebReceiptPrintService {
     PrinterPaperWidth paperWidth = PrinterPaperWidth.mm80,
   }) async {
     final business = await _businessSettingsManager.load();
+    final fiscal = business.resolvedFiscalProfile;
+    final taxIdLabel = fiscal.taxIdentifierLabel;
+
     final shopName = business.shopName.trim().isEmpty
         ? 'FLORAPRISE'
         : business.shopName.trim();
     final address = business.address.trim();
     final phone = business.phone.trim();
     final gstin =
-        business.gstRegistered ? business.gstNumber.trim() : '';
+        business.gstRegistered ? business.gstNumber.trim() : (fiscal.taxIdentifier ?? '');
 
     final orderNo = _string(payload, 'orderNo', 'order_no');
     final deliveryTime = _string(payload, 'deliveryTime', 'delivery_time');
@@ -307,7 +316,7 @@ class WebReceiptPrintService {
       buffer.writeln('<div class="center">Phone: ${_escapeHtml(phone)}</div>');
     }
     if (gstin.isNotEmpty) {
-      buffer.writeln('<div class="center">GSTIN: ${_escapeHtml(gstin)}</div>');
+      buffer.writeln('<div class="center">${_escapeHtml(taxIdLabel)}: ${_escapeHtml(gstin)}</div>');
     }
 
     buffer
@@ -329,15 +338,16 @@ class WebReceiptPrintService {
       buffer.writeln('<div class="row"><span>Mobile:</span><span>${_escapeHtml(recipientPhone)}</span></div>');
     }
     if (deliveryAddress.isNotEmpty) {
-      buffer.writeln('<div>Address: ${_escapeHtml(deliveryAddress)}</div>');
+      buffer.writeln('<div class="row"><span>Address:</span><span>${_escapeHtml(deliveryAddress)}</span></div>');
     }
     if (landmark.isNotEmpty) {
-      buffer.writeln('<div>Landmark: ${_escapeHtml(landmark)}</div>');
+      buffer.writeln('<div class="row"><span>Landmark:</span><span>${_escapeHtml(landmark)}</span></div>');
     }
     if (pinCode.isNotEmpty) {
-      buffer.writeln('<div>PIN: ${_escapeHtml(pinCode)}</div>');
+      buffer.writeln('<div class="row"><span>Pincode:</span><span>${_escapeHtml(pinCode)}</span></div>');
     }
 
+    // Sender
     if (senderName.isNotEmpty || senderPhone.isNotEmpty) {
       buffer
         ..writeln('<div class="sep"></div>')
@@ -437,8 +447,8 @@ class WebReceiptPrintService {
     return const [];
   }
 
-  static String _money(int paise) {
-    return '₹${(paise / 100).toStringAsFixed(2)}';
+  static String _money(int paise, [String symbol = '₹']) {
+    return '$symbol${(paise / 100).toStringAsFixed(2)}';
   }
 
   static String _escapeHtml(String text) {

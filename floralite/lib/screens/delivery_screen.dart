@@ -17,6 +17,7 @@ import '../data/repositories/product_repository.dart';
 import '../l10n/app_localizations.dart';
 import '../managers/business_settings_manager.dart';
 import '../managers/pricing_manager.dart';
+import '../models/fiscal_profile.dart';
 import '../models/gst_calculation_type.dart';
 import '../models/order_workspace_models.dart';
 import '../models/payment_split.dart';
@@ -134,6 +135,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   _CustomerInfo? _customerInfo;
   bool _senderSameAsCustomer = true;
   bool _gstRegistered = true;
+  FiscalProfile _fiscalProfile = CountryPresets.india();
   int _defaultDeliveryChargePaise = 0;
   int _minimumPreparationBufferMinutes = 60;
   String _shopName = '';
@@ -196,6 +198,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
       setState(() {
         _gstRegistered = settings.gstRegistered;
+        _fiscalProfile = settings.resolvedFiscalProfile;
         _defaultDeliveryChargePaise = settings.defaultDeliveryChargePaise;
         _minimumPreparationBufferMinutes =
             settings.minimumPreparationBufferMinutes;
@@ -253,6 +256,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         billDiscountType: _billDiscountType,
         billDiscountValue: _billDiscountValue,
         rewardDiscountPaise: _rewardDiscountAmountPaise,
+        fiscalProfile: _fiscalProfile,
       );
 
   List<WalkInLineItem> get _walkInLines => _products
@@ -266,7 +270,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           discountPaise: product.discountValue ?? 0,
           discountType: product.discountType,
           discountValue: product.discountValue,
-          gstPercent: _gstRegistered ? product.gstPercent : 0,
+          gstPercent: _fiscalProfile.taxEnabled ? product.gstPercent : 0,
           gstCalculationType: product.gstCalculationType,
           source: product.source,
         ),
@@ -893,7 +897,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 decoration: InputDecoration(
                   labelText: l10n.deliveryCharge,
                   prefixIcon: const Icon(Icons.local_shipping),
-                  prefixText: '₹',
+                  prefixText: '${_fiscalProfile.currencySymbol} ',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -1226,7 +1230,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                     const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   labelText: l10n.amountReceived,
-                  prefixText: '₹ ',
+                  prefixText: '${_fiscalProfile.currencySymbol} ',
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -1328,12 +1332,12 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 ],
               ),
               const SizedBox(height: 4),
-              if (_gstRegistered)
+              if (_fiscalProfile.taxEnabled && _gstAmountPaise > 0)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      l10n.gst,
+                      _fiscalProfile.taxLabel,
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
@@ -1800,9 +1804,9 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                     TextField(
                       controller: amountController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Amount',
-                        prefixText: '₹',
+                        prefixText: '${_fiscalProfile.currencySymbol} ',
                       ),
                     ),
                     if (showSaveAsDesign && attachmentPath != null) ...[
@@ -1831,6 +1835,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                         : descriptionController.text.trim();
                     final amountRupees = int.tryParse(
                           amountController.text
+                              .replaceAll(_fiscalProfile.currencySymbol, '')
                               .replaceAll('₹', '')
                               .replaceAll(',', '')
                               .trim(),
@@ -1862,10 +1867,14 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                           trackInventory: trackInventory,
                           designId: description,
                           quantity: 1,
-                          price: '₹$amountRupees',
-                          gstPercent:
-                              _gstRegistered ? (gstPercentOverride ?? 12) : 0,
-                          gstCalculationType: GstCalculationType.inclusive,
+                          price: '${_fiscalProfile.currencySymbol}$amountRupees',
+                          gstPercent: _fiscalProfile.taxEnabled
+                              ? (gstPercentOverride ??
+                                  _fiscalProfile.taxRatePercent.round())
+                              : 0,
+                          gstCalculationType: _fiscalProfile.taxInclusive
+                              ? GstCalculationType.inclusive
+                              : GstCalculationType.exclusive,
                           source: source,
                           attachmentPath: attachmentPath,
                           note: note,
@@ -1919,6 +1928,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               decoration: InputDecoration(
                 labelText: l10n.sellingPrice,
                 hintText: l10n.eG850,
+                prefixText: '${_fiscalProfile.currencySymbol} ',
               ),
               keyboardType: TextInputType.number,
             ),
@@ -1943,6 +1953,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               final description = descriptionController.text.trim();
               final amount = int.tryParse(
                     priceController.text
+                        .replaceAll(_fiscalProfile.currencySymbol, '')
                         .replaceAll('₹', '')
                         .replaceAll(',', '')
                         .trim(),
@@ -1971,9 +1982,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 _products.add(_ProductItem(
                   designId: description,
                   quantity: 1,
-                  price: '₹$amount',
-                  gstPercent: _gstRegistered ? 12 : 0,
-                  gstCalculationType: GstCalculationType.inclusive,
+                  price: '${_fiscalProfile.currencySymbol}$amount',
+                  gstPercent: _fiscalProfile.taxEnabled
+                      ? _fiscalProfile.taxRatePercent.round()
+                      : 0,
+                  gstCalculationType: _fiscalProfile.taxInclusive
+                      ? GstCalculationType.inclusive
+                      : GstCalculationType.exclusive,
                   discount: discountController.text.isNotEmpty
                       ? discountController.text
                       : null,
@@ -2180,6 +2195,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           source: product.source,
         ),
         lineSubtotalPaise: lineSubtotal,
+        currencySymbol: _fiscalProfile.currencySymbol,
       ),
     );
 
@@ -2209,6 +2225,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         subtotalPaise: _subtotalPaise,
         currentDiscountType: _billDiscountType,
         currentDiscountValue: _billDiscountValue,
+        currencySymbol: _fiscalProfile.currencySymbol,
       ),
     );
 
@@ -2570,7 +2587,11 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       return 0;
     }
 
-    final sanitized = value.replaceAll('₹', '').replaceAll(',', '').trim();
+    final sanitized = value
+        .replaceAll(_fiscalProfile.currencySymbol, '')
+        .replaceAll('₹', '')
+        .replaceAll(',', '')
+        .trim();
     final parsed = double.tryParse(sanitized) ?? 0;
     return (parsed * 100).round();
   }
@@ -2727,8 +2748,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       '${l10n.subtotal}: ${_formatPaise(context, _subtotalPaise)}',
       if (_billDiscountType != null && _billDiscountValue != null)
         '${l10n.billDiscount}: ${DiscountService.getDiscountDisplayText(discountType: _billDiscountType!, discountValue: _billDiscountValue!)}',
-      if (_gstRegistered)
-        '${l10n.gst}: ${_formatPaise(context, _gstAmountPaise)}',
+      if (_fiscalProfile.taxEnabled && _gstAmountPaise > 0)
+        '${_fiscalProfile.taxLabel}: ${_formatPaise(context, _gstAmountPaise)}',
       '${l10n.grandTotal}: ${_formatPaise(context, _totalAmountPaise)}',
       buildRewardWhatsAppText(rewardSummary),
     ];
@@ -2780,9 +2801,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       _ProductItem(
         designId: AppLocalizations.of(context)!.deliveryCharge,
         quantity: 1,
-        price: '₹$amountRupees',
-        gstPercent: _gstRegistered ? 12 : 0,
-        gstCalculationType: GstCalculationType.inclusive,
+        price: '${_fiscalProfile.currencySymbol}$amountRupees',
+        gstPercent: _fiscalProfile.taxEnabled
+            ? _fiscalProfile.taxRatePercent.round()
+            : 0,
+        gstCalculationType: _fiscalProfile.taxInclusive
+            ? GstCalculationType.inclusive
+            : GstCalculationType.exclusive,
         source: _deliveryChargeSource,
       ),
     );
@@ -2933,8 +2958,8 @@ class _ProductItem {
   final String? discount;
   final String? discountType;
   final int? discountValue;
-  final int gstPercent;
-  final GstCalculationType gstCalculationType;
+  final int? gstPercent;
+  final GstCalculationType? gstCalculationType;
   final String source;
   final String? attachmentPath;
   final String? note;
@@ -2950,8 +2975,8 @@ class _ProductItem {
     this.discount,
     this.discountType,
     this.discountValue,
-    this.gstPercent = 12,
-    this.gstCalculationType = GstCalculationType.inclusive,
+    this.gstPercent,
+    this.gstCalculationType,
     this.source = 'manual',
     this.attachmentPath,
     this.note,

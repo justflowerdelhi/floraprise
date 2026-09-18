@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../data/repositories/business_profile_repository.dart';
 import '../data/repositories/cloud_company_profile_repository.dart';
 import '../managers/business_settings_manager.dart';
+import '../models/fiscal_profile.dart';
 import '../providers/storage_mode_provider.dart';
 import '../services/mobile_auth_service.dart';
 import '../widgets/common_widgets.dart';
@@ -42,8 +43,10 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   String _pinCode = '';
   bool _gstRegistered = true;
   String _gstNumber = '';
+  FiscalProfile _fiscalProfile = CountryPresets.india();
   String _logoPath = '';
   final ImagePicker _imagePicker = ImagePicker();
+
 
   @override
   void initState() {
@@ -57,10 +60,13 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
       final storageProvider = context.read<StorageModeProvider>();
       final isCloud = storageProvider.isCloud;
       
+      final fiscal = await _businessSettingsManager.getFiscalProfile();
+
       setState(() {
         _isCloudMode = isCloud;
         _isLoading = true;
         _loadError = null;
+        _fiscalProfile = fiscal;
       });
       
       if (isCloud) {
@@ -116,8 +122,8 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
           _city = ''; // Not available in current API
           _state = ''; // Not available in current API
           _pinCode = ''; // Not available in current API
-          _gstRegistered = (cloudProfile.taxIdentifier ?? '').isNotEmpty;
-          _gstNumber = cloudProfile.taxIdentifier ?? '';
+          _gstRegistered = _fiscalProfile.taxEnabled;
+          _gstNumber = _fiscalProfile.taxIdentifier ?? cloudProfile.taxIdentifier ?? '';
         });
       } else {
         setState(() {
@@ -146,8 +152,8 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         _city = profile.city ?? '';
         _state = profile.state ?? '';
         _pinCode = profile.pinCode ?? '';
-        _gstRegistered = profile.gstRegistered;
-        _gstNumber = profile.gstNumber ?? '';
+        _gstRegistered = _fiscalProfile.taxEnabled;
+        _gstNumber = _fiscalProfile.taxIdentifier ?? profile.gstNumber ?? '';
       });
     } else {
       // Fallback to BusinessSettingsManager for backward compatibility
@@ -158,11 +164,12 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         _ownerName = settings.ownerName;
         _businessPhone = settings.phone;
         _businessAddress = settings.address;
-        _gstRegistered = settings.gstRegistered;
-        _gstNumber = settings.gstNumber;
+        _gstRegistered = _fiscalProfile.taxEnabled;
+        _gstNumber = _fiscalProfile.taxIdentifier ?? settings.gstNumber;
       });
     }
   }
+
 
   Future<void> _pickBusinessLogo(ImageSource source) async {
     final image = await _imagePicker.pickImage(
@@ -673,32 +680,6 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           ),
                         ),
                         const Divider(),
-                        SwitchListTile(
-                          title: const Text('GST Registered'),
-                          subtitle: Text(_gstRegistered ? 'Yes' : 'No'),
-                          value: _gstRegistered,
-                          onChanged: (value) async {
-                            setState(() => _gstRegistered = value);
-                            await _saveProfile();
-                          },
-                          secondary: const Icon(Icons.receipt_long),
-                        ),
-                        const Divider(),
-                        if (_gstRegistered)
-                          _buildDetailRow(
-                            'GST Number',
-                            _gstNumber.isEmpty ? '-' : _gstNumber,
-                            Icons.confirmation_number,
-                            () => _editBusinessTextField(
-                              title: 'GST Number',
-                              initialValue: _gstNumber,
-                              onSave: (value) async {
-                                _gstNumber = value;
-                                await _saveProfile();
-                              },
-                            ),
-                          ),
-                        const Divider(),
                         _buildDetailRow(
                           'Floraprise Shop ID',
                           'Coming Soon',
@@ -708,10 +689,333 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  _buildFiscalSettingsCard(),
                 ],
               ),
       ),
     );
+  }
+
+  Widget _buildFiscalSettingsCard() {
+    final taxIdLabel = _getTaxIdLabel(_fiscalProfile.countryCode);
+    final currencyDisplay =
+        '${_fiscalProfile.currencyCode} (${_fiscalProfile.currencySymbol})';
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+            child: Row(
+              children: [
+                Icon(Icons.public,
+                    color: Theme.of(context).colorScheme.primary, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Country & Tax Settings',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(),
+          _buildDetailRow(
+            'Country',
+            _getCountryDisplayName(_fiscalProfile.countryCode),
+            Icons.flag_outlined,
+            () => _showCountryPicker(),
+          ),
+          const Divider(),
+          _buildDetailRow(
+            'Currency',
+            currencyDisplay,
+            Icons.currency_exchange,
+            null,
+          ),
+          const Divider(),
+          SwitchListTile(
+            title: Text('Enable ${_fiscalProfile.taxLabel}'),
+            subtitle: Text(_fiscalProfile.taxEnabled
+                ? 'Tax is applied at checkout'
+                : 'Disabled (Zero Tax)'),
+            value: _fiscalProfile.taxEnabled,
+            onChanged: (value) async {
+              setState(() {
+                _fiscalProfile = _fiscalProfile.copyWith(taxEnabled: value);
+                _gstRegistered = value;
+              });
+              await _saveFiscalProfile();
+            },
+            secondary: const Icon(Icons.receipt_long),
+          ),
+          const Divider(),
+          _buildDetailRow(
+            'Tax Name / Label',
+            _fiscalProfile.taxLabel,
+            Icons.label_outline,
+            () => _editBusinessTextField(
+              title: 'Tax Name / Label',
+              initialValue: _fiscalProfile.taxLabel,
+              onSave: (value) async {
+                if (value.isNotEmpty) {
+                  setState(() {
+                    _fiscalProfile = _fiscalProfile.copyWith(taxLabel: value);
+                  });
+                  await _saveFiscalProfile();
+                }
+              },
+            ),
+          ),
+          const Divider(),
+          _buildDetailRow(
+            'Default Tax Rate',
+            '${_fiscalProfile.taxRatePercent}%',
+            Icons.percent,
+            () => _editTaxRateDialog(),
+          ),
+          const Divider(),
+          _buildDetailRow(
+            'Pricing Model',
+            _fiscalProfile.taxInclusive
+                ? 'Prices include tax'
+                : 'Tax is added to prices',
+            Icons.calculate_outlined,
+            () => _showPricingModelDialog(),
+          ),
+          const Divider(),
+          _buildDetailRow(
+            taxIdLabel,
+            _fiscalProfile.taxIdentifier?.isNotEmpty == true
+                ? _fiscalProfile.taxIdentifier!
+                : '-',
+            Icons.confirmation_number,
+            () => _editBusinessTextField(
+              title: taxIdLabel,
+              initialValue: _fiscalProfile.taxIdentifier ?? '',
+              onSave: (value) async {
+                setState(() {
+                  _fiscalProfile = _fiscalProfile.copyWith(
+                    taxIdentifier: value.trim().isEmpty ? null : value.trim(),
+                  );
+                  _gstNumber = value.trim();
+                });
+                await _saveFiscalProfile();
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showCountryPicker() async {
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Select Country'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'IN'),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text('🇮🇳  India (INR - ₹)'),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'AE'),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text('🇦🇪  United Arab Emirates (AED - د.إ)'),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'US'),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text('🇺🇸  United States (USD - \$)'),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (selected != null && selected != _fiscalProfile.countryCode) {
+      final preset = CountryPresets.forCountry(selected);
+      setState(() {
+        _fiscalProfile = preset;
+        _gstRegistered = preset.taxEnabled;
+        _gstNumber = preset.taxIdentifier ?? '';
+      });
+      await _saveFiscalProfile();
+    }
+  }
+
+  Future<void> _editTaxRateDialog() async {
+    final controller = TextEditingController(
+      text: _fiscalProfile.taxRatePercent == 0
+          ? '0'
+          : _fiscalProfile.taxRatePercent.toString(),
+    );
+    String? errorText;
+
+    final result = await showDialog<double>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Default Tax Rate (%)'),
+          content: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'Tax Rate (%)',
+              errorText: errorText,
+              suffixText: '%',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final text = controller.text.trim();
+                final rate = double.tryParse(text);
+                if (rate == null ||
+                    rate < 0 ||
+                    rate.isNaN ||
+                    rate.isInfinite) {
+                  setDialogState(() {
+                    errorText = 'Please enter a valid rate (0 or higher)';
+                  });
+                  return;
+                }
+                Navigator.pop(dialogContext, rate);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _fiscalProfile = _fiscalProfile.copyWith(taxRatePercent: result);
+      });
+      await _saveFiscalProfile();
+    }
+  }
+
+  Future<void> _showPricingModelDialog() async {
+    bool isInclusive = _fiscalProfile.taxInclusive;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Pricing Model'),
+          content: RadioGroup<bool>(
+            groupValue: isInclusive,
+            onChanged: (val) {
+              if (val != null) {
+                setDialogState(() => isInclusive = val);
+              }
+            },
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioListTile<bool>(
+                  title: Text('Prices include tax'),
+                  subtitle: Text('Catalog and shelf prices are tax-inclusive'),
+                  value: true,
+                ),
+                RadioListTile<bool>(
+                  title: Text('Tax is added to prices'),
+                  subtitle:
+                      Text('Tax is calculated and added on top at checkout'),
+                  value: false,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, isInclusive),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _fiscalProfile = _fiscalProfile.copyWith(taxInclusive: result);
+      });
+      await _saveFiscalProfile();
+    }
+  }
+
+  Future<void> _saveFiscalProfile() async {
+    await _businessSettingsManager.setFiscalProfile(_fiscalProfile);
+    if (_isCloudMode) {
+      try {
+        final baseUrl = _mobileAuthService.baseUrl;
+        final accessToken = await _mobileAuthService.getStoredAccessToken();
+        if (accessToken != null && accessToken.trim().isNotEmpty) {
+          await _cloudCompanyProfileRepository.updateCompanyProfile(
+            baseUrl: baseUrl,
+            accessToken: accessToken,
+            currencyCode: _fiscalProfile.currencyCode,
+            taxIdentifier: _fiscalProfile.taxIdentifier,
+            timeZone: _fiscalProfile.timeZone,
+            region: _fiscalProfile.countryCode,
+            taxEnabled: _fiscalProfile.taxEnabled,
+            taxLabel: _fiscalProfile.taxLabel,
+            taxRatePercent: _fiscalProfile.taxRatePercent,
+            taxInclusive: _fiscalProfile.taxInclusive,
+          );
+        }
+      } catch (e) {
+        debugPrint('Cloud fiscal profile update error: $e');
+      }
+    }
+    BusinessSettingsManager.notifySettingsChanged();
+  }
+
+  String _getCountryDisplayName(String code) {
+    switch (code.toUpperCase()) {
+      case 'IN':
+        return 'India 🇮🇳';
+      case 'AE':
+        return 'United Arab Emirates 🇦🇪';
+      case 'US':
+        return 'United States 🇺🇸';
+      default:
+        return code;
+    }
+  }
+
+  String _getTaxIdLabel(String countryCode) {
+    switch (countryCode.toUpperCase()) {
+      case 'IN':
+        return 'GSTIN';
+      case 'AE':
+        return 'TRN';
+      case 'US':
+        return 'Tax ID / EIN';
+      default:
+        return 'Tax ID';
+    }
   }
 
   Widget _buildDetailRow(

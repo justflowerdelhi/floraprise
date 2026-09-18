@@ -5,12 +5,14 @@ class BillDiscountDialog extends StatefulWidget {
   final int subtotalPaise;
   final String? currentDiscountType;
   final int? currentDiscountValue;
+  final String currencySymbol;
 
   const BillDiscountDialog({
     super.key,
     required this.subtotalPaise,
     this.currentDiscountType,
     this.currentDiscountValue,
+    this.currencySymbol = '₹',
   });
 
   @override
@@ -94,21 +96,21 @@ class _BillDiscountDialogState extends State<BillDiscountDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Subtotal: ₹${subtotal.toStringAsFixed(2)}'),
+          Text('Subtotal: ${widget.currencySymbol}${subtotal.toStringAsFixed(2)}'),
           const SizedBox(height: 16),
           const Text('Discount Type'),
           const SizedBox(height: 8),
           SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(
+            segments: [
+              const ButtonSegment(
                 value: 'percentage',
                 label: Text('%'),
               ),
               ButtonSegment(
                 value: 'fixed',
-                label: Text('₹'),
+                label: Text(widget.currencySymbol),
               ),
-              ButtonSegment(
+              const ButtonSegment(
                 value: 'final_amount',
                 label: Text('Final'),
               ),
@@ -127,8 +129,8 @@ class _BillDiscountDialogState extends State<BillDiscountDialog> {
             _discountType == 'percentage'
                 ? 'Discount (%)'
                 : _discountType == 'fixed'
-                    ? 'Discount (₹)'
-                    : 'Customer Will Pay (₹)',
+                    ? 'Discount (${widget.currencySymbol})'
+                    : 'Customer Will Pay (${widget.currencySymbol})',
           ),
           const SizedBox(height: 8),
           TextField(
@@ -141,7 +143,7 @@ class _BillDiscountDialogState extends State<BillDiscountDialog> {
                       ? 'e.g., 100'
                       : 'e.g., 1600',
               errorText: _error,
-              suffix: const Text('₹'),
+              suffix: Text(widget.currencySymbol),
             ),
             onChanged: (_) => setState(() => _error = null),
           ),

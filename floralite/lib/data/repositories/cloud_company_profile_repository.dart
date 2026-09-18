@@ -17,6 +17,10 @@ class CloudCompanyProfile {
   final String currencyCode;
   final String? taxIdentifier;
   final String region;
+  final bool? taxEnabled;
+  final String? taxLabel;
+  final double? taxRatePercent;
+  final bool? taxInclusive;
   final bool isActive;
   final DateTime createdAtUtc;
   final DateTime? updatedAtUtc;
@@ -32,12 +36,85 @@ class CloudCompanyProfile {
     required this.currencyCode,
     this.taxIdentifier,
     required this.region,
+    this.taxEnabled,
+    this.taxLabel,
+    this.taxRatePercent,
+    this.taxInclusive,
     required this.isActive,
     required this.createdAtUtc,
     this.updatedAtUtc,
   });
 
+  CloudCompanyProfile copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? phone,
+    String? address,
+    String? shortDescription,
+    String? timeZone,
+    String? currencyCode,
+    String? taxIdentifier,
+    String? region,
+    bool? taxEnabled,
+    String? taxLabel,
+    double? taxRatePercent,
+    bool? taxInclusive,
+    bool? isActive,
+    DateTime? createdAtUtc,
+    DateTime? updatedAtUtc,
+  }) {
+    return CloudCompanyProfile(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      address: address ?? this.address,
+      shortDescription: shortDescription ?? this.shortDescription,
+      timeZone: timeZone ?? this.timeZone,
+      currencyCode: currencyCode ?? this.currencyCode,
+      taxIdentifier: taxIdentifier ?? this.taxIdentifier,
+      region: region ?? this.region,
+      taxEnabled: taxEnabled ?? this.taxEnabled,
+      taxLabel: taxLabel ?? this.taxLabel,
+      taxRatePercent: taxRatePercent ?? this.taxRatePercent,
+      taxInclusive: taxInclusive ?? this.taxInclusive,
+      isActive: isActive ?? this.isActive,
+      createdAtUtc: createdAtUtc ?? this.createdAtUtc,
+      updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
+    );
+  }
+
   factory CloudCompanyProfile.fromJson(Map<String, dynamic> json) {
+    final rawTaxEnabled = json['taxEnabled'] ?? json['TaxEnabled'];
+    final bool? taxEnabled = rawTaxEnabled == null
+        ? null
+        : (rawTaxEnabled is bool
+            ? rawTaxEnabled
+            : (rawTaxEnabled is num
+                ? rawTaxEnabled != 0
+                : rawTaxEnabled.toString().toLowerCase() == 'true' ||
+                    rawTaxEnabled.toString() == '1'));
+
+    final rawTaxInclusive = json['taxInclusive'] ?? json['TaxInclusive'];
+    final bool? taxInclusive = rawTaxInclusive == null
+        ? null
+        : (rawTaxInclusive is bool
+            ? rawTaxInclusive
+            : (rawTaxInclusive is num
+                ? rawTaxInclusive != 0
+                : rawTaxInclusive.toString().toLowerCase() == 'true' ||
+                    rawTaxInclusive.toString() == '1'));
+
+    final rawTaxRate = json['taxRatePercent'] ?? json['TaxRatePercent'];
+    final double? taxRatePercent = rawTaxRate == null
+        ? null
+        : (rawTaxRate is num
+            ? rawTaxRate.toDouble()
+            : double.tryParse(rawTaxRate.toString()));
+
+    final taxLabel = (json['taxLabel'] ?? json['TaxLabel'])?.toString();
+
     return CloudCompanyProfile(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
@@ -49,6 +126,10 @@ class CloudCompanyProfile {
       currencyCode: json['currencyCode'] ?? 'USD',
       taxIdentifier: json['taxIdentifier'],
       region: json['region'] ?? '',
+      taxEnabled: taxEnabled,
+      taxLabel: taxLabel,
+      taxRatePercent: taxRatePercent,
+      taxInclusive: taxInclusive,
       isActive: json['isActive'] ?? true,
       createdAtUtc: json['createdAtUtc'] != null
           ? DateTime.parse(json['createdAtUtc'])
@@ -70,6 +151,10 @@ class CloudCompanyProfile {
         'currencyCode': currencyCode,
         'taxIdentifier': taxIdentifier,
         'region': region,
+        if (taxEnabled != null) 'taxEnabled': taxEnabled,
+        if (taxLabel != null) 'taxLabel': taxLabel,
+        if (taxRatePercent != null) 'taxRatePercent': taxRatePercent,
+        if (taxInclusive != null) 'taxInclusive': taxInclusive,
         'isActive': isActive,
         'createdAtUtc': createdAtUtc.toIso8601String(),
         'updatedAtUtc': updatedAtUtc?.toIso8601String(),
@@ -223,6 +308,11 @@ class CloudCompanyProfileRepository {
     String? timeZone,
     String? currencyCode,
     String? taxIdentifier,
+    String? region,
+    bool? taxEnabled,
+    String? taxLabel,
+    double? taxRatePercent,
+    bool? taxInclusive,
   }) async {
     final uri = Uri.parse('$baseUrl/api/v1/mobile/company/profile');
     final override = _sender;
@@ -238,7 +328,14 @@ class CloudCompanyProfileRepository {
         if (taxIdentifier != null) 'taxIdentifier': taxIdentifier,
       });
       final data = json is Map<String, dynamic> ? json['data'] ?? json : json;
-      final profile = CloudCompanyProfile.fromJson(data as Map<String, dynamic>);
+      var profile = CloudCompanyProfile.fromJson(data as Map<String, dynamic>);
+      profile = profile.copyWith(
+        region: region,
+        taxEnabled: taxEnabled,
+        taxLabel: taxLabel,
+        taxRatePercent: taxRatePercent,
+        taxInclusive: taxInclusive,
+      );
       await _cacheProfile(profile);
       return profile;
     }
@@ -273,7 +370,14 @@ class CloudCompanyProfileRepository {
 
       final json = jsonDecode(responseBody);
       final data = json is Map<String, dynamic> ? json['data'] ?? json : json;
-      final profile = CloudCompanyProfile.fromJson(data as Map<String, dynamic>);
+      var profile = CloudCompanyProfile.fromJson(data as Map<String, dynamic>);
+      profile = profile.copyWith(
+        region: region,
+        taxEnabled: taxEnabled,
+        taxLabel: taxLabel,
+        taxRatePercent: taxRatePercent,
+        taxInclusive: taxInclusive,
+      );
       await _cacheProfile(profile);
       return profile;
     } finally {
@@ -282,6 +386,9 @@ class CloudCompanyProfileRepository {
       }
     }
   }
+
+  /// Directly saves / updates the cached company profile.
+  Future<void> saveCachedProfile(CloudCompanyProfile profile) => _cacheProfile(profile);
 
   /// Gets the cached company profile from secure storage.
   /// Checks 'cloud_company_profile' first, and falls back to 'mobile_auth_company'
