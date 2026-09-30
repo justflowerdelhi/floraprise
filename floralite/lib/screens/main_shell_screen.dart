@@ -482,6 +482,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
               lastSegment != 'walkin' &&
               lastSegment != 'delivery' &&
               lastSegment != 'pickup' &&
+              lastSegment != 'event-sales' &&
+              lastSegment != 'event-sale' &&
+              lastSegment != 'events' &&
               lastSegment != 'search') {
             cloudOrderId ??= lastSegment;
           }
@@ -519,6 +522,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
           ),
         '/orders/pickup' => const OrdersScreen(
             initialFilters: OrderWorkspaceFilters(pickup: true),
+          ),
+        '/orders/event-sales' || '/orders/events' => const OrdersScreen(
+            initialFilters: OrderWorkspaceFilters(eventSale: true),
           ),
         '/orders/search' => const OrdersScreen(
             focusSearch: true,
@@ -609,6 +615,12 @@ class _OrdersTab extends StatelessWidget {
           title: 'Pickup Orders',
           subtitle: 'Create or review pickup work.',
           onTap: () => Navigator.pushNamed(context, '/orders/pickup'),
+        ),
+        _WorkspaceAction(
+          icon: Icons.celebration_rounded,
+          title: 'Event Sales',
+          subtitle: 'Manage weddings, parties, and corporate events.',
+          onTap: () => Navigator.pushNamed(context, '/orders/event-sales'),
         ),
         _WorkspaceAction(
           icon: Icons.receipt_long_rounded,

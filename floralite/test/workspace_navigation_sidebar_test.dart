@@ -195,7 +195,7 @@ void main() {
   });
 
   group('WorkspaceNavigation Shared Source of Truth', () {
-    test('contains all 6 grouped sections with 26 top-level destinations (31 total with Home and submenus)', () {
+    test('contains all 6 grouped sections with 26 top-level destinations (32 total with Home and submenus)', () {
       expect(WorkspaceNavigation.sections.length, 6);
 
       final sectionTitles =
@@ -209,7 +209,7 @@ void main() {
         'UTILITIES',
       ]);
 
-      expect(WorkspaceNavigation.allDestinations.length, 31);
+      expect(WorkspaceNavigation.allDestinations.length, 32);
 
       // Section items count
       final salesSection = WorkspaceNavigation.sections[0];
@@ -229,11 +229,12 @@ void main() {
 
       final ordersItem = salesSection.items[1];
       expect(ordersItem.hasChildren, isTrue);
-      expect(ordersItem.children.length, 4);
+      expect(ordersItem.children.length, 5);
       expect(ordersItem.children.map((c) => c.route).toList(), [
         '/orders/walkin',
         '/orders/delivery',
         '/orders/pickup',
+        '/orders/event-sales',
         '/orders/search',
       ]);
 
@@ -394,6 +395,7 @@ void main() {
       expect(find.text('Walkin Orders'), findsOneWidget);
       expect(find.text('Delivery Orders'), findsOneWidget);
       expect(find.text('Pickup Orders'), findsOneWidget);
+      expect(find.text('Event Sales'), findsOneWidget);
       expect(find.text('Search Orders'), findsOneWidget);
       expect(find.text('Categories'), findsOneWidget);
       expect(find.text('Staff'), findsOneWidget);

@@ -117,6 +117,13 @@ class WorkspaceNavigation {
               badgeSelector: (s) => s.todayPickupCount,
             ),
             const WorkspaceDestination(
+              id: 'orders_event_sales',
+              title: 'Event Sales',
+              route: '/orders/event-sales',
+              icon: Icons.celebration_outlined,
+              selectedIcon: Icons.celebration_rounded,
+            ),
+            const WorkspaceDestination(
               id: 'orders_search',
               title: 'Search Orders',
               route: '/orders/search',

@@ -266,8 +266,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         Navigator.pushNamed(context, '/orders'),
                                     onDeliveriesTap: () => Navigator.pushNamed(
                                         context, '/delivery-workspace'),
-                                    onPaymentsTap: () =>
-                                        Navigator.pushNamed(context, '/reminders'),
+                                    onPaymentsTap: () => Navigator.pushNamed(
+                                        context, '/reports/pending-payments'),
                                   );
                                 },
                               ),
@@ -330,8 +330,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   Navigator.pushNamed(context, '/orders'),
                               onDeliveriesTap: () => Navigator.pushNamed(
                                   context, '/delivery-workspace'),
-                              onPaymentsTap: () =>
-                                  Navigator.pushNamed(context, '/reminders'),
+                              onPaymentsTap: () => Navigator.pushNamed(
+                                  context, '/reports/pending-payments'),
                             );
                           },
                         ),

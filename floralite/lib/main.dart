@@ -28,6 +28,7 @@ import 'data/repositories/cloud_associate_repository.dart';
 import 'data/repositories/staff_repository.dart';
 import 'data/repositories/attendance_repository.dart';
 import 'data/repositories/cloud_attendance_repository.dart';
+import 'models/order_workspace_models.dart';
 import 'screens/my_designs_screen.dart';
 import 'screens/walkin_sales_screen.dart';
 import 'screens/orders_screen.dart';
@@ -696,7 +697,14 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
                     } else if (lastSegment != 'orders' &&
                         lastSegment != 'order' &&
                         lastSegment != 'order-detail' &&
-                        lastSegment != 'order-details') {
+                        lastSegment != 'order-details' &&
+                        lastSegment != 'walkin' &&
+                        lastSegment != 'delivery' &&
+                        lastSegment != 'pickup' &&
+                        lastSegment != 'event-sales' &&
+                        lastSegment != 'event-sale' &&
+                        lastSegment != 'events' &&
+                        lastSegment != 'search') {
                       cloudOrderId ??= lastSegment;
                     }
                   }
@@ -749,6 +757,30 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
                   const _SubscriptionGate(child: MyDesignsScreen()),
               '/orders': (context) =>
                   const _SubscriptionGate(child: OrdersScreen()),
+              '/orders/walkin': (context) => const _SubscriptionGate(
+                  child: OrdersScreen(
+                    initialFilters: OrderWorkspaceFilters(takeAway: true),
+                  )),
+              '/orders/delivery': (context) => const _SubscriptionGate(
+                  child: OrdersScreen(
+                    initialFilters: OrderWorkspaceFilters(delivery: true),
+                  )),
+              '/orders/pickup': (context) => const _SubscriptionGate(
+                  child: OrdersScreen(
+                    initialFilters: OrderWorkspaceFilters(pickup: true),
+                  )),
+              '/orders/event-sales': (context) => const _SubscriptionGate(
+                  child: OrdersScreen(
+                    initialFilters: OrderWorkspaceFilters(eventSale: true),
+                  )),
+              '/orders/events': (context) => const _SubscriptionGate(
+                  child: OrdersScreen(
+                    initialFilters: OrderWorkspaceFilters(eventSale: true),
+                  )),
+              '/orders/search': (context) => const _SubscriptionGate(
+                  child: OrdersScreen(
+                    focusSearch: true,
+                  )),
               '/customers': (context) =>
                   const _SubscriptionGate(child: CustomersScreen()),
               '/crm': (context) =>
