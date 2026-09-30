@@ -42,7 +42,7 @@ void main() {
       "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_products_cloud_product_id_unique'",
     );
 
-    expect(version.single['user_version'], 45);
+    expect(version.single['user_version'], 46);
     final productColumn = columns.singleWhere((row) => row['name'] == 'cloud_product_id');
     final companyColumn = columns.singleWhere((row) => row['name'] == 'cloud_product_company_id');
     expect(productColumn['type'], 'TEXT');

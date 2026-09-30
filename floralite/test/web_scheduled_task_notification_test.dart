@@ -12,6 +12,10 @@ void main() {
 
       expect(service.isSupported, isFalse);
       expect(service.permission, equals(WebNotificationPermission.unsupported));
+      expect(
+        WebNotificationService.defaultSoundAsset,
+        equals('assets/sounds/floraprise_task_reminder.wav'),
+      );
 
       final requested = await service.requestPermission();
       expect(requested, isFalse);
@@ -26,6 +30,12 @@ void main() {
       );
 
       expect(() => service.playChime(), returnsNormally);
+      expect(
+        () => service.playChime(
+          soundAsset: 'assets/sounds/floraprise_task_reminder.wav',
+        ),
+        returnsNormally,
+      );
     });
 
     test('isTaskEligibleForReminder correctly identifies due and ineligible tasks', () {
@@ -137,6 +147,13 @@ void main() {
       service.start();
       expect(service.isRunning, isFalse); // False on VM/non-web
       service.stop();
+    });
+
+    test('Custom sound asset is present in assets/sounds and matches defaultSoundAsset', () {
+      expect(
+        WebNotificationService.defaultSoundAsset,
+        equals('assets/sounds/floraprise_task_reminder.wav'),
+      );
     });
   });
 }

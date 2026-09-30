@@ -1,19 +1,46 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:async';
-import 'dart:html' as html;
 import 'dart:js' as js;
-import 'dart:js_util' as js_util;
 import 'dart:typed_data';
 
 import 'web_bluetooth_adapter.dart';
 
 WebBluetoothAdapter createWebBluetoothAdapter() => BrowserWebBluetoothAdapter();
 
+Future<dynamic> _promiseToFuture(dynamic promise) {
+  final completer = Completer<dynamic>();
+  try {
+    final jsPromise = promise is js.JsObject
+        ? promise
+        : js.JsObject.fromBrowserObject(promise);
+    final onResolve = js.JsFunction.withThis((_, [result]) {
+      if (!completer.isCompleted) {
+        completer.complete(result);
+      }
+    });
+    final onReject = js.JsFunction.withThis((_, [error]) {
+      if (!completer.isCompleted) {
+        completer.completeError(error ?? 'Promise rejected');
+      }
+    });
+    jsPromise.callMethod('then', [onResolve, onReject]);
+  } catch (e) {
+    if (!completer.isCompleted) {
+      completer.completeError(e);
+    }
+  }
+  return completer.future;
+}
+
 class BrowserWebBluetoothAdapter implements WebBluetoothAdapter {
-  dynamic get _bluetooth {
+  js.JsObject? get _bluetooth {
     try {
-      if (js_util.hasProperty(html.window.navigator, 'bluetooth')) {
-        return js_util.getProperty(html.window.navigator, 'bluetooth');
+      final nav = js.context['navigator'] as js.JsObject?;
+      if (nav != null && nav.hasProperty('bluetooth')) {
+        final bt = nav['bluetooth'];
+        if (bt != null) {
+          return bt is js.JsObject ? bt : js.JsObject.fromBrowserObject(bt);
+        }
       }
     } catch (_) {}
     return null;
@@ -28,13 +55,14 @@ class BrowserWebBluetoothAdapter implements WebBluetoothAdapter {
     if (bt == null) return null;
 
     final servicesList = optionalServices ?? knownThermalServiceUuids;
-    final options = js_util.newObject();
-    js_util.setProperty(options, 'acceptAllDevices', true);
-    js_util.setProperty(options, 'optionalServices', servicesList);
+    final options = js.JsObject.jsify({
+      'acceptAllDevices': true,
+      'optionalServices': servicesList,
+    });
 
     try {
-      final rawDevice = await js_util.promiseToFuture<dynamic>(
-        js_util.callMethod(bt, 'requestDevice', [options]),
+      final rawDevice = await _promiseToFuture(
+        bt.callMethod('requestDevice', [options]),
       );
       if (rawDevice == null) return null;
       return BrowserWebBluetoothDevice(rawDevice);
@@ -53,23 +81,24 @@ class BrowserWebBluetoothAdapter implements WebBluetoothAdapter {
     if (bt == null) return const [];
 
     try {
-      if (js_util.hasProperty(bt, 'getDevices')) {
-        final rawDevices = await js_util.promiseToFuture<dynamic>(
-          js_util.callMethod(bt, 'getDevices', []),
+      if (bt.hasProperty('getDevices')) {
+        final rawDevices = await _promiseToFuture(
+          bt.callMethod('getDevices', []),
         );
-        if (rawDevices is List) {
-          return rawDevices.map((d) => BrowserWebBluetoothDevice(d)).toList();
-        }
-        final length = js_util.getProperty(rawDevices, 'length') as int? ?? 0;
-        final list = <WebBluetoothDevice>[];
-        for (var i = 0; i < length; i++) {
-          final d = js_util.callMethod(rawDevices, 'item', [i]) ??
-              js_util.getProperty(rawDevices, i);
-          if (d != null) {
-            list.add(BrowserWebBluetoothDevice(d));
+        if (rawDevices != null) {
+          final jsDevices = rawDevices is js.JsObject
+              ? rawDevices
+              : js.JsObject.fromBrowserObject(rawDevices);
+          final length = jsDevices['length'] as int? ?? 0;
+          final list = <WebBluetoothDevice>[];
+          for (var i = 0; i < length; i++) {
+            final item = jsDevices[i];
+            if (item != null) {
+              list.add(BrowserWebBluetoothDevice(item));
+            }
           }
+          return list;
         }
-        return list;
       }
     } catch (_) {}
     return const [];
@@ -77,15 +106,28 @@ class BrowserWebBluetoothAdapter implements WebBluetoothAdapter {
 }
 
 class BrowserWebBluetoothDevice implements WebBluetoothDevice {
-  BrowserWebBluetoothDevice(this.rawDevice);
+  BrowserWebBluetoothDevice(dynamic rawDevice)
+      : _jsDevice = rawDevice is js.JsObject
+            ? rawDevice
+            : js.JsObject.fromBrowserObject(rawDevice);
 
-  final dynamic rawDevice;
+  final js.JsObject _jsDevice;
   BrowserWebBluetoothCharacteristic? _cachedCharacteristic;
+
+  js.JsObject? get _gatt {
+    try {
+      final gatt = _jsDevice['gatt'];
+      if (gatt == null) return null;
+      return gatt is js.JsObject ? gatt : js.JsObject.fromBrowserObject(gatt);
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   String get id {
     try {
-      return js_util.getProperty(rawDevice, 'id')?.toString() ?? '';
+      return _jsDevice['id']?.toString() ?? '';
     } catch (_) {
       return '';
     }
@@ -94,7 +136,7 @@ class BrowserWebBluetoothDevice implements WebBluetoothDevice {
   @override
   String get name {
     try {
-      final val = js_util.getProperty(rawDevice, 'name')?.toString();
+      final val = _jsDevice['name']?.toString();
       if (val != null && val.trim().isNotEmpty) return val.trim();
     } catch (_) {}
     return 'Bluetooth Thermal Printer';
@@ -103,9 +145,7 @@ class BrowserWebBluetoothDevice implements WebBluetoothDevice {
   @override
   bool get isConnected {
     try {
-      final gatt = js_util.getProperty(rawDevice, 'gatt');
-      if (gatt == null) return false;
-      return js_util.getProperty(gatt, 'connected') == true;
+      return _gatt?['connected'] == true;
     } catch (_) {
       return false;
     }
@@ -113,24 +153,19 @@ class BrowserWebBluetoothDevice implements WebBluetoothDevice {
 
   @override
   Future<void> connect() async {
-    final gatt = js_util.getProperty(rawDevice, 'gatt');
+    final gatt = _gatt;
     if (gatt == null) {
       throw Exception('GATT server unavailable on this device');
     }
     if (isConnected) return;
-    await js_util.promiseToFuture<dynamic>(
-      js_util.callMethod(gatt, 'connect', []),
-    );
+    await _promiseToFuture(gatt.callMethod('connect', []));
     _cachedCharacteristic = null;
   }
 
   @override
   Future<void> disconnect() async {
     try {
-      final gatt = js_util.getProperty(rawDevice, 'gatt');
-      if (gatt != null) {
-        js_util.callMethod(gatt, 'disconnect', []);
-      }
+      _gatt?.callMethod('disconnect', []);
     } catch (_) {}
     _cachedCharacteristic = null;
   }
@@ -138,12 +173,13 @@ class BrowserWebBluetoothDevice implements WebBluetoothDevice {
   @override
   void onDisconnected(void Function() callback) {
     try {
-      js_util.callMethod(rawDevice, 'addEventListener', [
+      final listener = js.JsFunction.withThis((_, [__]) {
+        _cachedCharacteristic = null;
+        callback();
+      });
+      _jsDevice.callMethod('addEventListener', [
         'gattserverdisconnected',
-        js.allowInterop((_) {
-          _cachedCharacteristic = null;
-          callback();
-        }),
+        listener,
       ]);
     } catch (_) {}
   }
@@ -152,7 +188,7 @@ class BrowserWebBluetoothDevice implements WebBluetoothDevice {
   Future<WebBluetoothCharacteristic?> findWritableCharacteristic() async {
     if (_cachedCharacteristic != null) return _cachedCharacteristic;
 
-    final gatt = js_util.getProperty(rawDevice, 'gatt');
+    final gatt = _gatt;
     if (gatt == null) return null;
 
     if (!isConnected) {
@@ -162,10 +198,13 @@ class BrowserWebBluetoothDevice implements WebBluetoothDevice {
     // Step 1: Probe known thermal primary services
     for (final serviceUuid in knownThermalServiceUuids) {
       try {
-        final service = await js_util.promiseToFuture<dynamic>(
-          js_util.callMethod(gatt, 'getPrimaryService', [serviceUuid]),
+        final rawService = await _promiseToFuture(
+          gatt.callMethod('getPrimaryService', [serviceUuid]),
         );
-        if (service != null) {
+        if (rawService != null) {
+          final service = rawService is js.JsObject
+              ? rawService
+              : js.JsObject.fromBrowserObject(rawService);
           final char = await _findWritableInService(service);
           if (char != null) {
             _cachedCharacteristic = char;
@@ -177,15 +216,26 @@ class BrowserWebBluetoothDevice implements WebBluetoothDevice {
 
     // Step 2: Fallback - Discover all primary services on device
     try {
-      final services = await js_util.promiseToFuture<dynamic>(
-        js_util.callMethod(gatt, 'getPrimaryServices', []),
+      final rawServices = await _promiseToFuture(
+        gatt.callMethod('getPrimaryServices', []),
       );
-      final servicesList = _toList(services);
-      for (final service in servicesList) {
-        final char = await _findWritableInService(service);
-        if (char != null) {
-          _cachedCharacteristic = char;
-          return char;
+      if (rawServices != null) {
+        final jsServices = rawServices is js.JsObject
+            ? rawServices
+            : js.JsObject.fromBrowserObject(rawServices);
+        final length = jsServices['length'] as int? ?? 0;
+        for (var i = 0; i < length; i++) {
+          final item = jsServices[i];
+          if (item != null) {
+            final service = item is js.JsObject
+                ? item
+                : js.JsObject.fromBrowserObject(item);
+            final char = await _findWritableInService(service);
+            if (char != null) {
+              _cachedCharacteristic = char;
+              return char;
+            }
+          }
         }
       }
     } catch (_) {}
@@ -194,36 +244,28 @@ class BrowserWebBluetoothDevice implements WebBluetoothDevice {
   }
 
   Future<BrowserWebBluetoothCharacteristic?> _findWritableInService(
-      dynamic service) async {
+      js.JsObject service) async {
     try {
-      final chars = await js_util.promiseToFuture<dynamic>(
-        js_util.callMethod(service, 'getCharacteristics', []),
+      final rawChars = await _promiseToFuture(
+        service.callMethod('getCharacteristics', []),
       );
-      final charList = _toList(chars);
-      for (final c in charList) {
-        final charObj = BrowserWebBluetoothCharacteristic(c);
-        if (charObj.canWrite) {
-          return charObj;
+      if (rawChars != null) {
+        final jsChars = rawChars is js.JsObject
+            ? rawChars
+            : js.JsObject.fromBrowserObject(rawChars);
+        final length = jsChars['length'] as int? ?? 0;
+        for (var i = 0; i < length; i++) {
+          final item = jsChars[i];
+          if (item != null) {
+            final charObj = BrowserWebBluetoothCharacteristic(item);
+            if (charObj.canWrite) {
+              return charObj;
+            }
+          }
         }
       }
     } catch (_) {}
     return null;
-  }
-
-  List<dynamic> _toList(dynamic jsArrayOrList) {
-    if (jsArrayOrList == null) return const [];
-    if (jsArrayOrList is List) return jsArrayOrList;
-    try {
-      final length = js_util.getProperty(jsArrayOrList, 'length') as int? ?? 0;
-      final list = <dynamic>[];
-      for (var i = 0; i < length; i++) {
-        final item = js_util.getProperty(jsArrayOrList, i);
-        if (item != null) list.add(item);
-      }
-      return list;
-    } catch (_) {
-      return const [];
-    }
   }
 
   @override
@@ -251,14 +293,17 @@ class BrowserWebBluetoothDevice implements WebBluetoothDevice {
 }
 
 class BrowserWebBluetoothCharacteristic implements WebBluetoothCharacteristic {
-  BrowserWebBluetoothCharacteristic(this.rawCharacteristic);
+  BrowserWebBluetoothCharacteristic(dynamic rawCharacteristic)
+      : _jsChar = rawCharacteristic is js.JsObject
+            ? rawCharacteristic
+            : js.JsObject.fromBrowserObject(rawCharacteristic);
 
-  final dynamic rawCharacteristic;
+  final js.JsObject _jsChar;
 
   @override
   String get uuid {
     try {
-      return js_util.getProperty(rawCharacteristic, 'uuid')?.toString() ?? '';
+      return _jsChar['uuid']?.toString() ?? '';
     } catch (_) {
       return '';
     }
@@ -267,11 +312,10 @@ class BrowserWebBluetoothCharacteristic implements WebBluetoothCharacteristic {
   @override
   bool get canWrite {
     try {
-      final props = js_util.getProperty(rawCharacteristic, 'properties');
+      final props = _jsChar['properties'] as js.JsObject?;
       if (props == null) return false;
-      final write = js_util.getProperty(props, 'write') == true;
-      final writeNoResp =
-          js_util.getProperty(props, 'writeWithoutResponse') == true;
+      final write = props['write'] == true;
+      final writeNoResp = props['writeWithoutResponse'] == true;
       return write || writeNoResp;
     } catch (_) {
       return false;
@@ -281,25 +325,21 @@ class BrowserWebBluetoothCharacteristic implements WebBluetoothCharacteristic {
   @override
   Future<void> writeValue(Uint8List bytes) async {
     try {
-      final props = js_util.getProperty(rawCharacteristic, 'properties');
-      final writeNoResp =
-          props != null && js_util.getProperty(props, 'writeWithoutResponse') == true;
+      final props = _jsChar['properties'] as js.JsObject?;
+      final writeNoResp = props != null && props['writeWithoutResponse'] == true;
+      final jsArray = js.JsObject(js.context['Uint8Array'], [bytes]);
 
-      if (writeNoResp &&
-          js_util.hasProperty(rawCharacteristic, 'writeValueWithoutResponse')) {
-        await js_util.promiseToFuture<dynamic>(
-          js_util.callMethod(
-              rawCharacteristic, 'writeValueWithoutResponse', [bytes]),
+      if (writeNoResp && _jsChar.hasProperty('writeValueWithoutResponse')) {
+        await _promiseToFuture(
+          _jsChar.callMethod('writeValueWithoutResponse', [jsArray]),
         );
-      } else if (js_util.hasProperty(
-          rawCharacteristic, 'writeValueWithResponse')) {
-        await js_util.promiseToFuture<dynamic>(
-          js_util.callMethod(
-              rawCharacteristic, 'writeValueWithResponse', [bytes]),
+      } else if (_jsChar.hasProperty('writeValueWithResponse')) {
+        await _promiseToFuture(
+          _jsChar.callMethod('writeValueWithResponse', [jsArray]),
         );
       } else {
-        await js_util.promiseToFuture<dynamic>(
-          js_util.callMethod(rawCharacteristic, 'writeValue', [bytes]),
+        await _promiseToFuture(
+          _jsChar.callMethod('writeValue', [jsArray]),
         );
       }
     } catch (e) {

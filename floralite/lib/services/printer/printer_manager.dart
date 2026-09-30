@@ -4,8 +4,8 @@ import 'package:flutter/foundation.dart';
 
 import '../../data/repositories/printer_repository.dart';
 import '../../models/printer_models.dart';
-import 'bluetooth_printer_service.dart';
 import 'printer_service.dart';
+import 'printer_transport_factory.dart';
 import 'receipt_builder.dart';
 
 class PrinterManager {
@@ -15,7 +15,7 @@ class PrinterManager {
     PrinterService? transport,
   })  : _repository = repository ?? PrinterRepository(),
         _receiptBuilder = receiptBuilder ?? ReceiptBuilder(),
-        _transport = transport ?? BluetoothPrinterService();
+        _transport = transport ?? PrinterTransportFactory.createDefault();
 
   final PrinterRepository _repository;
   final ReceiptBuilder _receiptBuilder;
@@ -99,7 +99,9 @@ class PrinterManager {
   }) async {
     final id =
         await _repository.enqueue(type: type, payload: payload, copies: copies);
-    if (tryPrintNow) unawaited(processQueue());
+    if (tryPrintNow) {
+      await processQueue();
+    }
     return id;
   }
 
@@ -136,7 +138,6 @@ class PrinterManager {
   Future<void> cancelJob(int id) => _repository.cancel(id);
 
   Future<void> processQueue() async {
-    if (kIsWeb) return;
     await refreshConnectionState();
     if (!_isConnected) {
       final connected = await autoConnect();

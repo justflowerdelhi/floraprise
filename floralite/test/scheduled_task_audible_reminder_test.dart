@@ -8,21 +8,32 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Scheduled Task Audible Reminder Tests', () {
-    test('SmartAlertNotificationService creates floraprise_task_reminders_v2 channel details', () {
+    test('SmartAlertNotificationService creates floraprise_task_reminders_v3 channel details with custom sound', () {
       final service = SmartAlertNotificationService.instance;
       final details = service.getTaskReminderNotificationDetails(enableVibration: true);
 
       expect(details.android, isNotNull);
       final android = details.android!;
 
-      expect(android.channelId, equals('floraprise_task_reminders_v2'));
+      expect(android.channelId, equals('floraprise_task_reminders_v3'));
       expect(android.channelName, equals('Floraprise Task Reminders'));
       expect(android.importance, equals(Importance.max));
       expect(android.priority, equals(Priority.max));
       expect(android.playSound, isTrue);
+      expect(android.sound, isNotNull);
+      expect(android.sound, isA<RawResourceAndroidNotificationSound>());
+      final sound = android.sound as RawResourceAndroidNotificationSound;
+      expect(sound.sound, equals('floraprise_task_reminder'));
+      expect(android.audioAttributesUsage, equals(AudioAttributesUsage.notification));
       expect(android.enableVibration, isTrue);
       expect(android.visibility, equals(NotificationVisibility.public));
       expect(android.category, equals(AndroidNotificationCategory.reminder));
+
+      // Verify Darwin (iOS/macOS) sound
+      expect(details.iOS, isNotNull);
+      expect(details.iOS!.sound, equals('floraprise_task_reminder.wav'));
+      expect(details.macOS, isNotNull);
+      expect(details.macOS!.sound, equals('floraprise_task_reminder.wav'));
 
       // Verify actions
       expect(android.actions, isNotNull);

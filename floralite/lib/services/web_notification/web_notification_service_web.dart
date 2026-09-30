@@ -62,11 +62,34 @@ void showNotification({
   }
 }
 
-void playChime() {
+void playChime(
+    {String soundAsset = 'assets/sounds/floraprise_task_reminder.wav'}) {
   try {
+    // In Flutter Web, assets packaged via pubspec.yaml are located under 'assets/' + assetKey
+    final primarySrc = soundAsset.startsWith('assets/')
+        ? 'assets/$soundAsset'
+        : 'assets/assets/$soundAsset';
+
     final audio = html.AudioElement()
-      ..src = 'assets/floraprise_task_reminder.wav'
+      ..src = primarySrc
       ..volume = 0.8;
+
+    // Register error handler to attempt fallback to direct relative path if needed
+    audio.onError.listen((_) {
+      try {
+        final fallbackAudio = html.AudioElement()
+          ..src = soundAsset
+          ..volume = 0.8;
+        fallbackAudio.play().catchError((e) {
+          debugPrint(
+              'WebNotificationService: Fallback audio autoplay prevented: $e');
+        });
+      } catch (err) {
+        debugPrint(
+            'WebNotificationService: Fallback audio playback error: $err');
+      }
+    });
+
     audio.play().catchError((e) {
       debugPrint('WebNotificationService: Audio autoplay prevented: $e');
     });

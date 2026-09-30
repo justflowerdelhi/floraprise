@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'web_bluetooth_adapter.dart';
 
 WebBluetoothAdapter createWebBluetoothAdapter() => _StubWebBluetoothAdapter();

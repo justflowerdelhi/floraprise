@@ -16,4 +16,5 @@ void showNotification({
   VoidCallback? onClick,
 }) {}
 
-void playChime() {}
+void playChime(
+    {String soundAsset = 'assets/sounds/floraprise_task_reminder.wav'}) {}

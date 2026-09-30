@@ -15,13 +15,16 @@ class PrinterProvider extends ChangeNotifier {
     this._printerManager, {
     BuildContext? Function()? contextProvider,
     WebReceiptPrintService? webReceiptPrintService,
+    bool? isWeb,
   })  : _contextProvider = contextProvider,
         _webReceiptPrintService =
-            webReceiptPrintService ?? WebReceiptPrintService();
+            webReceiptPrintService ?? WebReceiptPrintService(),
+        _isWeb = isWeb ?? kIsWeb;
 
   final PrinterManager _printerManager;
   final BuildContext? Function()? _contextProvider;
   final WebReceiptPrintService _webReceiptPrintService;
+  final bool _isWeb;
 
   PrinterConfig? _config;
   List<PrinterDeviceInfo> _discoveredPrinters = const [];
@@ -50,11 +53,6 @@ class PrinterProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _config = await _printerManager.loadConfig();
-      if (kIsWeb) {
-        _queue = const [];
-        _hasLastReceipt = false;
-        return;
-      }
       _queue = await _printerManager.listQueue();
       _hasLastReceipt = await _printerManager.hasLastSuccessfulReceipt();
       final isConnected = await _printerManager.refreshConnectionState();
@@ -229,13 +227,24 @@ class PrinterProvider extends ChangeNotifier {
   Future<void> enqueuePosBill(Map<String, dynamic> payload) async {
     _error = null;
     try {
-      if (kIsWeb) {
+      final isBtConnected = _printerManager.isConnected ||
+          (_config?.hasPrinter == true &&
+              await _printerManager.refreshConnectionState());
+
+      if (_isWeb && !isBtConnected) {
         await _webReceiptPrintService.printPosBill(
           payload,
           paperWidth: _config?.paperWidth ?? PrinterPaperWidth.mm80,
         );
+        await _printerManager.enqueue(
+          type: PrintJobType.posBill,
+          payload: payload,
+          tryPrintNow: false,
+        );
+        _hasLastReceipt = true;
         return;
       }
+
       await _ensureBluetoothPermission();
       await _printerManager.enqueue(
         type: PrintJobType.posBill,
@@ -246,10 +255,8 @@ class PrinterProvider extends ChangeNotifier {
       _hasLastReceipt = await _printerManager.hasLastSuccessfulReceipt();
     } catch (error) {
       _error = error.toString();
-      if (!kIsWeb) {
-        _queue = await _printerManager.listQueue();
-        _hasLastReceipt = await _printerManager.hasLastSuccessfulReceipt();
-      }
+      _queue = await _printerManager.listQueue();
+      _hasLastReceipt = await _printerManager.hasLastSuccessfulReceipt();
     } finally {
       notifyListeners();
     }
@@ -258,13 +265,23 @@ class PrinterProvider extends ChangeNotifier {
   Future<void> enqueueDeliverySlip(Map<String, dynamic> payload) async {
     _error = null;
     try {
-      if (kIsWeb) {
+      final isBtConnected = _printerManager.isConnected ||
+          (_config?.hasPrinter == true &&
+              await _printerManager.refreshConnectionState());
+
+      if (_isWeb && !isBtConnected) {
         await _webReceiptPrintService.printDeliverySlip(
           payload,
           paperWidth: _config?.paperWidth ?? PrinterPaperWidth.mm80,
         );
+        await _printerManager.enqueue(
+          type: PrintJobType.deliverySlip,
+          payload: payload,
+          tryPrintNow: false,
+        );
         return;
       }
+
       await _ensureBluetoothPermission();
       await _printerManager.enqueue(
         type: PrintJobType.deliverySlip,
@@ -274,9 +291,7 @@ class PrinterProvider extends ChangeNotifier {
       _queue = await _printerManager.listQueue();
     } catch (error) {
       _error = error.toString();
-      if (!kIsWeb) {
-        _queue = await _printerManager.listQueue();
-      }
+      _queue = await _printerManager.listQueue();
     } finally {
       notifyListeners();
     }
@@ -305,7 +320,7 @@ class PrinterProvider extends ChangeNotifier {
   }
 
   Future<void> _ensureBluetoothPermission() async {
-    if (kIsWeb || !Platform.isAndroid) return;
+    if (_isWeb || !Platform.isAndroid) return;
     final permissionContext = _contextProvider?.call();
     if (permissionContext != null && permissionContext.mounted) {
       final proceed = await FirstUsePermissionService.ensureExplainedOnce(
@@ -338,8 +353,25 @@ class PrinterProvider extends ChangeNotifier {
   }
 
   String _friendlyPrinterError(Object error, {required String operation}) {
+    if (error is PrinterServiceException) {
+      return error.message;
+    }
     final message = error.toString().replaceFirst('Exception: ', '').trim();
     final normalized = message.toLowerCase();
+    if (normalized.contains('compatible ble') ||
+        normalized.contains('gatt') ||
+        normalized.contains('characteristic') ||
+        normalized.contains('service')) {
+      return 'This printer does not expose a compatible BLE printing service.';
+    }
+    if (normalized.contains('browser') ||
+        normalized.contains('navigator.bluetooth')) {
+      return 'Bluetooth is not available in this browser. Please use Chrome or Edge over HTTPS.';
+    }
+    if (normalized.contains('user cancelled') ||
+        normalized.contains('user canceled')) {
+      return 'Printer selection cancelled.';
+    }
     if (normalized.contains('null check operator') ||
         normalized.contains('not initialized')) {
       return 'Bluetooth is unavailable. Please turn on Bluetooth and try again.';

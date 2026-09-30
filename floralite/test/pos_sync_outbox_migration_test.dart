@@ -93,7 +93,7 @@ void main() {
     final outbox = await upgraded.query('pos_sync_outbox', where: 'local_order_id = ?', whereArgs: [orderId]);
 
     expect(File(databasePath).existsSync(), isTrue);
-    expect(version.single['user_version'], 45);
+    expect(version.single['user_version'], 46);
     expect(tables, hasLength(1));
     expect(order.single['order_no'], 'ORD-EXISTING-41');
     expect(order.single['status'], 'confirmed');

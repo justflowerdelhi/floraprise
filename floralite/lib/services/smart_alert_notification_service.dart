@@ -84,12 +84,13 @@ class SmartAlertNotificationService {
     // Create Floraprise Task Reminders Channel
     await android.createNotificationChannel(
       const AndroidNotificationChannel(
-        'floraprise_task_reminders_v2',
+        'floraprise_task_reminders_v3',
         'Floraprise Task Reminders',
         description: 'Audible reminders for scheduled tasks and follow-ups',
         importance: Importance.max,
         playSound: true,
         sound: RawResourceAndroidNotificationSound('floraprise_task_reminder'),
+        audioAttributesUsage: AudioAttributesUsage.notification,
         enableVibration: true,
         showBadge: true,
       ),
@@ -105,7 +106,7 @@ class SmartAlertNotificationService {
   }) {
     return NotificationDetails(
       android: AndroidNotificationDetails(
-        'floraprise_task_reminders_v2',
+        'floraprise_task_reminders_v3',
         'Floraprise Task Reminders',
         channelDescription:
             'Audible reminders for scheduled tasks and follow-ups',
@@ -113,6 +114,7 @@ class SmartAlertNotificationService {
         priority: Priority.max,
         playSound: true,
         sound: const RawResourceAndroidNotificationSound('floraprise_task_reminder'),
+        audioAttributesUsage: AudioAttributesUsage.notification,
         enableVibration: enableVibration,
         vibrationPattern: enableVibration
             ? Int64List.fromList([0, 500, 200, 500])

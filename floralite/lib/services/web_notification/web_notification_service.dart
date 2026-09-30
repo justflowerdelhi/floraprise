@@ -16,6 +16,10 @@ class WebNotificationService {
 
   static final WebNotificationService instance = WebNotificationService._();
 
+  /// Default sound asset path used for task reminder audio playback on web.
+  static const String defaultSoundAsset =
+      'assets/sounds/floraprise_task_reminder.wav';
+
   /// Whether the browser Notification API is available.
   bool get isSupported => kIsWeb && impl.isSupported;
 
@@ -48,9 +52,9 @@ class WebNotificationService {
     );
   }
 
-  /// Attempts to play a short chime on web if autoplay policy permits.
-  void playChime() {
+  /// Attempts to play the custom task reminder chime on web if autoplay policy permits.
+  void playChime({String soundAsset = defaultSoundAsset}) {
     if (!kIsWeb) return;
-    impl.playChime();
+    impl.playChime(soundAsset: soundAsset);
   }
 }

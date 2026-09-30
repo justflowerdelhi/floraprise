@@ -172,6 +172,7 @@ class FcmService {
         'source': 'fcm',
       });
 
+      await SmartAlertNotificationService.instance.initialize();
       final notificationDetails = SmartAlertNotificationService.instance
           .getTaskReminderNotificationDetails(enableVibration: true);
 

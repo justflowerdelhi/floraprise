@@ -46,12 +46,16 @@ class OrderPrintService {
 
     final bundle = await _orderManager.getOrderDetailBundle(orderId);
     final payload = await _posPayload(header, bundle);
-    if (kIsWeb) {
+    final isConnected = _printerManager.isConnected ||
+        await _printerManager.refreshConnectionState();
+    if (kIsWeb && !isConnected) {
       final webPrinter = WebReceiptPrintService();
       await webPrinter.printPosBill(payload);
       return;
     }
-    await repo.enqueueReceiptJob(orderId, payload);
+    if (!kIsWeb) {
+      await repo.enqueueReceiptJob(orderId, payload);
+    }
     await _printerManager.enqueue(
       type: PrintJobType.posBill,
       payload: payload,
@@ -74,7 +78,16 @@ class OrderPrintService {
     }
 
     final payload = _deliveryPayload(header, bundle);
-    await repo.enqueueReceiptJob(orderId, payload);
+    final isConnected = _printerManager.isConnected ||
+        await _printerManager.refreshConnectionState();
+    if (kIsWeb && !isConnected) {
+      final webPrinter = WebReceiptPrintService();
+      await webPrinter.printDeliverySlip(payload);
+      return;
+    }
+    if (!kIsWeb) {
+      await repo.enqueueReceiptJob(orderId, payload);
+    }
     await _printerManager.enqueue(
       type: PrintJobType.deliverySlip,
       payload: payload,

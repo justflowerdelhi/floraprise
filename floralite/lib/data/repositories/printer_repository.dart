@@ -1,12 +1,24 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../models/printer_models.dart';
 import '../database/app_database.dart';
 
 class PrinterRepository {
+  PrinterRepository({
+    SharedPreferences? prefs,
+    bool? isWeb,
+  })  : _prefs = prefs,
+        _isWeb = isWeb ?? kIsWeb;
+
+  final bool _isWeb;
+  SharedPreferences? _prefs;
+  static const String _webConfigKey = 'floraprise_printer_config_v1';
+  static const String _webLastReceiptKey = 'floraprise_last_receipt_v1';
+
   static PrinterConfig _webConfig = const PrinterConfig(
     connectionKind: PrinterConnectionKind.bluetooth,
     paperWidth: PrinterPaperWidth.mm80,
@@ -21,8 +33,30 @@ class PrinterRepository {
     thankYouMessage: 'Thank you for shopping with us',
   );
 
+  final List<PrintQueueJob> _webQueue = [];
+  int _webNextJobId = 1;
+  PrintQueueJob? _webLastSuccessfulReceipt;
+
+  Future<SharedPreferences> _getPrefs() async {
+    return _prefs ??= await SharedPreferences.getInstance();
+  }
+
   Future<PrinterConfig> getConfig() async {
-    if (kIsWeb) return _webConfig;
+    if (_isWeb) {
+      try {
+        final prefs = await _getPrefs();
+        final jsonStr = prefs.getString(_webConfigKey);
+        if (jsonStr != null && jsonStr.trim().isNotEmpty) {
+          final decoded = jsonDecode(jsonStr);
+          if (decoded is Map<String, dynamic>) {
+            _webConfig = PrinterConfig.fromMap(decoded);
+            return _webConfig;
+          }
+        }
+      } catch (_) {}
+      return _webConfig;
+    }
+
     final db = await AppDatabase.instance.database;
     final rows = await db.query(
       'printer_config',
@@ -37,10 +71,15 @@ class PrinterRepository {
   }
 
   Future<void> saveConfig(PrinterConfig config) async {
-    if (kIsWeb) {
+    if (_isWeb) {
       _webConfig = config;
+      try {
+        final prefs = await _getPrefs();
+        await prefs.setString(_webConfigKey, jsonEncode(config.toMap()));
+      } catch (_) {}
       return;
     }
+
     final db = await AppDatabase.instance.database;
     await db.insert(
       'printer_config',
@@ -70,10 +109,26 @@ class PrinterRepository {
     required Map<String, dynamic> payload,
     int? copies,
   }) async {
-    if (kIsWeb) return 0;
-    final db = await AppDatabase.instance.database;
     final now = DateTime.now().toIso8601String();
     final config = await getConfig();
+
+    if (_isWeb) {
+      final id = _webNextJobId++;
+      final job = PrintQueueJob(
+        id: id,
+        type: type,
+        payload: payload,
+        status: PrintJobStatus.pending,
+        copies: (copies ?? config.copies).clamp(1, 5),
+        retryCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      );
+      _webQueue.add(job);
+      return id;
+    }
+
+    final db = await AppDatabase.instance.database;
     return db.insert('print_queue', {
       'job_type': type.name,
       'payload_json': jsonEncode(payload),
@@ -92,7 +147,13 @@ class PrinterRepository {
     },
     int limit = 50,
   }) async {
-    if (kIsWeb) return const [];
+    if (_isWeb) {
+      return _webQueue
+          .where((job) => statuses.contains(job.status))
+          .take(limit)
+          .toList();
+    }
+
     final db = await AppDatabase.instance.database;
     final statusArgs = statuses.map((status) => status.name).toList();
     final rows = await db.query(
@@ -106,7 +167,24 @@ class PrinterRepository {
   }
 
   Future<PrintQueueJob?> getLastSuccessfulReceipt() async {
-    if (kIsWeb) return null;
+    if (_isWeb) {
+      if (_webLastSuccessfulReceipt != null) {
+        return _webLastSuccessfulReceipt;
+      }
+      try {
+        final prefs = await _getPrefs();
+        final jsonStr = prefs.getString(_webLastReceiptKey);
+        if (jsonStr != null && jsonStr.trim().isNotEmpty) {
+          final decoded = jsonDecode(jsonStr);
+          if (decoded is Map<String, dynamic>) {
+            _webLastSuccessfulReceipt = PrintQueueJob.fromMap(decoded);
+            return _webLastSuccessfulReceipt;
+          }
+        }
+      } catch (_) {}
+      return null;
+    }
+
     final db = await AppDatabase.instance.database;
     final rows = await db.query(
       'print_queue',
@@ -124,14 +202,65 @@ class PrinterRepository {
         PrintJobStatus.printing,
       );
 
-  Future<void> markPrinted(int id) => _updateStatus(
-        id,
-        PrintJobStatus.printed,
-        printedAt: DateTime.now().toIso8601String(),
-      );
+  Future<void> markPrinted(int id) async {
+    final now = DateTime.now().toIso8601String();
+    if (_isWeb) {
+      final index = _webQueue.indexWhere((j) => j.id == id);
+      if (index >= 0) {
+        final old = _webQueue[index];
+        final updated = PrintQueueJob(
+          id: old.id,
+          type: old.type,
+          payload: old.payload,
+          status: PrintJobStatus.printed,
+          copies: old.copies,
+          retryCount: old.retryCount,
+          lastError: null,
+          createdAt: old.createdAt,
+          updatedAt: now,
+          printedAt: now,
+        );
+        _webQueue[index] = updated;
+        if (updated.type == PrintJobType.posBill) {
+          _webLastSuccessfulReceipt = updated;
+          try {
+            final prefs = await _getPrefs();
+            await prefs.setString(
+                _webLastReceiptKey, jsonEncode(updated.toMap()));
+          } catch (_) {}
+        }
+      }
+      return;
+    }
+    await _updateStatus(
+      id,
+      PrintJobStatus.printed,
+      printedAt: now,
+    );
+  }
 
   Future<void> markFailed(int id, Object error) async {
-    if (kIsWeb) return;
+    final now = DateTime.now().toIso8601String();
+    if (_isWeb) {
+      final index = _webQueue.indexWhere((j) => j.id == id);
+      if (index >= 0) {
+        final old = _webQueue[index];
+        _webQueue[index] = PrintQueueJob(
+          id: old.id,
+          type: old.type,
+          payload: old.payload,
+          status: PrintJobStatus.failed,
+          copies: old.copies,
+          retryCount: old.retryCount + 1,
+          lastError: error.toString(),
+          createdAt: old.createdAt,
+          updatedAt: now,
+          printedAt: old.printedAt,
+        );
+      }
+      return;
+    }
+
     final db = await AppDatabase.instance.database;
     await db.rawUpdate('''
       UPDATE print_queue
@@ -140,18 +269,60 @@ class PrinterRepository {
     ''', [
       PrintJobStatus.failed.name,
       error.toString(),
-      DateTime.now().toIso8601String(),
+      now,
       id,
     ]);
   }
 
-  Future<void> cancel(int id) => _updateStatus(id, PrintJobStatus.cancelled);
+  Future<void> cancel(int id) async {
+    if (_isWeb) {
+      final index = _webQueue.indexWhere((j) => j.id == id);
+      if (index >= 0) {
+        final old = _webQueue[index];
+        _webQueue[index] = PrintQueueJob(
+          id: old.id,
+          type: old.type,
+          payload: old.payload,
+          status: PrintJobStatus.cancelled,
+          copies: old.copies,
+          retryCount: old.retryCount,
+          lastError: old.lastError,
+          createdAt: old.createdAt,
+          updatedAt: DateTime.now().toIso8601String(),
+          printedAt: old.printedAt,
+        );
+      }
+      return;
+    }
+    await _updateStatus(id, PrintJobStatus.cancelled);
+  }
 
-  Future<void> retry(int id) => _updateStatus(
-        id,
-        PrintJobStatus.pending,
-        clearError: true,
-      );
+  Future<void> retry(int id) async {
+    if (_isWeb) {
+      final index = _webQueue.indexWhere((j) => j.id == id);
+      if (index >= 0) {
+        final old = _webQueue[index];
+        _webQueue[index] = PrintQueueJob(
+          id: old.id,
+          type: old.type,
+          payload: old.payload,
+          status: PrintJobStatus.pending,
+          copies: old.copies,
+          retryCount: old.retryCount,
+          lastError: null,
+          createdAt: old.createdAt,
+          updatedAt: DateTime.now().toIso8601String(),
+          printedAt: old.printedAt,
+        );
+      }
+      return;
+    }
+    await _updateStatus(
+      id,
+      PrintJobStatus.pending,
+      clearError: true,
+    );
+  }
 
   Future<void> _updateStatus(
     int id,

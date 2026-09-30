@@ -68,6 +68,7 @@ flutter:
     - assets/icon.png
     - assets/splash_icon.png
     - assets/floraprise-title.png
+    - assets/sounds/floraprise_task_reminder.wav
 
 flutter_launcher_icons:
   android: true

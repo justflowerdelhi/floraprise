@@ -62,4 +62,19 @@ class PrintQueueJob {
       printedAt: map['printed_at'] as String?,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'job_type': type.name,
+      'payload_json': jsonEncode(payload),
+      'status': status.name,
+      'copies': copies,
+      'retry_count': retryCount,
+      if (lastError != null) 'last_error': lastError,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+      if (printedAt != null) 'printed_at': printedAt,
+    };
+  }
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +8,7 @@ import '../data/repositories/scheduler_repository.dart';
 import '../models/scheduler_task.dart';
 import '../models/smart_alert.dart';
 import 'smart_alert_notification_service.dart';
+import 'web_notification/web_notification_service.dart';
 
 const _alertActionAcknowledge = 'alert_acknowledge';
 const _alertActionComplete = 'alert_complete';
@@ -257,6 +259,10 @@ class SmartAlertEngine {
       notificationDetails,
       payload: payload,
     );
+
+    if (kIsWeb) {
+      WebNotificationService.instance.playChime();
+    }
   }
 
   Future<void> _showEscalatedNotification(SchedulerTask task, SmartAlert alert) async {
@@ -278,6 +284,10 @@ class SmartAlertEngine {
       notificationDetails,
       payload: payload,
     );
+
+    if (kIsWeb) {
+      WebNotificationService.instance.playChime();
+    }
   }
 
   String _buildAlarmBody(SchedulerTask task) {
@@ -384,6 +394,10 @@ class SmartAlertEngine {
       notificationDetails,
       payload: payload,
     );
+
+    if (kIsWeb) {
+      WebNotificationService.instance.playChime();
+    }
   }
 
   String _buildInitialBody(SchedulerTask task) {
