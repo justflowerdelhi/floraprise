@@ -270,13 +270,15 @@ class CloudOccasionRepository {
         if (!spec.isAtSameMomentAs(eff)) continue;
       }
 
+      final customerName =
+          c.customerName.isNotEmpty ? c.customerName : 'No Customer';
       final record = OccasionFollowUpRecord(
-        sourceType: 'contact',
+        sourceType: 'occasion',
         sourceId: c.id,
         cloudSourceId: c.cloudId,
         date: effectiveDate,
-        title: '${c.recipientName} - ${c.occasion}',
-        subtitle: '${c.customerName} (${c.relationship})',
+        title: c.recipientName,
+        subtitle: '${c.occasion} • ${c.relationship} • $customerName',
         category: c.occasion,
         customerPhone: c.customerPhone,
         recipientPhone: c.recipientPhone,

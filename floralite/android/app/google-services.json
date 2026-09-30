@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "795467295347",
+    "project_id": "floraprise-b3dd5",
+    "storage_bucket": "floraprise-b3dd5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:795467295347:android:c47d8e22382aba5b635806",
+        "android_client_info": {
+          "package_name": "com.floraprise.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJJTa6I2ku2otW_2hyCJ3TXhVSvoEQuyg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -10,12 +10,14 @@ class LiveDeliveryTrackingScreen extends StatefulWidget {
   const LiveDeliveryTrackingScreen({
     super.key,
     this.orderId,
+    this.cloudOrderId,
     this.assignmentId,
     this.trackingLink,
     this.publicView = false,
   });
 
   final int? orderId;
+  final String? cloudOrderId;
   final String? assignmentId;
   final String? trackingLink;
   final bool publicView;
@@ -57,6 +59,7 @@ class _LiveDeliveryTrackingScreenState
 
     if (!widget.publicView &&
         widget.orderId == null &&
+        (widget.cloudOrderId == null || widget.cloudOrderId!.trim().isEmpty) &&
         (widget.assignmentId == null || widget.assignmentId!.trim().isEmpty)) {
       setState(() {
         _error = 'Tracking reference is missing.';
@@ -70,12 +73,16 @@ class _LiveDeliveryTrackingScreenState
           ? await _trackingService.getPublicTrackingByLink(
               widget.trackingLink!,
             )
-          : widget.assignmentId != null &&
-                  widget.assignmentId!.trim().isNotEmpty
+          : (widget.assignmentId != null &&
+                  widget.assignmentId!.trim().isNotEmpty)
               ? await _trackingService
                   .getTrackingByAssignmentId(widget.assignmentId!)
-              : await _trackingService
-                  .getTrackingForLocalOrder(widget.orderId!);
+              : (widget.cloudOrderId != null &&
+                      widget.cloudOrderId!.trim().isNotEmpty)
+                  ? await _trackingService
+                      .getTrackingForCloudOrder(widget.cloudOrderId!.trim())
+                  : await _trackingService
+                      .getTrackingForLocalOrder(widget.orderId!);
 
       if (!mounted) return;
       setState(() {

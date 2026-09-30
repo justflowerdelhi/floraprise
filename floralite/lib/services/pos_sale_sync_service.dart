@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../data/database/app_database.dart';
@@ -132,6 +133,9 @@ class PosSaleSyncService {
       throw StateError('Cloud session is not available. Please log in again.');
     }
 
+    debugPrint('[POS SALE SYNC HTTP POST] URI: ${_auth.baseUrl}/api/v1/mobile/pos-sales/sync');
+    debugPrint('[POS SALE SYNC HTTP BODY] $payloadJson');
+
     var response = await _send(payloadJson, token);
     if (response.statusCode == 401) {
       token = await _refreshToken();
@@ -139,6 +143,7 @@ class PosSaleSyncService {
     }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      debugPrint('[POS SALE SYNC HTTP ERROR] Status: ${response.statusCode}, Body: ${response.body}');
       throw StateError(
         'POS sale sync failed (HTTP ${response.statusCode}). Body: ${response.body}',
       );

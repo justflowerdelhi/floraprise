@@ -104,7 +104,9 @@ class CloudAssociateRepository {
       'gstNumber': input.gstNumber?.trim(),
       'website': input.website?.trim(),
       'notes': input.notes?.trim(),
-      'types': input.types.map((t) => t.storageValue).toList(),
+      'types': input.rawTypes.isNotEmpty
+          ? input.rawTypes
+          : input.types.map((t) => t.storageValue).toList(),
       'isActive': input.isActive,
     };
 
@@ -133,7 +135,9 @@ class CloudAssociateRepository {
       'gstNumber': input.gstNumber?.trim(),
       'website': input.website?.trim(),
       'notes': input.notes?.trim(),
-      'types': input.types.map((t) => t.storageValue).toList(),
+      'types': input.rawTypes.isNotEmpty
+          ? input.rawTypes
+          : input.types.map((t) => t.storageValue).toList(),
       'isActive': input.isActive,
     };
 

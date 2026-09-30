@@ -1,9 +1,12 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:io' as io;
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:share_plus/share_plus.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -20,7 +23,7 @@ class DesignShareImageService {
 
   final ShareBrandingSettingsService _brandingSettingsService;
 
-  Future<File> generateBrandedJpeg({
+  Future<Uint8List> generateBrandedJpegBytes({
     required DesignRecord design,
     required ShareBrandingSettings settings,
     required DesignShareVariant variant,
@@ -30,24 +33,16 @@ class DesignShareImageService {
       throw StateError('Design image is not available for sharing.');
     }
 
-    final sourceFile = File(sourcePath);
-    if (!await sourceFile.exists()) {
-      throw StateError('Design image file not found.');
-    }
-
     final identity = await _brandingSettingsService.loadBrandingIdentity();
     final sourceImage = await _decodeImageFromPath(sourcePath);
     ui.Image? logoImage;
     if (settings.showWatermark &&
         settings.showLogo &&
         identity.logoPath.isNotEmpty) {
-      final logoFile = File(identity.logoPath);
-      if (await logoFile.exists()) {
-        try {
-          logoImage = await _decodeImageFromPath(identity.logoPath);
-        } catch (_) {
-          logoImage = null;
-        }
+      try {
+        logoImage = await _decodeImageFromPath(identity.logoPath);
+      } catch (_) {
+        logoImage = null;
       }
     }
 
@@ -128,13 +123,56 @@ class DesignShareImageService {
       throw StateError('Unable to prepare image for sharing.');
     }
 
-    final jpgBytes = _convertPngToJpeg(pngBytes.buffer.asUint8List());
+    return _convertPngToJpeg(pngBytes.buffer.asUint8List());
+  }
+
+  Future<dynamic> generateBrandedJpeg({
+    required DesignRecord design,
+    required ShareBrandingSettings settings,
+    required DesignShareVariant variant,
+  }) async {
+    final jpgBytes = await generateBrandedJpegBytes(
+      design: design,
+      settings: settings,
+      variant: variant,
+    );
+    if (kIsWeb) {
+      final fileName =
+          'floraprise_share_${design.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      return XFile.fromData(jpgBytes, mimeType: 'image/jpeg', name: fileName);
+    }
     final directory = await getTemporaryDirectory();
     final fileName =
         'floraprise_share_${design.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final outputFile = File(p.join(directory.path, fileName));
+    final outputFile = io.File(p.join(directory.path, fileName));
     await outputFile.writeAsBytes(jpgBytes, flush: true);
     return outputFile;
+  }
+
+  Future<XFile> generateBrandedJpegXFile({
+    required DesignRecord design,
+    required ShareBrandingSettings settings,
+    required DesignShareVariant variant,
+  }) async {
+    final fileName =
+        'floraprise_share_${design.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final bytes = await generateBrandedJpegBytes(
+      design: design,
+      settings: settings,
+      variant: variant,
+    );
+    if (!kIsWeb) {
+      try {
+        final directory = await getTemporaryDirectory();
+        final outputFile = io.File(p.join(directory.path, fileName));
+        await outputFile.writeAsBytes(bytes, flush: true);
+        return XFile(outputFile.path, mimeType: 'image/jpeg', name: fileName);
+      } catch (_) {
+        // Fallback to in-memory XFile
+      }
+    }
+    return XFile.fromData(bytes,
+        mimeType: 'image/jpeg', name: fileName, path: fileName);
   }
 
   void _drawPhoto(
@@ -545,8 +583,39 @@ class DesignShareImageService {
         .toList();
   }
 
+  Future<Uint8List> _loadBytes(String path) async {
+    final trimmed = path.trim();
+    if (trimmed.startsWith('data:image')) {
+      final commaIndex = trimmed.indexOf(',');
+      final base64String =
+          commaIndex != -1 ? trimmed.substring(commaIndex + 1) : trimmed;
+      return base64Decode(base64String);
+    }
+    if (trimmed.startsWith('http://') ||
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('blob:')) {
+      final res = await http.get(Uri.parse(trimmed));
+      if (res.statusCode == 200) return res.bodyBytes;
+      throw StateError(
+          'Failed to download image from $trimmed (${res.statusCode})');
+    }
+    if (kIsWeb) {
+      try {
+        return await XFile(trimmed).readAsBytes();
+      } catch (_) {
+        final res = await http.get(Uri.parse(trimmed));
+        return res.bodyBytes;
+      }
+    }
+    final file = io.File(trimmed);
+    if (!await file.exists()) {
+      throw StateError('Design image file not found: $trimmed');
+    }
+    return await file.readAsBytes();
+  }
+
   Future<ui.Image> _decodeImageFromPath(String path) async {
-    final bytes = await File(path).readAsBytes();
+    final bytes = await _loadBytes(path);
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
     return frame.image;

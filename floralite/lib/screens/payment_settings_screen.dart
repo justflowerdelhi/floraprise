@@ -277,9 +277,9 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     if (_isLoading) {
-      return Scaffold(
-        appBar: const AppHeader(title: 'Payment Settings'),
-        body: const Center(child: CircularProgressIndicator()),
+      return const Scaffold(
+        appBar: AppHeader(title: 'Payment Settings'),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -530,27 +530,31 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             ),
             const SizedBox(height: 8),
-            RadioListTile<bool>(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('I have a card machine / swipe terminal'),
-              subtitle: const Text(
-                'Record terminal ID, card brand, and approval ref at checkout',
-                style: TextStyle(fontSize: 12),
-              ),
-              value: true,
+            RadioGroup<bool>(
               groupValue: _hasCardMachine,
               onChanged: (val) => setState(() => _hasCardMachine = val ?? true),
-            ),
-            RadioListTile<bool>(
-              contentPadding: EdgeInsets.zero,
-              title: const Text("I don't have a card machine"),
-              subtitle: const Text(
-                'Manual card payment tracking only',
-                style: TextStyle(fontSize: 12),
+              child: const Column(
+                children: [
+                  RadioListTile<bool>(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('I have a card machine / swipe terminal'),
+                    subtitle: Text(
+                      'Record terminal ID, card brand, and approval ref at checkout',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    value: true,
+                  ),
+                  RadioListTile<bool>(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text("I don't have a card machine"),
+                    subtitle: Text(
+                      'Manual card payment tracking only',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    value: false,
+                  ),
+                ],
               ),
-              value: false,
-              groupValue: _hasCardMachine,
-              onChanged: (val) => setState(() => _hasCardMachine = val ?? false),
             ),
             if (_hasCardMachine) ...[
               const SizedBox(height: 8),
@@ -650,7 +654,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
           if (_onlineEnabled) ...[
             const Divider(height: 20),
             DropdownButtonFormField<String>(
-              value: _selectedGateway,
+              initialValue: _selectedGateway,
               decoration: const InputDecoration(
                 labelText: 'Payment Provider',
                 prefixIcon: Icon(Icons.account_balance_wallet_outlined),
@@ -667,7 +671,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _selectedEnvironment,
+              initialValue: _selectedEnvironment,
               decoration: const InputDecoration(
                 labelText: 'Account Mode',
                 prefixIcon: Icon(Icons.tune),

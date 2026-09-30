@@ -6,6 +6,7 @@ import '../data/repositories/product_repository.dart';
 import '../providers/cloud_product_provider.dart';
 import '../widgets/app_header.dart';
 import '../widgets/floraprise_page_header.dart';
+import '../widgets/library/library_category_picker_sheet.dart';
 
 class CloudCategoriesScreen extends StatefulWidget {
   const CloudCategoriesScreen({super.key});
@@ -21,6 +22,56 @@ class _CloudCategoriesScreenState extends State<CloudCategoriesScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.read<CloudProductProvider>().load();
     });
+  }
+
+  Future<void> _importFromLibrary() async {
+    final selectedCategory = await LibraryCategoryPickerSheet.show(context);
+    if (selectedCategory == null || !mounted) return;
+
+    final provider = context.read<CloudProductProvider>();
+    final exists = provider.categories.any(
+      (c) =>
+          c.name.trim().toLowerCase() ==
+          selectedCategory.name.trim().toLowerCase(),
+    );
+
+    if (exists) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Category "${selectedCategory.name}" is already in your catalogue.',
+          ),
+          backgroundColor: Colors.orange.shade800,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await provider.createCategory(
+        CloudCategoryInput(
+          name: selectedCategory.name,
+          defaultUnit: 'Stem',
+          isPerishable: true,
+          trackBatchByDefault: true,
+        ),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Category "${selectedCategory.name}" imported from Floraprise Library!',
+          ),
+          backgroundColor: const Color(0xFF2E7D32),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not import category: $error')),
+        );
+      }
+    }
   }
 
   Future<void> _edit({CloudCategory? category}) async {
@@ -234,6 +285,11 @@ class _CloudCategoriesScreenState extends State<CloudCategoriesScreen> {
         title: isDesktop ? null : 'Categories',
         actions: [
           IconButton(
+            tooltip: 'Import from Library',
+            icon: const Icon(Icons.menu_book_rounded),
+            onPressed: _importFromLibrary,
+          ),
+          IconButton(
             onPressed: provider.isLoading ? null : provider.load,
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
@@ -258,6 +314,12 @@ class _CloudCategoriesScreenState extends State<CloudCategoriesScreen> {
                 icon: Icons.add_rounded,
                 primary: true,
                 onPressed: () => _edit(),
+              ),
+              FloraprisePageHeaderAction(
+                label: 'Import from Library',
+                icon: Icons.menu_book_rounded,
+                primary: false,
+                onPressed: _importFromLibrary,
               ),
             ],
           ),

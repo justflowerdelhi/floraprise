@@ -200,17 +200,41 @@ class CloudAttendanceRepository {
         'notes': input.notes!.trim(),
     };
 
-    final response = await _request('POST', uri, body: body);
-    if (response is! Map<String, dynamic>) {
-      throw StateError('Failed to create attendance in cloud');
+    try {
+      final response = await _request('POST', uri, body: body);
+      if (response is! Map<String, dynamic>) {
+        throw StateError('Failed to create attendance in cloud');
+      }
+      return Attendance.fromCloudJson(response);
+    } catch (e) {
+      if (e.toString().contains('409') || e.toString().contains('already exists')) {
+        // Attendance already exists in cloud, resolve existing record and update
+        final existingRecords = await getAttendanceForDate(input.attendanceDate);
+        final matched = existingRecords.firstWhere(
+          (a) =>
+              (a.cloudStaffId != null && a.cloudStaffId == staffId) ||
+              a.staffId == input.staffId,
+          orElse: () => throw e,
+        );
+        if (matched.cloudId != null &&
+            matched.cloudId != '00000000-0000-0000-0000-000000000000') {
+          return await update(matched.cloudId!, input);
+        }
+      }
+      rethrow;
     }
-    return Attendance.fromCloudJson(response);
   }
 
   Future<Attendance> update(
     String cloudId,
     AttendanceUpsertInput input,
   ) async {
+    if (cloudId.isEmpty ||
+        cloudId == '0' ||
+        cloudId == '00000000-0000-0000-0000-000000000000') {
+      return await create(input);
+    }
+
     final uri = Uri.parse('${_auth.baseUrl}/api/staff/attendance/$cloudId');
     final staffId = input.cloudStaffId ?? input.staffId.toString();
 

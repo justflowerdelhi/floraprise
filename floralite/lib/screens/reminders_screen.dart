@@ -57,6 +57,17 @@ class _RemindersScreenState extends State<RemindersScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _loadCustomRelationships();
+        final args = ModalRoute.of(context)?.settings.arguments;
+        if (args is Map<String, dynamic> && args['autoOpenAdd'] == true) {
+          _showAddReminderDialog(
+            initialOccasion: args['occasion'] as String?,
+            initialDate: args['date'] as DateTime?,
+            initialCustomerName: args['customerName'] as String?,
+            initialCustomerPhone: args['customerPhone'] as String?,
+            initialRecipientName: args['recipientName'] as String?,
+            initialNotes: args['notes'] as String?,
+          );
+        }
       }
     });
   }
@@ -245,7 +256,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
     final todayDate = DateTime(today.year, today.month, today.day);
     final validRecords = records.where((record) {
       final parts = record.subtitle.split(' • ');
-      final customerName = parts.length > 2 ? parts[2] : '';
+      final customerName = parts.length > 2
+          ? parts[2]
+          : (parts.isNotEmpty ? parts.last : '');
       final recipientName = record.title;
       return customerName.isNotEmpty && recipientName.isNotEmpty;
     }).toList();
@@ -1278,7 +1291,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
     }
   }
 
-  Future<void> _showAddReminderDialog() async {
+  Future<void> _showAddReminderDialog({
+    String? initialOccasion,
+    DateTime? initialDate,
+    String? initialCustomerName,
+    String? initialCustomerPhone,
+    String? initialRecipientName,
+    String? initialNotes,
+  }) async {
     final provider = context.read<OccasionProvider>();
     final customerProvider = context.read<CustomerProvider>();
 
@@ -1288,14 +1308,18 @@ class _RemindersScreenState extends State<RemindersScreen> {
       if (!mounted) return;
     }
 
-    final customerController = TextEditingController();
-    final mobileController = TextEditingController();
-    final recipientController = TextEditingController();
+    final customerController =
+        TextEditingController(text: initialCustomerName ?? '');
+    final mobileController =
+        TextEditingController(text: initialCustomerPhone ?? '');
+    final recipientController =
+        TextEditingController(text: initialRecipientName ?? '');
     final relationshipController = TextEditingController();
     final occasionController = TextEditingController();
     final phoneController = TextEditingController();
     final companyController = TextEditingController();
-    final notesController = TextEditingController();
+    final notesController =
+        TextEditingController(text: initialNotes ?? '');
     final dateController = TextEditingController();
     final mobileFocusNode = FocusNode();
     final recipientFocusNode = FocusNode();
@@ -1303,13 +1327,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
     final occasionFocusNode = FocusNode();
     final dateFocusNode = FocusNode();
 
-    DateTime selectedDate = DateTime.now();
+    DateTime selectedDate = initialDate ?? DateTime.now();
     relationshipController.text = provider.relationships.isNotEmpty
         ? provider.relationships.first
         : 'Other';
-    occasionController.text = provider.occasions.isNotEmpty
-        ? provider.occasions.first
-        : 'General Reminder';
+    occasionController.text = initialOccasion ??
+        (provider.occasions.isNotEmpty
+            ? provider.occasions.first
+            : 'General Reminder');
     dateController.text = _formatDate(selectedDate);
 
     String selectedSource = 'Manual';
@@ -1414,6 +1439,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 children: [
                   // Customer Search Field
                   Autocomplete<Map<String, dynamic>>(
+                    initialValue: customerController.text.isNotEmpty
+                        ? TextEditingValue(text: customerController.text)
+                        : null,
                     optionsBuilder: (TextEditingValue textEditingValue) {
                       if (textEditingValue.text.isEmpty) {
                         return const Iterable<Map<String, dynamic>>.empty();
@@ -1432,7 +1460,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         focusNode, onFieldSubmitted) {
                       customerSearchFocusNode = focusNode;
                       customerSearchTextController = textEditingController;
-                      customerController.text = textEditingController.text;
                       return TextField(
                         controller: textEditingController,
                         focusNode: focusNode,

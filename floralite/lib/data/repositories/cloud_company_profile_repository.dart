@@ -14,7 +14,7 @@ class CloudCompanyProfile {
   final String? address;
   final String? shortDescription;
   final String timeZone;
-  final String currencyCode;
+  final String? currencyCode;
   final String? taxIdentifier;
   final String region;
   final bool? taxEnabled;
@@ -24,6 +24,11 @@ class CloudCompanyProfile {
   final bool isActive;
   final DateTime createdAtUtc;
   final DateTime? updatedAtUtc;
+  final String? ownerName;
+  final String? city;
+  final String? state;
+  final String? pinCode;
+  final String? logoPath;
 
   CloudCompanyProfile({
     required this.id,
@@ -33,7 +38,7 @@ class CloudCompanyProfile {
     this.address,
     this.shortDescription,
     required this.timeZone,
-    required this.currencyCode,
+    this.currencyCode,
     this.taxIdentifier,
     required this.region,
     this.taxEnabled,
@@ -43,6 +48,11 @@ class CloudCompanyProfile {
     required this.isActive,
     required this.createdAtUtc,
     this.updatedAtUtc,
+    this.ownerName,
+    this.city,
+    this.state,
+    this.pinCode,
+    this.logoPath,
   });
 
   CloudCompanyProfile copyWith({
@@ -55,6 +65,7 @@ class CloudCompanyProfile {
     String? timeZone,
     String? currencyCode,
     String? taxIdentifier,
+    bool clearTaxIdentifier = false,
     String? region,
     bool? taxEnabled,
     String? taxLabel,
@@ -63,7 +74,22 @@ class CloudCompanyProfile {
     bool? isActive,
     DateTime? createdAtUtc,
     DateTime? updatedAtUtc,
+    String? ownerName,
+    String? city,
+    String? state,
+    String? pinCode,
+    String? logoPath,
   }) {
+    String? resolvedTaxIdentifier;
+    if (clearTaxIdentifier) {
+      resolvedTaxIdentifier = null;
+    } else if (taxIdentifier != null) {
+      resolvedTaxIdentifier =
+          taxIdentifier.trim().isEmpty ? null : taxIdentifier.trim();
+    } else {
+      resolvedTaxIdentifier = this.taxIdentifier;
+    }
+
     return CloudCompanyProfile(
       id: id ?? this.id,
       name: name ?? this.name,
@@ -73,7 +99,7 @@ class CloudCompanyProfile {
       shortDescription: shortDescription ?? this.shortDescription,
       timeZone: timeZone ?? this.timeZone,
       currencyCode: currencyCode ?? this.currencyCode,
-      taxIdentifier: taxIdentifier ?? this.taxIdentifier,
+      taxIdentifier: resolvedTaxIdentifier,
       region: region ?? this.region,
       taxEnabled: taxEnabled ?? this.taxEnabled,
       taxLabel: taxLabel ?? this.taxLabel,
@@ -82,6 +108,11 @@ class CloudCompanyProfile {
       isActive: isActive ?? this.isActive,
       createdAtUtc: createdAtUtc ?? this.createdAtUtc,
       updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
+      ownerName: ownerName ?? this.ownerName,
+      city: city ?? this.city,
+      state: state ?? this.state,
+      pinCode: pinCode ?? this.pinCode,
+      logoPath: logoPath ?? this.logoPath,
     );
   }
 
@@ -115,6 +146,17 @@ class CloudCompanyProfile {
 
     final taxLabel = (json['taxLabel'] ?? json['TaxLabel'])?.toString();
 
+    final rawCurrency = json['currencyCode'] ?? json['CurrencyCode'] ?? json['currency'];
+    final String? currencyCode = (rawCurrency != null && rawCurrency.toString().trim().isNotEmpty)
+        ? rawCurrency.toString().trim()
+        : null;
+
+    final ownerName = (json['ownerName'] ?? json['OwnerName'])?.toString();
+    final city = (json['city'] ?? json['City'])?.toString();
+    final state = (json['state'] ?? json['State'])?.toString();
+    final pinCode = (json['pinCode'] ?? json['PinCode'] ?? json['pincode'] ?? json['Pincode'])?.toString();
+    final logoPath = (json['logoPath'] ?? json['LogoPath'])?.toString();
+
     return CloudCompanyProfile(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
@@ -123,7 +165,7 @@ class CloudCompanyProfile {
       address: json['address'],
       shortDescription: json['shortDescription'],
       timeZone: json['timeZone'] ?? 'UTC',
-      currencyCode: json['currencyCode'] ?? 'USD',
+      currencyCode: currencyCode,
       taxIdentifier: json['taxIdentifier'],
       region: json['region'] ?? '',
       taxEnabled: taxEnabled,
@@ -137,6 +179,11 @@ class CloudCompanyProfile {
       updatedAtUtc: json['updatedAtUtc'] != null
           ? DateTime.parse(json['updatedAtUtc'])
           : null,
+      ownerName: ownerName,
+      city: city,
+      state: state,
+      pinCode: pinCode,
+      logoPath: logoPath,
     );
   }
 
@@ -148,7 +195,7 @@ class CloudCompanyProfile {
         'address': address,
         'shortDescription': shortDescription,
         'timeZone': timeZone,
-        'currencyCode': currencyCode,
+        if (currencyCode != null) 'currencyCode': currencyCode,
         'taxIdentifier': taxIdentifier,
         'region': region,
         if (taxEnabled != null) 'taxEnabled': taxEnabled,
@@ -158,6 +205,11 @@ class CloudCompanyProfile {
         'isActive': isActive,
         'createdAtUtc': createdAtUtc.toIso8601String(),
         'updatedAtUtc': updatedAtUtc?.toIso8601String(),
+        if (ownerName != null) 'ownerName': ownerName,
+        if (city != null) 'city': city,
+        if (state != null) 'state': state,
+        if (pinCode != null) 'pinCode': pinCode,
+        if (logoPath != null) 'logoPath': logoPath,
       };
 }
 
@@ -313,6 +365,11 @@ class CloudCompanyProfileRepository {
     String? taxLabel,
     double? taxRatePercent,
     bool? taxInclusive,
+    String? ownerName,
+    String? city,
+    String? state,
+    String? pinCode,
+    String? logoPath,
   }) async {
     final uri = Uri.parse('$baseUrl/api/v1/mobile/company/profile');
     final override = _sender;
@@ -326,6 +383,11 @@ class CloudCompanyProfileRepository {
         if (timeZone != null) 'timeZone': timeZone,
         if (currencyCode != null) 'currencyCode': currencyCode,
         if (taxIdentifier != null) 'taxIdentifier': taxIdentifier,
+        if (ownerName != null) 'ownerName': ownerName,
+        if (city != null) 'city': city,
+        if (state != null) 'state': state,
+        if (pinCode != null) 'pinCode': pinCode,
+        if (logoPath != null) 'logoPath': logoPath,
       });
       final data = json is Map<String, dynamic> ? json['data'] ?? json : json;
       var profile = CloudCompanyProfile.fromJson(data as Map<String, dynamic>);
@@ -359,6 +421,11 @@ class CloudCompanyProfileRepository {
           if (timeZone != null) 'timeZone': timeZone,
           if (currencyCode != null) 'currencyCode': currencyCode,
           if (taxIdentifier != null) 'taxIdentifier': taxIdentifier,
+          if (ownerName != null) 'ownerName': ownerName,
+          if (city != null) 'city': city,
+          if (state != null) 'state': state,
+          if (pinCode != null) 'pinCode': pinCode,
+          if (logoPath != null) 'logoPath': logoPath,
         }),
       ).timeout(const Duration(seconds: 20));
 
@@ -378,6 +445,90 @@ class CloudCompanyProfileRepository {
         taxRatePercent: taxRatePercent,
         taxInclusive: taxInclusive,
       );
+      await _cacheProfile(profile);
+      return profile;
+    } finally {
+      if (shouldClose) {
+        client.close();
+      }
+    }
+  }
+
+  /// Uploads a logo image to the Cloud API.
+  Future<CloudCompanyProfile> uploadLogo({
+    required String baseUrl,
+    required String accessToken,
+    required List<int> bytes,
+    required String fileName,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/mobile/company/logo');
+    final override = _sender;
+    if (override != null) {
+      final json = await override('POST', uri, body: {'fileName': fileName});
+      final data = json is Map<String, dynamic> ? json['data'] ?? json : json;
+      final profile = CloudCompanyProfile.fromJson(data as Map<String, dynamic>);
+      await _cacheProfile(profile);
+      return profile;
+    }
+
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['Authorization'] = 'Bearer $accessToken';
+    request.headers['Accept'] = 'application/json';
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: fileName,
+      ),
+    );
+
+    final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError('Logo upload failed (HTTP ${response.statusCode}): ${response.body}');
+    }
+
+    final json = jsonDecode(response.body);
+    final data = json is Map<String, dynamic> ? json['data'] ?? json : json;
+    final profile = CloudCompanyProfile.fromJson(data as Map<String, dynamic>);
+    await _cacheProfile(profile);
+    return profile;
+  }
+
+  /// Deletes the logo image via the Cloud API.
+  Future<CloudCompanyProfile> deleteLogo({
+    required String baseUrl,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/mobile/company/logo');
+    final override = _sender;
+    if (override != null) {
+      final json = await override('DELETE', uri);
+      final data = json is Map<String, dynamic> ? json['data'] ?? json : json;
+      final profile = CloudCompanyProfile.fromJson(data as Map<String, dynamic>);
+      await _cacheProfile(profile);
+      return profile;
+    }
+
+    final client = _client ?? http.Client();
+    final shouldClose = _client == null;
+    try {
+      final response = await client.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError('Logo delete failed (HTTP ${response.statusCode}).');
+      }
+
+      final json = jsonDecode(response.body);
+      final data = json is Map<String, dynamic> ? json['data'] ?? json : json;
+      final profile = CloudCompanyProfile.fromJson(data as Map<String, dynamic>);
       await _cacheProfile(profile);
       return profile;
     } finally {
@@ -425,11 +576,13 @@ class CloudCompanyProfileRepository {
           final timeZone =
               (companyMap['timeZone'] ?? companyMap['TimeZone'] ?? 'UTC')
                   .toString();
-          final currencyCode = (companyMap['currency'] ??
-                  companyMap['currencyCode'] ??
-                  companyMap['CurrencyCode'] ??
-                  'INR')
-              .toString();
+          final rawCurrency = companyMap['currency'] ??
+              companyMap['currencyCode'] ??
+              companyMap['CurrencyCode'];
+          final currencyCode = (rawCurrency != null &&
+                  rawCurrency.toString().trim().isNotEmpty)
+              ? rawCurrency.toString().trim()
+              : null;
           final region =
               (companyMap['region'] ?? companyMap['Region'] ?? '').toString();
 
@@ -471,10 +624,7 @@ class CloudCompanyProfileRepository {
         final map = Map<String, dynamic>.from(
           jsonDecode(companyRaw) as Map<String, dynamic>,
         );
-        map['name'] = profile.name;
-        if (profile.taxIdentifier != null) {
-          map['taxIdentifier'] = profile.taxIdentifier;
-        }
+        map['taxIdentifier'] = profile.taxIdentifier;
         if (profile.phone != null) {
           map['phone'] = profile.phone;
         }

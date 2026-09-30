@@ -19,6 +19,7 @@ class InventoryProductRecord {
   final GstCalculationType gstCalculationType;
   final int currentQty;
   final int minQty;
+  final int reservedQty;
 
   const InventoryProductRecord({
     required this.productId,
@@ -35,6 +36,47 @@ class InventoryProductRecord {
     required this.gstCalculationType,
     required this.currentQty,
     required this.minQty,
+    this.reservedQty = 0,
+  });
+
+  int get availableToSell {
+    if (!trackInventory) return 999999;
+    final avail = currentQty - reservedQty;
+    return avail < 0 ? 0 : (avail > currentQty ? currentQty : avail);
+  }
+}
+
+class InventoryReservationRecord {
+  final int id;
+  final int orderId;
+  final int? orderLineId;
+  final int productId;
+  final String? cloudProductId;
+  final int quantity;
+  final String status;
+  final String? eventDate;
+  final String? eventName;
+  final String? notes;
+  final String createdAt;
+  final String updatedAt;
+  final String? releasedAt;
+  final String? consumedAt;
+
+  const InventoryReservationRecord({
+    required this.id,
+    required this.orderId,
+    this.orderLineId,
+    required this.productId,
+    this.cloudProductId,
+    required this.quantity,
+    required this.status,
+    this.eventDate,
+    this.eventName,
+    this.notes,
+    required this.createdAt,
+    required this.updatedAt,
+    this.releasedAt,
+    this.consumedAt,
   });
 }
 
@@ -235,7 +277,12 @@ class InventoryRepository {
         p.gst_percent,
         p.gst_calculation_type,
         COALESCE(i.current_qty, 0) AS current_qty,
-        COALESCE(i.min_qty, p.min_stock, 0) AS min_qty
+        COALESCE(i.min_qty, p.min_stock, 0) AS min_qty,
+        COALESCE((
+          SELECT SUM(r.quantity)
+          FROM inventory_reservations r
+          WHERE r.product_id = p.id AND r.status = 'active'
+        ), 0) AS reserved_qty
       FROM products p
       LEFT JOIN inventory_items i ON i.product_id = p.id
       WHERE p.active = 1 AND p.deleted_at IS NULL
@@ -258,6 +305,7 @@ class InventoryRepository {
             ),
             currentQty: row['current_qty'] as int,
             minQty: row['min_qty'] as int,
+            reservedQty: (row['reserved_qty'] as int?) ?? 0,
           ),
         )
         .toList();
@@ -557,5 +605,164 @@ class InventoryRepository {
         'note': note,
         'created_at': now,
     });
+  }
+
+  Future<int> reserveStock({
+    required int orderId,
+    int? orderLineId,
+    required int productId,
+    String? cloudProductId,
+    required int quantity,
+    String? eventDate,
+    String? eventName,
+    String? notes,
+  }) async {
+    if (quantity <= 0) {
+      throw ArgumentError('Quantity must be greater than zero');
+    }
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+    return db.insert('inventory_reservations', {
+      'order_id': orderId,
+      'order_line_id': orderLineId,
+      'product_id': productId,
+      'cloud_product_id': cloudProductId,
+      'quantity': quantity,
+      'status': 'active',
+      'event_date': eventDate,
+      'event_name': eventName,
+      'notes': notes,
+      'created_at': now,
+      'updated_at': now,
+    });
+  }
+
+  Future<void> releaseReservation(int reservationId) async {
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      'inventory_reservations',
+      {
+        'status': 'released',
+        'released_at': now,
+        'updated_at': now,
+      },
+      where: 'id = ? AND status = ?',
+      whereArgs: [reservationId, 'active'],
+    );
+  }
+
+  Future<void> releaseActiveReservationsForOrder(int orderId, [DatabaseExecutor? executor]) async {
+    final db = executor ?? await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      'inventory_reservations',
+      {
+        'status': 'released',
+        'released_at': now,
+        'updated_at': now,
+      },
+      where: 'order_id = ? AND status = ?',
+      whereArgs: [orderId, 'active'],
+    );
+  }
+
+  Future<void> consumeActiveReservationsForOrder(int orderId, [DatabaseExecutor? executor]) async {
+    final db = executor ?? await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      'inventory_reservations',
+      {
+        'status': 'consumed',
+        'consumed_at': now,
+        'updated_at': now,
+      },
+      where: 'order_id = ? AND status = ?',
+      whereArgs: [orderId, 'active'],
+    );
+  }
+
+  Future<List<InventoryReservationRecord>> getActiveReservationsForProduct(int productId) async {
+    final db = await AppDatabase.instance.database;
+    final rows = await db.query(
+      'inventory_reservations',
+      where: 'product_id = ? AND status = ?',
+      whereArgs: [productId, 'active'],
+      orderBy: 'event_date ASC, created_at ASC',
+    );
+    return rows.map(_mapReservationRecord).toList();
+  }
+
+  Future<List<InventoryReservationRecord>> getReservationsForOrder({
+    int? orderId,
+    String? cloudOrderId,
+  }) async {
+    if (orderId == null || orderId <= 0) return [];
+    final db = await AppDatabase.instance.database;
+    final rows = await db.query(
+      'inventory_reservations',
+      where: 'order_id = ?',
+      whereArgs: [orderId],
+      orderBy: 'created_at ASC',
+    );
+    return rows.map(_mapReservationRecord).toList();
+  }
+
+  Future<int> releaseQuantityFromProductReservations({
+    required int productId,
+    required int quantityToRelease,
+  }) async {
+    if (quantityToRelease <= 0) return 0;
+    final db = await AppDatabase.instance.database;
+    final now = DateTime.now().toIso8601String();
+    int remaining = quantityToRelease;
+    final reservations = await getActiveReservationsForProduct(productId);
+    for (final res in reservations) {
+      if (remaining <= 0) break;
+      if (res.quantity <= remaining) {
+        await db.update(
+          'inventory_reservations',
+          {
+            'status': 'released',
+            'released_at': now,
+            'updated_at': now,
+          },
+          where: 'id = ?',
+          whereArgs: [res.id],
+        );
+        remaining -= res.quantity;
+      } else {
+        await db.update(
+          'inventory_reservations',
+          {
+            'quantity': res.quantity - remaining,
+            'updated_at': now,
+          },
+          where: 'id = ?',
+          whereArgs: [res.id],
+        );
+        remaining = 0;
+      }
+    }
+    return quantityToRelease - remaining;
+  }
+
+  InventoryReservationRecord _mapReservationRecord(Map<String, Object?> row) {
+    return InventoryReservationRecord(
+      id: row['id'] as int,
+      orderId: row['order_id'] as int,
+      orderLineId: row['order_line_id'] as int?,
+      productId: row['product_id'] as int,
+      cloudProductId: row['cloud_product_id'] as String?,
+      quantity: row['quantity'] as int,
+      status: row['status'] as String,
+      eventDate: row['event_date'] as String?,
+      eventName: row['event_name'] as String?,
+      notes: row['notes'] as String?,
+      createdAt: row['created_at'] as String,
+      updatedAt: row['updated_at'] as String,
+      releasedAt: row['released_at'] as String?,
+      consumedAt: row['consumed_at'] as String?,
+    );
   }
 }

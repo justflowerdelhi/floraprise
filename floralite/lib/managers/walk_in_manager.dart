@@ -74,6 +74,9 @@ class WalkInManager {
   final PosSaleSyncService? _posSaleSyncService;
   final RewardManager _rewardManager;
 
+  PricingManager get pricingManager => _pricingManager;
+  CustomerManager get customerManager => _customerManager;
+
   Future<WalkInSession> startOrResume(FulfilmentType type) async {
     return WalkInSession.empty(type);
   }
@@ -145,6 +148,18 @@ class WalkInManager {
       rewardDiscountPaise: session.rewardDiscountAmountPaise,
     );
 
+    final paymentValidation = _pricingManager.validatePayments(
+      grandTotalPaise: totals.grandTotalPaise,
+      payments: session.payments,
+      customerName: session.customerName,
+      customerPhone: session.customerPhone,
+    );
+
+    if (!paymentValidation.isValid) {
+      throw StateError(
+          paymentValidation.message ?? 'Payment validation failed');
+    }
+
     await _orderManager.updateExistingOrder(
       orderId: orderId,
       session: session,
@@ -173,6 +188,8 @@ class WalkInManager {
     final paymentValidation = _pricingManager.validatePayments(
       grandTotalPaise: totals.grandTotalPaise,
       payments: session.payments,
+      customerName: session.customerName,
+      customerPhone: session.customerPhone,
     );
 
     if (!paymentValidation.isValid) {
@@ -227,6 +244,8 @@ class WalkInManager {
     final paymentValidation = _pricingManager.validatePayments(
       grandTotalPaise: totals.grandTotalPaise,
       payments: session.payments,
+      customerName: session.customerName,
+      customerPhone: session.customerPhone,
     );
 
     if (!paymentValidation.isValid) {
@@ -245,6 +264,13 @@ class WalkInManager {
         clientSyncId: clientSyncId,
         now: now,
       );
+
+      // Diagnostic logging for Event Sale forensic debug
+      debugPrint('[DIAGNOSTIC POS SYNC] (Web Branch)');
+      debugPrint('  session.fulfilmentType: ${session.fulfilmentType}');
+      debugPrint('  payload.order.fulfilment_type: ${(payload['order'] as Map?)?['fulfilment_type']}');
+      debugPrint('  payload.inventoryTransactions: ${payload['inventoryTransactions']}');
+      debugPrint('  payload.lines: ${payload['lines']}');
 
       await syncService.submitPayload(payload);
       if (session.draftOrderId != null) {
@@ -364,6 +390,7 @@ class WalkInManager {
     required DateTime now,
     FiscalProfile? fiscalProfile,
   }) {
+    final isEventSale = session.fulfilmentType == FulfilmentType.eventSale;
     final orderNo = cloudPosOrderNumber(clientSyncId);
     final lineSnapshots = <Map<String, dynamic>>[];
     final inventorySnapshots = <Map<String, dynamic>>[];
@@ -424,7 +451,7 @@ class WalkInManager {
         'source': line.source,
       });
 
-      if (hasAuthoritativeProduct) {
+      if (!isEventSale && hasAuthoritativeProduct) {
         inventorySnapshots.add({
           'id': i + 1,
           'product_id': authoritativeId,
@@ -443,6 +470,11 @@ class WalkInManager {
           'created_at': now.toIso8601String(),
         }).toList();
 
+    final paidAmountPaise = session.payments
+        .where((p) => !p.isCreditOutstanding)
+        .fold<int>(0, (sum, p) => sum + p.amountPaise);
+    final isPaid = paidAmountPaise >= totals.grandTotalPaise ? 1 : 0;
+
     return {
       'clientSyncId': clientSyncId,
       'localOrderId': (now.millisecondsSinceEpoch & 0x7FFFFFFF),
@@ -453,7 +485,10 @@ class WalkInManager {
         'customer_name': session.customerName,
         'source': 'pos',
         'channel': 'walkin',
-        'fulfilment_type': session.fulfilmentType.name,
+        'fulfilment_type': session.fulfilmentType == FulfilmentType.eventSale
+            ? 'event_sale'
+            : session.fulfilmentType.name,
+        'occasion': session.occasion,
         'recipient_name': session.recipientName,
         'recipient_phone': session.recipientPhone,
         'delivery_address': session.deliveryAddress,
@@ -473,7 +508,7 @@ class WalkInManager {
         'reward_discount_amount_paise': session.rewardDiscountAmountPaise.round(),
         'reward_points_earned': 0,
         'reward_points_redeemed': session.rewardPointsRedeemed.round(),
-        'is_paid': 1,
+        'is_paid': isPaid,
       },
       'lines': lineSnapshots,
       'payments': paymentSnapshots,

@@ -19,6 +19,7 @@ interface DemoRequest {
   id: string;
   fullName: string;
   businessEmail: string;
+  phoneNumber?: string;
   businessType?: string;
   currentSoftware?: string;
   notes?: string;
@@ -155,6 +156,7 @@ export default function AdminDemoRequestsPage() {
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>Email</TableCell>
+              <TableCell>Phone / WhatsApp</TableCell>
               <TableCell>Business Type</TableCell>
               <TableCell>Current Software</TableCell>
               <TableCell>Notes</TableCell>
@@ -167,13 +169,14 @@ export default function AdminDemoRequestsPage() {
           <TableBody>
             {requests.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} align="center">No demo requests yet</TableCell>
+                <TableCell colSpan={10} align="center">No demo requests yet</TableCell>
               </TableRow>
             )}
             {requests.map((r) => (
               <TableRow key={r.id}>
                 <TableCell>{r.fullName}</TableCell>
                 <TableCell>{r.businessEmail}</TableCell>
+                <TableCell>{r.phoneNumber || '—'}</TableCell>
                 <TableCell>{r.businessType || '—'}</TableCell>
                 <TableCell>{r.currentSoftware || '—'}</TableCell>
                 <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -222,7 +225,7 @@ export default function AdminDemoRequestsPage() {
         <DialogTitle>Update Demo Request Status</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" mb={2}>
-            {editItem?.fullName} — {editItem?.businessEmail}
+            {editItem?.fullName} — {editItem?.businessEmail} {editItem?.phoneNumber ? `(${editItem.phoneNumber})` : ''}
           </Typography>
           <Select
             value={editStatus}

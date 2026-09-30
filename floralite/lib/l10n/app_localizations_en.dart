@@ -1824,4 +1824,94 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get items => 'Items';
+
+  @override
+  String get importCustomers => 'Import Customers';
+
+  @override
+  String get import => 'Import';
+
+  @override
+  String get importContacts => 'Import from Contacts';
+
+  @override
+  String get importExcelCsv => 'Import from Excel / CSV';
+
+  @override
+  String get downloadSampleTemplate => 'Download Sample Template';
+
+  @override
+  String get duplicateHandling => 'Duplicate Handling';
+
+  @override
+  String get skipExisting => 'Skip Existing';
+
+  @override
+  String get updateExisting => 'Update Existing';
+
+  @override
+  String get previewSummary => 'Preview Summary';
+
+  @override
+  String get totalRowsCount => 'Total Rows';
+
+  @override
+  String get readyToImport => 'Ready to Import';
+
+  @override
+  String get duplicatesFound => 'Duplicates Found';
+
+  @override
+  String get invalidRowsCount => 'Invalid Rows';
+
+  @override
+  String get importProgress => 'Importing Customers...';
+
+  @override
+  String get importResult => 'Import Result';
+
+  @override
+  String get importedCount => 'Imported';
+
+  @override
+  String get updatedCount => 'Updated';
+
+  @override
+  String get skippedCount => 'Skipped';
+
+  @override
+  String get downloadBillPdf => 'Download Bill (PDF)';
+
+  @override
+  String get downloadDeliverySlipPdf => 'Download Delivery Slip (PDF)';
+
+  @override
+  String get billPdf => 'Bill (PDF)';
+
+  @override
+  String get deliverySlipPdf => 'Delivery Slip (PDF)';
+
+  @override
+  String get crmTitle => 'CRM';
+
+  @override
+  String get crmToday => 'Today';
+
+  @override
+  String get crmEnquiries => 'Enquiries';
+
+  @override
+  String get crmFollowUps => 'Today\'s Follow-ups';
+
+  @override
+  String get crmNewEnquiries => 'New Enquiries';
+
+  @override
+  String get crmQuotesPending => 'Quotes Pending';
+
+  @override
+  String get crmOccasionsThisWeek => 'Occasions This Week';
+
+  @override
+  String get crmOccasions => 'Occasions';
 }

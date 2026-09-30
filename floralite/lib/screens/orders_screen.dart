@@ -6,10 +6,17 @@ import '../providers/order_provider.dart';
 import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/floraprise_page_header.dart';
-import 'order_detail_screen.dart';
+import '../widgets/order_action_menu_sheet.dart';
 
 class OrdersScreen extends StatefulWidget {
-  const OrdersScreen({super.key});
+  const OrdersScreen({
+    super.key,
+    this.initialFilters,
+    this.focusSearch = false,
+  });
+
+  final OrderWorkspaceFilters? initialFilters;
+  final bool focusSearch;
 
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
@@ -19,6 +26,7 @@ class _OrdersScreenState extends State<OrdersScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   static const _tabKeys = [
     'all',
@@ -43,12 +51,20 @@ class _OrdersScreenState extends State<OrdersScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<OrderProvider>();
-      provider.loadOrdersForTab(_tabKeys[_tabController.index]);
+      if (widget.initialFilters != null) {
+        provider.applyFilters(widget.initialFilters!);
+      } else {
+        provider.loadOrdersForTab(_tabKeys[_tabController.index]);
+      }
+      if (widget.focusSearch) {
+        _searchFocusNode.requestFocus();
+      }
     });
   }
 
   @override
   void dispose() {
+    _searchFocusNode.dispose();
     _searchController.dispose();
     _tabController.dispose();
     super.dispose();
@@ -59,7 +75,13 @@ class _OrdersScreenState extends State<OrdersScreen>
     final colorScheme = Theme.of(context).colorScheme;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final l10n = AppLocalizations.of(context)!;
-    final selectedDate = context.watch<OrderProvider>().filters.selectedDate;
+    final currentFilters = context.watch<OrderProvider>().filters;
+    final selectedDate = currentFilters.selectedDate;
+    final hasActiveFilterChips = selectedDate != null ||
+        currentFilters.takeAway ||
+        currentFilters.delivery ||
+        currentFilters.pickup ||
+        currentFilters.eventSale;
 
     return Scaffold(
       appBar: AppHeader(
@@ -105,6 +127,7 @@ class _OrdersScreenState extends State<OrdersScreen>
                       height: 56,
                       child: TextField(
                         controller: _searchController,
+                        focusNode: _searchFocusNode,
                         onChanged: (value) {
                           context.read<OrderProvider>().setSearchQuery(value);
                         },
@@ -159,22 +182,70 @@ class _OrdersScreenState extends State<OrdersScreen>
                 ],
               ),
             ),
-            if (selectedDate != null)
+            if (hasActiveFilterChips)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Row(
-                  children: [
-                    Chip(
-                      avatar: const Icon(Icons.event, size: 18),
-                      label: Text('Showing ${_formatDateLabel(selectedDate)}'),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: () =>
-                          context.read<OrderProvider>().clearDateFilter(),
-                      child: const Text('Clear'),
-                    ),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      if (selectedDate != null) ...[
+                        Chip(
+                          avatar: const Icon(Icons.event, size: 18),
+                          label: Text('Showing ${_formatDateLabel(selectedDate)}'),
+                          onDeleted: () =>
+                              context.read<OrderProvider>().clearDateFilter(),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      if (currentFilters.takeAway) ...[
+                        Chip(
+                          avatar: const Icon(Icons.storefront_outlined, size: 18),
+                          label: const Text('Walk-in Orders'),
+                          onDeleted: () => context.read<OrderProvider>().applyFilters(
+                                currentFilters.copyWith(takeAway: false),
+                              ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      if (currentFilters.delivery) ...[
+                        Chip(
+                          avatar: const Icon(Icons.local_shipping_outlined, size: 18),
+                          label: const Text('Delivery Orders'),
+                          onDeleted: () => context.read<OrderProvider>().applyFilters(
+                                currentFilters.copyWith(delivery: false),
+                              ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      if (currentFilters.pickup) ...[
+                        Chip(
+                          avatar: const Icon(Icons.shopping_bag_outlined, size: 18),
+                          label: const Text('Pickup Orders'),
+                          onDeleted: () => context.read<OrderProvider>().applyFilters(
+                                currentFilters.copyWith(pickup: false),
+                              ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      if (currentFilters.eventSale) ...[
+                        Chip(
+                          avatar: const Icon(Icons.celebration_outlined, size: 18),
+                          label: const Text('Event Sales'),
+                          onDeleted: () => context.read<OrderProvider>().applyFilters(
+                                currentFilters.copyWith(eventSale: false),
+                              ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      TextButton(
+                        onPressed: () => context
+                            .read<OrderProvider>()
+                            .applyFilters(OrderWorkspaceFilters.empty),
+                        child: const Text('Clear All'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             Expanded(
@@ -216,17 +287,28 @@ class _OrdersScreenState extends State<OrdersScreen>
                       final order = provider.orders[index];
                       final paymentStatus =
                           order.isPaid == 1 ? 'Paid' : 'Pending';
+                      final isSameOrWalkIn = order.recipientName.trim().isEmpty ||
+                          order.recipientName.trim().toLowerCase() == 'walk-in' ||
+                          order.recipientName.trim().toLowerCase() == 'self' ||
+                          order.recipientName.trim().toLowerCase() ==
+                              order.customerName.trim().toLowerCase();
+                      final primaryName = isSameOrWalkIn
+                          ? (order.customerName.trim().isNotEmpty
+                              ? order.customerName.trim()
+                              : 'Walk-in Customer')
+                          : order.recipientName.trim();
+
                       return AppCard(
                         onTap: () {
-                          Navigator.push(
+                          showOrderActionMenu(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  OrderDetailScreen(
-                                orderId: order.id,
-                                cloudOrderId: order.cloudOrderId,
-                              ),
-                            ),
+                            orderId: order.id,
+                            cloudOrderId: order.cloudOrderId,
+                            orderListItem: order,
+                            onOrderUpdated: () {
+                              final p = context.read<OrderProvider>();
+                              p.loadOrdersForTab(p.activeTab);
+                            },
                           );
                         },
                         child: Column(
@@ -240,9 +322,9 @@ class _OrdersScreenState extends State<OrdersScreen>
                                   child: Text(
                                     order.displayOrderNo,
                                     style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                      fontWeight: FontWeight.w500,
+                                      fontSize: 12.5,
+                                      color: Colors.grey.shade700,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -256,27 +338,43 @@ class _OrdersScreenState extends State<OrdersScreen>
                               ],
                             ),
                             const SizedBox(height: 10),
-                            // Recipient Name - LARGE & BOLD (PRIMARY)
+                            // Primary Name (Customer Name for Walk-ins / Recipient for Deliveries) - LARGE & BOLD
                             Text(
-                              order.recipientName,
+                              primaryName,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
+                                color: Color(0xFF1E2922),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 4),
-                            // Ordered by Customer Name (small)
-                            Text(
-                              'Ordered by ${order.customerName}',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 12,
+                            if (!isSameOrWalkIn &&
+                                order.customerName.trim().isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.person_outline_rounded,
+                                    size: 15,
+                                    color: colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      'Ordered by ${order.customerName.trim()}',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade900,
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            ],
                             const SizedBox(height: 10),
                             // Delivery Date & Slot + Amount on same row
                             Row(
@@ -290,8 +388,9 @@ class _OrdersScreenState extends State<OrdersScreen>
                                       Text(
                                         _formatOrderTime(order),
                                         style: TextStyle(
-                                          color: Colors.grey.shade700,
+                                          color: Colors.grey.shade800,
                                           fontSize: 13,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ],
@@ -302,7 +401,7 @@ class _OrdersScreenState extends State<OrdersScreen>
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.primary,
-                                    fontSize: 16,
+                                    fontSize: 17,
                                   ),
                                 ),
                               ],
@@ -390,9 +489,9 @@ class _OrdersScreenState extends State<OrdersScreen>
       child: Text(
         label,
         style: TextStyle(
-          color: Colors.grey.shade700,
+          color: Colors.grey.shade800,
           fontSize: 12,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -410,9 +509,9 @@ class _OrdersScreenState extends State<OrdersScreen>
       child: Text(
         '$emoji $label',
         style: TextStyle(
-          color: Colors.blueGrey.shade700,
+          color: Colors.blueGrey.shade800,
           fontSize: 12,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -548,20 +647,11 @@ class _OrdersScreenState extends State<OrdersScreen>
                   _filterSwitch(
                       l10n.takeAway,
                       draft.takeAway,
-                      (v) => setState(() => draft = OrderWorkspaceFilters(
-                            today: draft.today,
-                            pending: draft.pending,
-                            completed: draft.completed,
-                            cancelled: draft.cancelled,
-                            delivery: draft.delivery,
-                            pickup: draft.pickup,
-                            takeAway: v,
-                            relay: draft.relay,
-                            corporate: draft.corporate,
-                            marketplace: draft.marketplace,
-                            paid: draft.paid,
-                            unpaid: draft.unpaid,
-                          ))),
+                      (v) => setState(() => draft = draft.copyWith(takeAway: v))),
+                  _filterSwitch(
+                      'Event Sales',
+                      draft.eventSale,
+                      (v) => setState(() => draft = draft.copyWith(eventSale: v))),
                   _filterSwitch(
                       l10n.relay,
                       draft.relay,

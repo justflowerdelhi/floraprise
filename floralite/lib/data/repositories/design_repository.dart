@@ -8,25 +8,40 @@ import '../database/app_database.dart';
 
 class DesignRepository {
   Future<String> storeImageLocally(String sourcePath) async {
-    final dbPath = await getDatabasesPath();
-    final imagesDir = Directory(p.join(dbPath, 'design_images'));
-    if (!await imagesDir.exists()) {
-      await imagesDir.create(recursive: true);
+    final trimmed = sourcePath.trim();
+    if (trimmed.isEmpty) return trimmed;
+
+    // Network, data URIs, blob URLs, or asset paths are already persistent / non-filesystem formats
+    if (trimmed.startsWith('http://') ||
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('data:image') ||
+        trimmed.startsWith('assets/') ||
+        trimmed.startsWith('blob:')) {
+      return trimmed;
     }
 
-    final extension =
-        p.extension(sourcePath).isEmpty ? '.jpg' : p.extension(sourcePath);
-    final fileName =
-        'design_${DateTime.now().millisecondsSinceEpoch}$extension';
-    final targetPath = p.join(imagesDir.path, fileName);
+    try {
+      final dbPath = await getDatabasesPath();
+      final imagesDir = Directory(p.join(dbPath, 'design_images'));
+      if (!await imagesDir.exists()) {
+        await imagesDir.create(recursive: true);
+      }
 
-    final sourceFile = File(sourcePath);
-    if (!await sourceFile.exists()) {
-      throw StateError('Image file not found');
+      final extension =
+          p.extension(trimmed).isEmpty ? '.jpg' : p.extension(trimmed);
+      final fileName =
+          'design_${DateTime.now().millisecondsSinceEpoch}$extension';
+      final targetPath = p.join(imagesDir.path, fileName);
+
+      final sourceFile = File(trimmed);
+      if (await sourceFile.exists()) {
+        final copied = await sourceFile.copy(targetPath);
+        return copied.path;
+      }
+    } catch (_) {
+      // Fall back to trimmed path if filesystem copying is unavailable
     }
-
-    final copied = await sourceFile.copy(targetPath);
-    return copied.path;
+    return trimmed;
   }
 
   Future<List<DesignRecord>> listDesigns({

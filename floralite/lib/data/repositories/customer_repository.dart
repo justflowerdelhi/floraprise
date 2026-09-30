@@ -115,7 +115,12 @@ class CustomerRepository {
       END) AS last_order_at,
       COALESCE(SUM(CASE
         WHEN o.is_paid = 0 AND o.status NOT IN ('cancelled', 'draft')
-          THEN o.grand_total_paise
+          THEN MAX(0, o.grand_total_paise - COALESCE((
+            SELECT SUM(op.amount_paise)
+            FROM order_payments op
+            WHERE op.order_id = o.id
+              AND LOWER(COALESCE(op.method, '')) != 'credit'
+          ), 0))
         ELSE 0
       END), 0) AS pending_payment_paise
     FROM customers c

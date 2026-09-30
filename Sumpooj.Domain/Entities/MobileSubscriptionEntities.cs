@@ -4,7 +4,8 @@ public enum MobileUserStatus
 {
     Active = 1,
     Suspended = 2,
-    Disabled = 3
+    Disabled = 3,
+    PendingOnboarding = 4
 }
 
 public enum MobileDeviceStatus
@@ -180,6 +181,15 @@ public sealed class MobileCustomer : MobileAuditableEntity
         Country = string.IsNullOrWhiteSpace(country) ? null : country.Trim();
         SetUpdatedBy(updatedBy);
     }
+
+    public void UpdateOwnerName(string ownerName, Guid? updatedBy = null)
+    {
+        if (!string.IsNullOrWhiteSpace(ownerName))
+        {
+            OwnerName = ownerName.Trim();
+            SetUpdatedBy(updatedBy);
+        }
+    }
 }
 
 public sealed class MobileUser : MobileAuditableEntity
@@ -212,6 +222,15 @@ public sealed class MobileUser : MobileAuditableEntity
     public ICollection<MobileDevice> Devices { get; } = new List<MobileDevice>();
     public MobileSubscription? Subscription { get; private set; }
 
+    public void UpdateFullName(string fullName, Guid? updatedBy = null)
+    {
+        if (!string.IsNullOrWhiteSpace(fullName))
+        {
+            FullName = fullName.Trim();
+            SetUpdatedBy(updatedBy);
+        }
+    }
+
     public void Suspend(Guid? updatedBy)
     {
         Status = MobileUserStatus.Suspended;
@@ -227,6 +246,12 @@ public sealed class MobileUser : MobileAuditableEntity
     public void Disable(Guid? updatedBy)
     {
         Status = MobileUserStatus.Disabled;
+        SetUpdatedBy(updatedBy);
+    }
+
+    public void SetPendingOnboarding(Guid? updatedBy = null)
+    {
+        Status = MobileUserStatus.PendingOnboarding;
         SetUpdatedBy(updatedBy);
     }
 }

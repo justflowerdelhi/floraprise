@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -25,8 +25,10 @@ import '../providers/printer_provider.dart';
 import '../data/repositories/customer_repository.dart';
 import '../providers/customer_provider.dart';
 import '../providers/walk_in_session_provider.dart';
+import '../widgets/customer_name_autocomplete.dart';
 import '../widgets/customer_search_sheet.dart';
 import '../services/discount_service.dart';
+import '../services/pdf/pdf_document_service.dart';
 import '../services/reward_summary_formatter.dart';
 import '../utils/locale_formatter.dart';
 import '../utils/whatsapp_phone_utils.dart';
@@ -38,6 +40,7 @@ import '../widgets/line_item_discount_dialog.dart';
 import '../widgets/product_picker_sheet.dart';
 import '../widgets/quantity_input_stepper.dart';
 import '../widgets/reward_summary_card.dart';
+import '../widgets/safe_platform_image.dart';
 import '../widgets/split_payment_sheet.dart';
 import 'my_designs_screen.dart';
 
@@ -92,7 +95,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
   DateTime? _pickupDate;
   TimeOfDay? _pickupTime;
   _CustomerInfo? _customerInfo;
-  bool _gstRegistered = true;
+  bool _gstRegistered = false;
   FiscalProfile _fiscalProfile = CountryPresets.india();
   String _shopName = '';
   String _businessPhone = '';
@@ -136,8 +139,8 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
       final settings = await _businessSettingsManager.load();
       if (!mounted) return;
       setState(() {
-        _gstRegistered = settings.gstRegistered;
         _fiscalProfile = settings.resolvedFiscalProfile;
+        _gstRegistered = _fiscalProfile.taxEnabled;
         _shopName = settings.shopName.trim();
         _businessPhone = settings.phone.trim();
         _businessAddress = settings.address.trim();
@@ -180,6 +183,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
         (product) => WalkInLineItem(
           productId: product.productId,
           cloudProductId: product.cloudProductId,
+          designRef: product.attachmentPath,
           description: product.designId,
           quantity: product.quantity,
           unitPricePaise: _parseCurrencyToPaise(product.price),
@@ -211,6 +215,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
           activeSession.lines.map(
             (line) => _ProductItem(
               productId: line.productId,
+              cloudProductId: line.cloudProductId,
               trackInventory: line.productId != null,
               designId: line.description,
               quantity: line.quantity,
@@ -227,6 +232,7 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
               gstPercent: line.gstPercent,
               gstCalculationType: line.gstCalculationType,
               source: line.source,
+              attachmentPath: line.designRef,
             ),
           ),
         );
@@ -399,29 +405,18 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                           product.attachmentPath!.isNotEmpty) ...[
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: kIsWeb
-                              ? Container(
-                                  width: 52,
-                                  height: 52,
-                                  color: Colors.grey.shade200,
-                                  alignment: Alignment.center,
-                                  child: const Icon(Icons.image),
-                                )
-                              : Image.file(
-                                  File(product.attachmentPath!),
-                                  width: 52,
-                                  height: 52,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      width: 52,
-                                      height: 52,
-                                      color: Colors.grey.shade200,
-                                      alignment: Alignment.center,
-                                      child: const Icon(Icons.image_not_supported),
-                                    );
-                                  },
-                                ),
+                          child: SizedBox(
+                            width: 52,
+                            height: 52,
+                            child: SafePlatformImageView(
+                              imagePath: product.attachmentPath,
+                              width: 52,
+                              height: 52,
+                              fit: BoxFit.cover,
+                              fallbackIcon: Icons.image_outlined,
+                              errorIcon: Icons.image_not_supported_outlined,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 10),
                       ],
@@ -704,17 +699,20 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                 },
               ),
               const SizedBox(height: 8),
-              TextField(
+              CustomerNameAutocomplete(
                 controller: _customerNameController,
-                decoration: InputDecoration(
-                  labelText: l10n.customerName,
-                  prefixIcon: const Icon(Icons.person),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                ),
+                labelText: l10n.customerName,
+                onCustomerSelected: (customer) {
+                  setState(() {
+                    _customerNameController.text = customer.name;
+                    if (customer.phone.isNotEmpty) {
+                      _phoneController.text = customer.phone;
+                    }
+                  });
+                  if (customer.phone.isNotEmpty) {
+                    _lookupCustomer(customer.phone);
+                  }
+                },
               ),
               const SizedBox(height: 8),
               TextField(
@@ -1286,10 +1284,16 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
     );
     if (image == null || !mounted) return;
 
+    String attachmentPath = image.path;
+    if (kIsWeb) {
+      final bytes = await image.readAsBytes();
+      attachmentPath = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    }
+
     await _showBillItemDialog(
       source: 'camera',
       initialDescription: 'Camera: ${p.basename(image.path)}',
-      attachmentPath: image.path,
+      attachmentPath: attachmentPath,
       showPreview: true,
       showSaveAsDesign: true,
     );
@@ -1303,10 +1307,16 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
     );
     if (image == null || !mounted) return;
 
+    String attachmentPath = image.path;
+    if (kIsWeb) {
+      final bytes = await image.readAsBytes();
+      attachmentPath = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    }
+
     await _showBillItemDialog(
       source: 'gallery',
       initialDescription: 'Gallery: ${p.basename(image.path)}',
-      attachmentPath: image.path,
+      attachmentPath: attachmentPath,
       showPreview: true,
       showSaveAsDesign: true,
     );
@@ -1319,19 +1329,39 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
         builder: (context) => const MyDesignsScreen(isSelectionMode: true),
       ),
     );
-    if (selected == null || !mounted) return;
+    if (selected == null || !mounted || !context.mounted) return;
 
     final description = selected.description.trim().isNotEmpty
         ? selected.description.trim()
         : selected.designId.trim();
 
-    await _showBillItemDialog(
-      source: 'design',
-      initialDescription: description,
-      initialAmount: selected.price,
-      attachmentPath: selected.imagePath,
-      note: selected.description,
-      showPreview: selected.imagePath != null,
+    final pricePaise =
+        selected.pricePaise ?? _parseCurrencyToPaise(selected.price);
+
+    setState(() {
+      _products.add(
+        _ProductItem(
+          productId: null,
+          cloudProductId: null,
+          trackInventory: false,
+          designId: description,
+          quantity: 1,
+          price: _formatPaise(context, pricePaise),
+          gstPercent: _fiscalProfile.taxEnabled
+              ? _fiscalProfile.taxRatePercent.round()
+              : 0,
+          gstCalculationType: _fiscalProfile.taxInclusive
+              ? GstCalculationType.inclusive
+              : GstCalculationType.exclusive,
+          source: 'design',
+          attachmentPath: selected.imagePath,
+          note: selected.description,
+        ),
+      );
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context)!.addedToCart)),
     );
   }
 
@@ -1378,28 +1408,18 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                       const SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: kIsWeb
-                            ? Container(
-                                height: 140,
-                                width: double.infinity,
-                                color: Colors.grey.shade200,
-                                alignment: Alignment.center,
-                                child: const Icon(Icons.image, size: 48),
-                              )
-                            : Image.file(
-                                File(attachmentPath),
-                                height: 140,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    height: 140,
-                                    color: Colors.grey.shade200,
-                                    alignment: Alignment.center,
-                                    child: const Text('Preview not available'),
-                                  );
-                                },
-                              ),
+                        child: SizedBox(
+                          height: 140,
+                          width: double.infinity,
+                          child: SafePlatformImageView(
+                            imagePath: attachmentPath,
+                            height: 140,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            fallbackIcon: Icons.image_outlined,
+                            errorIcon: Icons.image_not_supported_outlined,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -1917,6 +1937,13 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
           ),
           OutlinedButton.icon(
             onPressed: () async {
+              await _downloadBillPdf(context, orderId);
+            },
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text('Download PDF'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () async {
               await _shareWhatsApp(context, orderId);
             },
             icon: const Icon(Icons.share),
@@ -2227,6 +2254,50 @@ class _PickupLaterScreenState extends State<PickupLaterScreen> {
                   : 'Receipt queued for printing.'),
         ),
       ),
+    );
+  }
+
+  Future<void> _downloadBillPdf(BuildContext context, [int? orderId]) async {
+    if (_products.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add at least one product.')),
+      );
+      return;
+    }
+
+    final payments = _buildPayments(_totalAmountPaise);
+    final paidPaise = _paidAmountPaiseFromPayments(payments);
+    final outstandingPaise =
+        (_totalAmountPaise - paidPaise).clamp(0, _totalAmountPaise);
+    final payload = {
+      'invoiceNumber': orderId?.toString() ?? 'Draft',
+      'dateTime': DateTime.now().toString().split('.').first,
+      'customerName': _customerNameController.text.trim(),
+      'customerPhone': _phoneController.text.trim(),
+      'items': _printItems(),
+      'basicAmountPaise': _subtotalPaise,
+      'discountPaise': _billDiscountPaise,
+      'gstPaise': _gstAmountPaise,
+      'taxLabel': '${_fiscalProfile.taxLabel} Amount',
+      'roundOffPaise': _orderTotals.roundOffPaise,
+      'grandTotalPaise': _totalAmountPaise,
+      'paymentMode': _selectedPayment ?? 'Pending',
+      'paymentSummary': payments
+          .map(
+            (payment) => {
+              'method': _displayPaymentMethodLabel(payment),
+              'amountPaise': payment.amountPaise,
+              'isCredit': payment.isCreditOutstanding,
+            },
+          )
+          .toList(growable: false),
+      'paidPaise': paidPaise,
+      'outstandingPaise': outstandingPaise,
+    };
+
+    await PdfDocumentService().downloadOrShareBillPdfFromPayload(
+      context: context,
+      payload: payload,
     );
   }
 

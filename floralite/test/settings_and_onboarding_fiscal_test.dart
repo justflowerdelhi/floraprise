@@ -33,7 +33,7 @@ void main() {
       expect(profile.countryCode, 'IN');
       expect(profile.currencyCode, 'INR');
       expect(profile.currencySymbol, '₹');
-      expect(profile.taxEnabled, isTrue);
+      expect(profile.taxEnabled, isFalse);
       expect(profile.taxLabel, 'GST');
       expect(profile.taxRatePercent, 18.0);
       expect(profile.taxInclusive, isTrue);
@@ -45,6 +45,7 @@ void main() {
       final manager = BusinessSettingsManager();
       final uaeProfile = CountryPresets.uae().copyWith(
         taxIdentifier: '100200300400003',
+        taxEnabled: true,
       );
 
       await manager.setFiscalProfile(uaeProfile);
@@ -119,6 +120,7 @@ void main() {
       final manager = BusinessSettingsManager();
       final customUae = CountryPresets.uae().copyWith(
         taxIdentifier: 'TRN-123456',
+        taxEnabled: true,
       );
       await manager.setFiscalProfile(customUae);
       await manager.setShopName('Dubai Blooms');

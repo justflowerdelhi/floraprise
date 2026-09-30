@@ -8,6 +8,7 @@ import '../data/repositories/cloud_finance_repository.dart';
 import '../data/repositories/day_closing_repository.dart';
 import '../data/repositories/expense_repository.dart';
 import '../data/repositories/opening_cash_repository.dart';
+import '../data/repositories/order_repository.dart';
 import '../models/cash_book.dart';
 import '../models/day_closing.dart';
 import '../models/expense.dart';
@@ -22,11 +23,9 @@ class DayClosingScreen extends StatefulWidget {
     CloudCashBookRepository? cloudCashBookRepository,
     CloudDayCloseRepository? cloudDayCloseRepository,
     DateTime? initialDate,
-  })  : _cloudCashBookRepository = cloudCashBookRepository,
-      _cloudDayCloseRepository = cloudDayCloseRepository,
+  })  : _cloudDayCloseRepository = cloudDayCloseRepository,
         _initialDate = initialDate;
 
-  final CloudCashBookRepository? _cloudCashBookRepository;
   final CloudDayCloseRepository? _cloudDayCloseRepository;
   final DateTime? _initialDate;
 
@@ -54,6 +53,7 @@ DayCloseCashBookTotals dayCloseCashBookTotalsFromTransactions(
   List<CashBook> transactions, {
   required bool includeCashSales,
   required bool includeCashExpenses,
+  bool includeCashCollections = true,
 }) {
   var cashSales = 0;
   var cashExpenses = 0;
@@ -69,7 +69,11 @@ DayCloseCashBookTotals dayCloseCashBookTotalsFromTransactions(
         if (includeCashExpenses) cashExpenses += tx.cashOut;
         break;
       case CashBookTransactionType.cashReceived:
-        cashReceived += tx.cashIn;
+        final isOrderCollection =
+            tx.description.toLowerCase().contains('payment collection');
+        if (includeCashCollections || !isOrderCollection) {
+          cashReceived += tx.cashIn;
+        }
         break;
       case CashBookTransactionType.cashPaid:
         cashPaid += tx.cashOut;
@@ -92,7 +96,7 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
   final _expenseRepository = ExpenseRepository();
   final _dayClosingRepository = DayClosingRepository();
   final _cashBookRepository = CashBookRepository();
-  late final CloudCashBookRepository _cloudCashBookRepository;
+  final _orderRepository = OrderRepository();
   late final CloudDayCloseRepository _cloudDayCloseRepository;
 
   late DateTime _selectedDate;
@@ -102,6 +106,7 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
   int _upiSales = 0;
   int _cardSales = 0;
   int _creditSales = 0;
+  int _cashCollections = 0;
   int _cashExpenses = 0;
   int _upiExpenses = 0;
   int _cardExpenses = 0;
@@ -121,8 +126,6 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
   void initState() {
     super.initState();
     _selectedDate = widget._initialDate ?? DateTime.now();
-    _cloudCashBookRepository =
-        widget._cloudCashBookRepository ?? CloudCashBookRepository();
     _cloudDayCloseRepository =
       widget._cloudDayCloseRepository ?? CloudDayCloseRepository();
     _notesDictationController.bindController(_notesController);
@@ -169,6 +172,8 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
           _cashSales = _moneyPaise(summary, 'cashSales');
           _cardSales = _moneyPaise(summary, 'cardSales');
           _upiSales = _moneyPaise(summary, 'upiSales');
+          _creditSales = _moneyPaise(summary, 'creditSales');
+          _cashCollections = _moneyPaise(summary, 'cashCollections');
           _cashExpenses = _moneyPaise(summary, 'cashExpenses');
           _upiExpenses = upiExpenses;
           _cardExpenses = cardExpenses;
@@ -182,27 +187,29 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
       final existingClosing =
           await _dayClosingRepository.getByDate(_selectedDate);
 
-      final cashBookTransactions = isCloud
-          ? await _cloudCashBookRepository.getByDate(_selectedDate)
-          : await _cashBookRepository.getByDate(_selectedDate);
+      final cashBookTransactions =
+          await _cashBookRepository.getByDate(_selectedDate);
 
-      final cashExpenses = isCloud
-          ? cashBookTransactions
-              .where((tx) =>
-                  tx.transactionType == CashBookTransactionType.cashExpense)
-              .fold<int>(0, (sum, tx) => sum + tx.cashOut)
-          : await _expenseRepository.getTotalByPaymentMode(
-              PaymentMode.cash, _selectedDate,
-            );
+      final cashExpenses = await _expenseRepository.getTotalByPaymentMode(
+        PaymentMode.cash, _selectedDate,
+      );
       final upiExpenses = await _expenseRepository.getTotalByPaymentMode(
-          PaymentMode.upi, _selectedDate);
+        PaymentMode.upi, _selectedDate,
+      );
       final cardExpenses = await _expenseRepository.getTotalByPaymentMode(
-          PaymentMode.card, _selectedDate);
+        PaymentMode.card, _selectedDate,
+      );
 
       final cashBookTotals = dayCloseCashBookTotalsFromTransactions(
         cashBookTransactions,
-        includeCashSales: isCloud,
-        includeCashExpenses: isCloud,
+        includeCashSales: false,
+        includeCashExpenses: false,
+        includeCashCollections: false,
+      );
+
+      final salesBreakdown = await _orderRepository.getSalesBreakdown(
+        startDate: _selectedDate,
+        endDate: _selectedDate,
       );
 
       setState(() {
@@ -213,18 +220,22 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
         _cardExpenses = cardExpenses;
         _cashReceived = cashBookTotals.cashReceived;
         _cashPaid = cashBookTotals.cashPaid;
-        if (isCloud) {
-          _cashSales = cashBookTotals.cashSales;
-        }
 
         if (existingClosing != null) {
           _cashSales = existingClosing.cashSales;
           _upiSales = existingClosing.upiSales;
           _cardSales = existingClosing.cardSales;
           _creditSales = existingClosing.creditSales;
+          _cashCollections = 0;
           _countedCashController.text =
               (existingClosing.countedCash / 100).toStringAsFixed(2);
           _notesController.text = existingClosing.notes ?? '';
+        } else {
+          _cashSales = salesBreakdown.cashSalesPaise;
+          _upiSales = salesBreakdown.upiSalesPaise;
+          _cardSales = salesBreakdown.cardSalesPaise;
+          _creditSales = salesBreakdown.creditCreatedPaise;
+          _cashCollections = salesBreakdown.cashCollectionsPaise;
         }
 
         _isLoading = false;
@@ -259,7 +270,7 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
 
   int get _expectedCash {
     final opening = _openingCash?.amount ?? 0;
-    return opening + _cashSales + _cashReceived - _cashExpenses - _cashPaid;
+    return opening + _cashSales + _cashCollections + _cashReceived - _cashExpenses - _cashPaid;
   }
 
   int get _difference {
@@ -408,6 +419,8 @@ class _DayClosingScreenState extends State<DayClosingScreen> {
         _buildRow('UPI Sales', _upiSales),
         _buildRow('Card Sales', _cardSales),
         _buildRow('Credit Sales', _creditSales),
+        if (_cashCollections > 0)
+          _buildRow('Cash Collections', _cashCollections),
       ],
     );
   }

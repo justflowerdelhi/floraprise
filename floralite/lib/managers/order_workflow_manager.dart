@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 import '../data/repositories/associate_repository.dart';
+import '../data/repositories/cloud_associate_repository.dart';
 import '../data/repositories/order_workflow_repository.dart';
 import '../models/order_status.dart';
 import '../models/order_workspace_models.dart';
 import '../models/scheduler_task.dart';
+import '../providers/storage_mode_provider.dart';
 import '../services/delivery_tracking_service.dart';
 import '../services/order_print_service.dart';
 import '../services/order_whatsapp_service.dart';
@@ -23,12 +26,16 @@ class OrderWorkflowManager {
     required OrderWorkflowRepository workflowRepository,
     required AssociateRepository associateRepository,
     required SchedulerManager schedulerManager,
+    CloudAssociateRepository? cloudAssociateRepository,
+    StorageModeProvider? storageModeProvider,
     OrderWhatsappService? whatsappService,
     OrderPrintService? printService,
     String createdBy = 'system',
   })  : _orderManager = orderManager,
         _workflowRepository = workflowRepository,
         _associateRepository = associateRepository,
+        _cloudAssociateRepository = cloudAssociateRepository,
+        _storageModeProvider = storageModeProvider,
         _schedulerManager = schedulerManager,
         _whatsappService = whatsappService,
         _printService = printService,
@@ -37,6 +44,8 @@ class OrderWorkflowManager {
   final OrderManager _orderManager;
   final OrderWorkflowRepository _workflowRepository;
   final AssociateRepository _associateRepository;
+  final CloudAssociateRepository? _cloudAssociateRepository;
+  final StorageModeProvider? _storageModeProvider;
   final SchedulerManager _schedulerManager;
   final OrderWhatsappService? _whatsappService;
   final OrderPrintService? _printService;
@@ -50,7 +59,8 @@ class OrderWorkflowManager {
     required String newStatus,
     String? notes,
   }) async {
-    if (!OrderStatus.canTransition(currentStatus, newStatus)) {
+    final header = await _orderManager.getOrderDetailHeader(orderId);
+    if (!OrderStatus.canTransition(currentStatus, newStatus, fulfilmentType: header?.fulfilmentType)) {
       throw ArgumentError(
         'Cannot move from ${OrderStatus.label(currentStatus)} to ${OrderStatus.label(newStatus)}.',
       );
@@ -280,15 +290,30 @@ class OrderWorkflowManager {
       bundle: bundle,
       assignments: assignments,
       timeline: timeline,
-      nextStatuses: OrderStatus.nextStatuses(header.status),
+      nextStatuses: OrderStatus.nextStatuses(header.status, fulfilmentType: header.fulfilmentType),
     );
   }
 
   /// Returns active associates that can be selected for a workflow role.
-  Future<List<AssociateRecord>> getAssignableAssociates() async {
+  Future<List<AssociateRecord>> getAssignableAssociates({bool? isCloud}) async {
+    final useCloud = isCloud ?? (_storageModeProvider?.isCloud == true || kIsWeb);
+    if (useCloud && _cloudAssociateRepository != null) {
+      try {
+        final rows = await _cloudAssociateRepository!.getAll(activeOnly: true);
+        return rows
+            .where((a) =>
+                a.isActive &&
+                (a.types.isNotEmpty || a.rawTypes.isNotEmpty))
+            .toList(growable: false);
+      } catch (e) {
+        debugPrint('[OrderWorkflowManager] Failed to load cloud associates: $e');
+      }
+    }
     final rows = await _associateRepository.getAll(activeOnly: true);
     return rows
-        .where((a) => a.isActive && a.types.isNotEmpty)
+        .where((a) =>
+            a.isActive &&
+            (a.types.isNotEmpty || a.rawTypes.isNotEmpty))
         .toList(growable: false);
   }
 

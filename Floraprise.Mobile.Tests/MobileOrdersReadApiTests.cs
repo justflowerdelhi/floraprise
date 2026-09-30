@@ -151,6 +151,136 @@ public sealed class MobileOrdersReadApiTests : IDisposable
         Assert.IsType<NotFoundResult>(hiddenDetail);
     }
 
+    [Fact]
+    public async Task Workspace_PaymentStatusUnpaid_ReturnsPartiallyPaidAndUnpaidOrdersAcrossDeliveryWalkInPickup()
+    {
+        await using var db = CreateDb();
+
+        // 1. Delivery order with partial payment (₹1000 total, ₹170 paid, ₹830 outstanding)
+        var custUbaid = new Customer(_companyId, "ubaid", null, "9574184092");
+        var deliveryOrder = new Order(
+            _companyId,
+            custUbaid.Id,
+            DateTime.UtcNow.AddHours(4),
+            "Flower Street 123",
+            "560001",
+            "ubaid",
+            "9574184092");
+        deliveryOrder.SetImportedOrderNumber("ORD-DELIVERY-PARTIAL");
+        deliveryOrder.AddItem(Guid.NewGuid(), "Deluxe Bouquet", 1, 1000m);
+        deliveryOrder.MarkPartiallyPaid(170m);
+        var deliveryPayment = new Payment(_companyId, deliveryOrder.Id, PaymentMethod.Cash, 170m);
+        deliveryPayment.Approve(null, null);
+
+        // 2. Walk-in order with partial payment (₹10000 total, ₹5000 paid, ₹5000 outstanding)
+        var custWalkIn = new Customer(_companyId, "Walkin Customer", null, "9876543211");
+        var walkInOrder = new Order(_companyId, custWalkIn.Id, DateTime.UtcNow, string.Empty, string.Empty, string.Empty, string.Empty);
+        walkInOrder.SetImportedOrderNumber("ORD-WALKIN-PARTIAL");
+        walkInOrder.AddItem(Guid.NewGuid(), "Roses", 1, 10000m);
+        walkInOrder.MarkPartiallyPaid(5000m);
+        var walkInPayment = new Payment(_companyId, walkInOrder.Id, PaymentMethod.Upi, 5000m);
+        walkInPayment.Approve(null, null);
+
+        // 3. Pickup order with zero payment / unpaid (₹8000 total, ₹0 paid, ₹8000 outstanding)
+        var custPickup = new Customer(_companyId, "Pickup Customer", null, "9876543212");
+        var pickupOrder = new Order(_companyId, custPickup.Id, DateTime.UtcNow.AddDays(1), string.Empty, string.Empty, string.Empty, string.Empty);
+        pickupOrder.SetImportedOrderNumber("ORD-PICKUP-UNPAID");
+        pickupOrder.AddItem(Guid.NewGuid(), "Lilies", 1, 8000m);
+
+        // 4. Fully paid order (₹500 total, ₹500 paid, ₹0 outstanding)
+        var custPaid = new Customer(_companyId, "Paid Customer", null, "9876543213");
+        var paidOrder = new Order(_companyId, custPaid.Id, DateTime.UtcNow, string.Empty, string.Empty, string.Empty, string.Empty);
+        paidOrder.SetImportedOrderNumber("ORD-FULLY-PAID");
+        paidOrder.AddItem(Guid.NewGuid(), "Orchids", 1, 500m);
+        paidOrder.MarkPaid();
+        var fullPayment = new Payment(_companyId, paidOrder.Id, PaymentMethod.Cash, 500m);
+        fullPayment.Approve(null, null);
+
+        db.AddRange(custUbaid, deliveryOrder, deliveryPayment,
+                    custWalkIn, walkInOrder, walkInPayment,
+                    custPickup, pickupOrder,
+                    custPaid, paidOrder, fullPayment);
+        await db.SaveChangesAsync();
+
+        var controller = Controller(db);
+        var request = new MobileOrderWorkspaceRequest
+        {
+            PaymentStatus = "unpaid",
+            PageSize = 20
+        };
+
+        var result = await controller.Workspace(request, CancellationToken.None);
+        var response = AssertOk<MobileOrderWorkspaceResponse>(result);
+
+        Assert.Equal(3, response.TotalCount);
+        Assert.Equal(3, response.Items.Count);
+
+        var deliveryItem = Assert.Single(response.Items, i => i.OrderNumber == "ORD-DELIVERY-PARTIAL");
+        Assert.Equal("ubaid", deliveryItem.CustomerName);
+        Assert.Equal("9574184092", deliveryItem.CustomerPhone);
+        Assert.Equal("delivery", deliveryItem.FulfilmentType);
+        Assert.Equal(1000m, deliveryItem.TotalAmount);
+        Assert.Equal(170m, deliveryItem.PaidAmount);
+        Assert.Equal(830m, deliveryItem.BalanceDue);
+        Assert.Equal("PartiallyPaid", deliveryItem.PaymentStatus);
+
+        var walkInItem = Assert.Single(response.Items, i => i.OrderNumber == "ORD-WALKIN-PARTIAL");
+        Assert.Equal(10000m, walkInItem.TotalAmount);
+        Assert.Equal(5000m, walkInItem.PaidAmount);
+        Assert.Equal(5000m, walkInItem.BalanceDue);
+
+        var pickupItem = Assert.Single(response.Items, i => i.OrderNumber == "ORD-PICKUP-UNPAID");
+        Assert.Equal(8000m, pickupItem.TotalAmount);
+        Assert.Equal(0m, pickupItem.PaidAmount);
+        Assert.Equal(8000m, pickupItem.BalanceDue);
+
+        Assert.DoesNotContain(response.Items, i => i.OrderNumber == "ORD-FULLY-PAID");
+    }
+
+    [Fact]
+    public async Task Workspace_And_Detail_ReturnEventSaleFulfilmentType()
+    {
+        await using var db = CreateDb();
+        var seeded = SeedOrder(db, orderNumber: "ORD-EVENT-101", paymentAmount: 500m);
+        seeded.Order.AddInternalNote("[fulfilment:event_sale]");
+        await db.SaveChangesAsync();
+
+        var workspaceResult = await Controller(db).Workspace(new MobileOrderWorkspaceRequest { PageSize = 20 }, CancellationToken.None);
+        var workspaceResponse = AssertOk<MobileOrderWorkspaceResponse>(workspaceResult);
+        var item = Assert.Single(workspaceResponse.Items, i => i.OrderNumber == "ORD-EVENT-101");
+        Assert.Equal("event_sale", item.FulfilmentType);
+
+        var detailResult = await Controller(db).GetById(seeded.Order.Id, CancellationToken.None);
+        var detail = AssertOk<MobileOrderDetailDto>(detailResult);
+        Assert.Equal("event_sale", detail.FulfilmentType);
+    }
+
+    [Fact]
+    public async Task Workspace_FulfilmentTypeEventSaleFilter_ReturnsOnlyEventSales()
+    {
+        await using var db = CreateDb();
+        var eventOrder = SeedOrder(db, orderNumber: "ORD-EVENT-ONLY", paymentAmount: 500m);
+        eventOrder.Order.AddInternalNote("[fulfilment:event_sale]");
+
+        var normalDelivery = SeedOrder(db, orderNumber: "ORD-DELIVERY-ONLY", paymentAmount: 100m);
+
+        await db.SaveChangesAsync();
+
+        // 1. Filter by event_sale -> only returns ORD-EVENT-ONLY
+        var eventResult = await Controller(db).Workspace(new MobileOrderWorkspaceRequest { FulfilmentType = "event_sale" }, CancellationToken.None);
+        var eventResponse = AssertOk<MobileOrderWorkspaceResponse>(eventResult);
+        var filteredEvent = Assert.Single(eventResponse.Items);
+        Assert.Equal("ORD-EVENT-ONLY", filteredEvent.OrderNumber);
+        Assert.Equal("event_sale", filteredEvent.FulfilmentType);
+
+        // 2. Filter by delivery -> only returns ORD-DELIVERY-ONLY
+        var deliveryResult = await Controller(db).Workspace(new MobileOrderWorkspaceRequest { FulfilmentType = "delivery" }, CancellationToken.None);
+        var deliveryResponse = AssertOk<MobileOrderWorkspaceResponse>(deliveryResult);
+        var filteredDelivery = Assert.Single(deliveryResponse.Items);
+        Assert.Equal("ORD-DELIVERY-ONLY", filteredDelivery.OrderNumber);
+        Assert.Equal("delivery", filteredDelivery.FulfilmentType);
+    }
+
     private SumpoojDbContext CreateDb(Guid? companyId = null)
     {
         var options = new DbContextOptionsBuilder<SumpoojDbContext>()

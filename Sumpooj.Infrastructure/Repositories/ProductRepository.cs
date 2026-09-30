@@ -323,4 +323,10 @@ GROUP BY c.table_name";
             .Include(p => p.ProductCategoryRef)
             .Include(p => p.TaxRule)
             .FirstOrDefaultAsync(p => p.Barcode == barcode || _db.Barcodes.Any(b => b.ProductId == p.Id && b.Value == barcode));
+
+    public Task<Product?> GetBySourceLibraryProductIdAsync(Guid companyId, Guid sourceLibraryProductId)
+        => _db.Products
+            .Include(p => p.ProductCategoryRef)
+            .Include(p => p.TaxRule)
+            .FirstOrDefaultAsync(p => p.CompanyId == companyId && p.SourceLibraryProductId == sourceLibraryProductId);
 }

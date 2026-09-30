@@ -74,15 +74,82 @@ class SmartAlertNotificationService {
         'floraprise_critical',
         'Floraprise Critical',
         description:
-            'Critical alarm-style notifications with full screen intent',
+            'Critical priority notifications for urgent tasks and orders',
         importance: Importance.max,
         playSound: true,
         enableVibration: true,
       ),
     );
 
+    // Create Floraprise Task Reminders Channel
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'floraprise_task_reminders_v2',
+        'Floraprise Task Reminders',
+        description: 'Audible reminders for scheduled tasks and follow-ups',
+        importance: Importance.max,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound('floraprise_task_reminder'),
+        enableVibration: true,
+        showBadge: true,
+      ),
+    );
+
     _initialized = true;
     debugPrint('SmartAlert: Notification channels initialized');
+  }
+
+  NotificationDetails getTaskReminderNotificationDetails({
+    String? sound,
+    bool enableVibration = true,
+  }) {
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        'floraprise_task_reminders_v2',
+        'Floraprise Task Reminders',
+        channelDescription:
+            'Audible reminders for scheduled tasks and follow-ups',
+        importance: Importance.max,
+        priority: Priority.max,
+        playSound: true,
+        sound: const RawResourceAndroidNotificationSound('floraprise_task_reminder'),
+        enableVibration: enableVibration,
+        vibrationPattern: enableVibration
+            ? Int64List.fromList([0, 500, 200, 500])
+            : Int64List.fromList([0]),
+        category: AndroidNotificationCategory.reminder,
+        visibility: NotificationVisibility.public,
+        autoCancel: true,
+        actions: const <AndroidNotificationAction>[
+          AndroidNotificationAction(
+            'snooze_15',
+            'Snooze 15m',
+            showsUserInterface: false,
+            cancelNotification: true,
+          ),
+          AndroidNotificationAction(
+            'dismiss',
+            'Dismiss',
+            showsUserInterface: false,
+            cancelNotification: true,
+          ),
+        ],
+      ),
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        sound: 'floraprise_task_reminder.wav',
+        interruptionLevel: InterruptionLevel.timeSensitive,
+      ),
+      macOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        sound: 'floraprise_task_reminder.wav',
+        interruptionLevel: InterruptionLevel.timeSensitive,
+      ),
+    );
   }
 
   String getChannelId(AlertLevel level) {
@@ -159,7 +226,7 @@ class SmartAlertNotificationService {
           channelId,
           'Floraprise Critical',
           channelDescription:
-              'Critical alarm-style notifications with full screen intent',
+              'Critical priority notifications for urgent tasks and orders',
           importance: Importance.max,
           priority: Priority.max,
           playSound: settings.vibrationEnabled,

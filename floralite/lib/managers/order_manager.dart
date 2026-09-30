@@ -12,9 +12,6 @@ class OrderManager {
   final OrderRepository _orderRepository;
   final JobRepository _jobRepository;
 
-  static const Map<String, List<String>> _allowedTransitions =
-      OrderStatus.allowedTransitions;
-
   Future<WalkInSession?> loadLatestDraftForType(FulfilmentType type) {
     return _orderRepository.getLatestDraft(type);
   }
@@ -235,8 +232,9 @@ class OrderManager {
     required String newStatus,
     String? notes,
   }) async {
-    final allowed = _allowedTransitions[currentStatus] ?? const <String>[];
-    if (!allowed.contains(newStatus)) {
+    final header = await _orderRepository.getOrderDetailHeader(orderId);
+    if (!OrderStatus.canTransition(currentStatus, newStatus,
+        fulfilmentType: header?.fulfilmentType)) {
       throw StateError(
           'Invalid status transition: $currentStatus -> $newStatus');
     }

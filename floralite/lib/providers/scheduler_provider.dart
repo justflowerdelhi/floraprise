@@ -162,20 +162,31 @@ class SchedulerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> markTaskInProgress(int taskId) async {
-    if (isCloud && _cloudRepo != null) {
-      final cloudId = _findCloudId(taskId);
-      if (cloudId != null) {
-        await _cloudRepo!.setStatus(cloudId, TaskStatus.inProgress);
+  Future<bool> markTaskInProgress(int taskId) async {
+    _error = null;
+    notifyListeners();
+    try {
+      if (isCloud && _cloudRepo != null) {
+        final cloudId = _findCloudId(taskId);
+        if (cloudId != null) {
+          await _cloudRepo!.setStatus(cloudId, TaskStatus.inProgress);
+        }
+      } else {
+        await _schedulerManager.markInProgress(taskId);
       }
-    } else {
-      await _schedulerManager.markInProgress(taskId);
+      await loadOperationalQueue();
+      _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
+      return true;
+    } catch (e) {
+      _error = 'Failed to update task: $e';
+      notifyListeners();
+      return false;
     }
-    await loadOperationalQueue();
-    _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
   }
 
-  Future<void> markTaskCompleted(int taskId) async {
+  Future<bool> markTaskCompleted(int taskId) async {
+    _error = null;
+    notifyListeners();
     try {
       if (isCloud && _cloudRepo != null) {
         final cloudId = _findCloudId(taskId);
@@ -185,26 +196,36 @@ class SchedulerProvider extends ChangeNotifier {
       } else {
         await _schedulerManager.markCompleted(taskId);
       }
+      await loadOperationalQueue();
+      _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
+      return true;
     } catch (e) {
       _error = 'Failed to complete task: $e';
-      rethrow;
-    } finally {
-      await loadOperationalQueue();
+      notifyListeners();
+      return false;
     }
-    _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
   }
 
-  Future<void> markTaskDeferred(int taskId) async {
-    if (isCloud && _cloudRepo != null) {
-      final cloudId = _findCloudId(taskId);
-      if (cloudId != null) {
-        await _cloudRepo!.setStatus(cloudId, TaskStatus.deferred);
+  Future<bool> markTaskDeferred(int taskId) async {
+    _error = null;
+    notifyListeners();
+    try {
+      if (isCloud && _cloudRepo != null) {
+        final cloudId = _findCloudId(taskId);
+        if (cloudId != null) {
+          await _cloudRepo!.setStatus(cloudId, TaskStatus.deferred);
+        }
+      } else {
+        await _schedulerManager.markDeferred(taskId);
       }
-    } else {
-      await _schedulerManager.markDeferred(taskId);
+      await loadOperationalQueue();
+      _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
+      return true;
+    } catch (e) {
+      _error = 'Failed to defer task: $e';
+      notifyListeners();
+      return false;
     }
-    await loadOperationalQueue();
-    _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
   }
 
   Future<bool> createTask({
@@ -243,8 +264,14 @@ class SchedulerProvider extends ChangeNotifier {
           notes: notes,
         );
       }
-      await loadOperationalQueue(date: scheduledAt);
-      _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
+      try {
+        await loadOperationalQueue(date: scheduledAt);
+      } catch (queueErr) {
+        debugPrint('SchedulerProvider.createTask queue reload error: $queueErr');
+      }
+      try {
+        _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
+      } catch (_) {}
       return true;
     } catch (e) {
       _error = e.toString();
@@ -299,8 +326,14 @@ class SchedulerProvider extends ChangeNotifier {
           notes: notes,
         );
       }
-      await loadOperationalQueue(date: scheduledAt);
-      _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
+      try {
+        await loadOperationalQueue(date: scheduledAt);
+      } catch (queueErr) {
+        debugPrint('SchedulerProvider.editTask queue reload error: $queueErr');
+      }
+      try {
+        _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
+      } catch (_) {}
       return true;
     } catch (e) {
       _error = e.toString();
@@ -337,16 +370,25 @@ class SchedulerProvider extends ChangeNotifier {
     await loadOperationalQueue();
   }
 
-  Future<void> snoozeTask(int taskId, Duration duration) async {
-    if (isCloud && _cloudRepo != null) {
-      final cloudId = _findCloudId(taskId);
-      if (cloudId != null) {
-        await _cloudRepo!.setStatus(cloudId, TaskStatus.deferred);
+  Future<bool> snoozeTask(int taskId, Duration duration) async {
+    _error = null;
+    notifyListeners();
+    try {
+      if (isCloud && _cloudRepo != null) {
+        final cloudId = _findCloudId(taskId);
+        if (cloudId != null) {
+          await _cloudRepo!.setStatus(cloudId, TaskStatus.deferred);
+        }
+      } else {
+        await _schedulerManager.snoozeTask(taskId, duration);
       }
-    } else {
-      await _schedulerManager.snoozeTask(taskId, duration);
+      await loadOperationalQueue();
+      _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
+      return true;
+    } catch (e) {
+      _error = 'Failed to snooze task: $e';
+      notifyListeners();
+      return false;
     }
-    await loadOperationalQueue();
-    _businessDataEvents?.publish(source: BusinessDataChangeSource.scheduler);
   }
 }

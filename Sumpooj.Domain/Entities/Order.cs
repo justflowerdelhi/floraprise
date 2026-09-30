@@ -103,7 +103,7 @@ public class Order : BaseEntity
         MarkUpdated();
     }
 
-    public void AddItem(Guid productId, string productName, int quantity, decimal unitPrice)
+    public void AddItem(Guid? productId, string productName, int quantity, decimal unitPrice)
     {
         if (Status != OrderStatus.Pending && Status != OrderStatus.Confirmed && Status != OrderStatus.AutoCreated)
             throw new InvalidOperationException("Cannot modify items for orders in current status");
@@ -443,7 +443,7 @@ public class OrderItem
 {
     private OrderItem() { }
 
-    public OrderItem(Guid productId, string productName, int quantity, decimal unitPrice)
+    public OrderItem(Guid? productId, string productName, int quantity, decimal unitPrice)
     {
         Id = Guid.NewGuid();
         ProductId = productId;
@@ -454,7 +454,7 @@ public class OrderItem
     }
 
     public Guid Id { get; private set; }
-    public Guid ProductId { get; private set; }
+    public Guid? ProductId { get; private set; }
     public string ProductName { get; private set; }
     public int Quantity { get; private set; }
     public decimal UnitPrice { get; private set; }

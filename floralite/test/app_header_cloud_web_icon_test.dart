@@ -93,10 +93,11 @@ void main() {
       // Verify it is only a visual indicator, NOT a clickable button or link
       expect(find.widgetWithIcon(IconButton, Icons.language), findsNothing);
 
-      // Authenticated company name is displayed
-      expect(find.text('Sunflower Studios'), findsOneWidget);
-      expect(find.text('My Flower Shop'), findsNothing);
-      expect(find.byType(BusinessIdentity), findsOneWidget);
+      // Verify profile menu icon is present
+      expect(find.byIcon(Icons.account_circle_rounded), findsOneWidget);
+
+      // Duplicate shop identity is NOT displayed in main content header
+      expect(find.byType(BusinessIdentity), findsNothing);
       expect(find.byType(FlorapriseBrand), findsNothing);
     });
 

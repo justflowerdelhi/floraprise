@@ -32,6 +32,16 @@ public sealed record MobileApiRegisterRequest(
     string? PushToken,
     string? IpAddress);
 
+public sealed record MobileApiRegisterResponse(
+    string Status,
+    Guid CompanyId,
+    Guid MobileUserId,
+    string BusinessName,
+    string OwnerName,
+    string Mobile,
+    string Email,
+    string Message);
+
 public sealed record MobileApiRefreshRequest(string RefreshToken);
 
 public sealed record MobileApiLogoutRequest(string? RefreshToken);
@@ -292,7 +302,12 @@ public sealed record MobileCompanyProfileDto(
     string Region,
     bool IsActive,
     DateTime CreatedAtUtc,
-    DateTime? UpdatedAtUtc);
+    DateTime? UpdatedAtUtc,
+    string? OwnerName = null,
+    string? City = null,
+    string? State = null,
+    string? PinCode = null,
+    string? LogoPath = null);
 
 public sealed record ShareBrandingSettingsDto(
     Guid Id,

@@ -353,7 +353,13 @@ class _AttendanceMarkScreenState extends State<AttendanceMarkScreen> {
             : _notesController.text.trim(),
       );
 
-      if (_attendance == null || _attendance!.id == 0) {
+      final isNewRecord = _attendance == null ||
+          _attendance!.id == 0 ||
+          _attendance!.cloudId == null ||
+          _attendance!.cloudId == '00000000-0000-0000-0000-000000000000' ||
+          _attendance!.status == AttendanceStatus.notMarked;
+
+      if (isNewRecord) {
         await provider.createAttendance(input);
       } else {
         await provider.updateAttendance(_attendance!.id, input);

@@ -228,9 +228,9 @@ class SmartAlertEngine {
 
     _activeAlerts[alert.taskId] = escalatedAlert;
 
-    // Show full-screen alarm for critical alerts
+    // Show critical priority notification for critical alerts
     if (alert.level == AlertLevel.critical) {
-      await _showFullScreenAlarm(task, escalatedAlert);
+      await _showCriticalAlert(task, escalatedAlert);
     } else {
       await _showEscalatedNotification(task, escalatedAlert);
     }
@@ -238,7 +238,7 @@ class SmartAlertEngine {
     debugPrint('SmartAlertEngine: Escalated alert ${alert.taskId} to ${escalatedAlert.state}');
   }
 
-  Future<void> _showFullScreenAlarm(SchedulerTask task, SmartAlert alert) async {
+  Future<void> _showCriticalAlert(SchedulerTask task, SmartAlert alert) async {
     final payload = jsonEncode({
       'taskId': task.id,
       'alertLevel': alert.level.name,
@@ -517,7 +517,7 @@ class SmartAlertEngine {
     if (_alertQueue.current != null) {
       final task = await _repository.getTask(_alertQueue.current!.taskId);
       if (task != null) {
-        await _showFullScreenAlarm(task, _alertQueue.current!);
+        await _showCriticalAlert(task, _alertQueue.current!);
       }
     }
   }
@@ -527,7 +527,10 @@ class SmartAlertEngine {
     if (payload == null || payload.trim().isEmpty) return;
 
     final decoded = jsonDecode(payload) as Map<String, dynamic>;
-    final taskId = decoded['taskId'] as int?;
+    final rawTaskId = decoded['taskId'];
+    final taskId = rawTaskId is int
+        ? rawTaskId
+        : int.tryParse(rawTaskId?.toString() ?? '');
     if (taskId == null) return;
 
     switch (response.actionId) {
@@ -544,26 +547,24 @@ class SmartAlertEngine {
         await snoozeAlert(taskId, const Duration(minutes: 10));
         break;
       case _alertActionSnooze15:
+      case 'snooze_15':
         await snoozeAlert(taskId, const Duration(minutes: 15));
         break;
       case _alertActionDismiss:
+      case 'dismiss':
         await dismissAlert(taskId);
         break;
       case _alertActionOpenOrder:
         await acknowledgeAlert(taskId);
-        // TODO: Navigate to order screen
         break;
       case _alertActionNavigate:
         await acknowledgeAlert(taskId);
-        // TODO: Open navigation
         break;
       case _alertActionCallCustomer:
         await acknowledgeAlert(taskId);
-        // TODO: Call customer
         break;
       case _alertActionCallDriver:
         await acknowledgeAlert(taskId);
-        // TODO: Call driver
         break;
       default:
         // Default action is acknowledge

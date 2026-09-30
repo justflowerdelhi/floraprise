@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../data/repositories/ready_bouquet_repository.dart';
+import '../services/business_data_event_bus.dart';
 import '../widgets/common_widgets.dart';
 import 'ready_bouquet_detail_screen.dart';
 
@@ -18,11 +20,39 @@ class _ReadyBouquetInventoryScreenState
   List<ReadyBouquetSummary> _items = const [];
   bool _isLoading = true;
   String? _error;
+  BusinessDataEventBus? _eventBus;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final bus = context.read<BusinessDataEventBus?>();
+    if (bus != _eventBus) {
+      _eventBus?.removeListener(_onEventBusChanged);
+      _eventBus = bus;
+      _eventBus?.addListener(_onEventBusChanged);
+    }
+  }
+
+  void _onEventBusChanged() {
+    final change = _eventBus?.lastChange;
+    if (change == null) return;
+    if (change.source == BusinessDataChangeSource.inventory ||
+        change.source == BusinessDataChangeSource.production ||
+        change.source == BusinessDataChangeSource.product) {
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _eventBus?.removeListener(_onEventBusChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {

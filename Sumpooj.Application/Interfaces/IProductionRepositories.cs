@@ -7,6 +7,7 @@ public interface IFloralRecipeRepository
 {
     Task<List<FloralRecipe>> GetAllAsync(Guid companyId);
     Task<FloralRecipe?> GetByIdAsync(Guid companyId, Guid id);
+    Task<FloralRecipe?> GetBySourceLibraryRecipeIdAsync(Guid companyId, Guid sourceLibraryRecipeId);
     Task AddAsync(FloralRecipe recipe);
     Task UpdateAsync(FloralRecipe recipe);
     Task DeleteAsync(FloralRecipe recipe);

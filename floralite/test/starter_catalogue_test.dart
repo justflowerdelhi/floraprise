@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:floraprise/data/catalogue/catalogue_installer.dart';
 import 'package:floraprise/data/catalogue/starter_catalogue.dart';
 import 'package:floraprise/data/database/app_database.dart';
@@ -5,6 +8,18 @@ import 'package:floraprise/data/repositories/inventory_repository.dart';
 import 'package:floraprise/data/repositories/product_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+File _findCanonicalStarterCatalogueJson() {
+  final candidates = [
+    File('../Sumpooj.Infrastructure/Data/starter_catalogue.json'),
+    File('../../Sumpooj.Infrastructure/Data/starter_catalogue.json'),
+    File('C:/floraprise/Sumpooj.Infrastructure/Data/starter_catalogue.json'),
+  ];
+  for (final file in candidates) {
+    if (file.existsSync()) return file;
+  }
+  throw Exception('Canonical starter_catalogue.json not found');
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -74,5 +89,45 @@ void main() {
     expect(darkRedRoses.single.purchasePricePaise, 0);
     expect(darkRedRoses.single.trackInventory, isTrue);
     expect(darkRedRoses.single.minStock, 0);
+  });
+
+  test('Flutter StarterCatalogue maintains strict parity with canonical starter_catalogue.json', () {
+    final jsonFile = _findCanonicalStarterCatalogueJson();
+    final jsonList = jsonDecode(jsonFile.readAsStringSync()) as List<dynamic>;
+
+    expect(jsonList.length, 142, reason: 'Canonical JSON must contain exactly 142 products');
+
+    final flutterProductsByName = <String, StarterCatalogueProduct>{};
+    for (final p in StarterCatalogue.products) {
+      if (!flutterProductsByName.containsKey(p.name) || p.sellingPricePaise > 0) {
+        flutterProductsByName[p.name] = p;
+      }
+    }
+
+    final validCategories = {'Flowers', 'Fillers', 'Foliage', 'Packing', 'Accessories', 'Finished Products'};
+
+    for (final raw in jsonList) {
+      final item = raw as Map<String, dynamic>;
+      final name = item['name'] as String;
+      final category = item['category'] as String;
+      final defaultUnit = item['defaultUnit'] as String;
+      final sellingPricePaise = item['sellingPricePaise'] as int;
+      final purchasePricePaise = item['purchasePricePaise'] as int?;
+      final gstPercent = item['gstPercent'] as int;
+      final trackInventory = item['trackInventory'] as bool;
+      final minStock = item['minStock'] as int;
+
+      expect(validCategories.contains(category), isTrue, reason: 'Category "$category" must be in the 6 source categories');
+      expect(flutterProductsByName.containsKey(name), isTrue, reason: 'Flutter StarterCatalogue must contain "$name"');
+
+      final flutterProduct = flutterProductsByName[name]!;
+      expect(flutterProduct.category, category, reason: 'Category mismatch for "$name"');
+      expect(flutterProduct.defaultUnit, defaultUnit, reason: 'Unit mismatch for "$name"');
+      expect(flutterProduct.sellingPricePaise, sellingPricePaise, reason: 'Selling price mismatch for "$name"');
+      expect(flutterProduct.purchasePricePaise, purchasePricePaise, reason: 'Purchase price mismatch for "$name"');
+      expect(flutterProduct.gstPercent, gstPercent, reason: 'GST mismatch for "$name"');
+      expect(flutterProduct.trackInventory, trackInventory, reason: 'Track inventory mismatch for "$name"');
+      expect(flutterProduct.minStock, minStock, reason: 'Min stock mismatch for "$name"');
+    }
   });
 }

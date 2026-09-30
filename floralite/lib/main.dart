@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:app_links/app_links.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'data/repositories/customer_repository.dart';
 import 'data/repositories/category_repository.dart';
@@ -13,6 +15,7 @@ import 'data/repositories/inventory_repository.dart';
 import 'data/repositories/cloud_inventory_repository.dart';
 import 'data/repositories/job_repository.dart';
 import 'data/repositories/order_repository.dart';
+import 'data/repositories/cloud_order_repository.dart';
 import 'data/repositories/order_workflow_repository.dart';
 import 'data/repositories/occasion_repository.dart';
 import 'data/repositories/cloud_occasion_repository.dart';
@@ -28,12 +31,15 @@ import 'data/repositories/cloud_attendance_repository.dart';
 import 'screens/my_designs_screen.dart';
 import 'screens/walkin_sales_screen.dart';
 import 'screens/orders_screen.dart';
+import 'screens/order_detail_screen.dart';
+import 'screens/order_view_screen.dart';
 import 'screens/customers_screen.dart';
 import 'screens/categories_screen.dart';
 import 'screens/cloud_staff_screen.dart';
 import 'screens/reminders_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/reports/sales_report_screen.dart';
+import 'screens/reports/pending_payments_screen.dart';
 import 'screens/reports/order_status_report_screen.dart';
 import 'screens/reports/top_customers_report_screen.dart';
 import 'screens/reports/top_products_report_screen.dart';
@@ -44,12 +50,21 @@ import 'screens/reports/wastage_report_screen.dart';
 import 'screens/reports/production_report_screen.dart';
 import 'screens/reports/rewards_report_screen.dart';
 import 'screens/products_screen.dart';
+import 'screens/library/library_home_screen.dart';
+import 'data/repositories/library_repository.dart';
+import 'providers/library_provider.dart';
 import 'screens/scheduler_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/rewards_settings_screen.dart';
 import 'screens/shop_details_screen.dart';
 import 'screens/share_branding_settings_screen.dart';
 import 'screens/about_screen.dart';
+import 'screens/crm/crm_today_screen.dart';
+import 'screens/crm/crm_enquiries_screen.dart';
+import 'screens/crm/crm_customers_screen.dart';
+import 'screens/crm/crm_occasions_screen.dart';
+import 'providers/crm_provider.dart';
+import 'services/crm_service.dart';
 import 'screens/business_registration_screen.dart';
 import 'screens/subscription_screen.dart';
 import 'screens/license_subscription_required_screen.dart';
@@ -128,6 +143,9 @@ import 'services/app_route_observer.dart';
 import 'services/business_data_event_bus.dart';
 import 'services/printer/printer_manager.dart';
 import 'services/scheduler_service.dart';
+import 'firebase_options.dart';
+import 'services/fcm_service.dart';
+import 'services/web_notification/web_scheduler_reminder_service.dart';
 import 'screens/main_shell_screen.dart';
 import 'screens/delivery_workspace_screen.dart';
 import 'screens/live_delivery_tracking_screen.dart';
@@ -137,7 +155,17 @@ import 'screens/payment_settings_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase.initializeApp error: $e');
+  }
+
   await SchedulerService.instance.initialize();
+  await FcmService.instance.initialize();
   // restorePendingSchedules moved to SplashScreen to avoid blocking startup
   runApp(const FlorapriseGoApp());
 }
@@ -157,6 +185,12 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
   @override
   void initState() {
     super.initState();
+    FcmService.instance.setNavigatorKey(_navigatorKey);
+    if (kIsWeb) {
+      WebSchedulerReminderService.instance.start(
+        navigatorKey: _navigatorKey,
+      );
+    }
     _initDeepLinks();
   }
 
@@ -247,6 +281,7 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
     final associateRepository = AssociateRepository();
     final staffRepository = StaffRepository();
     final mobileAuthService = MobileAuthService();
+    FcmService.instance.setAuthService(mobileAuthService);
     final schedulerManager = SchedulerManager(schedulerRepository);
     final languageManager = LanguageManager();
     final printerManager = PrinterManager();
@@ -345,7 +380,12 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) => OrderWorkflowProvider(orderWorkflowManager),
+          create: (context) => OrderWorkflowProvider(
+            orderWorkflowManager,
+            cloudAssociateRepository:
+                CloudAssociateRepository(auth: mobileAuthService),
+            storageModeProvider: context.read<StorageModeProvider>(),
+          ),
         ),
         ChangeNotifierProvider(
           create: (context) => SchedulerProvider(
@@ -377,6 +417,18 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
             CloudOccasionRepository(auth: mobileAuthService),
             context.read<CustomerProvider>(),
           )..loadInitial(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => CrmProvider(
+            crmService: CrmService(
+              occasionRepository: occasionRepository,
+              cloudOccasionRepository: CloudOccasionRepository(auth: mobileAuthService),
+              schedulerRepository: schedulerRepository,
+              cloudSchedulerRepository: CloudSchedulerRepository(auth: mobileAuthService),
+              orderRepository: orderRepository,
+              cloudOrderRepository: CloudOrderRepository(auth: mobileAuthService),
+            ),
+          ),
         ),
         ChangeNotifierProvider(
           create: (context) => InventoryProvider(
@@ -435,6 +487,11 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
             AttendanceRepository(),
             context.read<StorageModeProvider>(),
             CloudAttendanceRepository(auth: mobileAuthService),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => LibraryProvider(
+            repository: LibraryRepository(auth: mobileAuthService),
           ),
         ),
       ],
@@ -550,6 +607,121 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
                   ),
                 );
               }
+              final routeUri = Uri.tryParse(settings.name ?? '');
+              final routePath = routeUri?.path ?? settings.name ?? '';
+              if (routePath == '/order-view' ||
+                  routePath == '/order-views') {
+                int? orderId;
+                String? cloudOrderId;
+
+                if (settings.arguments is Map) {
+                  final args = settings.arguments as Map<dynamic, dynamic>;
+                  if (args['orderId'] is int) {
+                    orderId = args['orderId'] as int;
+                  } else if (args['orderId'] != null) {
+                    orderId = int.tryParse(args['orderId'].toString());
+                  }
+                  cloudOrderId = args['cloudOrderId']?.toString();
+                }
+
+                if (orderId == null && routeUri != null) {
+                  final queryOrderId = routeUri.queryParameters['orderId'] ??
+                      routeUri.queryParameters['id'];
+                  if (queryOrderId != null) {
+                    orderId = int.tryParse(queryOrderId);
+                  }
+                  cloudOrderId ??= routeUri.queryParameters['cloudOrderId'];
+                  if (orderId == null && routeUri.pathSegments.isNotEmpty) {
+                    final lastSegment = routeUri.pathSegments.last;
+                    final parsed = int.tryParse(lastSegment);
+                    if (parsed != null) {
+                      orderId = parsed;
+                    } else if (lastSegment != 'order-view' &&
+                        lastSegment != 'order-views') {
+                      cloudOrderId ??= lastSegment;
+                    }
+                  }
+                }
+
+                if ((orderId != null && orderId > 0) ||
+                    (cloudOrderId != null && cloudOrderId.isNotEmpty)) {
+                  final effectiveRouteName = (routeUri != null &&
+                          (routeUri.hasQuery || routeUri.pathSegments.length > 1))
+                      ? settings.name
+                      : '/order-view?orderId=${orderId ?? 0}${cloudOrderId != null && cloudOrderId.isNotEmpty ? '&cloudOrderId=$cloudOrderId' : ''}';
+                  return MaterialPageRoute(
+                    settings: RouteSettings(
+                      name: effectiveRouteName,
+                      arguments: settings.arguments,
+                    ),
+                    builder: (context) => _SubscriptionGate(
+                      child: OrderViewScreen(
+                        orderId: orderId ?? 0,
+                        cloudOrderId: cloudOrderId,
+                      ),
+                    ),
+                  );
+                }
+              }
+
+              if (routePath == '/order-detail' ||
+                  routePath == '/order-details' ||
+                  routePath.startsWith('/orders/') ||
+                  routePath.startsWith('/order/')) {
+                int? orderId;
+                String? cloudOrderId;
+
+                if (settings.arguments is Map) {
+                  final args = settings.arguments as Map<dynamic, dynamic>;
+                  if (args['orderId'] is int) {
+                    orderId = args['orderId'] as int;
+                  } else if (args['orderId'] != null) {
+                    orderId = int.tryParse(args['orderId'].toString());
+                  }
+                  cloudOrderId = args['cloudOrderId']?.toString();
+                }
+
+                if (orderId == null && routeUri != null) {
+                  final queryOrderId = routeUri.queryParameters['orderId'] ??
+                      routeUri.queryParameters['id'];
+                  if (queryOrderId != null) {
+                    orderId = int.tryParse(queryOrderId);
+                  }
+                  cloudOrderId ??= routeUri.queryParameters['cloudOrderId'];
+                  if (orderId == null && routeUri.pathSegments.isNotEmpty) {
+                    final lastSegment = routeUri.pathSegments.last;
+                    final parsed = int.tryParse(lastSegment);
+                    if (parsed != null) {
+                      orderId = parsed;
+                    } else if (lastSegment != 'orders' &&
+                        lastSegment != 'order' &&
+                        lastSegment != 'order-detail' &&
+                        lastSegment != 'order-details') {
+                      cloudOrderId ??= lastSegment;
+                    }
+                  }
+                }
+
+                if ((orderId != null && orderId > 0) ||
+                    (cloudOrderId != null && cloudOrderId.isNotEmpty)) {
+                  final effectiveRouteName = (routeUri != null &&
+                          (routeUri.hasQuery || routeUri.pathSegments.length > 1))
+                      ? settings.name
+                      : '/order-detail?orderId=${orderId ?? 0}${cloudOrderId != null && cloudOrderId.isNotEmpty ? '&cloudOrderId=$cloudOrderId' : ''}';
+                  return MaterialPageRoute(
+                    settings: RouteSettings(
+                      name: effectiveRouteName,
+                      arguments: settings.arguments,
+                    ),
+                    builder: (context) => _SubscriptionGate(
+                      child: OrderDetailScreen(
+                        orderId: orderId ?? 0,
+                        cloudOrderId: cloudOrderId,
+                      ),
+                    ),
+                  );
+                }
+              }
               return null;
             },
             routes: {
@@ -579,6 +751,14 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
                   const _SubscriptionGate(child: OrdersScreen()),
               '/customers': (context) =>
                   const _SubscriptionGate(child: CustomersScreen()),
+              '/crm': (context) =>
+                  const _SubscriptionGate(child: CrmTodayScreen()),
+              '/crm/enquiries': (context) =>
+                  const _SubscriptionGate(child: CrmEnquiriesScreen()),
+              '/crm/customers': (context) =>
+                  const _SubscriptionGate(child: CrmCustomersScreen()),
+              '/crm/occasions': (context) =>
+                  const _SubscriptionGate(child: CrmOccasionsScreen()),
               '/staff': (context) =>
                   const _SubscriptionGate(child: StaffModeScreen()),
               '/reminders': (context) =>
@@ -587,6 +767,8 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
                   const _SubscriptionGate(child: ProductsScreen()),
               '/categories': (context) =>
                   const _SubscriptionGate(child: CategoriesScreen()),
+              '/library': (context) =>
+                  const _SubscriptionGate(child: LibraryHomeScreen()),
               '/scheduler': (context) =>
                   const _SubscriptionGate(child: SchedulerScreen()),
               '/settings': (context) =>
@@ -633,6 +815,8 @@ class _FlorapriseGoAppState extends State<FlorapriseGoApp> {
                   const _SubscriptionGate(child: ReportsScreen()),
               '/reports/sales': (context) =>
                   const _SubscriptionGate(child: SalesReportScreen()),
+              '/reports/pending-payments': (context) =>
+                  const _SubscriptionGate(child: PendingPaymentsScreen()),
               '/reports/order-status': (context) =>
                   const _SubscriptionGate(child: OrderStatusReportScreen()),
               '/reports/top-customers': (context) =>

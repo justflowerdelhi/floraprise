@@ -216,7 +216,10 @@ class _DeliveryCard extends StatelessWidget {
               const SizedBox(height: 12),
               _InfoLine(
                 icon: Icons.person_outline_rounded,
-                label: delivery.customerName,
+                label: delivery.customerName.trim().isNotEmpty
+                    ? delivery.customerName.trim()
+                    : 'Customer',
+                isPrimary: true,
               ),
               const SizedBox(height: 8),
               _InfoLine(
@@ -570,6 +573,22 @@ class _DeliveryWorkspaceDetailScreenState
             snapshot: snapshot,
             status: normalizedStatus,
             onOpenMap: _navigate,
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () {
+              final numericId = int.tryParse(delivery.orderId) ?? 0;
+              Navigator.pushNamed(
+                context,
+                '/order-detail',
+                arguments: {
+                  'orderId': numericId,
+                  'cloudOrderId': delivery.orderId,
+                },
+              );
+            },
+            icon: const Icon(Icons.receipt_long_outlined),
+            label: const Text('View Full Order Details'),
           ),
           const SizedBox(height: 16),
           _TimelineCard(snapshot: snapshot),
@@ -1114,19 +1133,39 @@ class _InlineError extends StatelessWidget {
 }
 
 class _InfoLine extends StatelessWidget {
-  const _InfoLine({required this.icon, required this.label});
+  const _InfoLine({
+    required this.icon,
+    required this.label,
+    this.isPrimary = false,
+  });
 
   final IconData icon;
   final String label;
+  final bool isPrimary;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Row(
       children: [
-        Icon(icon, size: 18),
+        Icon(
+          icon,
+          size: 18,
+          color: isPrimary ? colorScheme.primary : Colors.grey.shade700,
+        ),
         const SizedBox(width: 8),
         Expanded(
-            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis)),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: isPrimary ? 15.5 : 13.5,
+              fontWeight: isPrimary ? FontWeight.bold : FontWeight.w500,
+              color: isPrimary ? const Color(0xFF1E2922) : Colors.grey.shade800,
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -1824,4 +1824,94 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get items => 'आइटम';
+
+  @override
+  String get importCustomers => 'ग्राहक आयात करें';
+
+  @override
+  String get import => 'आयात';
+
+  @override
+  String get importContacts => 'संपर्क से आयात करें';
+
+  @override
+  String get importExcelCsv => 'एक्सेल / CSV से आयात करें';
+
+  @override
+  String get downloadSampleTemplate => 'नमूना टेम्पलेट डाउनलोड करें';
+
+  @override
+  String get duplicateHandling => 'डुप्लिकेट हैंडलिंग';
+
+  @override
+  String get skipExisting => 'मौजूदा छोड़ें';
+
+  @override
+  String get updateExisting => 'मौजूदा अपडेट करें';
+
+  @override
+  String get previewSummary => 'पूर्वावलोकन सारांश';
+
+  @override
+  String get totalRowsCount => 'कुल पंक्तियाँ';
+
+  @override
+  String get readyToImport => 'आयात के लिए तैयार';
+
+  @override
+  String get duplicatesFound => 'डुप्लिकेट मिले';
+
+  @override
+  String get invalidRowsCount => 'अमान्य पंक्तियाँ';
+
+  @override
+  String get importProgress => 'ग्राहक आयात किए जा रहे हैं...';
+
+  @override
+  String get importResult => 'आयात परिणाम';
+
+  @override
+  String get importedCount => 'आयातित';
+
+  @override
+  String get updatedCount => 'अपडेट किया गया';
+
+  @override
+  String get skippedCount => 'छोड़ा गया';
+
+  @override
+  String get downloadBillPdf => 'बिल डाउनलोड करें (PDF)';
+
+  @override
+  String get downloadDeliverySlipPdf => 'डिलीवरी पर्ची डाउनलोड करें (PDF)';
+
+  @override
+  String get billPdf => 'बिल (PDF)';
+
+  @override
+  String get deliverySlipPdf => 'डिलीवरी पर्ची (PDF)';
+
+  @override
+  String get crmTitle => 'सीआरएम';
+
+  @override
+  String get crmToday => 'आज';
+
+  @override
+  String get crmEnquiries => 'पूछताछ';
+
+  @override
+  String get crmFollowUps => 'आज के फॉलो-अप';
+
+  @override
+  String get crmNewEnquiries => 'नई पूछताछ';
+
+  @override
+  String get crmQuotesPending => 'लंबित कोटेशन';
+
+  @override
+  String get crmOccasionsThisWeek => 'इस सप्ताह के अवसर';
+
+  @override
+  String get crmOccasions => 'अवसर';
 }

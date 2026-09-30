@@ -46,13 +46,28 @@ class OrderStatus {
     deliveryFailed: [outForDelivery, cancelled],
   };
 
-  static bool canTransition(String fromStatus, String toStatus) {
-    final allowed = allowedTransitions[fromStatus] ?? [];
+  static const Map<String, List<String>> eventSaleAllowedTransitions = {
+    draft: [confirmed, cancelled],
+    created: [confirmed, cancelled],
+    confirmed: [preparing, sentToDesigner, cancelled],
+    sentToDesigner: [preparing, cancelled],
+    preparing: [ready, cancelled],
+    ready: [delivered, cancelled],
+    outForDelivery: [delivered, deliveryFailed, cancelled],
+    deliveryFailed: [outForDelivery, cancelled],
+  };
+
+  static bool canTransition(String fromStatus, String toStatus, {String? fulfilmentType}) {
+    final isEventSale = fulfilmentType?.trim().toLowerCase() == 'event_sale';
+    final map = isEventSale ? eventSaleAllowedTransitions : allowedTransitions;
+    final allowed = map[fromStatus] ?? [];
     return allowed.contains(toStatus);
   }
 
-  static List<String> nextStatuses(String currentStatus) {
-    return List.unmodifiable(allowedTransitions[currentStatus] ?? []);
+  static List<String> nextStatuses(String currentStatus, {String? fulfilmentType}) {
+    final isEventSale = fulfilmentType?.trim().toLowerCase() == 'event_sale';
+    final map = isEventSale ? eventSaleAllowedTransitions : allowedTransitions;
+    return List.unmodifiable(map[currentStatus] ?? []);
   }
 
   static bool isTerminal(String status) {
@@ -95,7 +110,13 @@ class OrderStatus {
     };
   }
 
-  static String actionLabel(String status) {
+  static String actionLabel(String status, {String? fulfilmentType}) {
+    final isEventSale = fulfilmentType?.trim().toLowerCase() == 'event_sale';
+    if (isEventSale) {
+      if (status == ready) return 'Mark Ready for Event';
+      if (status == delivered) return 'Fulfill Event';
+      if (status == preparing) return 'Start Preparing';
+    }
     return switch (status) {
       sentToDesigner => 'Send to Designer',
       preparing => 'Start Preparing',

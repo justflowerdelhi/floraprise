@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
+
 import '../data/repositories/scheduler_repository.dart';
 import '../models/scheduler_task.dart';
 import '../services/scheduler_service.dart';
+import '../services/smart_alert_engine.dart';
 import '../models/walk_in_enums.dart';
 
 class SchedulerManager {
@@ -33,7 +36,11 @@ class SchedulerManager {
     );
 
     final taskId = await _schedulerRepository.publishTask(task);
-    await _schedulerService.scheduleTask(taskId);
+    try {
+      await _schedulerService.scheduleTask(taskId);
+    } catch (e) {
+      debugPrint('SchedulerManager.publishTask notification error: $e');
+    }
 
     return taskId;
   }
@@ -111,8 +118,18 @@ class SchedulerManager {
     return _schedulerRepository.updateTaskStatus(taskId, TaskStatus.inProgress);
   }
 
-  Future<void> markCompleted(int taskId) {
-    return _schedulerService.markCompleted(taskId);
+  Future<void> markCompleted(int taskId) async {
+    await _schedulerRepository.updateTaskStatus(taskId, TaskStatus.completed);
+    try {
+      await _schedulerService.cancelTask(taskId);
+    } catch (e) {
+      debugPrint('SchedulerManager.markCompleted cancelTask error: $e');
+    }
+    try {
+      await SmartAlertEngine.instance.acknowledgeAlert(taskId);
+    } catch (e) {
+      debugPrint('SchedulerManager.markCompleted acknowledgeAlert error: $e');
+    }
   }
 
   Future<void> markDeferred(int taskId) {
@@ -156,20 +173,43 @@ class SchedulerManager {
       requiresAlarm: requiresAlarm,
       notes: notes,
     );
-    await _schedulerService.rescheduleTask(taskId);
+    try {
+      await _schedulerService.rescheduleTask(taskId);
+    } catch (e) {
+      debugPrint('SchedulerManager.editTask rescheduleTask error: $e');
+    }
   }
 
   Future<void> deleteTask(int taskId) async {
-    await _schedulerService.cancelTask(taskId);
     await _schedulerRepository.softDeleteTask(taskId);
+    try {
+      await _schedulerService.cancelTask(taskId);
+    } catch (e) {
+      debugPrint('SchedulerManager.deleteTask cancelTask error: $e');
+    }
+    try {
+      await SmartAlertEngine.instance.acknowledgeAlert(taskId);
+    } catch (e) {
+      debugPrint('SchedulerManager.deleteTask acknowledgeAlert error: $e');
+    }
   }
 
   Future<void> restorePendingSchedules() {
     return _schedulerService.restorePendingSchedules();
   }
 
-  Future<void> snoozeTask(int taskId, Duration duration) {
-    return _schedulerService.snoozeTask(taskId, duration);
+  Future<void> snoozeTask(int taskId, Duration duration) async {
+    final nextReminder = DateTime.now().add(duration);
+    await _schedulerRepository.updateReminderState(
+      taskId: taskId,
+      nextReminderAt: nextReminder,
+      status: TaskStatus.pending,
+    );
+    try {
+      await _schedulerService.snoozeTask(taskId, duration);
+    } catch (e) {
+      debugPrint('SchedulerManager.snoozeTask error: $e');
+    }
   }
 
   String _deliverySlotLabel(String raw) {

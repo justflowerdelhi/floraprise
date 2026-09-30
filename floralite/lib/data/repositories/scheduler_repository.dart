@@ -28,10 +28,7 @@ class SchedulerRepository {
   }
 
   TaskPriority _taskPriorityFromDb(String value) {
-    return TaskPriority.values.firstWhere(
-      (item) => _enumName(item) == value,
-      orElse: () => TaskPriority.normal,
-    );
+    return TaskPriorityX.fromNormalizedString(value);
   }
 
   TaskStatus _taskStatusFromDb(String value) {

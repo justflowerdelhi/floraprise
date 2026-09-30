@@ -85,6 +85,7 @@ const SubscriptionPage = lazy(() =>
 
 // Settings
 const TenantSettingsPage = lazy(() => import('../pages/settings/TenantSettingsPage'));
+const PaymentSettingsPage = lazy(() => import('../pages/settings/PaymentSettingsPage'));
 const PaymentGatewaySettings = lazy(() => import('../pages/settings/PaymentGatewaySettings'));
 const TaxRulesSettings = lazy(() => import('../pages/settings/TaxRulesSettings'));
 const LocationsSettings = lazy(() => import('../pages/settings/LocationsSettings'));
@@ -408,7 +409,9 @@ export default function AppRoutes() {
           {/* ─── Settings / Subscription ────────────────── */}
           <Route path="/subscription" element={<SubscriptionPage />} />
           <Route path="/settings/tenant" element={<TenantSettingsPage />} />
-          <Route path="/settings/payment-gateways" element={<PaymentGatewaySettings />} />
+          <Route path="/settings/payments" element={<PaymentSettingsPage />} />
+          <Route path="/settings/payment-gateways" element={<PaymentSettingsPage />} />
+          <Route path="/settings/gateways-advanced" element={<PaymentGatewaySettings />} />
           <Route path="/settings/tax-rules" element={<TaxRulesSettings />} />
           <Route path="/settings/locations" element={<LocationsSettings />} />
           <Route path="/settings/delivery-zones" element={<DeliveryZonesSettings />} />

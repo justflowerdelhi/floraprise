@@ -2,6 +2,7 @@ enum FulfilmentType {
   takeAway,
   pickupLater,
   delivery,
+  eventSale,
 }
 
 enum OrderStatus {

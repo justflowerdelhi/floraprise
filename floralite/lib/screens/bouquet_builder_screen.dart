@@ -1,20 +1,20 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
-import '../data/repositories/product_repository.dart';
 import '../data/repositories/production_repository.dart';
 import '../models/walk_in_enums.dart';
 import '../models/walk_in_line_item.dart';
 import '../models/walk_in_session.dart';
-import '../providers/printer_provider.dart';
 import '../services/business_data_event_bus.dart';
+import '../services/design_image_helper.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/library/library_recipe_picker_sheet.dart';
 import '../widgets/product_picker_sheet.dart';
 import '../widgets/quantity_input_stepper.dart';
+import '../widgets/safe_platform_image.dart';
 import 'take_away_screen.dart';
 
 class BouquetBuilderScreen extends StatefulWidget {
@@ -30,7 +30,6 @@ enum _RecipeSavedAction { produceNow, continueEditing, close }
 
 class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
   final ProductionRepository _productionRepository = ProductionRepository();
-  final ProductRepository _productRepository = ProductRepository();
 
   final _nameController = TextEditingController();
   final _sellingPriceController = TextEditingController();
@@ -78,30 +77,30 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
       return;
     }
     try {
-      final product =
-          await _productRepository.getProductById(widget.existingProductId!);
-      final components =
-          await _productionRepository.getRecipeItems(widget.existingProductId!);
-      final metadata = await _productionRepository
-          .getRecipeMetadata(widget.existingProductId!);
+      final detail =
+          await _productionRepository.getRecipeDetail(widget.existingProductId!);
       if (!mounted) return;
-      setState(() {
-        _nameController.text = product?.name ?? '';
-        final loadedCategory = product?.category ?? 'Bouquet';
-        _category = _recipeCategories.contains(loadedCategory)
-            ? loadedCategory
-            : 'Bouquet';
-        _sellingPriceController.text =
-            _rupeesFromPaise(product?.sellingPricePaise ?? 0);
-        _components.addAll(components);
-        if (metadata != null) {
-          _shelfLifeDays = metadata['shelf_life_days'] as int? ?? 3;
-          _refreshAfterDays = metadata['refresh_after_days'] as int? ?? 2;
-          _occasion = metadata['occasion'] as String?;
-        }
-        _imagePath = product?.imagePath;
-        _isLoading = false;
-      });
+      if (detail != null) {
+        setState(() {
+          _nameController.text = detail.name;
+          final loadedCategory = detail.category;
+          _category = _recipeCategories.contains(loadedCategory)
+              ? loadedCategory
+              : 'Bouquet';
+          _sellingPriceController.text =
+              _rupeesFromPaise(detail.sellingPricePaise);
+          _labourCostController.text =
+              _rupeesFromPaise(detail.labourCostPaise);
+          _components.addAll(detail.items);
+          _shelfLifeDays = detail.shelfLifeDays;
+          _refreshAfterDays = detail.refreshAfterDays;
+          _occasion = detail.occasion;
+          _imagePath = detail.imagePath;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -151,13 +150,17 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
     if (quantity == null || quantity <= 0 || !mounted) return;
 
     final existingIndex = _components.indexWhere(
-      (c) => c.rawProductId == product.id,
+      (c) =>
+          c.rawProductId == product.id ||
+          (product.cloudProductId != null &&
+              c.cloudProductId == product.cloudProductId),
     );
     if (existingIndex >= 0) {
       final existing = _components[existingIndex];
       setState(() {
         _components[existingIndex] = RecipeItem(
           rawProductId: existing.rawProductId,
+          cloudProductId: existing.cloudProductId ?? product.cloudProductId,
           productName: existing.productName,
           unit: existing.unit,
           quantity: existing.quantity + quantity,
@@ -169,6 +172,7 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
       setState(() {
         _components.add(RecipeItem(
           rawProductId: product.id,
+          cloudProductId: product.cloudProductId,
           productName: product.name,
           unit: product.defaultUnit,
           quantity: quantity,
@@ -215,6 +219,7 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
     setState(() {
       _components[index] = RecipeItem(
         rawProductId: item.rawProductId,
+        cloudProductId: item.cloudProductId,
         productName: item.productName,
         unit: item.unit,
         quantity: quantity,
@@ -277,9 +282,6 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
       return;
     }
 
-    final quantity = await _askProduceQuantity();
-    if (quantity == null || quantity <= 0 || !mounted) return;
-
     setState(() => _isSaving = true);
     try {
       if (_isFromRecipe && _updateMasterRecipe) {
@@ -290,7 +292,7 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
         finishedProductId: widget.existingProductId,
         productName: name,
         category: _category,
-        quantity: quantity,
+        quantity: 1,
         components: _components,
         sellingPricePaise: _sellingPricePaise,
         labourCostPaise: _labourCostPaise,
@@ -308,38 +310,6 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
-  }
-
-  Future<int?> _askProduceQuantity() async {
-    var quantity = 1;
-    return showDialog<int>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('How many bouquets?'),
-          content: Center(
-            heightFactor: 1,
-            child: QuantityInputStepper(
-              value: quantity,
-              min: 1,
-              onChanged: (value) {
-                setDialogState(() => quantity = value);
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, quantity),
-              child: const Text('Produce'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _saveAsRecipe() async {
@@ -373,13 +343,11 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
       if (!mounted) return;
       switch (nextAction) {
         case _RecipeSavedAction.produceNow:
-          final quantity = await _askProduceQuantity();
-          if (quantity == null || quantity <= 0 || !mounted) return;
           final production = await _productionRepository.produceBouquet(
             finishedProductId: productId,
             productName: result.name,
             category: result.category,
-            quantity: quantity,
+            quantity: 1,
             components: _components,
             sellingPricePaise: _sellingPricePaise,
             labourCostPaise: _labourCostPaise,
@@ -421,6 +389,7 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
       category: category ?? _category,
       items: _components,
       sellingPricePaise: _sellingPricePaise,
+      labourCostPaise: _labourCostPaise,
       shelfLifeDays: _shelfLifeDays,
       refreshAfterDays: _refreshAfterDays,
       occasion: occasion ?? _occasion,
@@ -487,7 +456,13 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
     final image =
         await ImagePicker().pickImage(source: source, imageQuality: 85);
     if (!mounted || image == null) return;
-    setState(() => _imagePath = image.path);
+    if (kIsWeb) {
+      final bytes = await image.readAsBytes();
+      final dataUri = DesignImageHelper.processBytesToDataUri(bytes);
+      setState(() => _imagePath = dataUri);
+    } else {
+      setState(() => _imagePath = image.path);
+    }
   }
 
   void _publishInventoryEvent() {
@@ -497,43 +472,87 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
   }
 
   Future<void> _handleProductionCompleted(ProductionResult result) async {
-    final action = await showDialog<bool>(
+    final productName = result.productName ?? _nameController.text.trim();
+    final batchCode = result.barcode?.trim() ?? '';
+
+    final action = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Production Completed'),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Bouquet Produced'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              productName.isEmpty ? 'Ready Bouquet' : productName,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            if (batchCode.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Batch / Unit: $batchCode',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.check, size: 16, color: Colors.green),
+                      SizedBox(width: 6),
+                      Text('1 unit added to Ready Bouquets',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.check, size: 16, color: Colors.green),
+                      SizedBox(width: 6),
+                      Text('1 unit added to Inventory',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Skip'),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.pop(context, 'produce_another'),
+            icon: const Icon(Icons.add_circle_outline),
+            label: const Text('Produce Another'),
           ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(context, true),
-            icon: const Icon(Icons.qr_code_2),
-            label: const Text('Print Barcode'),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, 'done'),
+            child: const Text('Done'),
           ),
         ],
       ),
     );
     if (!mounted) return;
 
-    if (action == true) {
-      final product = await _productRepository.getProductById(
-        result.finishedProductId,
-      );
-      if (!mounted) return;
-      final barcode = product?.florapriseBarcode.trim() ?? '';
-      if (product != null && barcode.isNotEmpty) {
-        await context.read<PrinterProvider>().enqueueBarcodeLabel(
-              productName: product.name,
-              barcode: barcode,
-              quantity: result.finishedQuantity,
-              sellingPricePaise: product.sellingPricePaise,
-            );
-      }
+    if (action == 'produce_another') {
+      await _produceReadyBouquet();
+    } else {
+      Navigator.pushReplacementNamed(context, '/ready-bouquets');
     }
-
-    if (mounted) Navigator.pushReplacementNamed(context, '/ready-bouquets');
   }
 
   void _showError(String message) {
@@ -550,6 +569,23 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
     super.dispose();
   }
 
+  Future<void> _useLibraryRecipe() async {
+    final result = await LibraryRecipePickerSheet.show(context);
+    if (result == null || !mounted) return;
+
+    if (result.importedId != null) {
+      final numericId = int.tryParse(result.importedId!);
+      if (numericId != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BouquetBuilderScreen(existingProductId: numericId),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -561,6 +597,13 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_isFromRecipe ? 'Edit Bouquet Recipe' : 'New Bouquet'),
+        actions: [
+          IconButton(
+            tooltip: 'Use Library Recipe',
+            icon: const Icon(Icons.menu_book_rounded),
+            onPressed: _useLibraryRecipe,
+          ),
+        ],
       ),
       body: SafeArea(
         child: ListView(
@@ -720,25 +763,31 @@ class _BouquetBuilderScreenState extends State<BouquetBuilderScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    File(imagePath),
+                  child: SafePlatformImageView(
+                    imagePath: imagePath,
                     width: 88,
                     height: 88,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 88,
-                      height: 88,
-                      color:
-                          Theme.of(context).colorScheme.surfaceContainerHighest,
-                      child: const Icon(Icons.image_not_supported_outlined),
-                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
-                FilledButton.tonalIcon(
-                  onPressed: _pickRecipePhoto,
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text('Change Photo'),
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: _pickRecipePhoto,
+                        icon: const Icon(Icons.photo_camera_outlined),
+                        label: const Text('Change Photo'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() => _imagePath = null),
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('Remove'),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

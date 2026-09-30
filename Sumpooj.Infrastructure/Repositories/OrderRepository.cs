@@ -90,7 +90,7 @@ public class OrderRepository : IOrderRepository
             {
                 Id = o.Id,
                 OrderNumber = o.OrderNumber,
-                CustomerName = o.Customer!.Name,
+                CustomerName = o.Customer != null ? o.Customer.Name : (o.RecipientName ?? string.Empty),
                 OrderDate = o.OrderDate,
                 DeliveryDate = o.DeliveryDate,
                 Status = o.Status.ToString(),
@@ -98,7 +98,7 @@ public class OrderRepository : IOrderRepository
                 FulfillmentStatus = o.FulfillmentStatus.ToString(),
                 OrderSource = o.OrderSource.ToString(),
                 TotalAmount = o.TotalAmount,
-                ItemCount = o.Items.Count,
+                ItemCount = o.Items != null ? o.Items.Count : 0,
                 RecipientName = o.RecipientName,
                 DeliveryPincode = o.DeliveryPincode,
                 DeliveryPriority = o.DeliveryPriority.ToString(),
@@ -121,7 +121,7 @@ public class OrderRepository : IOrderRepository
             {
                 Id = o.Id,
                 OrderNumber = o.OrderNumber,
-                CustomerName = o.Customer!.Name,
+                CustomerName = o.Customer != null ? o.Customer.Name : (o.RecipientName ?? string.Empty),
                 OrderDate = o.OrderDate,
                 DeliveryDate = o.DeliveryDate,
                 Status = o.Status.ToString(),
@@ -129,7 +129,7 @@ public class OrderRepository : IOrderRepository
                 FulfillmentStatus = o.FulfillmentStatus.ToString(),
                 OrderSource = o.OrderSource.ToString(),
                 TotalAmount = o.TotalAmount,
-                ItemCount = o.Items.Count,
+                ItemCount = o.Items != null ? o.Items.Count : 0,
                 RecipientName = o.RecipientName,
                 DeliveryPincode = o.DeliveryPincode,
                 DeliveryPriority = o.DeliveryPriority.ToString(),
@@ -140,30 +140,46 @@ public class OrderRepository : IOrderRepository
 
     public async Task<List<OrderListDto>> GetByDateAsync(Guid companyId, DateTime date)
     {
-        var dayStart = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
-        var dayEnd = dayStart.AddDays(1);
-        return await _db.Orders
-            .Where(o => o.CompanyId == companyId && o.IsActive && o.OrderDate >= dayStart && o.OrderDate < dayEnd)
+        var (dayStart, dayEnd) = GetUtcRangeForBusinessDate(date);
+        var orders = await _db.Orders
+            .Where(o => o.CompanyId == companyId && o.IsActive && o.Status != OrderStatus.Cancelled && o.OrderDate >= dayStart && o.OrderDate < dayEnd)
             .OrderBy(o => o.OrderDate)
-            .Select(o => new OrderListDto
-            {
-                Id = o.Id,
-                OrderNumber = o.OrderNumber,
-                CustomerName = o.Customer!.Name,
-                OrderDate = o.OrderDate,
-                DeliveryDate = o.DeliveryDate,
-                Status = o.Status.ToString(),
-                PaymentStatus = o.PaymentStatus.ToString(),
-                FulfillmentStatus = o.FulfillmentStatus.ToString(),
-                OrderSource = o.OrderSource.ToString(),
-                TotalAmount = o.TotalAmount,
-                ItemCount = o.Items.Count,
-                RecipientName = o.RecipientName,
-                DeliveryPincode = o.DeliveryPincode,
-                DeliveryPriority = o.DeliveryPriority.ToString(),
-                LocationId = o.LocationId
-            })
             .ToListAsync();
+
+        return orders.Select(o => new OrderListDto
+        {
+            Id = o.Id,
+            OrderNumber = o.OrderNumber,
+            CustomerName = o.Customer?.Name ?? o.RecipientName ?? string.Empty,
+            OrderDate = o.OrderDate,
+            DeliveryDate = o.DeliveryDate,
+            Status = o.Status.ToString(),
+            PaymentStatus = o.PaymentStatus.ToString(),
+            FulfillmentStatus = o.FulfillmentStatus.ToString(),
+            OrderSource = o.OrderSource.ToString(),
+            TotalAmount = o.TotalAmount,
+            ItemCount = o.Items?.Count ?? 0,
+            RecipientName = o.RecipientName,
+            DeliveryPincode = o.DeliveryPincode,
+            DeliveryPriority = o.DeliveryPriority.ToString(),
+            LocationId = o.LocationId
+        }).ToList();
+    }
+
+    private static (DateTime utcStart, DateTime utcEnd) GetUtcRangeForBusinessDate(DateTime businessDate)
+    {
+        if (TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Kolkata", out var tz) ||
+            TimeZoneInfo.TryFindSystemTimeZoneById("India Standard Time", out tz))
+        {
+            var istMidnight = new DateTime(businessDate.Year, businessDate.Month, businessDate.Day, 0, 0, 0, DateTimeKind.Unspecified);
+            var istEnd = istMidnight.AddDays(1);
+            var utcStart = TimeZoneInfo.ConvertTimeToUtc(istMidnight, tz);
+            var utcEnd = TimeZoneInfo.ConvertTimeToUtc(istEnd, tz);
+            return (utcStart, utcEnd);
+        }
+
+        var dayStart = DateTime.SpecifyKind(businessDate.Date, DateTimeKind.Utc);
+        return (dayStart, dayStart.AddDays(1));
     }
 
     public async Task<List<OrderListDto>> GetByCustomerAsync(Guid companyId, Guid customerId)
@@ -175,7 +191,7 @@ public class OrderRepository : IOrderRepository
             {
                 Id = o.Id,
                 OrderNumber = o.OrderNumber,
-                CustomerName = o.Customer!.Name,
+                CustomerName = o.Customer != null ? o.Customer.Name : (o.RecipientName ?? string.Empty),
                 OrderDate = o.OrderDate,
                 DeliveryDate = o.DeliveryDate,
                 Status = o.Status.ToString(),
@@ -183,7 +199,7 @@ public class OrderRepository : IOrderRepository
                 FulfillmentStatus = o.FulfillmentStatus.ToString(),
                 OrderSource = o.OrderSource.ToString(),
                 TotalAmount = o.TotalAmount,
-                ItemCount = o.Items.Count,
+                ItemCount = o.Items != null ? o.Items.Count : 0,
                 RecipientName = o.RecipientName,
                 DeliveryPincode = o.DeliveryPincode,
                 DeliveryPriority = o.DeliveryPriority.ToString(),

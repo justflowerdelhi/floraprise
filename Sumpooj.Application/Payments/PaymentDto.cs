@@ -13,6 +13,7 @@ public class PaymentDto
     public string? CardBrand { get; set; }
     public string? Last4 { get; set; }
     public string? TerminalId { get; set; }
+    public string PaymentType { get; set; } = "SaleTender";
     public DateTime CreatedAtUtc { get; set; }
 }
 
@@ -21,6 +22,7 @@ public class CreatePaymentRequest
     public Guid OrderId { get; set; }
     public string Method { get; set; } = default!;
     public decimal Amount { get; set; }
+    public string? PaymentType { get; set; }
     public Guid? LocationId { get; set; }
     public DateTime? PaymentDate { get; set; }
 }

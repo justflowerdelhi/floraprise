@@ -792,7 +792,7 @@ public class ProductionService
 
     // ─── Helpers ────────────────────────────────────────────
 
-    private static FloralRecipeDto MapRecipe(FloralRecipe r) => new()
+    public static FloralRecipeDto MapRecipe(FloralRecipe r) => new()
     {
         Id = r.Id,
         TenantId = r.CompanyId.ToString(),
@@ -808,6 +808,7 @@ public class ProductionService
             UnitCost = c.UnitCost
         }).ToList(),
         SampleImages = r.SampleImages?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList(),
+        SourceLibraryRecipeId = r.SourceLibraryRecipeId,
         IsActive = r.IsActive,
         CreatedAt = r.CreatedAtUtc.ToString("o"),
         UpdatedAt = (r.UpdatedAtUtc ?? r.CreatedAtUtc).ToString("o")

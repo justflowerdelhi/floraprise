@@ -6,6 +6,7 @@ import '../database/app_database.dart';
 import '../../models/gst_calculation_type.dart';
 import '../../services/barcode_service.dart';
 import 'cloud_product_repository.dart';
+import 'production_repository.dart';
 
 enum ProductSort {
   nameAsc,
@@ -145,6 +146,7 @@ class ProductInventoryRecord {
   final bool favorite;
   final int currentQty;
   final int minQty;
+  final int reservedQty;
 
   const ProductInventoryRecord({
     required this.id,
@@ -166,7 +168,14 @@ class ProductInventoryRecord {
     required this.favorite,
     required this.currentQty,
     required this.minQty,
+    this.reservedQty = 0,
   });
+
+  int get availableToSell {
+    if (!trackInventory) return 999999;
+    final avail = currentQty - reservedQty;
+    return avail < 0 ? 0 : (avail > currentQty ? currentQty : avail);
+  }
 }
 
 class CloudProductLocalUpsertResult {
@@ -272,8 +281,20 @@ class ProductRepository {
     }
 
     if (category != null && category.trim().isNotEmpty) {
-      where.add('category = ?');
-      args.add(category.trim());
+      final trimmedCat = category.trim();
+      if (ProductionRepository.isFinishedProductCategory(trimmedCat) &&
+          (trimmedCat.toLowerCase() == 'finished products' ||
+              trimmedCat.toLowerCase() == 'finished product')) {
+        final placeholders = List.filled(
+          ProductionRepository.finishedProductCategories.length,
+          '?',
+        ).join(', ');
+        where.add('LOWER(category) IN ($placeholders)');
+        args.addAll(ProductionRepository.finishedProductCategories);
+      } else {
+        where.add('category = ?');
+        args.add(trimmedCat);
+      }
     }
 
     if (trackInventory != null) {
@@ -726,7 +747,12 @@ class ProductRepository {
         p.active,
         p.is_favorite,
         COALESCE(i.current_qty, 0) AS current_qty,
-        COALESCE(i.min_qty, p.min_stock, 0) AS min_qty
+        COALESCE(i.min_qty, p.min_stock, 0) AS min_qty,
+        COALESCE((
+          SELECT SUM(r.quantity)
+          FROM inventory_reservations r
+          WHERE r.product_id = p.id AND r.status = 'active'
+        ), 0) AS reserved_qty
       FROM products p
       LEFT JOIN inventory_items i ON i.product_id = p.id
       WHERE p.active = 1 AND p.deleted_at IS NULL
@@ -762,6 +788,7 @@ class ProductRepository {
         favorite: (row['is_favorite'] as int? ?? 0) == 1,
         currentQty: row['current_qty'] as int,
         minQty: row['min_qty'] as int,
+        reservedQty: (row['reserved_qty'] as int?) ?? 0,
       );
     }).toList();
   }

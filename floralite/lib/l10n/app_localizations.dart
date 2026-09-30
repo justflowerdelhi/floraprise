@@ -3693,6 +3693,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Items'**
   String get items;
+
+  /// No description provided for @importCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Customers'**
+  String get importCustomers;
+
+  /// No description provided for @import.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get import;
+
+  /// No description provided for @importContacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Contacts'**
+  String get importContacts;
+
+  /// No description provided for @importExcelCsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Excel / CSV'**
+  String get importExcelCsv;
+
+  /// No description provided for @downloadSampleTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Sample Template'**
+  String get downloadSampleTemplate;
+
+  /// No description provided for @duplicateHandling.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate Handling'**
+  String get duplicateHandling;
+
+  /// No description provided for @skipExisting.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip Existing'**
+  String get skipExisting;
+
+  /// No description provided for @updateExisting.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Existing'**
+  String get updateExisting;
+
+  /// No description provided for @previewSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview Summary'**
+  String get previewSummary;
+
+  /// No description provided for @totalRowsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Rows'**
+  String get totalRowsCount;
+
+  /// No description provided for @readyToImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to Import'**
+  String get readyToImport;
+
+  /// No description provided for @duplicatesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicates Found'**
+  String get duplicatesFound;
+
+  /// No description provided for @invalidRowsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid Rows'**
+  String get invalidRowsCount;
+
+  /// No description provided for @importProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing Customers...'**
+  String get importProgress;
+
+  /// No description provided for @importResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Result'**
+  String get importResult;
+
+  /// No description provided for @importedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported'**
+  String get importedCount;
+
+  /// No description provided for @updatedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated'**
+  String get updatedCount;
+
+  /// No description provided for @skippedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get skippedCount;
+
+  /// No description provided for @downloadBillPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Bill (PDF)'**
+  String get downloadBillPdf;
+
+  /// No description provided for @downloadDeliverySlipPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Delivery Slip (PDF)'**
+  String get downloadDeliverySlipPdf;
+
+  /// No description provided for @billPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Bill (PDF)'**
+  String get billPdf;
+
+  /// No description provided for @deliverySlipPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery Slip (PDF)'**
+  String get deliverySlipPdf;
+
+  /// No description provided for @crmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'CRM'**
+  String get crmTitle;
+
+  /// No description provided for @crmToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get crmToday;
+
+  /// No description provided for @crmEnquiries.
+  ///
+  /// In en, this message translates to:
+  /// **'Enquiries'**
+  String get crmEnquiries;
+
+  /// No description provided for @crmFollowUps.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s Follow-ups'**
+  String get crmFollowUps;
+
+  /// No description provided for @crmNewEnquiries.
+  ///
+  /// In en, this message translates to:
+  /// **'New Enquiries'**
+  String get crmNewEnquiries;
+
+  /// No description provided for @crmQuotesPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Quotes Pending'**
+  String get crmQuotesPending;
+
+  /// No description provided for @crmOccasionsThisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Occasions This Week'**
+  String get crmOccasionsThisWeek;
+
+  /// No description provided for @crmOccasions.
+  ///
+  /// In en, this message translates to:
+  /// **'Occasions'**
+  String get crmOccasions;
 }
 
 class _AppLocalizationsDelegate

@@ -6,6 +6,7 @@ import '../models/gst_calculation_type.dart';
 import '../models/walk_in_line_item.dart';
 import '../services/discount_service.dart';
 import '../services/tax_calculation_engine.dart';
+import 'customer_manager.dart';
 
 class PricingValidation {
   final bool isValid;
@@ -108,6 +109,8 @@ class PricingManager {
   PricingValidation validatePayments({
     required int grandTotalPaise,
     required List<PaymentSplit> payments,
+    String customerName = '',
+    String customerPhone = '',
   }) {
     if (payments.isEmpty) {
       return const PricingValidation(
@@ -116,19 +119,37 @@ class PricingManager {
       );
     }
 
-    final allocated = payments.fold<int>(0, (sum, p) => sum + p.amountPaise);
-    if (allocated > grandTotalPaise) {
+    final totalAllocated = payments.fold<int>(0, (sum, p) => sum + p.amountPaise);
+    if (totalAllocated > grandTotalPaise) {
       return const PricingValidation(
         isValid: false,
         message: 'Payment total cannot exceed grand total',
       );
     }
 
-    if (allocated <= 0) {
+    if (totalAllocated <= 0) {
       return const PricingValidation(
         isValid: false,
         message: 'Please enter at least one payment amount',
       );
+    }
+
+    final paidPaise = payments
+        .where((p) => !p.isCreditOutstanding)
+        .fold<int>(0, (sum, p) => sum + p.amountPaise);
+    final outstandingPaise = grandTotalPaise - paidPaise;
+
+    if (outstandingPaise > 0) {
+      final hasValidName = customerName.trim().isNotEmpty;
+      final hasValidPhone = CustomerManager.isValidPhone(customerPhone);
+
+      if (!hasValidName || !hasValidPhone) {
+        return const PricingValidation(
+          isValid: false,
+          message:
+              'Customer Name and Phone Number are required for credit or partial payment transactions.',
+        );
+      }
     }
 
     return const PricingValidation(isValid: true);

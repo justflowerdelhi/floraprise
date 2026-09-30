@@ -1,12 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Text;
 using Sumpooj.API.Services.Mobile;
 using Sumpooj.Application.Authorization;
+using Sumpooj.Application.Companies;
 using Sumpooj.Application.Mobile;
 using Sumpooj.Domain.Entities;
+using Sumpooj.Infrastructure.Identity;
 using Sumpooj.Infrastructure.Persistence;
 
 namespace Sumpooj.API.Controllers;
@@ -19,15 +22,21 @@ public sealed class PlatformMobileAdministrationController : ControllerBase
     private readonly SumpoojDbContext _db;
     private readonly IMobileClientService _mobileClientService;
     private readonly IMobileSubscriptionService _mobileSubscriptionService;
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ICompanyService _companyService;
 
     public PlatformMobileAdministrationController(
         SumpoojDbContext db,
         IMobileClientService mobileClientService,
-        IMobileSubscriptionService mobileSubscriptionService)
+        IMobileSubscriptionService mobileSubscriptionService,
+        UserManager<ApplicationUser> userManager,
+        ICompanyService companyService)
     {
         _db = db;
         _mobileClientService = mobileClientService;
         _mobileSubscriptionService = mobileSubscriptionService;
+        _userManager = userManager;
+        _companyService = companyService;
     }
 
     [HttpGet("dashboard")]
@@ -779,39 +788,96 @@ public sealed class PlatformMobileAdministrationController : ControllerBase
         });
     }
 
-    [HttpGet("customers/{mobileUserId:guid}")]
-    public async Task<IActionResult> GetCustomerDetails([FromRoute] Guid mobileUserId, [FromQuery] Guid companyId)
+    [HttpGet("customers/{id:guid}")]
+    public async Task<IActionResult> GetCustomerDetails([FromRoute] Guid id, [FromQuery] Guid? companyId = null)
     {
+        var targetCompanyId = companyId ?? id;
         var user = await _db.MobileUsers
             .AsNoTracking()
             .Include(x => x.MobileCustomer)
             .Include(x => x.Subscription)
                 .ThenInclude(x => x!.SubscriptionPlan)
-            .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Id == mobileUserId && !x.IsDeleted);
+            .FirstOrDefaultAsync(x => (x.Id == id || x.CompanyId == targetCompanyId) && !x.IsDeleted);
 
         if (user == null)
             return NotFound(new { message = "Mobile customer not found." });
 
+        var effectiveCompanyId = user.CompanyId;
+        var effectiveUserId = user.Id;
+
+        var company = await _db.Companies
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == effectiveCompanyId);
+
+        var locations = await _db.Locations
+            .AsNoTracking()
+            .Where(x => x.CompanyId == effectiveCompanyId)
+            .OrderByDescending(x => x.IsDefault)
+            .ThenBy(x => x.Name)
+            .Select(x => new MobileAdminLocationDto
+            {
+                Id = x.Id,
+                CompanyId = x.CompanyId,
+                Name = x.Name,
+                Code = x.Code,
+                Type = x.LocationType.ToString(),
+                Address = x.Address,
+                IsActive = x.IsActive,
+                IsDefault = x.IsDefault,
+                CreatedAtUtc = x.CreatedAtUtc,
+            })
+            .ToListAsync();
+
+        var licenses = await _db.MobileLicenses
+            .AsNoTracking()
+            .Include(x => x.MobileDevice)
+            .Include(x => x.MobileSubscription)
+                .ThenInclude(x => x!.SubscriptionPlan)
+            .Where(x => x.CompanyId == effectiveCompanyId && !x.IsDeleted)
+            .OrderByDescending(x => x.IssuedAtUtc)
+            .Select(x => new MobileAdminLicenseListItemDto
+            {
+                MobileLicenseId = x.Id,
+                CompanyId = x.CompanyId,
+                MobileUserId = x.MobileDevice != null ? x.MobileDevice.MobileUserId : effectiveUserId,
+                LicenseNumber = x.Id.ToString(),
+                BusinessName = user.MobileCustomer != null ? user.MobileCustomer.BusinessName : user.FullName,
+                Plan = x.MobileSubscription != null && x.MobileSubscription.SubscriptionPlan != null 
+                    ? (x.MobileSubscription.SubscriptionPlan.Name ?? x.MobileSubscription.SubscriptionPlan.Code)
+                    : (user.Subscription != null && user.Subscription.SubscriptionPlan != null ? user.Subscription.SubscriptionPlan.Name : "Pro"),
+                Status = x.Status.ToString(),
+                IssueDateUtc = x.IssuedAtUtc,
+                ExpiryDateUtc = x.ExpiryUtc,
+                RemainingDays = x.MobileSubscription != null ? GetRemainingDays(x.MobileSubscription) : (user.Subscription != null ? GetRemainingDays(user.Subscription) : 0),
+            })
+            .ToListAsync();
+
         var devices = await _db.MobileDevices
             .AsNoTracking()
-            .Where(x => x.CompanyId == companyId && x.MobileUserId == mobileUserId && !x.IsDeleted)
+            .Include(x => x.License)
+            .Where(x => x.CompanyId == effectiveCompanyId && x.MobileUserId == effectiveUserId && !x.IsDeleted)
             .Select(x => new MobileAdminDeviceDto
             {
+                MobileDeviceId = x.Id,
                 DeviceId = x.DeviceId,
+                DeviceName = string.IsNullOrWhiteSpace(x.Model) ? x.DeviceId : x.Model,
+                Model = x.Model,
                 Platform = x.Platform,
                 AppVersion = x.AppVersion,
                 Status = x.Status.ToString(),
+                LicenseKey = x.License != null ? x.License.Id.ToString() : null,
                 LastHeartbeatAtUtc = x.LastHeartbeatAtUtc,
                 LastLoginAtUtc = x.LastLoginAtUtc,
                 LastSyncAtUtc = x.LastSyncAtUtc,
                 LastIpAddress = x.LastIpAddress,
+                RegisteredAtUtc = x.CreatedAtUtc,
             })
             .OrderByDescending(x => x.LastHeartbeatAtUtc)
             .ToListAsync();
 
         var payments = await _db.MobilePaymentTransactions
             .AsNoTracking()
-            .Where(x => x.CompanyId == companyId
+            .Where(x => x.CompanyId == effectiveCompanyId
                         && user.Subscription != null
                         && x.MobileSubscriptionId == user.Subscription.Id
                         && !x.IsDeleted)
@@ -898,6 +964,24 @@ public sealed class PlatformMobileAdministrationController : ControllerBase
             }
         }
 
+        var auditLogs = await _db.AuditLogs
+            .AsNoTracking()
+            .Where(x => x.CompanyId == effectiveCompanyId)
+            .OrderByDescending(x => x.Timestamp)
+            .Take(20)
+            .ToListAsync();
+
+        foreach (var al in auditLogs)
+        {
+            activityTimeline.Add(new MobileAdminTimelineItemDto
+            {
+                TimestampUtc = al.Timestamp,
+                Category = "support",
+                Title = al.Action,
+                Description = $"{al.UserName ?? "Admin"}: {al.Description ?? al.Action}",
+            });
+        }
+
         activityTimeline = activityTimeline
             .OrderByDescending(x => x.TimestampUtc)
             .Take(100)
@@ -908,21 +992,29 @@ public sealed class PlatformMobileAdministrationController : ControllerBase
             MobileUserId = user.Id,
             CompanyId = user.CompanyId,
             CustomerName = user.FullName,
-            BusinessName = user.MobileCustomer?.BusinessName,
-            OwnerName = user.MobileCustomer?.OwnerName,
+            BusinessName = user.MobileCustomer?.BusinessName ?? company?.Name,
+            OwnerName = user.MobileCustomer?.OwnerName ?? user.FullName,
+            Address = company?.Address,
             City = user.MobileCustomer?.City,
             State = user.MobileCustomer?.State,
-            Country = user.MobileCustomer?.Country,
+            Country = user.MobileCustomer?.Country ?? "IN",
+            TaxIdentifier = company?.TaxIdentifier,
             Mobile = user.Mobile,
-            Email = user.Email,
+            Email = user.Email ?? company?.Email,
             UserStatus = user.Status.ToString(),
             SubscriptionStatus = user.Subscription?.Status.ToString() ?? "Unknown",
             PlanCode = user.Subscription?.SubscriptionPlan?.Code,
             PlanName = user.Subscription?.SubscriptionPlan?.Name,
             TrialEndUtc = user.Subscription?.TrialEndUtc,
             SubscriptionEndUtc = user.Subscription?.EndUtc,
+            SubscriptionStartedAtUtc = user.Subscription?.CreatedAtUtc,
             AutoRenew = user.Subscription?.AutoRenew,
             RemainingDays = GetRemainingDays(user.Subscription),
+            MaxDevices = user.Subscription?.SubscriptionPlan?.MaximumDevices ?? 3,
+            MaxStaff = user.Subscription?.SubscriptionPlan?.MaximumStaff ?? 10,
+            IncludedModulesJson = user.Subscription?.SubscriptionPlan?.IncludedModulesJson,
+            Locations = locations,
+            Licenses = licenses,
             Devices = devices,
             RecentPayments = payments,
             ActivityTimeline = activityTimeline,
@@ -1016,17 +1108,258 @@ public sealed class PlatformMobileAdministrationController : ControllerBase
         return Ok(new { message = "Mobile customer suspended successfully." });
     }
 
+    [HttpPost("onboard")]
+    public async Task<IActionResult> Onboard([FromBody] MobileAdminOnboardRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.BusinessName) ||
+            string.IsNullOrWhiteSpace(request.OwnerName) ||
+            string.IsNullOrWhiteSpace(request.Mobile))
+        {
+            return BadRequest(new { message = "Business name, owner name, and mobile phone number are required." });
+        }
+
+        var mobile = request.Mobile.Trim();
+        var email = string.IsNullOrWhiteSpace(request.Email)
+            ? $"{mobile}@floraprise.com"
+            : request.Email.Trim();
+        var businessName = request.BusinessName.Trim();
+        var ownerName = request.OwnerName.Trim();
+
+        var existingUser = await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == mobile || u.Email == email, cancellationToken);
+        if (existingUser != null)
+        {
+            return Conflict(new
+            {
+                errorCode = "PHONE_OR_EMAIL_IN_USE",
+                message = "A user account with this mobile number or email address already exists."
+            });
+        }
+
+        var executionStrategy = _db.Database.CreateExecutionStrategy();
+        Company? company = null;
+        MobileUser? mobileUser = null;
+        Location? location = null;
+        MobileSubscription? subscription = null;
+
+        await executionStrategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+            // 1. Company
+            company = new Company(
+                name: businessName,
+                region: request.Country ?? "IN",
+                email: email,
+                phone: mobile,
+                address: request.Address?.Trim(),
+                shortDescription: "Onboarded via Central Admin",
+                logoPath: null,
+                timeZone: "Asia/Kolkata",
+                currencyCode: "INR",
+                taxIdentifier: request.TaxIdentifier?.Trim()
+            );
+
+            if (!request.ActivateImmediately)
+            {
+                company.Deactivate();
+            }
+
+            _db.Companies.Add(company);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            // 2. Default Location ("Main Store" / "MAIN-01")
+            var locName = string.IsNullOrWhiteSpace(request.LocationName) ? "Main Store" : request.LocationName.Trim();
+            var locCode = string.IsNullOrWhiteSpace(request.LocationCode) ? "MAIN-01" : request.LocationCode.Trim();
+            Enum.TryParse<LocationType>(request.LocationType, true, out var locType);
+            if (locType == default) locType = LocationType.Store;
+
+            location = new Location(
+                company.Id,
+                locName,
+                locCode,
+                locType,
+                request.Address?.Trim()
+            );
+            location.SetAsDefault();
+            _db.Locations.Add(location);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            // 3. ApplicationUser
+            var appUser = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                PhoneNumber = mobile,
+                CompanyId = company.Id,
+                EmailConfirmed = true,
+                PhoneNumberConfirmed = true,
+                IsActive = request.ActivateImmediately
+            };
+
+            var password = string.IsNullOrWhiteSpace(request.Password) ? "Floraprise@123" : request.Password;
+            var createRes = await _userManager.CreateAsync(appUser, password);
+            if (!createRes.Succeeded)
+            {
+                throw new InvalidOperationException($"Failed to create admin user: {string.Join(", ", createRes.Errors.Select(e => e.Description))}");
+            }
+
+            await _userManager.AddToRoleAsync(appUser, "CompanyAdmin");
+
+            // 4. MobileCustomer
+            var customer = new MobileCustomer(
+                company.Id,
+                businessName,
+                ownerName,
+                mobile
+            );
+            customer.UpdateProfile(email, request.City?.Trim(), request.State?.Trim(), request.Country ?? "IN", appUser.Id);
+            customer.SetCreatedBy(appUser.Id);
+            _db.MobileCustomers.Add(customer);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            // 5. MobileUser
+            mobileUser = new MobileUser(
+                company.Id,
+                customer.Id,
+                ownerName,
+                mobile,
+                email
+            );
+
+            if (request.ActivateImmediately)
+            {
+                mobileUser.Activate(appUser.Id);
+            }
+            else
+            {
+                mobileUser.SetPendingOnboarding(appUser.Id);
+            }
+            mobileUser.SetCreatedBy(appUser.Id);
+            _db.MobileUsers.Add(mobileUser);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            // 6. MobileSubscription
+            SubscriptionPlan? plan = null;
+            if (request.PlanId.HasValue)
+            {
+                plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == request.PlanId.Value && !p.IsDeleted, cancellationToken);
+            }
+            else if (!string.IsNullOrWhiteSpace(request.PlanCode))
+            {
+                var pCode = request.PlanCode.Trim().ToUpperInvariant();
+                plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Code == pCode && !p.IsDeleted, cancellationToken);
+            }
+
+            if (plan == null)
+            {
+                plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.IsActive && !p.IsDeleted, cancellationToken);
+            }
+
+            var now = DateTime.UtcNow;
+            if (plan != null)
+            {
+                var trialDays = Math.Max(1, plan.TrialDays);
+                subscription = new MobileSubscription(
+                    company.Id,
+                    mobileUser.Id,
+                    plan.Id,
+                    now,
+                    now.AddDays(trialDays)
+                );
+
+                if (request.ActivateImmediately)
+                {
+                    var isAnnual = string.Equals(request.BillingCycle, "annual", StringComparison.OrdinalIgnoreCase);
+                    var durationDays = isAnnual ? 365 : 30;
+                    subscription.Activate(now, now.AddDays(durationDays), true, appUser.Id);
+                }
+                subscription.SetCreatedBy(appUser.Id);
+                _db.MobileSubscriptions.Add(subscription);
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
+            await tx.CommitAsync(cancellationToken);
+        });
+
+        await LogSupportActionAsync(
+            company!.Id,
+            mobileUser?.Id,
+            "ACCOUNT_ONBOARDED",
+            null,
+            new { request.BusinessName, request.OwnerName, request.Mobile, request.ActivateImmediately },
+            request.Notes,
+            cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            companyId = company.Id,
+            mobileUserId = mobileUser?.Id,
+            businessName = company.Name,
+            ownerName,
+            mobile,
+            email,
+            status = request.ActivateImmediately ? "Active" : "PendingOnboarding",
+            locationId = location?.Id,
+            locationName = location?.Name,
+            locationCode = location?.Code,
+            subscriptionId = subscription?.Id,
+            message = request.ActivateImmediately ? "Subscriber onboarded and activated successfully." : "Subscriber onboarded in Pending Onboarding status."
+        });
+    }
+
     [HttpPost("customers/{mobileUserId:guid}/activate")]
     public async Task<IActionResult> Activate([FromRoute] Guid mobileUserId, [FromBody] MobileAdminCompanyScopedRequest request, CancellationToken cancellationToken)
     {
         var user = await _db.MobileUsers
+            .Include(x => x.Subscription)
             .FirstOrDefaultAsync(x => x.CompanyId == request.CompanyId && x.Id == mobileUserId && !x.IsDeleted, cancellationToken);
 
         if (user == null)
             return NotFound(new { message = "Mobile customer not found." });
 
+        // STRICT CHECK 1: Company must exist
+        var company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == request.CompanyId, cancellationToken);
+        if (company == null)
+            return BadRequest(new { success = false, message = "Cannot activate: Company record does not exist." });
+
+        // STRICT CHECK 2: Default Location must exist and be active
+        var hasDefaultLocation = await _db.Locations.AnyAsync(l => l.CompanyId == request.CompanyId && l.IsDefault && l.IsActive, cancellationToken);
+        if (!hasDefaultLocation)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                errorCode = "MISSING_DEFAULT_LOCATION",
+                message = "Cannot activate: Missing active default location. Remediate default location first before activation.",
+                failedCheck = "location"
+            });
+        }
+
+        // Activate Company
+        company.Activate();
+
+        // Activate ApplicationUser
+        var appUsers = await _userManager.Users.Where(u => u.CompanyId == request.CompanyId).ToListAsync(cancellationToken);
+        foreach (var appUser in appUsers)
+        {
+            appUser.IsActive = true;
+        }
+
+        // Activate MobileUser
+        var prev = new { UserStatus = user.Status.ToString() };
         user.Activate(null);
 
+        // Ensure Subscription is Active
+        if (user.Subscription != null)
+        {
+            if (user.Subscription.Status != MobileSubscriptionStatus.Active && user.Subscription.Status != MobileSubscriptionStatus.Trial)
+            {
+                user.Subscription.Activate(DateTime.UtcNow, DateTime.UtcNow.AddYears(1), user.Subscription.AutoRenew, null);
+            }
+        }
+
+        // Activate Devices and Licenses
         var deviceIds = await _db.MobileDevices
             .Where(x => x.CompanyId == request.CompanyId && x.MobileUserId == mobileUserId && !x.IsDeleted)
             .Select(x => x.Id)
@@ -1039,9 +1372,86 @@ public sealed class PlatformMobileAdministrationController : ControllerBase
             license.Activate(null);
 
         await _db.SaveChangesAsync(cancellationToken);
-        await LogSupportActionAsync(request.CompanyId, mobileUserId, "ACCOUNT_ACTIVATED", new { UserStatus = "Suspended" }, new { UserStatus = "Active" }, request.Notes, cancellationToken);
+        await LogSupportActionAsync(request.CompanyId, mobileUserId, "ACCOUNT_ACTIVATED", prev, new { UserStatus = "Active" }, request.Notes, cancellationToken);
 
-        return Ok(new { message = "Mobile customer activated successfully." });
+        return Ok(new
+        {
+            success = true,
+            message = "Mobile customer activated successfully.",
+            companyId = request.CompanyId,
+            mobileUserId,
+            userStatus = "Active",
+            subscriptionStatus = user.Subscription?.Status.ToString() ?? "Active"
+        });
+    }
+
+    [HttpPost("companies/{companyId:guid}/remediate-default-location")]
+    public async Task<IActionResult> RemediateDefaultLocation([FromRoute] Guid companyId, [FromBody] MobileAdminSupportActionRequest request, CancellationToken cancellationToken)
+    {
+        var company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, cancellationToken);
+        if (company == null)
+            return NotFound(new { message = "Company not found." });
+
+        var locations = await _db.Locations
+            .Where(l => l.CompanyId == companyId)
+            .ToListAsync(cancellationToken);
+
+        var existingDefault = locations.FirstOrDefault(l => l.IsDefault && l.IsActive);
+        if (existingDefault != null)
+        {
+            return Ok(new
+            {
+                success = true,
+                message = "Active default location already exists.",
+                location = new
+                {
+                    id = existingDefault.Id,
+                    name = existingDefault.Name,
+                    code = existingDefault.Code,
+                    type = existingDefault.LocationType.ToString(),
+                    isDefault = existingDefault.IsDefault,
+                    isActive = existingDefault.IsActive
+                }
+            });
+        }
+
+        var target = locations.FirstOrDefault(l => l.Name.Equals("Main Store", StringComparison.OrdinalIgnoreCase) || l.Code.Equals("MAIN-01", StringComparison.OrdinalIgnoreCase))
+            ?? locations.FirstOrDefault();
+
+        if (target != null)
+        {
+            target.Activate();
+            target.SetAsDefault();
+        }
+        else
+        {
+            target = new Location(
+                companyId,
+                name: "Main Store",
+                code: "MAIN-01",
+                locationType: LocationType.Store,
+                address: company.Address);
+            target.SetAsDefault();
+            _db.Locations.Add(target);
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await LogSupportActionAsync(companyId, null, "LOCATION_REMEDIATED", null, new { LocationId = target.Id, target.Name, target.Code }, request.Notes, cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            message = "Default location provisioned successfully.",
+            location = new
+            {
+                id = target.Id,
+                name = target.Name,
+                code = target.Code,
+                type = target.LocationType.ToString(),
+                isDefault = target.IsDefault,
+                isActive = target.IsActive
+            }
+        });
     }
 
     [HttpPost("customers/{mobileUserId:guid}/extend")]
@@ -1397,9 +1807,12 @@ public sealed class MobileAdminCustomerDetailDto
     public string CustomerName { get; set; } = string.Empty;
     public string? BusinessName { get; set; }
     public string? OwnerName { get; set; }
+    public string? Address { get; set; }
     public string? City { get; set; }
     public string? State { get; set; }
     public string? Country { get; set; }
+    public string? PinCode { get; set; }
+    public string? TaxIdentifier { get; set; }
     public string Mobile { get; set; } = string.Empty;
     public string? Email { get; set; }
     public string UserStatus { get; set; } = string.Empty;
@@ -1408,11 +1821,30 @@ public sealed class MobileAdminCustomerDetailDto
     public string? PlanName { get; set; }
     public DateTime? TrialEndUtc { get; set; }
     public DateTime? SubscriptionEndUtc { get; set; }
+    public DateTime? SubscriptionStartedAtUtc { get; set; }
     public bool? AutoRenew { get; set; }
     public int RemainingDays { get; set; }
+    public int MaxDevices { get; set; } = 3;
+    public int MaxStaff { get; set; } = 10;
+    public string? IncludedModulesJson { get; set; }
+    public List<MobileAdminLocationDto> Locations { get; set; } = new();
+    public List<MobileAdminLicenseListItemDto> Licenses { get; set; } = new();
     public List<MobileAdminDeviceDto> Devices { get; set; } = new();
     public List<MobileAdminPaymentDto> RecentPayments { get; set; } = new();
     public List<MobileAdminTimelineItemDto> ActivityTimeline { get; set; } = new();
+}
+
+public sealed class MobileAdminLocationDto
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Code { get; set; } = string.Empty;
+    public string Type { get; set; } = "Store";
+    public string? Address { get; set; }
+    public bool IsActive { get; set; }
+    public bool IsDefault { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 }
 
 public sealed class MobileAdminTimelineItemDto
@@ -1425,14 +1857,19 @@ public sealed class MobileAdminTimelineItemDto
 
 public sealed class MobileAdminDeviceDto
 {
+    public Guid? MobileDeviceId { get; set; }
     public string DeviceId { get; set; } = string.Empty;
+    public string? DeviceName { get; set; }
+    public string? Model { get; set; }
     public string Platform { get; set; } = string.Empty;
     public string AppVersion { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
+    public string? LicenseKey { get; set; }
     public DateTime? LastHeartbeatAtUtc { get; set; }
     public DateTime? LastLoginAtUtc { get; set; }
     public DateTime? LastSyncAtUtc { get; set; }
     public string? LastIpAddress { get; set; }
+    public DateTime? RegisteredAtUtc { get; set; }
 }
 
 public sealed class MobileAdminPaymentDto
@@ -1487,4 +1924,27 @@ public sealed class MobileAdminConvertTrialRequest : MobileAdminCompanyScopedReq
 {
     public Guid PlanId { get; set; }
     public string BillingCycle { get; set; } = "monthly";
+}
+
+public sealed class MobileAdminOnboardRequest
+{
+    public string BusinessName { get; set; } = string.Empty;
+    public string OwnerName { get; set; } = string.Empty;
+    public string Mobile { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public string? Password { get; set; }
+    public string? Address { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? PinCode { get; set; }
+    public string? Country { get; set; } = "IN";
+    public string? TaxIdentifier { get; set; }
+    public string? PlanCode { get; set; }
+    public Guid? PlanId { get; set; }
+    public string BillingCycle { get; set; } = "annual";
+    public bool ActivateImmediately { get; set; } = false;
+    public string? LocationName { get; set; } = "Main Store";
+    public string? LocationCode { get; set; } = "MAIN-01";
+    public string? LocationType { get; set; } = "Store";
+    public string? Notes { get; set; }
 }

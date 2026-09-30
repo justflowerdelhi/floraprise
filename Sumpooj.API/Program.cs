@@ -30,13 +30,16 @@ using Sumpooj.Infrastructure.Identity;
 using Sumpooj.Infrastructure.Persistence;
 using Sumpooj.Infrastructure.Persistence.Repositories;
 using Sumpooj.Infrastructure.Repositories;
-using Sumpooj.Application.Marketing;
 using Sumpooj.Application.Email;
+using Sumpooj.Application.Library;
+using Sumpooj.Application.Marketing;
 using Sumpooj.Application.Mobile;
 using Sumpooj.Application.Services;
 using Sumpooj.Application.WhatsApp;
 using Sumpooj.Infrastructure.Email;
+using Sumpooj.Infrastructure.Services;
 using Sumpooj.Infrastructure.WhatsApp;
+using Sumpooj.Infrastructure.Workers;
 using System.Diagnostics;
 using System.Security.Claims;
 using System.Text;
@@ -257,6 +260,18 @@ builder.Services.AddScoped<IBarcodeRepository, BarcodeRepository>();
 builder.Services.AddScoped<IProductCategoryRepository, ProductCategoryRepository>();
 builder.Services.AddScoped<ProductCategoryService>();
 
+builder.Services.AddScoped<ILibraryCategoryRepository, LibraryCategoryRepository>();
+builder.Services.AddScoped<ILibraryProductRepository, LibraryProductRepository>();
+builder.Services.AddScoped<ILibraryRecipeRepository, LibraryRecipeRepository>();
+builder.Services.AddScoped<ILibraryDesignRepository, LibraryDesignRepository>();
+builder.Services.AddScoped<ILibraryCardRepository, LibraryCardRepository>();
+builder.Services.AddScoped<ILibraryTutorialRepository, LibraryTutorialRepository>();
+builder.Services.AddScoped<ILibraryFestivalRepository, LibraryFestivalRepository>();
+builder.Services.AddScoped<ILibraryWeddingDateRepository, LibraryWeddingDateRepository>();
+builder.Services.AddScoped<ICloudDesignRepository, CloudDesignRepository>();
+builder.Services.AddScoped<ILibraryService, LibraryService>();
+builder.Services.AddScoped<LibraryService>();
+
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 builder.Services.AddScoped<SupplierService>();
 
@@ -415,6 +430,10 @@ if (builder.Configuration.GetValue("Corporate:EnableBirthdayAutomation", false))
 {
     builder.Services.AddHostedService<CorporateBirthdayAutomationHostedService>();
 }
+
+// FCM Push Notifications & Scheduled Task Audible Reminders
+builder.Services.AddHttpClient<IFcmNotificationService, FcmNotificationService>();
+builder.Services.AddHostedService<ScheduledTaskReminderWorker>();
 
 #endregion
 
@@ -875,6 +894,24 @@ try
                       AND column_name = 'IsPriceMismatch'
                 ) THEN
                     ALTER TABLE "PurchaseOrderItems" ADD COLUMN "IsPriceMismatch" boolean NULL;
+                END IF;
+            END $$;
+            """);
+
+            // Self-heal: ensure OrderItems.ProductId is nullable to support custom / My Design order lines.
+            await db.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'OrderItems'
+                      AND column_name = 'ProductId'
+                      AND is_nullable = 'NO'
+                ) THEN
+                    ALTER TABLE "OrderItems" ALTER COLUMN "ProductId" DROP NOT NULL;
                 END IF;
             END $$;
             """);

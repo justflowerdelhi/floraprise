@@ -42,6 +42,7 @@ public class AdminDemoRequestsController : ControllerBase
             Id = d.Id,
             FullName = d.FullName,
             BusinessEmail = d.BusinessEmail,
+            PhoneNumber = d.PhoneNumber,
             BusinessType = d.BusinessType,
             CurrentSoftware = d.CurrentSoftware,
             Notes = d.Notes,
@@ -68,6 +69,7 @@ public class AdminDemoRequestsController : ControllerBase
             Id = d.Id,
             FullName = d.FullName,
             BusinessEmail = d.BusinessEmail,
+            PhoneNumber = d.PhoneNumber,
             BusinessType = d.BusinessType,
             CurrentSoftware = d.CurrentSoftware,
             Notes = d.Notes,
@@ -116,6 +118,7 @@ public class AdminDemoRequestsController : ControllerBase
             Name = demo.FullName,
             Region = "IN",
             Email = demo.BusinessEmail,
+            Phone = demo.PhoneNumber,
             ShortDescription = demo.BusinessType,
             TimeZone = "Asia/Kolkata",
             CurrencyCode = "INR",
@@ -133,6 +136,7 @@ public class AdminDemoRequestsController : ControllerBase
             if (existingUser.CompanyId == null)
             {
                 existingUser.CompanyId = companyId;
+                existingUser.PhoneNumber = demo.PhoneNumber ?? existingUser.PhoneNumber;
                 await _userManager.UpdateAsync(existingUser);
             }
         }
@@ -142,6 +146,7 @@ public class AdminDemoRequestsController : ControllerBase
             {
                 UserName = adminEmail,
                 Email = adminEmail,
+                PhoneNumber = demo.PhoneNumber,
                 CompanyId = companyId,
                 EmailConfirmed = true,
                 IsActive = true,
@@ -189,6 +194,7 @@ public class DemoRequestListDto
     public Guid Id { get; set; }
     public string FullName { get; set; } = default!;
     public string BusinessEmail { get; set; } = default!;
+    public string? PhoneNumber { get; set; }
     public string? BusinessType { get; set; }
     public string? CurrentSoftware { get; set; }
     public string? Notes { get; set; }

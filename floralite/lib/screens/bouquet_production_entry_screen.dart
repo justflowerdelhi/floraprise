@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/repositories/production_repository.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/library/library_recipe_picker_sheet.dart';
 import 'bouquet_builder_screen.dart';
 
 class BouquetProductionEntryScreen extends StatefulWidget {
@@ -45,6 +46,22 @@ class _BouquetProductionEntryScreenState
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _useLibraryRecipe() async {
+    final result = await LibraryRecipePickerSheet.show(context);
+    if (result == null || !mounted) return;
+
+    if (result.importedId != null) {
+      final numericId = int.tryParse(result.importedId!);
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BouquetBuilderScreen(existingProductId: numericId),
+        ),
+      );
+    } else {
+      _openNewBouquet();
     }
   }
 
@@ -155,6 +172,55 @@ class _BouquetProductionEntryScreenState
                             const SizedBox(height: 4),
                             const Text(
                               'Start from a saved recipe and customise',
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_isLoading)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        const Icon(Icons.chevron_right),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              AppCard(
+                onTap: _isLoading ? null : _useLibraryRecipe,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.menu_book_rounded,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Use Library Recipe',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Start from a curated Floraprise master recipe',
                             ),
                           ],
                         ),

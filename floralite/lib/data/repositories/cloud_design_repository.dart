@@ -77,6 +77,17 @@ class CloudDesignRepository {
     return DesignRecord.fromCloudJson(response);
   }
 
+  String? _durableImageReference(String? value) {
+    final image = value?.trim();
+    if (image == null || image.isEmpty) {
+      return null;
+    }
+    if (image.toLowerCase().startsWith('blob:')) {
+      return null;
+    }
+    return image;
+  }
+
   Future<DesignRecord> create({
     required String? imagePath,
     required String description,
@@ -91,7 +102,7 @@ class CloudDesignRepository {
     final uri = Uri.parse('${_auth.baseUrl}/api/designs');
     final body = {
       'description': description.trim(),
-      'imageReference': imagePath?.trim(),
+      'imageReference': _durableImageReference(imagePath),
       'sellingPricePaise': sellingPricePaise,
       'flowers': flowers?.trim(),
       'occasion': occasion?.trim(),
@@ -123,7 +134,7 @@ class CloudDesignRepository {
     final uri = Uri.parse('${_auth.baseUrl}/api/designs/$id');
     final body = {
       'description': description.trim(),
-      'imageReference': imagePath?.trim(),
+      'imageReference': _durableImageReference(imagePath),
       'sellingPricePaise': sellingPricePaise,
       'flowers': flowers?.trim(),
       'occasion': occasion?.trim(),

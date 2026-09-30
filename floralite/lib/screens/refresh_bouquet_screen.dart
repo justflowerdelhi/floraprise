@@ -25,6 +25,8 @@ class _RefreshBouquetScreenState extends State<RefreshBouquetScreen> {
   bool _returnToInventory = true;
   ProductRecord? _selectedProduct;
   bool _isSaving = false;
+  List<ReadyBouquetConsumptionRecord> _consumptions = const [];
+  bool _isLoadingConsumptions = false;
 
   final List<(String value, String label, IconData icon)> _actions = const [
     ('replace', 'Replace', Icons.swap_horiz),
@@ -32,10 +34,69 @@ class _RefreshBouquetScreenState extends State<RefreshBouquetScreen> {
     ('remove', 'Remove', Icons.remove),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadConsumptions();
+  }
+
+  Future<void> _loadConsumptions() async {
+    setState(() => _isLoadingConsumptions = true);
+    try {
+      final list = await _repository.getBatchConsumptions(
+        batchId: widget.batch.id,
+        cloudBatchId: widget.batch.cloudId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _consumptions = list;
+        _isLoadingConsumptions = false;
+        if (list.isNotEmpty && _selectedProduct == null) {
+          _selectedProduct = _recordFromConsumption(list.first);
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingConsumptions = false);
+    }
+  }
+
+  static ProductRecord _recordFromConsumption(ReadyBouquetConsumptionRecord c) {
+    final now = DateTime.now().toIso8601String();
+    return ProductRecord(
+      id: -1,
+      name: c.productName,
+      category: 'Raw Materials',
+      defaultUnit: '${c.quantity} ${c.unit}',
+      sellingPricePaise: 0,
+      purchasePricePaise: 0,
+      gstPercent: 0,
+      sku: '',
+      manufacturerBarcode: '',
+      florapriseBarcode: '',
+      trackInventory: true,
+      minStock: 0,
+      supplier: '',
+      notes: '',
+      active: true,
+      favorite: false,
+      cloudProductId: c.rawProductId,
+      deletedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
   Future<void> _pickProduct() async {
     final product = await showProductPickerSheet(context);
     if (product == null || !mounted) return;
     setState(() => _selectedProduct = product);
+  }
+
+  void _selectConsumption(ReadyBouquetConsumptionRecord c) {
+    setState(() {
+      _selectedProduct = _recordFromConsumption(c);
+    });
   }
 
   Future<void> _save() async {
@@ -58,6 +119,7 @@ class _RefreshBouquetScreenState extends State<RefreshBouquetScreen> {
             cloudBatchId: widget.batch.cloudId,
             productId: product.id,
             cloudProductId: product.cloudProductId,
+            productName: product.name,
             quantity: _quantity,
           );
         case 'add':
@@ -66,6 +128,7 @@ class _RefreshBouquetScreenState extends State<RefreshBouquetScreen> {
             cloudBatchId: widget.batch.cloudId,
             productId: product.id,
             cloudProductId: product.cloudProductId,
+            productName: product.name,
             quantity: _quantity,
           );
         case 'remove':
@@ -74,6 +137,7 @@ class _RefreshBouquetScreenState extends State<RefreshBouquetScreen> {
             cloudBatchId: widget.batch.cloudId,
             productId: product.id,
             cloudProductId: product.cloudProductId,
+            productName: product.name,
             quantity: _quantity,
             returnToInventory: _returnToInventory,
           );
@@ -97,6 +161,19 @@ class _RefreshBouquetScreenState extends State<RefreshBouquetScreen> {
     );
   }
 
+  String _formatComponentSubtitle(ProductRecord product) {
+    if (product.id > 0) {
+      return 'ID: ${product.id}';
+    }
+    if (product.defaultUnit.trim().isNotEmpty) {
+      return product.defaultUnit.trim();
+    }
+    if (product.sku.trim().isNotEmpty) {
+      return product.sku.trim();
+    }
+    return 'Raw Material';
+  }
+
   @override
   Widget build(BuildContext context) {
     final batch = widget.batch;
@@ -117,13 +194,58 @@ class _RefreshBouquetScreenState extends State<RefreshBouquetScreen> {
                         ),
                   ),
                   const SizedBox(height: 4),
-                  Text('Batch stock: ${batch.remainingQuantity} ${batch.unit}'),
+                  Text(
+                    batch.cloudId != null && batch.cloudId!.isNotEmpty
+                        ? 'Bouquet #${batch.cloudId!.length > 8 ? batch.cloudId!.substring(0, 8) : batch.cloudId}'
+                        : 'Bouquet #${batch.id}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
                   Text(
                     'Produced: ${_formatDate(batch.producedAt)}',
                   ),
                 ],
               ),
             ),
+            if (_isLoadingConsumptions) ...[
+              const SizedBox(height: 16),
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
+            ] else if (_consumptions.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Bouquet Recipe Components',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _consumptions.map((c) {
+                        final isSelected = _selectedProduct?.cloudProductId == c.rawProductId ||
+                            (_selectedProduct?.name == c.productName && _selectedProduct?.cloudProductId == null);
+                        return ChoiceChip(
+                          label: Text('${c.productName} (${c.quantity} ${c.unit})'),
+                          selected: isSelected,
+                          onSelected: (_) => _selectConsumption(c),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             AppCard(
               child: Column(
@@ -161,9 +283,19 @@ class _RefreshBouquetScreenState extends State<RefreshBouquetScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Component',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Component',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      if (_consumptions.isNotEmpty)
+                        TextButton(
+                          onPressed: _pickProduct,
+                          child: const Text('Pick Other...'),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   ListTile(
@@ -172,7 +304,7 @@ class _RefreshBouquetScreenState extends State<RefreshBouquetScreen> {
                     title: Text(_selectedProduct?.name ?? 'Select Component'),
                     subtitle: _selectedProduct == null
                         ? const Text('Tap to choose a raw material')
-                        : Text('ID: ${_selectedProduct!.id}'),
+                        : Text(_formatComponentSubtitle(_selectedProduct!)),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: _pickProduct,
                   ),

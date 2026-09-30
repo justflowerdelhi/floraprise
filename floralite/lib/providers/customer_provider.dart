@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../data/repositories/customer_repository.dart';
 import '../managers/customer_manager.dart';
+import '../managers/customer_import_manager.dart';
 import '../services/business_data_event_bus.dart';
 import 'storage_mode_provider.dart';
 import '../data/repositories/cloud_customer_repository.dart';
@@ -253,6 +254,10 @@ class CustomerProvider extends ChangeNotifier {
     return _customerManager.lookupByPhone(phone);
   }
 
+  Future<List<CustomerRecord>> searchCustomers(String query) {
+    return _customerManager.searchCustomers(query, isCloud: _cloud);
+  }
+
   Future<Map<String, dynamic>?> lookupCustomerStatistics(
     CustomerRecord customer,
   ) async {
@@ -450,6 +455,162 @@ class CustomerProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<dynamic> lookupCustomerForImport(String phone) async {
+    if (_cloud) {
+      final cloudCustomer = await _cloudRepository.findByPhone(phone);
+      if (cloudCustomer != null) return cloudCustomer;
+      if (!kIsWeb) {
+        return await _customerManager.lookupByPhone(phone);
+      }
+      return null;
+    } else {
+      return await _customerManager.lookupByPhone(phone);
+    }
+  }
+
+  Future<CustomerImportPreview> prepareImportBytes(
+    Uint8List bytes,
+    String fileName,
+  ) async {
+    final importManager = CustomerImportManager(_customerManager.customerRepository);
+    return importManager.prepareImportBytes(
+      bytes: bytes,
+      fileName: fileName,
+      findExistingCustomer: lookupCustomerForImport,
+    );
+  }
+
+  Future<CustomerImportPreview> prepareImportFromContacts(
+    List<dynamic> contacts,
+  ) async {
+    final importManager = CustomerImportManager(_customerManager.customerRepository);
+    return importManager.prepareImportFromContacts(
+      contacts: contacts,
+      findExistingCustomer: lookupCustomerForImport,
+    );
+  }
+
+  Future<CustomerImportResult> importCustomers({
+    required List<CustomerImportRow> rows,
+    required DuplicateHandlingOption duplicateHandling,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final importManager = CustomerImportManager(_customerManager.customerRepository);
+      final result = await importManager.runImport(
+        rows: rows,
+        duplicateHandling: duplicateHandling,
+        createCustomer: ({
+          required String phone,
+          required String name,
+          String birthdayMd = '',
+          String anniversaryMd = '',
+          String company = '',
+          String department = '',
+          String notes = '',
+        }) async {
+          if (_cloud) {
+            await _cloudRepository.create(phone: phone, name: name);
+            if (!kIsWeb) {
+              await _customerManager.ensureCustomer(
+                phone: phone,
+                name: name,
+                birthdayMd: birthdayMd,
+                anniversaryMd: anniversaryMd,
+                company: company,
+                department: department,
+                notes: notes,
+              );
+            }
+          } else {
+            await _customerManager.ensureCustomer(
+              phone: phone,
+              name: name,
+              birthdayMd: birthdayMd,
+              anniversaryMd: anniversaryMd,
+              company: company,
+              department: department,
+              notes: notes,
+            );
+          }
+        },
+        updateCustomer: ({
+          required dynamic existing,
+          required String phone,
+          required String name,
+          String birthdayMd = '',
+          String anniversaryMd = '',
+          String company = '',
+          String department = '',
+          String notes = '',
+        }) async {
+          if (_cloud) {
+            String customerId = '';
+            if (existing is CloudCustomer) {
+              customerId = existing.id;
+            } else if (existing is CustomerRecord &&
+                existing.cloudCustomerId != null &&
+                existing.cloudCustomerId!.isNotEmpty) {
+              customerId = existing.cloudCustomerId!;
+            } else if (existing is Map) {
+              customerId = existing['id']?.toString() ?? '';
+            }
+            if (customerId.isNotEmpty) {
+              await _cloudRepository.update(id: customerId, phone: phone, name: name);
+            }
+            if (!kIsWeb && existing is CustomerRecord) {
+              await _customerManager.updateCustomer(
+                id: existing.id,
+                phone: phone,
+                name: name,
+                birthdayMd: birthdayMd.isNotEmpty ? birthdayMd : existing.birthdayMd,
+                anniversaryMd:
+                    anniversaryMd.isNotEmpty ? anniversaryMd : existing.anniversaryMd,
+                company: company.isNotEmpty ? company : existing.company,
+                department:
+                    department.isNotEmpty ? department : existing.department,
+                notes: notes.isNotEmpty ? notes : existing.notes,
+              );
+            }
+          } else {
+            if (existing is CustomerRecord) {
+              await _customerManager.updateCustomer(
+                id: existing.id,
+                phone: phone,
+                name: name,
+                birthdayMd: birthdayMd.isNotEmpty ? birthdayMd : existing.birthdayMd,
+                anniversaryMd:
+                    anniversaryMd.isNotEmpty ? anniversaryMd : existing.anniversaryMd,
+                company: company.isNotEmpty ? company : existing.company,
+                department:
+                    department.isNotEmpty ? department : existing.department,
+                notes: notes.isNotEmpty ? notes : existing.notes,
+              );
+            }
+          }
+        },
+      );
+
+      await loadCustomers();
+
+      _businessDataEvents?.publish(
+        source: BusinessDataChangeSource.customer,
+      );
+
+      _isLoading = false;
+      notifyListeners();
+      return result;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
     }
   }
 }

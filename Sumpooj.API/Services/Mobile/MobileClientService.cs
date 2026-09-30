@@ -129,10 +129,20 @@ public sealed class MobileClientService : IMobileClientService
         var company = await _db.Companies.FirstOrDefaultAsync(x => x.Id == companyId, cancellationToken)
             ?? throw new KeyNotFoundException("Company not found.");
 
-        var roles = await _userManager.GetRolesAsync(identityUser);
-
         var mobile = ResolveMobile(identityUser, request.Identifier);
         _logger.LogInformation("[Mobile Login] Resolved mobile number: {Mobile}", mobile);
+
+        var existingMobileUser = await _db.MobileUsers.FirstOrDefaultAsync(
+            u => u.CompanyId == companyId && (u.Email == identityUser.Email || u.Mobile == mobile) && !u.IsDeleted,
+            cancellationToken);
+
+        if (!company.IsActive || (existingMobileUser != null && existingMobileUser.Status == MobileUserStatus.PendingOnboarding))
+        {
+            _logger.LogWarning("[Mobile Login] Account pending activation for user: {UserId}, company: {CompanyId}", identityUser.Id, companyId);
+            throw new UnauthorizedAccessException("ACCOUNT_PENDING_ACTIVATION: Your Floraprise account is awaiting activation.");
+        }
+
+        var roles = await _userManager.GetRolesAsync(identityUser);
 
         _logger.LogInformation("[Mobile Login] Calling RegisterOrStartTrialAsync for companyId: {CompanyId}, deviceId: {DeviceId}", companyId, request.DeviceId);
         var registration = await _mobileSubscriptionService.RegisterOrStartTrialAsync(
@@ -460,11 +470,22 @@ public sealed class MobileClientService : IMobileClientService
         var company = await _db.Companies.AsNoTracking().FirstOrDefaultAsync(x => x.Id == companyId, cancellationToken)
             ?? throw new KeyNotFoundException("Company not found.");
 
+        var mobileCustomer = await _db.MobileCustomers.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CompanyId == companyId && !x.IsDeleted, cancellationToken);
+
+        var ownerName = mobileCustomer?.OwnerName;
+        if (string.IsNullOrWhiteSpace(ownerName))
+        {
+            var user = await _db.MobileUsers.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.CompanyId == companyId && !x.IsDeleted, cancellationToken);
+            ownerName = user?.FullName;
+        }
+
         return new MobileCompanyProfileDto(
             Id: company.Id,
             Name: company.Name,
-            Email: company.Email,
-            Phone: company.Phone,
+            Email: company.Email ?? mobileCustomer?.Email,
+            Phone: company.Phone ?? mobileCustomer?.Mobile,
             Address: company.Address,
             ShortDescription: company.ShortDescription,
             TimeZone: company.TimeZone,
@@ -473,7 +494,12 @@ public sealed class MobileClientService : IMobileClientService
             Region: company.Region,
             IsActive: company.IsActive,
             CreatedAtUtc: company.CreatedAtUtc,
-            UpdatedAtUtc: company.UpdatedAtUtc);
+            UpdatedAtUtc: company.UpdatedAtUtc,
+            OwnerName: ownerName ?? "",
+            City: mobileCustomer?.City ?? "",
+            State: mobileCustomer?.State ?? "",
+            PinCode: mobileCustomer?.Country ?? "",
+            LogoPath: company.LogoPath);
     }
 
     public async Task<MobileSubscriptionStateResponse> GetCurrentSubscriptionAsync(Guid companyId, Guid mobileUserId, CancellationToken cancellationToken = default)
@@ -936,8 +962,13 @@ public sealed class MobileClientService : IMobileClientService
         var user = await _mobileUsers.GetByIdAsync(companyId, mobileUserId)
             ?? throw new KeyNotFoundException("Mobile user not found.");
 
-        var trialPlan = await _subscriptionPlans.GetByCodeAsync("MOBILE_TRIAL")
-            ?? throw new KeyNotFoundException("Trial subscription plan not found.");
+        var trialPlan = await _subscriptionPlans.GetByCodeAsync("MOBILE_TRIAL");
+        if (trialPlan == null)
+        {
+            await _mobileSubscriptionService.GetActivePlansAsync(cancellationToken);
+            trialPlan = await _subscriptionPlans.GetByCodeAsync("MOBILE_TRIAL")
+                ?? throw new KeyNotFoundException("Trial subscription plan not found.");
+        }
 
         var now = DateTime.UtcNow;
         var trialEnd = now.AddDays(Math.Max(1, trialPlan.TrialDays));

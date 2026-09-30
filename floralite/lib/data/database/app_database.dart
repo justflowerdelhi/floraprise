@@ -49,7 +49,7 @@ class AppDatabase {
 
     return openDatabase(
       path,
-      version: 44,
+      version: 46,
       onOpen: (db) async {
         await _ensureOccasionContactColumns(db);
         await _ensureAttendanceTable(db);
@@ -65,6 +65,9 @@ class AppDatabase {
         await _ensureOrderLineCloudProductColumn(db);
         await _ensureCustomerCloudLinkColumns(db);
         await _ensureOrderCloudCustomerColumn(db);
+        await _ensureOrderPaymentTypeColumn(db);
+        await _ensureCrmEnquiriesTable(db);
+        await _ensureInventoryReservationsTable(db);
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -179,6 +182,27 @@ class AppDatabase {
             created_at TEXT NOT NULL,
             FOREIGN KEY(product_id) REFERENCES products(id),
             FOREIGN KEY(order_id) REFERENCES orders(id)
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE inventory_reservations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            order_line_id INTEGER,
+            product_id INTEGER NOT NULL,
+            cloud_product_id TEXT,
+            quantity INTEGER NOT NULL CHECK(quantity > 0),
+            status TEXT NOT NULL DEFAULT 'active',
+            event_date TEXT,
+            event_name TEXT,
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            released_at TEXT,
+            consumed_at TEXT,
+            FOREIGN KEY(order_id) REFERENCES orders(id),
+            FOREIGN KEY(product_id) REFERENCES products(id)
           )
         ''');
 
@@ -338,6 +362,7 @@ class AppDatabase {
             order_id INTEGER NOT NULL,
             method TEXT NOT NULL,
             amount_paise INTEGER NOT NULL,
+            payment_type TEXT NOT NULL DEFAULT 'SaleTender',
             reference TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY(order_id) REFERENCES orders(id)
@@ -695,6 +720,15 @@ class AppDatabase {
             'CREATE INDEX idx_order_lines_order ON order_lines(order_id)');
         await db.execute(
           'CREATE INDEX idx_inventory_transactions_product_created ON inventory_transactions(product_id, created_at DESC)',
+        );
+        await db.execute(
+          'CREATE INDEX idx_inventory_reservations_product_status ON inventory_reservations(product_id, status)',
+        );
+        await db.execute(
+          'CREATE INDEX idx_inventory_reservations_order ON inventory_reservations(order_id)',
+        );
+        await db.execute(
+          'CREATE INDEX idx_inventory_reservations_status ON inventory_reservations(status)',
         );
         await db.execute(
           'CREATE INDEX idx_timeline_order_created ON order_timeline_events(order_id, created_at)',
@@ -1077,6 +1111,7 @@ class AppDatabase {
         if (oldVersion < 45) {
           await _ensureCustomerCloudLinkColumns(db);
           await _ensureOrderCloudCustomerColumn(db);
+          await _ensureCrmEnquiriesTable(db);
         }
 
         if (oldVersion < 11) {
@@ -1493,6 +1528,10 @@ class AppDatabase {
         if (oldVersion < 39) {
           await _ensureDeliveryAssignmentSyncColumns(db);
         }
+
+        if (oldVersion < 46) {
+          await _ensureInventoryReservationsTable(db);
+        }
       },
     );
   }
@@ -1717,6 +1756,99 @@ class AppDatabase {
       'scheduler_tasks',
       'next_reminder_at',
       'TEXT',
+    );
+  }
+
+  Future<void> _ensureOrderPaymentTypeColumn(Database db) async {
+    await _ensureColumn(
+      db,
+      'order_payments',
+      'payment_type',
+      'TEXT',
+      defaultValue: "'SaleTender'",
+      notNull: true,
+    );
+  }
+
+  Future<void> _ensureCrmEnquiriesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS crm_enquiries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cloud_id TEXT,
+        client_sync_id TEXT NOT NULL UNIQUE,
+        customer_id INTEGER NOT NULL,
+        cloud_customer_id TEXT,
+        customer_name TEXT NOT NULL,
+        customer_phone TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'General',
+        requirement TEXT NOT NULL,
+        event_date TEXT,
+        budget_paise INTEGER,
+        location TEXT,
+        notes TEXT,
+        status TEXT NOT NULL DEFAULT 'new',
+        next_action TEXT,
+        next_follow_up_at TEXT,
+        quote_order_id INTEGER,
+        converted_order_id INTEGER,
+        lost_reason TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        deleted_at TEXT,
+        FOREIGN KEY(customer_id) REFERENCES customers(id)
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_crm_enquiries_customer_id ON crm_enquiries(customer_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_crm_enquiries_status ON crm_enquiries(status)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_crm_enquiries_event_date ON crm_enquiries(event_date)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_crm_enquiries_next_follow_up ON crm_enquiries(next_follow_up_at)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_crm_enquiries_created_at ON crm_enquiries(created_at)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_crm_enquiries_client_sync_id ON crm_enquiries(client_sync_id)',
+    );
+  }
+
+  Future<void> _ensureInventoryReservationsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS inventory_reservations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL,
+        order_line_id INTEGER,
+        product_id INTEGER NOT NULL,
+        cloud_product_id TEXT,
+        quantity INTEGER NOT NULL CHECK(quantity > 0),
+        status TEXT NOT NULL DEFAULT 'active',
+        event_date TEXT,
+        event_name TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        released_at TEXT,
+        consumed_at TEXT,
+        FOREIGN KEY(order_id) REFERENCES orders(id),
+        FOREIGN KEY(product_id) REFERENCES products(id)
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_inventory_reservations_product_status ON inventory_reservations(product_id, status)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_inventory_reservations_order ON inventory_reservations(order_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_inventory_reservations_status ON inventory_reservations(status)',
     );
   }
 

@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
@@ -14,8 +14,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sumpooj.Infrastructure", "Sumpooj.Infrastructure\Sumpooj.Infrastructure.csproj", "{6AD382F0-0EB0-0FDB-2972-A27895B9993D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sumpooj.Infrastructure.Tests", "Sumpooj.Infrastructure.Tests\Sumpooj.Infrastructure.Tests.csproj", "{52660AED-E6CF-4F6A-A609-F35AFC47D441}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlorapriseSchemaInventory", "..\Users\HP\AppData\Local\Temp\FlorapriseSchemaInventory\FlorapriseSchemaInventory.csproj", "{B41249D7-D495-4022-AAB2-B97AB1C433CC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -99,18 +97,6 @@ Global
 		{52660AED-E6CF-4F6A-A609-F35AFC47D441}.Release|x64.Build.0 = Release|Any CPU
 		{52660AED-E6CF-4F6A-A609-F35AFC47D441}.Release|x86.ActiveCfg = Release|Any CPU
 		{52660AED-E6CF-4F6A-A609-F35AFC47D441}.Release|x86.Build.0 = Release|Any CPU
-		{B41249D7-D495-4022-AAB2-B97AB1C433CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B41249D7-D495-4022-AAB2-B97AB1C433CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B41249D7-D495-4022-AAB2-B97AB1C433CC}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{B41249D7-D495-4022-AAB2-B97AB1C433CC}.Debug|x64.Build.0 = Debug|Any CPU
-		{B41249D7-D495-4022-AAB2-B97AB1C433CC}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{B41249D7-D495-4022-AAB2-B97AB1C433CC}.Debug|x86.Build.0 = Debug|Any CPU
-		{B41249D7-D495-4022-AAB2-B97AB1C433CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B41249D7-D495-4022-AAB2-B97AB1C433CC}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B41249D7-D495-4022-AAB2-B97AB1C433CC}.Release|x64.ActiveCfg = Release|Any CPU
-		{B41249D7-D495-4022-AAB2-B97AB1C433CC}.Release|x64.Build.0 = Release|Any CPU
-		{B41249D7-D495-4022-AAB2-B97AB1C433CC}.Release|x86.ActiveCfg = Release|Any CPU
-		{B41249D7-D495-4022-AAB2-B97AB1C433CC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

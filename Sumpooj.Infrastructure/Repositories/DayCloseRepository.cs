@@ -23,7 +23,7 @@ public class DayCloseRepository : IDayCloseRepository, ICashDrawerRepository
     public async Task<CashDrawerSummary> GetSummaryAsync(Guid companyId, DateTime date)
     {
         var day = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
-        var dayEnd = day.AddDays(1);
+        var (dayStart, dayEnd) = GetUtcRangeForBusinessDate(date);
         var openingCash = await _db.OpeningCashEntries
             .Where(entry => entry.CompanyId == companyId && entry.Date == day)
             .Select(entry => (decimal?)entry.Amount)
@@ -47,7 +47,7 @@ public class DayCloseRepository : IDayCloseRepository, ICashDrawerRepository
 
         var cashPayments = await _db.Payments
             .Where(p => p.CompanyId == companyId
-                && p.CreatedAtUtc >= day && p.CreatedAtUtc < dayEnd
+                && p.CreatedAtUtc >= dayStart && p.CreatedAtUtc < dayEnd
                 && p.Method == Domain.Entities.PaymentMethod.Cash
                 && p.Status == Domain.Entities.PaymentTransactionStatus.Approved)
             .SumAsync(p => (decimal?)p.Amount) ?? 0m;
@@ -59,8 +59,7 @@ public class DayCloseRepository : IDayCloseRepository, ICashDrawerRepository
 
     public async Task<Domain.Entities.DayClose?> GetByDateAsync(Guid companyId, Guid locationId, DateTime date)
     {
-        var dayStart = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
-        var dayEnd = dayStart.AddDays(1);
+        var (dayStart, dayEnd) = GetUtcRangeForBusinessDate(date);
         return await _db.DayCloses
             .FirstOrDefaultAsync(d => d.CompanyId == companyId && 
                                       d.LocationId == locationId && 
@@ -69,12 +68,27 @@ public class DayCloseRepository : IDayCloseRepository, ICashDrawerRepository
 
     public async Task<bool> IsDayClosedAsync(Guid companyId, Guid locationId, DateTime date)
     {
-        var dayStart = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
-        var dayEnd = dayStart.AddDays(1);
+        var (dayStart, dayEnd) = GetUtcRangeForBusinessDate(date);
         return await _db.DayCloses
             .AnyAsync(d => d.CompanyId == companyId && 
                           d.LocationId == locationId && 
                           d.BusinessDate >= dayStart && d.BusinessDate < dayEnd);
+    }
+
+    private static (DateTime utcStart, DateTime utcEnd) GetUtcRangeForBusinessDate(DateTime businessDate)
+    {
+        if (TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Kolkata", out var tz) ||
+            TimeZoneInfo.TryFindSystemTimeZoneById("India Standard Time", out tz))
+        {
+            var istMidnight = new DateTime(businessDate.Year, businessDate.Month, businessDate.Day, 0, 0, 0, DateTimeKind.Unspecified);
+            var istEnd = istMidnight.AddDays(1);
+            var utcStart = TimeZoneInfo.ConvertTimeToUtc(istMidnight, tz);
+            var utcEnd = TimeZoneInfo.ConvertTimeToUtc(istEnd, tz);
+            return (utcStart, utcEnd);
+        }
+
+        var dayStart = DateTime.SpecifyKind(businessDate.Date, DateTimeKind.Utc);
+        return (dayStart, dayStart.AddDays(1));
     }
 
     public async Task<List<DayCloseDto>> GetHistoryAsync(
@@ -127,6 +141,7 @@ public class DayCloseRepository : IDayCloseRepository, ICashDrawerRepository
                 UpiTotal = d.UpiTotal,
                 GiftCardTotal = d.GiftCardTotal,
                 OtherPaymentsTotal = d.OtherPaymentsTotal,
+                CreditTotal = d.TotalSales - (d.CashTotal + d.CardTotal + d.UpiTotal + d.GiftCardTotal + d.OtherPaymentsTotal),
                 ExpectedCash = d.ExpectedCash,
                 ActualCash = d.ActualCash,
                 CashVariance = d.CashVariance,

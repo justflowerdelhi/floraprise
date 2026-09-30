@@ -48,6 +48,7 @@ public sealed class MobileDashboardController : MobileApiControllerBase
                 .Where(o =>
                     o.CompanyId == companyId &&
                     o.IsActive &&
+                    o.Status != OrderStatus.Cancelled &&
                     o.OrderDate >= utcFromStart &&
                     o.OrderDate <= utcToEnd)
                 .ToListAsync(cancellationToken);
@@ -63,6 +64,11 @@ public sealed class MobileDashboardController : MobileApiControllerBase
                         p.Status == PaymentTransactionStatus.Approved)
                     .ToListAsync(cancellationToken);
 
+            var saleTenders = payments.Where(p => p.PaymentType == PaymentType.SaleTender).ToList();
+            var saleTendersByOrder = saleTenders
+                .GroupBy(p => p.OrderId)
+                .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+
             var expenses = await _db.Expenses
                 .AsNoTracking()
                 .Where(e =>
@@ -75,12 +81,10 @@ public sealed class MobileDashboardController : MobileApiControllerBase
             var summary = new MobileDashboardSummaryDto(
                 ToPaise(orders.Sum(o => o.TotalAmount)),
                 orders.Count,
-                ToPaise(payments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)),
-                ToPaise(payments.Where(p => p.Method == PaymentMethod.Upi).Sum(p => p.Amount)),
-                ToPaise(payments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)),
-                ToPaise(orders
-                    .Where(o => o.PaymentStatus == PaymentStatus.Credit)
-                    .Sum(o => o.TotalAmount)),
+                ToPaise(saleTenders.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)),
+                ToPaise(saleTenders.Where(p => p.Method == PaymentMethod.Upi).Sum(p => p.Amount)),
+                ToPaise(saleTenders.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)),
+                ToPaise(orders.Sum(o => Math.Max(0m, o.TotalAmount - saleTendersByOrder.GetValueOrDefault(o.Id, 0m)))),
                 orders.Count(o => o.Status is OrderStatus.Pending or OrderStatus.Confirmed),
                 orders.Count(o => o.Status == OrderStatus.Processing),
                 orders.Count(o => o.Status == OrderStatus.ReadyForDelivery),
@@ -117,12 +121,13 @@ public sealed class MobileDashboardController : MobileApiControllerBase
                 (utcFromStart, utcToEnd) = (utcToEnd, utcFromStart);
             }
 
-            // Same inclusion rule as GetSummary (Cloud Sales Report): active orders in range.
+            // Same inclusion rule as GetSummary (Cloud Sales Report): active, non-cancelled orders in range.
             var orders = await _db.Orders
                 .AsNoTracking()
                 .Where(o =>
                     o.CompanyId == companyId &&
                     o.IsActive &&
+                    o.Status != OrderStatus.Cancelled &&
                     o.OrderDate >= utcFromStart &&
                     o.OrderDate <= utcToEnd)
                 .ToListAsync(cancellationToken);
@@ -135,7 +140,7 @@ public sealed class MobileDashboardController : MobileApiControllerBase
                     .Where(i => EF.Property<Guid?>(i, "OrderId") != null && orderIds.Contains(EF.Property<Guid?>(i, "OrderId")!.Value))
                     .ToListAsync(cancellationToken);
 
-            var productIds = orderItems.Select(i => i.ProductId).Distinct().ToList();
+            var productIds = orderItems.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value).Distinct().ToList();
             var productCosts = productIds.Count == 0
                 ? new Dictionary<Guid, decimal>()
                 : await _db.Products
@@ -152,7 +157,7 @@ public sealed class MobileDashboardController : MobileApiControllerBase
             // store a per-sale historical cost snapshot. Products missing from the
             // catalog (e.g. deleted) contribute zero cost and are excluded from the estimate.
             var cogs = orderItems.Sum(i =>
-                productCosts.TryGetValue(i.ProductId, out var costPrice) ? costPrice * i.Quantity : 0m);
+                (i.ProductId.HasValue && productCosts.TryGetValue(i.ProductId.Value, out var costPrice)) ? costPrice * i.Quantity : 0m);
 
             var grossProfit = netRevenue - cogs;
             var marginPercent = netRevenue > 0 ? Math.Round(grossProfit / netRevenue * 100m, 2) : 0m;

@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
-import '../managers/business_settings_manager.dart';
 import '../providers/storage_mode_provider.dart';
 import '../services/storage_mode_service.dart';
-import 'business_identity.dart';
 
 class AppHeader extends StatefulWidget implements PreferredSizeWidget {
   const AppHeader({
@@ -31,40 +29,20 @@ class AppHeader extends StatefulWidget implements PreferredSizeWidget {
 }
 
 class _AppHeaderState extends State<AppHeader> {
-  final BusinessSettingsManager _businessSettingsManager =
-      BusinessSettingsManager();
   final StorageModeService _storageModeService = StorageModeService();
-  String _shopName = '';
-  String _businessSubtitle = '';
-  String _logoPath = '';
   bool _isCloud = false;
 
   @override
   void initState() {
     super.initState();
-    BusinessSettingsManager.changeNotifier.addListener(_onSettingsChanged);
-    _loadStorageModeAndShopName();
+    _loadStorageMode();
   }
 
-  @override
-  void dispose() {
-    BusinessSettingsManager.changeNotifier.removeListener(_onSettingsChanged);
-    super.dispose();
-  }
-
-  void _onSettingsChanged() {
-    _loadStorageModeAndShopName();
-  }
-
-  Future<void> _loadStorageModeAndShopName() async {
+  Future<void> _loadStorageMode() async {
     final isCloud = await _storageModeService.isCloud();
-    final settings = await _businessSettingsManager.load();
     if (!mounted) return;
     setState(() {
       _isCloud = isCloud;
-      _shopName = settings.shopName.trim();
-      _businessSubtitle = settings.subtitle.trim();
-      _logoPath = settings.logoPath.trim();
     });
   }
 
@@ -76,44 +54,25 @@ class _AppHeaderState extends State<AppHeader> {
     final storageProvider = Provider.of<StorageModeProvider?>(context);
     final isCloud = storageProvider?.isCloud ?? _isCloud;
 
-    final isDefaultTitle = widget.title == null ||
-        widget.title!.trim().isEmpty ||
-        widget.title!.trim() == 'Floraprise' ||
-        (l10n != null && widget.title!.trim() == l10n.appTitle);
+    final hasCustomTitle = widget.title != null &&
+        widget.title!.trim().isNotEmpty &&
+        widget.title!.trim() != 'Floraprise' &&
+        (l10n == null || widget.title!.trim() != l10n.appTitle);
 
     return AppBar(
       automaticallyImplyLeading: widget.showBackButton,
       titleSpacing: widget.showBackButton ? 0 : 16,
-      title: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isDefaultTitle)
-                  BusinessIdentity(
-                    name: _shopName,
-                    subtitle: _businessSubtitle,
-                    logoPath: _logoPath,
-                    logoSize: 32,
-                    nameFontSize: 14,
-                  )
-                else
-                  Text(
-                    widget.title!.trim(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      title: hasCustomTitle
+          ? Text(
+              widget.title!.trim(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface,
+              ),
+            )
+          : null,
       bottom: widget.bottom,
       actions: [
         ...?widget.actions,
@@ -131,7 +90,7 @@ class _AppHeaderState extends State<AppHeader> {
           onSelected: (value) async {
             await Navigator.pushNamed(context, value);
             if (mounted) {
-              await _loadStorageModeAndShopName();
+              await _loadStorageMode();
             }
           },
           itemBuilder: (context) => [

@@ -152,7 +152,7 @@ public class InternationalSubscriptionPaymentTests : IDisposable
 
         var result = await _authController.Register(registerReq, CancellationToken.None);
         var ok = Assert.IsType<OkObjectResult>(result);
-        var authResponse = Assert.IsType<MobileAuthTokenResponse>(ok.Value);
+        var authResponse = Assert.IsType<MobileApiRegisterResponse>(ok.Value);
 
         var company = await _db.Companies.FindAsync(authResponse.CompanyId);
         if (company != null)
@@ -161,6 +161,11 @@ public class InternationalSubscriptionPaymentTests : IDisposable
             company.UpdateLocalization(company.TimeZone ?? "UTC", currency);
             await _db.SaveChangesAsync();
         }
+
+        await _mobileClientService.RegisterDeviceAsync(
+            authResponse.CompanyId,
+            authResponse.MobileUserId,
+            new MobileDeviceRegisterRequest(deviceId, "ANDROID", "Google", "Pixel 9", "15", "1.0.0", null, "127.0.0.1"));
 
         return (authResponse.CompanyId, authResponse.MobileUserId, deviceId);
     }

@@ -117,6 +117,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                       value: '${widget.totalOrders}',
                       icon: Icons.shopping_bag,
                       color: colorScheme.primary,
+                      onTap: () {
+                        Navigator.pushNamed(context, '/orders');
+                      },
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -126,6 +129,11 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                       value: widget.pendingPayment,
                       icon: Icons.account_balance_wallet,
                       color: widget.pendingPayment != '₹0' ? Colors.red : Colors.green,
+                      onTap: widget.pendingPayment != '₹0'
+                          ? () {
+                              Navigator.pushNamed(context, '/reports/pending-payments');
+                            }
+                          : null,
                     ),
                   ),
                 ],
@@ -224,8 +232,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     required String value,
     required IconData icon,
     required Color color,
+    VoidCallback? onTap,
   }) {
-    return Container(
+    final cardContent = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
@@ -257,23 +266,36 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
         ],
       ),
     );
+
+    if (onTap != null) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: cardContent,
+        ),
+      );
+    }
+
+    return cardContent;
   }
 
   Widget _buildPurchaseInsightsCard(List<Map<String, dynamic>> insights) {
     if (insights.isEmpty) {
-      return AppCard(
+      return const AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Purchase Insights',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
-            const Text('No purchase history found.'),
+            SizedBox(height: 16),
+            Text('No purchase history found.'),
           ],
         ),
       );

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../../services/mobile_auth_service.dart';
 import 'product_repository.dart';
+import 'production_repository.dart';
 
 typedef CloudProductHttpSender = Future<dynamic> Function(
   String method,
@@ -323,13 +324,16 @@ class CloudProductRepository {
     final products = <CloudProduct>[];
     int? totalCount;
 
+    final isFinished = category != null &&
+        ProductionRepository.isFinishedProductCategory(category.trim());
+
     for (var page = 1;; page++) {
       final queryParameters = <String, String>{
         'page': '$page',
         'pageSize': '$pageSize',
       };
       if (query.trim().isNotEmpty) queryParameters['query'] = query.trim();
-      if (category != null && category.trim().isNotEmpty) {
+      if (category != null && category.trim().isNotEmpty && !isFinished) {
         queryParameters['category'] = category.trim();
       }
       if (trackInventory != null) {
@@ -344,17 +348,114 @@ class CloudProductRepository {
         Uri.parse('${_auth.baseUrl}/api/products/search')
             .replace(queryParameters: queryParameters),
       );
-      if (response is! Map) return products;
+      if (response is! Map) break;
       final rawItems = response['items'] ?? response['Items'] ?? [];
-      if (rawItems is! List || rawItems.isEmpty) return products;
+      if (rawItems is! List || rawItems.isEmpty) break;
       totalCount ??= _readInt(response, 'totalCount');
       products.addAll(
         rawItems
             .whereType<Map>()
             .map((item) => CloudProduct.fromJson(item.cast<String, dynamic>())),
       );
-      if (totalCount != null && products.length >= totalCount) return products;
-      if (rawItems.length < pageSize) return products;
+      if (totalCount != null && products.length >= totalCount) break;
+      if (rawItems.length < pageSize) break;
+    }
+
+    if (category == null ||
+        category.trim().isEmpty ||
+        category.trim().toLowerCase() == 'all' ||
+        isFinished) {
+      try {
+        final finishedGoods = await listSellableFinishedGoods();
+        final seenIds = products.map((p) => p.id.trim().toLowerCase()).toSet();
+        final seenNames =
+            products.map((p) => p.name.trim().toLowerCase()).toSet();
+        final queryLower = query.trim().toLowerCase();
+
+        for (final fg in finishedGoods) {
+          final idLower = fg.id.trim().toLowerCase();
+          final nameLower = fg.name.trim().toLowerCase();
+          if (seenIds.contains(idLower) || seenNames.contains(nameLower)) {
+            continue;
+          }
+          if (queryLower.isNotEmpty &&
+              !fg.name.toLowerCase().contains(queryLower) &&
+              !fg.sku.toLowerCase().contains(queryLower) &&
+              !(fg.barcode?.toLowerCase().contains(queryLower) ?? false)) {
+            continue;
+          }
+          if (showActive && !fg.isActive) continue;
+          if (showInactive && fg.isActive && !showActive) continue;
+          seenIds.add(idLower);
+          seenNames.add(nameLower);
+          products.add(fg);
+        }
+      } catch (_) {}
+    }
+
+    if (isFinished) {
+      return products
+          .where(
+              (p) => ProductionRepository.isFinishedProductCategory(p.category))
+          .toList();
+    }
+
+    return products;
+  }
+
+  Future<List<CloudProduct>> listSellableFinishedGoods() async {
+    try {
+      final response = await _sendRequest(
+        'GET',
+        Uri.parse('${_auth.baseUrl}/api/production/finished-goods/sellable'),
+      );
+      final rawItems = response is Map ? (response['items'] ?? response['Items'] ?? response) : response;
+      if (rawItems is! List) return [];
+      return rawItems.whereType<Map>().map((item) {
+        final json = item.cast<String, dynamic>();
+        final id = _readString(json, 'id');
+        final name = CloudProduct._string(json, 'name', fallback: CloudProduct._string(json, 'recipeName', fallback: 'Bouquet'));
+        final sku = CloudProduct._string(json, 'sku', fallback: CloudProduct._string(json, 'batchCode'));
+        final barcode = CloudProduct._nullableString(json, 'barcode');
+        final category = CloudProduct._string(json, 'category', fallback: 'Bouquets');
+        final retailPrice = (json['retailPrice'] as num?)?.toDouble() ?? 0.0;
+        final costPrice = (json['costPrice'] as num?)?.toDouble() ?? 0.0;
+        final stockQuantity = (json['stockQuantity'] as num?)?.toInt() ?? 0;
+        final isActive = CloudProduct._bool(json, 'isActive', fallback: true);
+
+        return CloudProduct(
+          id: id,
+          companyId: _readString(json, 'companyId'),
+          name: name,
+          sku: sku,
+          barcode: barcode,
+          manufacturerBarcode: barcode,
+          internalBarcode: sku,
+          brand: null,
+          description: null,
+          category: category,
+          categoryId: null,
+          unitOfMeasure: 'Piece',
+          retailPrice: retailPrice,
+          costPrice: costPrice,
+          wholesalePrice: null,
+          weddingEventPrice: null,
+          taxCategory: 'Standard',
+          trackInventory: true,
+          trackBatch: true,
+          stockQuantity: stockQuantity,
+          minimumStockLevel: 0,
+          reorderLevel: 0,
+          isActive: isActive,
+          shelfLifeDays: null,
+          expiryAlertDays: null,
+          temperatureNotes: null,
+          createdAtUtc: DateTime.now(),
+          updatedAtUtc: null,
+        );
+      }).toList();
+    } catch (_) {
+      return [];
     }
   }
 

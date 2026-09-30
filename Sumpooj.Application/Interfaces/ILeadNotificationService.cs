@@ -5,6 +5,7 @@ public interface ILeadNotificationService
     Task NotifyNewDemoRequestAsync(
         string fullName,
         string businessEmail,
+        string? phoneNumber,
         string? businessType,
         string? currentSoftware,
         string? notes,

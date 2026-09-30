@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sumpooj.Domain.Entities;
@@ -42,6 +42,7 @@ public static class DataSeeder
 
         await SeedRolesAsync(roleManager);
         await SeedPlatformAdminAsync(userManager);
+        await LibraryDataSeeder.SeedAsync(db);
         var demoCompany = await SeedDemoCompanyAsync(db);
         await SeedCompanyUsersAsync(userManager, demoCompany);
         await SeedLocationsAsync(db, demoCompany);
@@ -75,24 +76,31 @@ public static class DataSeeder
 
     private static async Task SeedPlatformAdminAsync(UserManager<ApplicationUser> userManager)
     {
-        const string superAdminEmail = "sumit.singh@sumpooj.com";
-        var superAdmin = await userManager.FindByEmailAsync(superAdminEmail);
-
-        if (superAdmin == null)
+        var platformAdmins = new[]
         {
-            superAdmin = new ApplicationUser
-            {
-                UserName = superAdminEmail,
-                Email = superAdminEmail,
-                CompanyId = null,
-                EmailConfirmed = true,
-                IsActive = true
-            };
+            (Email: "sumit.singh@sumpooj.com", Password: "Admin@123"),
+            (Email: "admin@floraprise.com", Password: "Flora@Admin2026!")
+        };
 
-            var result = await userManager.CreateAsync(superAdmin, "Admin@123");
-            if (result.Succeeded)
+        foreach (var admin in platformAdmins)
+        {
+            var existingUser = await userManager.FindByEmailAsync(admin.Email);
+            if (existingUser == null)
             {
-                await userManager.AddToRoleAsync(superAdmin, "PlatformSuperAdmin");
+                var newUser = new ApplicationUser
+                {
+                    UserName = admin.Email,
+                    Email = admin.Email,
+                    CompanyId = null,
+                    EmailConfirmed = true,
+                    IsActive = true
+                };
+
+                var result = await userManager.CreateAsync(newUser, admin.Password);
+                if (result.Succeeded)
+                {
+                    await userManager.AddToRoleAsync(newUser, "PlatformSuperAdmin");
+                }
             }
         }
     }

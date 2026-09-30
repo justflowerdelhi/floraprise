@@ -140,7 +140,7 @@ public class MobileDashboardSummaryTests
         Assert.Equal(7000, dto.CashPaise);
         Assert.Equal(4000, dto.UpiPaise);
         Assert.Equal(3000, dto.CardPaise);
-        Assert.Equal(0, dto.CreditPaise);
+        Assert.Equal(6000, dto.CreditPaise);
         Assert.Equal(0, dto.PendingOrderCount);
         Assert.Equal(1, dto.PreparingOrderCount);
         Assert.Equal(1, dto.ReadyOrderCount);

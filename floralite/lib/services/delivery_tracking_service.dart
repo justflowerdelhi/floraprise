@@ -240,6 +240,35 @@ class DeliveryTrackingService {
     }
   }
 
+  Future<String?> getCloudDeliveryId({
+    String? cloudOrderId,
+    String? orderNo,
+  }) async {
+    final normalizedCloudOrderId = cloudOrderId?.trim();
+    if (normalizedCloudOrderId != null && normalizedCloudOrderId.isNotEmpty) {
+      try {
+        final payload = await _getJson(
+          '/api/v1/mobile/delivery/orders/$normalizedCloudOrderId/tracking',
+        );
+        final assignmentId = _readString(payload, 'assignmentId')?.trim();
+        if (assignmentId != null && assignmentId.isNotEmpty) {
+          debugPrint(
+              '[DeliveryService] getCloudDeliveryId - Found assignmentId by cloudOrderId: $assignmentId');
+          return assignmentId;
+        }
+      } catch (e) {
+        debugPrint(
+            '[DeliveryService] getCloudDeliveryId by cloudOrderId failed: $e');
+      }
+    }
+
+    final normalizedOrderNo = orderNo?.trim();
+    if (normalizedOrderNo != null && normalizedOrderNo.isNotEmpty) {
+      return getCloudDeliveryIdForOrder(normalizedOrderNo);
+    }
+    return null;
+  }
+
   Future<String?> getCloudDeliveryIdForOrder(String orderNo) async {
     final normalizedOrderNo = orderNo.trim().toLowerCase();
     if (normalizedOrderNo.isEmpty) return null;
@@ -625,6 +654,17 @@ class DeliveryTrackingService {
     return _toSnapshot(payload);
   }
 
+  /// Gets tracking for a cloud order by its cloudOrderId (Guid).
+  Future<DeliveryTrackingSnapshot> getTrackingForCloudOrder(
+      String cloudOrderId) async {
+    debugPrint(
+        '[DeliveryService] getTrackingForCloudOrder - Cloud Order ID: $cloudOrderId');
+    final payload = await _getJson(
+      '/api/v1/mobile/delivery/orders/${cloudOrderId.trim()}/tracking',
+    );
+    return _toSnapshot(payload);
+  }
+
 
   Future<DeliveryTrackingSnapshot> getTrackingByAssignmentId(
       String assignmentId) async {
@@ -770,127 +810,49 @@ class DeliveryTrackingService {
   }
 
   Future<TrackingLinksResponse> generateTrackingLinks(String deliveryId) async {
-    final token = await _readAccessToken();
-    if (token == null || token.trim().isEmpty) {
-      throw const DeliveryTrackingException(
-        'Cloud delivery session is not available on this device.',
-      );
-    }
+    final payload = await _postJson(
+      '/api/public/tracking/generate-token',
+      {'deliveryId': deliveryId},
+    );
 
-    try {
-      final uri = _uri('/api/public/tracking/generate-token');
-      final request = await _httpClient.openUrl('POST', uri).timeout(
-            const Duration(seconds: 12),
-          );
-      request.headers.contentType = ContentType.json;
-      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-
-      final body = jsonEncode({'deliveryId': deliveryId});
-      request.add(utf8.encode(body));
-
-      final response =
-          await request.close().timeout(const Duration(seconds: 20));
-      final responseBody = await response.transform(utf8.decoder).join();
-      debugPrint('[DeliveryService] POST /api/public/tracking/generate-token -> HTTP ${response.statusCode}');
-      debugPrint('[DeliveryService] Response: $responseBody');
-      final decoded = responseBody.trim().isEmpty
-          ? <String, dynamic>{}
-          : (jsonDecode(responseBody) as Map<String, dynamic>);
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw DeliveryTrackingException(
-          _readString(_asMap(decoded['error']), 'message') ??
-              'Failed to generate tracking links.',
-        );
-      }
-
-      return TrackingLinksResponse(
-        token: _readString(decoded, 'token') ?? '',
-        driverLink: _readString(decoded, 'driverLink') ?? '',
-        customerLink: _readString(decoded, 'customerLink') ?? '',
-      );
-    } on SocketException {
-      throw DeliveryTrackingException(_connectionFailureMessage());
-    }
+    return TrackingLinksResponse(
+      token: _readString(payload, 'token') ?? '',
+      driverLink: _readString(payload, 'driverLink') ?? '',
+      customerLink: _readString(payload, 'customerLink') ?? '',
+    );
   }
 
   Future<DriverLinkResponse> getDriverLinkByToken(String token) async {
-    try {
-      final uri = _uri('/api/public/tracking/driver/$token');
-      final request = await _httpClient.openUrl('GET', uri).timeout(
-            const Duration(seconds: 12),
-          );
-      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
+    final payload = await _getPublicJson('/api/public/tracking/driver/$token');
 
-      final response =
-          await request.close().timeout(const Duration(seconds: 20));
-      final responseBody = await response.transform(utf8.decoder).join();
-      final decoded = responseBody.trim().isEmpty
-          ? <String, dynamic>{}
-          : (jsonDecode(responseBody) as Map<String, dynamic>);
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw DeliveryTrackingException(
-          _readString(_asMap(decoded['error']), 'message') ??
-              'Failed to get driver link.',
-        );
-      }
-
-      return DriverLinkResponse(
-        deliveryId: _readString(decoded, 'deliveryId') ?? '',
-        orderId: _readString(decoded, 'orderId') ?? '',
-        orderNumber: _readString(decoded, 'orderNumber') ?? '',
-        customerName: _readString(decoded, 'customerName') ?? '',
-        recipientName: _readString(decoded, 'recipientName') ?? '',
-        deliveryAddress: _readString(decoded, 'deliveryAddress') ?? '',
-        destinationLatitude: _readDouble(decoded, 'destinationLatitude'),
-        destinationLongitude: _readDouble(decoded, 'destinationLongitude'),
-        customerPhone: _readString(decoded, 'customerPhone'),
-        timeSlot: _readString(decoded, 'timeSlot') ?? '',
-        status: _readString(decoded, 'status') ?? '',
-        trackingToken: _readString(decoded, 'trackingToken') ?? '',
-        mapsUrl: _readString(decoded, 'mapsUrl'),
-      );
-    } on SocketException {
-      throw DeliveryTrackingException(_connectionFailureMessage());
-    }
+    return DriverLinkResponse(
+      deliveryId: _readString(payload, 'deliveryId') ?? '',
+      orderId: _readString(payload, 'orderId') ?? '',
+      orderNumber: _readString(payload, 'orderNumber') ?? '',
+      customerName: _readString(payload, 'customerName') ?? '',
+      recipientName: _readString(payload, 'recipientName') ?? '',
+      deliveryAddress: _readString(payload, 'deliveryAddress') ?? '',
+      destinationLatitude: _readDouble(payload, 'destinationLatitude'),
+      destinationLongitude: _readDouble(payload, 'destinationLongitude'),
+      customerPhone: _readString(payload, 'customerPhone'),
+      timeSlot: _readString(payload, 'timeSlot') ?? '',
+      status: _readString(payload, 'status') ?? '',
+      trackingToken: _readString(payload, 'trackingToken') ?? '',
+      mapsUrl: _readString(payload, 'mapsUrl'),
+    );
   }
 
   Future<bool> updateDeliveryStatus(String token, String status) async {
-    try {
-      final uri = _uri('/api/public/tracking/driver/status');
-      final request = await _httpClient.openUrl('POST', uri).timeout(
-            const Duration(seconds: 12),
-          );
-      request.headers.contentType = ContentType.json;
-      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
-
-      final body = jsonEncode({
+    final payload = await _postPublicJson(
+      '/api/public/tracking/driver/status',
+      {
         'trackingToken': token,
         'status': status,
-      });
-      request.add(utf8.encode(body));
+      },
+    );
 
-      final response =
-          await request.close().timeout(const Duration(seconds: 20));
-      final responseBody = await response.transform(utf8.decoder).join();
-      final decoded = responseBody.trim().isEmpty
-          ? <String, dynamic>{}
-          : (jsonDecode(responseBody) as Map<String, dynamic>);
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw DeliveryTrackingException(
-          _readString(_asMap(decoded['error']), 'message') ??
-              'Failed to update delivery status.',
-        );
-      }
-
-      final success = decoded['success'];
-      return success is bool && success;
-    } on SocketException {
-      throw DeliveryTrackingException(_connectionFailureMessage());
-    }
+    final success = payload['success'];
+    return success is bool && success;
   }
 
   Future<bool> uploadDriverLocation({
@@ -903,15 +865,9 @@ class DeliveryTrackingService {
     DateTime? recordedAt,
     String? driverMobile,
   }) async {
-    try {
-      final uri = _uri('/api/public/tracking/driver/location');
-      final request = await _httpClient.openUrl('POST', uri).timeout(
-            const Duration(seconds: 12),
-          );
-      request.headers.contentType = ContentType.json;
-      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
-
-      final body = jsonEncode({
+    final payload = await _postPublicJson(
+      '/api/public/tracking/driver/location',
+      {
         'trackingToken': token,
         'latitude': latitude,
         'longitude': longitude,
@@ -920,28 +876,11 @@ class DeliveryTrackingService {
         'heading': heading,
         'recordedAt': recordedAt?.toIso8601String(),
         'driverMobile': driverMobile,
-      });
-      request.add(utf8.encode(body));
+      },
+    );
 
-      final response =
-          await request.close().timeout(const Duration(seconds: 20));
-      final responseBody = await response.transform(utf8.decoder).join();
-      final decoded = responseBody.trim().isEmpty
-          ? <String, dynamic>{}
-          : (jsonDecode(responseBody) as Map<String, dynamic>);
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw DeliveryTrackingException(
-          _readString(_asMap(decoded['error']), 'message') ??
-              'Failed to upload location.',
-        );
-      }
-
-      final success = decoded['success'];
-      return success is bool && success;
-    } on SocketException {
-      throw DeliveryTrackingException(_connectionFailureMessage());
-    }
+    final success = payload['success'];
+    return success is bool && success;
   }
 
   Stream<DeliveryTrackingSnapshot> watchTracking(
@@ -1142,26 +1081,61 @@ class DeliveryTrackingService {
   Future<String?> _provisionDeviceSessionFromLocalShop() async {
     try {
       final settings = await BusinessSettingsManager().load();
-      final mobile = settings.phone.replaceAll(RegExp(r'[^0-9]'), '');
-      final shopName = settings.shopName.trim();
-      if (shopName.isEmpty ||
-          shopName == 'My Flower Shop' ||
-          mobile.length < 8) {
-        return null;
-      }
+      final rawDigits = settings.phone.replaceAll(RegExp(r'[^0-9]'), '');
+      final mobile = rawDigits.length >= 8 ? rawDigits : '9999900001';
+      final rawShopName = settings.shopName.trim();
+      final shopName = (rawShopName.isEmpty || rawShopName == 'My Flower Shop')
+          ? 'Floraprise Solo'
+          : rawShopName;
+      final ownerName = settings.ownerName.trim().isEmpty
+          ? shopName
+          : settings.ownerName.trim();
+      final address = settings.address.trim().isEmpty
+          ? 'Floraprise Shop'
+          : settings.address.trim();
+      const city = 'Bangalore';
 
-      final payload = await _auth.register(
-        companyName: shopName,
-        ownerName: settings.ownerName.trim().isEmpty
-            ? shopName
-            : settings.ownerName.trim(),
-        mobile: mobile,
-        address: settings.address.trim(),
-        city: '',
-        email: _buildProvisioningEmail(mobile),
-        password: _buildProvisioningPassword(mobile),
-      );
-      return payload.accessToken;
+      final email = _buildProvisioningEmail(mobile);
+      final password = _buildProvisioningPassword(mobile);
+
+      try {
+        final payload = await _auth.register(
+          companyName: shopName,
+          ownerName: ownerName,
+          mobile: mobile,
+          address: address,
+          city: city,
+          email: email,
+          password: password,
+        );
+        return payload.accessToken;
+      } on Object catch (regErr) {
+        debugPrint(
+          '[DeliveryService] Provision register returned: $regErr; attempting login with provisioned credentials.',
+        );
+        try {
+          final loginPayload = await _auth.login(
+            identifier: email,
+            password: password,
+            rememberLogin: true,
+          );
+          return loginPayload.accessToken;
+        } on Object {
+          try {
+            final loginMobilePayload = await _auth.login(
+              identifier: mobile,
+              password: password,
+              rememberLogin: true,
+            );
+            return loginMobilePayload.accessToken;
+          } on Object catch (loginErr) {
+            debugPrint(
+              '[DeliveryService] Provision login fallback failed: $loginErr',
+            );
+            return null;
+          }
+        }
+      }
     } on Object catch (error) {
       debugPrint('[DeliveryService] Silent device provisioning failed: $error');
       return null;
@@ -1424,6 +1398,146 @@ class DeliveryTrackingService {
       return decoded;
     } on SocketException {
       throw DeliveryTrackingException(_connectionFailureMessage());
+    }
+  }
+
+  Future<Map<String, dynamic>> _getPublicJson(String path) async {
+    if (kIsWeb) {
+      return _sendPublicJsonWeb('GET', path);
+    }
+    try {
+      final uri = _uri(path);
+      final request = await _httpClient.openUrl('GET', uri).timeout(
+            const Duration(seconds: 12),
+          );
+      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
+
+      final response =
+          await request.close().timeout(const Duration(seconds: 20));
+      final body = await response.transform(utf8.decoder).join();
+      final decoded = body.trim().isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(body) as Map<String, dynamic>);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              'HTTP ${response.statusCode}',
+        );
+      }
+
+      final success = decoded['success'];
+      if (success is bool && !success) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              'Failed to load public delivery data.',
+        );
+      }
+
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return data.cast<String, dynamic>();
+      return decoded;
+    } on SocketException {
+      throw DeliveryTrackingException(_connectionFailureMessage());
+    }
+  }
+
+  Future<Map<String, dynamic>> _postPublicJson(
+    String path,
+    Map<String, Object?> body,
+  ) async {
+    if (kIsWeb) {
+      return _sendPublicJsonWeb('POST', path, body: body);
+    }
+    try {
+      final uri = _uri(path);
+      final request = await _httpClient.openUrl('POST', uri).timeout(
+            const Duration(seconds: 12),
+          );
+      request.headers.contentType = ContentType.json;
+      request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
+      request.add(utf8.encode(jsonEncode(body)));
+
+      final response =
+          await request.close().timeout(const Duration(seconds: 20));
+      final responseBody = await response.transform(utf8.decoder).join();
+      final decoded = responseBody.trim().isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(responseBody) as Map<String, dynamic>);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              'HTTP ${response.statusCode}',
+        );
+      }
+
+      final success = decoded['success'];
+      if (success is bool && !success) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              'Failed to update delivery.',
+        );
+      }
+
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return data.cast<String, dynamic>();
+      return decoded;
+    } on SocketException {
+      throw DeliveryTrackingException(_connectionFailureMessage());
+    }
+  }
+
+  Future<Map<String, dynamic>> _sendPublicJsonWeb(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+  }) async {
+    final uri = _uri(path);
+    final client = http.Client();
+    try {
+      final request = http.Request(method, uri);
+      request.headers['Accept'] = 'application/json';
+      if (body != null) {
+        request.headers['Content-Type'] = 'application/json';
+        request.body = jsonEncode(body);
+      }
+      final streamed =
+          await client.send(request).timeout(const Duration(seconds: 20));
+      final responseBody = await streamed.stream.bytesToString();
+      final decoded = responseBody.trim().isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(responseBody) as Map<String, dynamic>);
+
+      if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              _readString(decoded, 'title') ??
+              _readString(decoded, 'detail') ??
+              'HTTP ${streamed.statusCode}',
+        );
+      }
+
+      final success = decoded['success'];
+      if (success is bool && !success) {
+        throw DeliveryTrackingException(
+          _readString(_asMap(decoded['error']), 'message') ??
+              'Failed to communicate with delivery service.',
+        );
+      }
+
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return data.cast<String, dynamic>();
+      return decoded;
+    } on DeliveryTrackingException {
+      rethrow;
+    } on Object {
+      throw DeliveryTrackingException(_connectionFailureMessage());
+    } finally {
+      client.close();
     }
   }
 

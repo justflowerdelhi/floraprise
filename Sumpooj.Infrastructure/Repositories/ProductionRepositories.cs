@@ -28,6 +28,13 @@ public class FloralRecipeRepository : IFloralRecipeRepository
             .FirstOrDefaultAsync(r => r.CompanyId == companyId && r.Id == id);
     }
 
+    public async Task<FloralRecipe?> GetBySourceLibraryRecipeIdAsync(Guid companyId, Guid sourceLibraryRecipeId)
+    {
+        return await _db.FloralRecipes
+            .Include(r => r.Components)
+            .FirstOrDefaultAsync(r => r.CompanyId == companyId && r.SourceLibraryRecipeId == sourceLibraryRecipeId);
+    }
+
     public async Task AddAsync(FloralRecipe recipe)
     {
         _db.FloralRecipes.Add(recipe);

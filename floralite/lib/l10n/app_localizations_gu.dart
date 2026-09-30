@@ -1825,4 +1825,94 @@ class AppLocalizationsGu extends AppLocalizations {
 
   @override
   String get items => 'આઇટમ્સ';
+
+  @override
+  String get importCustomers => 'ગ્રાહકો આયાત કરો';
+
+  @override
+  String get import => 'આયાત';
+
+  @override
+  String get importContacts => 'સંપર્કોમાંથી આયાત કરો';
+
+  @override
+  String get importExcelCsv => 'એક્સેલ / CSV માંથી આયાત કરો';
+
+  @override
+  String get downloadSampleTemplate => 'નમૂના નમૂનો ડાઉનલોડ કરો';
+
+  @override
+  String get duplicateHandling => 'ડુપ્લિકેટ હેન્ડલિંગ';
+
+  @override
+  String get skipExisting => 'હાલનું છોડો';
+
+  @override
+  String get updateExisting => 'હાલનું અપડેટ કરો';
+
+  @override
+  String get previewSummary => 'પૂર્વાવલોકન સારાંશ';
+
+  @override
+  String get totalRowsCount => 'કુલ પંક્તિઓ';
+
+  @override
+  String get readyToImport => 'આયાત માટે તૈયાર';
+
+  @override
+  String get duplicatesFound => 'ડુપ્લિકેટ મળ્યાં';
+
+  @override
+  String get invalidRowsCount => 'અમાન્ય પંક્તિઓ';
+
+  @override
+  String get importProgress => 'ગ્રાહકો આયાત થઈ રહ્યા છે...';
+
+  @override
+  String get importResult => 'આયાત પરિણામ';
+
+  @override
+  String get importedCount => 'આયાત થયેલ';
+
+  @override
+  String get updatedCount => 'અપડેટ થયેલ';
+
+  @override
+  String get skippedCount => 'છોડી દીધેલ';
+
+  @override
+  String get downloadBillPdf => 'બિલ ડાઉનલોડ કરો (PDF)';
+
+  @override
+  String get downloadDeliverySlipPdf => 'ડિલિવરી સ્લિપ ડાઉનલોડ કરો (PDF)';
+
+  @override
+  String get billPdf => 'બિલ (PDF)';
+
+  @override
+  String get deliverySlipPdf => 'ડિલિવરી સ્લિપ (PDF)';
+
+  @override
+  String get crmTitle => 'સીઆરએમ';
+
+  @override
+  String get crmToday => 'આજે';
+
+  @override
+  String get crmEnquiries => 'પૂછપરછ';
+
+  @override
+  String get crmFollowUps => 'આજના ફોલો-અપ';
+
+  @override
+  String get crmNewEnquiries => 'નવી પૂછપરછ';
+
+  @override
+  String get crmQuotesPending => 'બાકી કોટેશન';
+
+  @override
+  String get crmOccasionsThisWeek => 'આ અઠવાડિયાના પ્રસંગો';
+
+  @override
+  String get crmOccasions => 'પ્રસંગો';
 }

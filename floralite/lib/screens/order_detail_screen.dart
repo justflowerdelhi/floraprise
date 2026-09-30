@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +11,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../controllers/voice_dictation_controller.dart';
 import '../data/repositories/associate_repository.dart';
 import '../data/repositories/cloud_order_repository.dart';
+import '../data/repositories/inventory_repository.dart';
+import '../data/repositories/order_repository.dart';
+import '../data/repositories/product_repository.dart';
 import '../data/repositories/staff_repository.dart';
 import '../data/repositories/third_party_delivery_repository.dart';
 import '../l10n/app_localizations.dart';
@@ -22,16 +26,23 @@ import '../models/walk_in_session.dart';
 import '../providers/order_provider.dart';
 import '../providers/order_workflow_provider.dart';
 import '../services/delivery_tracking_service.dart';
+import '../services/pdf/pdf_document_service.dart';
 import '../services/product_image_service.dart';
 import '../services/speech_recognition_service.dart';
+import 'bouquet_production_entry_screen.dart';
 import 'delivery_screen.dart';
 import 'cloud_order_edit_screen.dart';
+import 'event_sale_screen.dart';
 import 'live_delivery_tracking_screen.dart';
 import 'pickup_later_screen.dart';
 import 'take_away_screen.dart';
+import '../data/repositories/cloud_inventory_repository.dart';
 import '../utils/whatsapp_phone_utils.dart';
 import '../utils/delivery_message_utils.dart';
+import '../widgets/collect_payment_dialog.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/safe_platform_image.dart';
+import '../widgets/schedule_payment_followup_dialog.dart';
 import '../widgets/voice_dictation_field_header.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -52,6 +63,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final DeliveryTrackingService _deliveryTrackingService =
       DeliveryTrackingService();
   final ProductImageService _productImageService = const ProductImageService();
+  final InventoryRepository _inventoryRepository = InventoryRepository();
+  final ProductRepository _productRepository = ProductRepository();
+  final OrderRepository _orderRepository = OrderRepository();
+  List<InventoryReservationRecord> _orderReservations = [];
   Timer? _deliveryConnectivityTimer;
   DeliveryTrackingSnapshot? _deliveryTrackingSnapshot;
   Object? _deliveryTrackingError;
@@ -60,7 +75,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _deliveryConnectivityLoading = false;
   bool _generatingStartDeliveryLink = false;
 
-  bool get _isCloudOrder => widget.cloudOrderId?.trim().isNotEmpty == true;
+  bool get _isCloudOrder {
+    if (widget.cloudOrderId?.trim().isNotEmpty == true) return true;
+    final headerCloudId = context.read<OrderProvider>().detailHeader?.cloudOrderId;
+    return headerCloudId != null && headerCloudId.trim().isNotEmpty;
+  }
 
   @override
   void initState() {
@@ -70,11 +89,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             widget.orderId,
             cloudOrderId: widget.cloudOrderId,
           );
-      if (_isCloudOrder) return;
       final workflowProvider = context.read<OrderWorkflowProvider>();
-      workflowProvider.loadWorkflow(widget.orderId);
-      workflowProvider.loadAssignableAssociates();
+      if (!_isCloudOrder) {
+        workflowProvider.loadWorkflow(widget.orderId);
+      }
+      workflowProvider.loadAssignableAssociates(
+        isCloud: _isCloudOrder || kIsWeb,
+      );
+      _loadOrderReservations();
     });
+  }
+
+  Future<void> _loadOrderReservations() async {
+    if (kIsWeb) return;
+    try {
+      final reservations = await _inventoryRepository.getReservationsForOrder(
+        orderId: widget.orderId > 0 ? widget.orderId : null,
+        cloudOrderId: widget.cloudOrderId,
+      );
+      if (mounted) {
+        setState(() {
+          _orderReservations = reservations;
+        });
+      }
+    } catch (e) {
+      debugPrint('[OrderDetailScreen] Error loading reservations: $e');
+    }
   }
 
   @override
@@ -95,6 +135,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
+            tooltip: 'Edit Order',
             onPressed: _isCloudOrder ? () => _editCloudOrder() : () => _editOrder(),
           ),
         ],
@@ -116,149 +157,108 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
             _ensureDeliveryConnectivityPolling(header);
 
-            return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 24 + bottomInset),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildOrderHeader(header, colorScheme),
-                  const SizedBox(height: 12),
-                  if (_isCloudOrder)
-                    _buildCloudQuickActions(header, detail)
-                  else
-                    _buildWorkflowQuickActions(header, detail),
-                  const SizedBox(height: 16),
-                  AppCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Timeline',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ...(detail?.timeline ?? const <OrderTimelineItem>[])
-                            .map(
-                          (item) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.history,
-                                  size: 16,
-                                  color: Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    '${_pretty(item.status)} • ${_formatDateTime(item.createdAt)}',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  AppCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Order Items',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ...(detail?.lines ?? const <Map<String, Object?>>[])
-                            .map(
-                          (line) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _buildOrderItem(
-                              (line['description'] as String?) ?? '-',
-                              _formatPaise(
-                                  (line['line_total_paise'] as int?) ?? 0),
-                              (line['qty'] as int?) ?? 0,
-                            ),
-                          ),
-                        ),
-                        const Divider(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= 800;
+
+                if (isWide) {
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(24, 20, 24, 28 + bottomInset),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1400),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Total',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                            // Left Column (58% width): Customer, Items, Financials, Notes, Linkages
+                            Expanded(
+                              flex: 6,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildCustomerCard(header, colorScheme),
+                                  const SizedBox(height: 16),
+                                  _buildOrderItemsSection(header, detail, colorScheme),
+                                  const SizedBox(height: 16),
+                                  _buildFinancialSummaryCard(header, detail, colorScheme),
+                                  if (_hasNotes(header, detail)) ...[
+                                    const SizedBox(height: 16),
+                                    _buildNotesCard(header, detail, colorScheme),
+                                  ],
+                                  if (_hasLinkages(detail)) ...[
+                                    const SizedBox(height: 16),
+                                    _buildLinkagesCard(detail!, colorScheme),
+                                  ],
+                                ],
                               ),
                             ),
-                            Text(
-                              _formatPaise(header.grandTotalPaise),
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
+                            const SizedBox(width: 20),
+                            // Right Column (42% width): Header summary, Payments, Fulfillment, Quick Actions, Timeline
+                            Expanded(
+                              flex: 4,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildOrderHeader(header, colorScheme),
+                                  const SizedBox(height: 16),
+                                  if (header.fulfilmentType == 'event_sale') ...[
+                                    _buildEventPreparationCard(header, detail, colorScheme),
+                                    const SizedBox(height: 16),
+                                  ],
+                                  _buildPaymentDetailsCard(header, detail, colorScheme),
+                                  const SizedBox(height: 16),
+                                  _buildFulfillmentCard(header, detail, colorScheme),
+                                  const SizedBox(height: 16),
+                                  _buildQuickActionsSection(header, detail, colorScheme),
+                                  const SizedBox(height: 16),
+                                  _buildTimelineCard(header, detail, colorScheme),
+                                ],
                               ),
                             ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  AppCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Linkages',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildLinkageRow(
-                          'Scheduler Tasks',
-                          '${detail?.schedulerTasks.length ?? 0}',
-                        ),
-                        _buildLinkageRow(
-                          'Inventory Impact Rows',
-                          '${detail?.inventoryTransactions.length ?? 0}',
-                        ),
-                        _buildLinkageRow(
-                          'Receipt Status',
-                          (detail?.receiptStatus ?? 'pending').toString(),
-                        ),
-                        _buildLinkageRow(
-                          'WhatsApp Status',
-                          (detail?.whatsappStatus ?? 'pending').toString(),
-                        ),
+                  );
+                }
+
+                // Mobile / Narrow Viewport (Single Column Streamlined Stack)
+                return SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, 24 + bottomInset),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildOrderHeader(header, colorScheme),
+                      const SizedBox(height: 14),
+                      _buildCustomerCard(header, colorScheme),
+                      const SizedBox(height: 14),
+                      _buildOrderItemsSection(header, detail, colorScheme),
+                      if (header.fulfilmentType == 'event_sale') ...[
+                        const SizedBox(height: 14),
+                        _buildEventPreparationCard(header, detail, colorScheme),
                       ],
-                    ),
+                      const SizedBox(height: 14),
+                      _buildFinancialSummaryCard(header, detail, colorScheme),
+                      const SizedBox(height: 14),
+                      _buildPaymentDetailsCard(header, detail, colorScheme),
+                      const SizedBox(height: 14),
+                      _buildFulfillmentCard(header, detail, colorScheme),
+                      if (_hasNotes(header, detail)) ...[
+                        const SizedBox(height: 14),
+                        _buildNotesCard(header, detail, colorScheme),
+                      ],
+                      const SizedBox(height: 14),
+                      _buildQuickActionsSection(header, detail, colorScheme),
+                      const SizedBox(height: 14),
+                      _buildTimelineCard(header, detail, colorScheme),
+                      if (_hasLinkages(detail)) ...[
+                        const SizedBox(height: 14),
+                        _buildLinkagesCard(detail!, colorScheme),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  if (detail != null) ...[
-                    _buildInfoCard('Relay Information', detail.relayInfo),
-                    const SizedBox(height: 16),
-                    _buildInfoCard(
-                        'Corporate Information', detail.corporateInfo),
-                    const SizedBox(height: 16),
-                    _buildInfoCard(
-                        'Marketplace Information', detail.marketplaceInfo),
-                    const SizedBox(height: 16),
-                  ],
-                  const SizedBox(height: 24),
-                ],
-              ),
+                );
+              },
             );
           },
         ),
@@ -275,86 +275,1554 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Order Number row
+          // Order Number & Status Chips Row
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  header.displayOrderNo,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colorScheme.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    InkWell(
+                      onTap: () => _copyOrderNumber(header.orderNo),
+                      borderRadius: BorderRadius.circular(4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              header.displayOrderNo,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: colorScheme.primary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.copy_rounded,
+                            size: 14,
+                            color: colorScheme.primary.withValues(alpha: 0.7),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (header.createdAt != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Placed on ${_formatDateTime(header.createdAt)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
               Flexible(
                 child: Wrap(
                   alignment: WrapAlignment.end,
-                  runAlignment: WrapAlignment.end,
-                  spacing: 8,
-                  runSpacing: 6,
+                  spacing: 6,
+                  runSpacing: 4,
                   children: [
-                    if (_shouldShowDeliveryConnectivity(header))
-                      _buildDeliveryConnectivityIndicator(
-                        header,
-                        colorScheme,
-                      ),
                     StatusChip(
                       label: _pretty(header.status),
                       color: _getStatusColor(header.status),
                     ),
+                    _buildPaymentStatusChip(header.paymentStatus),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          // Recipient Name - LARGE (primary focus)
-          Text(
-            header.recipientName,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          // Ordered by customer
-          Text(
-            'Ordered by ${header.customerName}',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 14),
-          // Metadata grid
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          // Metadata Grid
           Wrap(
             spacing: 16,
             runSpacing: 8,
             children: [
-              _headerValue('Occasion', header.occasion),
-              _headerValue('Source', _pretty(header.source)),
               _headerValue('Fulfillment', _pretty(header.fulfilmentType)),
-              _headerValue('Delivery Date', _formatDate(header.scheduledAt)),
-              _headerValue('Delivery Slot', _pretty(header.deliverySlot)),
-              _headerValue('Payment', header.paymentStatus),
-              _headerValue('Total', _formatPaise(header.grandTotalPaise)),
-              if (outstanding > 0)
-                _headerValue('Outstanding', _formatPaise(outstanding),
-                    isAlert: true),
+              _headerValue('Source', _pretty(header.source)),
+              if (header.occasion.trim().isNotEmpty && header.occasion != '-')
+                _headerValue('Occasion', header.occasion),
+              if (header.scheduledAt != null)
+                _headerValue('Delivery Date', _formatDate(header.scheduledAt)),
+              if (header.deliverySlot.trim().isNotEmpty && header.deliverySlot != '-')
+                _headerValue('Delivery Slot', _pretty(header.deliverySlot)),
             ],
           ),
+          const SizedBox(height: 12),
+          // Prominent Grand Total Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: colorScheme.primary.withValues(alpha: 0.15)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Grand Total',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          _formatPaise(header.grandTotalPaise),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (outstanding > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'Outstanding',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red.shade800,
+                          ),
+                        ),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            _formatPaise(outstanding),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_circle_rounded, size: 14, color: Colors.green.shade700),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Fully Paid',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerCard(
+    OrderDetailHeader header,
+    ColorScheme colorScheme,
+  ) {
+    final customerName = header.customerName.trim().isEmpty || header.customerName == '-'
+        ? 'Walk-In Customer'
+        : header.customerName;
+    final hasCustomerPhone = header.customerPhone.trim().isNotEmpty && header.customerPhone != '-';
+    final hasCustomerEmail = header.customerEmail != null &&
+        header.customerEmail!.trim().isNotEmpty &&
+        header.customerEmail != '-';
+    final isRecipientDifferent = header.recipientName.trim().isNotEmpty &&
+        header.recipientName != '-' &&
+        header.recipientName.trim().toLowerCase() != customerName.trim().toLowerCase();
+    final hasRecipientPhone = header.recipientPhone.trim().isNotEmpty &&
+        header.recipientPhone != '-' &&
+        header.recipientPhone != header.customerPhone;
+    final hasAddress = header.address.trim().isNotEmpty && header.address != '-';
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.person_pin_circle_outlined, size: 20, color: colorScheme.primary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Customer & Delivery Details',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Customer (Ordered By) Block
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'ORDERED BY',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ),
+                    if (hasCustomerPhone)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.phone, size: 18, color: Colors.green),
+                            tooltip: 'Call Customer',
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            onPressed: () => _callNumber(header.customerPhone),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Colors.teal),
+                            tooltip: 'WhatsApp Customer',
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            onPressed: () => _whatsappNumber(header.customerPhone),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  customerName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E2922),
+                  ),
+                ),
+                if (hasCustomerPhone) ...[
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Icon(Icons.phone_iphone_rounded, size: 15, color: Colors.grey.shade700),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          header.customerPhone,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (hasCustomerEmail) ...[
+                  const SizedBox(height: 3),
+                  InkWell(
+                    onTap: () => _emailCustomer(header.customerEmail),
+                    child: Row(
+                      children: [
+                        Icon(Icons.email_outlined, size: 15, color: Colors.grey.shade700),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            header.customerEmail!,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // Recipient & Address Block
+          if (isRecipientDifferent || hasRecipientPhone || hasAddress) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'DELIVER TO / RECIPIENT',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.primary,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
+                      if (hasRecipientPhone)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.phone, size: 18, color: Colors.green),
+                              tooltip: 'Call Recipient',
+                              constraints: const BoxConstraints(),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              onPressed: () => _callNumber(header.recipientPhone),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Colors.teal),
+                              tooltip: 'WhatsApp Recipient',
+                              constraints: const BoxConstraints(),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              onPressed: () => _whatsappNumber(header.recipientPhone),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                  if (isRecipientDifferent) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      header.recipientName,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E2922),
+                      ),
+                    ),
+                  ],
+                  if (hasRecipientPhone) ...[
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(Icons.phone_iphone_rounded, size: 15, color: Colors.grey.shade700),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            header.recipientPhone,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (hasAddress) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.location_on_outlined, size: 16, color: colorScheme.primary),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                header.address,
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade900,
+                                ),
+                              ),
+                              if (header.deliveryLandmark.trim().isNotEmpty)
+                                Text(
+                                  'Landmark: ${header.deliveryLandmark}',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                ),
+                              if (header.deliveryPincode.trim().isNotEmpty)
+                                Text(
+                                  'PIN: ${header.deliveryPincode}',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.near_me_rounded, size: 16),
+                      label: const Text('Navigate / Google Maps'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      onPressed: () => _navigateToCustomerAddress(header.address),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderItemsSection(
+    OrderDetailHeader header,
+    OrderDetailBundle? detail,
+    ColorScheme colorScheme,
+  ) {
+    final lines = detail?.lines ?? const <Map<String, Object?>>[];
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(Icons.local_florist_rounded, size: 20, color: colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Order Items (${lines.length})',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _formatPaise(header.grandTotalPaise),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (lines.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No line items found for this order.',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+              ),
+            )
+          else
+            ...lines.map(
+              (line) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildRichOrderItemCard(line, colorScheme, header: header),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRichOrderItemCard(
+    Map<String, Object?> line,
+    ColorScheme colorScheme, {
+    OrderDetailHeader? header,
+  }) {
+    final productName = (line['product_name'] as String?) ??
+        (line['description'] as String?) ??
+        'Item';
+    final sku = (line['product_sku'] as String?) ?? (line['sku'] as String?);
+    final qty = (line['qty'] as int?) ?? 1;
+    final unitPrice = (line['unit_price_paise'] as int?) ?? 0;
+    final discount = (line['discount_paise'] as int?) ?? 0;
+    final gstPercent = (line['gst_percent'] as int?) ?? 0;
+    final lineGst = (line['line_gst_paise'] as int?) ?? 0;
+    final lineTotal = (line['line_total_paise'] as int?) ??
+        (unitPrice > 0 ? unitPrice * qty : 0);
+    final customization = (line['special_instructions'] as String?) ??
+        (line['notes'] as String?) ??
+        (line['design_ref'] as String?);
+
+    final productId = (line['product_id'] as int?);
+    final cloudProductId = (line['cloud_product_id'] as String?);
+    final isEventSale = header != null &&
+        (header.fulfilmentType.toLowerCase() == 'event_sale' ||
+         header.fulfilmentType.toLowerCase() == 'event');
+    final isInventoryProduct = (productId != null && productId > 0) ||
+        (cloudProductId != null && cloudProductId.trim().isNotEmpty);
+
+    final imageResult = _productImageService.resolveForOrderLine(line);
+
+    List<InventoryReservationRecord> matchingReservations = [];
+    int reservedQty = 0;
+    if (isEventSale && isInventoryProduct) {
+      matchingReservations = _orderReservations
+          .where((r) =>
+              r.status == 'active' &&
+              ((line['id'] != null && r.orderLineId == line['id']) ||
+               (productId != null && r.productId == productId)))
+          .toList();
+      reservedQty = matchingReservations.fold<int>(0, (sum, r) => sum + r.quantity);
+    }
+    final stillToArrange = (qty - reservedQty).clamp(0, qty);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image Thumbnail
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 56,
+              height: 56,
+              child: _buildItemThumbnail(imageResult, colorScheme),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Item Details Column
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        productName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatPaise(lineTotal),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                if (sku != null && sku.trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'SKU: $sku',
+                      style: TextStyle(fontSize: 10, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 4),
+                // Qty x Unit price + discount + GST row
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'Qty: $qty × ${_formatPaise(unitPrice)}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+                    ),
+                    if (discount > 0)
+                      Text(
+                        'Disc: -${_formatPaise(discount)}',
+                        style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w600),
+                      ),
+                    if (gstPercent > 0)
+                      Text(
+                        'GST $gstPercent% (${_formatPaise(lineGst)})',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                      ),
+                  ],
+                ),
+                if (customization != null && customization.trim().isNotEmpty && customization != '-') ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.amber.shade100),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.format_quote_rounded, size: 13, color: Colors.amber.shade800),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            customization,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.amber.shade900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (isEventSale && isInventoryProduct) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: reservedQty > 0 ? Colors.teal.shade50 : Colors.blueGrey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: reservedQty > 0 ? Colors.teal.shade200 : Colors.blueGrey.shade200,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              reservedQty > 0 ? Icons.inventory_2_rounded : Icons.info_outline_rounded,
+                              size: 15,
+                              color: reservedQty > 0 ? Colors.teal.shade800 : Colors.blueGrey.shade700,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Event Stock Hold Status',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: reservedQty > 0 ? Colors.teal.shade900 : Colors.blueGrey.shade900,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            _buildReservationMetric(
+                              'Required',
+                              '$qty',
+                              Colors.blueGrey.shade700,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildReservationMetric(
+                              'Reserved / Held',
+                              '$reservedQty',
+                              reservedQty > 0 ? Colors.teal.shade800 : Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildReservationMetric(
+                              'Still to Arrange',
+                              '$stillToArrange',
+                              stillToArrange > 0 ? Colors.orange.shade800 : Colors.green.shade800,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          reservedQty == 0
+                              ? 'Stock is not reserved for this event. Future event booking does not consume physical stock.'
+                              : reservedQty >= qty
+                                  ? 'All $qty unit(s) reserved from stock.'
+                                  : '$reservedQty unit(s) reserved from stock. $stillToArrange unit(s) still to arrange.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: reservedQty > 0 ? Colors.teal.shade900 : Colors.blueGrey.shade800,
+                          ),
+                        ),
+                        if (!kIsWeb && header.status != 'cancelled' && header.status != 'delivered') ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (stillToArrange > 0) ...[
+                                TextButton.icon(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const BouquetProductionEntryScreen()),
+                                  ),
+                                  icon: const Icon(Icons.precision_manufacturing_outlined, size: 14),
+                                  label: const Text('Produce / Prepare', style: TextStyle(fontSize: 11)),
+                                  style: TextButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    foregroundColor: Colors.orange.shade800,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                              OutlinedButton.icon(
+                                icon: Icon(
+                                  reservedQty > 0 ? Icons.edit : Icons.bookmark_add_outlined,
+                                  size: 14,
+                                ),
+                                label: Text(
+                                  reservedQty > 0 ? 'Edit Hold ($reservedQty)' : 'Reserve Stock',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  visualDensity: VisualDensity.compact,
+                                  foregroundColor: reservedQty > 0 ? Colors.teal.shade800 : colorScheme.primary,
+                                  side: BorderSide(
+                                    color: reservedQty > 0 ? Colors.teal.shade400 : colorScheme.primary,
+                                  ),
+                                ),
+                                onPressed: () => _showOrderDetailReserveStockDialog(
+                                  line: line,
+                                  requiredQty: qty,
+                                  reservedQty: reservedQty,
+                                  matchingReservations: matchingReservations,
+                                  productId: productId,
+                                  cloudProductId: cloudProductId,
+                                  header: header,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReservationMetric(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showOrderDetailReserveStockDialog({
+    required Map<String, Object?> line,
+    required int requiredQty,
+    required int reservedQty,
+    required List<InventoryReservationRecord> matchingReservations,
+    required int? productId,
+    required String? cloudProductId,
+    required OrderDetailHeader? header,
+  }) async {
+    if (productId == null || header == null) return;
+
+    final allProducts = await _productRepository.listActiveProductsWithInventory();
+    final currentProd = allProducts.firstWhere(
+      (p) => p.id == productId,
+      orElse: () => ProductInventoryRecord(
+        id: productId,
+        code: '',
+        name: (line['product_name'] as String?) ?? 'Product',
+        category: 'Other',
+        defaultUnit: 'unit',
+        sku: '',
+        barcode: '',
+        manufacturerBarcode: '',
+        florapriseBarcode: '',
+        sellingPricePaise: 0,
+        purchasePricePaise: null,
+        gstPercent: 0,
+        trackInventory: true,
+        active: true,
+        favorite: false,
+        currentQty: 0,
+        minQty: 0,
+      ),
+    );
+
+    if (!mounted) return;
+
+    final avail = currentProd.availableToSell + reservedQty;
+    final maxCanReserve = avail.clamp(0, requiredQty);
+    final reserveController = TextEditingController(
+      text: (reservedQty > 0 ? reservedQty : maxCanReserve).toString(),
+    );
+
+    final newReserved = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Reserve Stock for Event'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  (line['product_name'] as String?) ?? 'Product',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Text('Required for Event: $requiredQty'),
+                Text('Available in Stock to Hold: $avail'),
+                Text('Currently Held: $reservedQty'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reserveController,
+                  decoration: InputDecoration(
+                    labelText: 'Units to Hold (0 - $maxCanReserve)',
+                    helperText: maxCanReserve <= 0 ? 'No available stock to hold right now' : null,
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            if (reservedQty > 0)
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, 0),
+                child: const Text('Release Hold', style: TextStyle(color: Colors.red)),
+              ),
+            FilledButton(
+              onPressed: () {
+                final qty = int.tryParse(reserveController.text.trim()) ?? 0;
+                if (qty < 0 || qty > maxCanReserve) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text('Please enter a quantity between 0 and $maxCanReserve')),
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext, qty);
+              },
+              child: const Text('Save Reservation'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (newReserved == null || newReserved == reservedQty || !mounted) return;
+
+    if (newReserved == 0) {
+      for (final r in matchingReservations) {
+        await _inventoryRepository.releaseReservation(r.id);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reservation released.')),
+        );
+      }
+    } else if (newReserved > reservedQty) {
+      final diff = newReserved - reservedQty;
+      await _inventoryRepository.reserveStock(
+        orderId: header.id,
+        orderLineId: line['id'] as int?,
+        productId: productId,
+        cloudProductId: cloudProductId,
+        quantity: diff,
+        eventDate: header.scheduledAt != null
+            ? '${header.scheduledAt!.year}-${header.scheduledAt!.month.toString().padLeft(2, '0')}-${header.scheduledAt!.day.toString().padLeft(2, '0')}'
+            : null,
+        eventName: '${header.customerName.isNotEmpty ? header.customerName : 'Event'} (#${header.orderNo})',
+        notes: 'Reserved from order details',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Reserved $newReserved unit(s) for event.')),
+        );
+      }
+    } else {
+      final toRelease = reservedQty - newReserved;
+      int remainingToRelease = toRelease;
+      for (final r in matchingReservations) {
+        if (remainingToRelease <= 0) break;
+        if (r.quantity <= remainingToRelease) {
+          await _inventoryRepository.releaseReservation(r.id);
+          remainingToRelease -= r.quantity;
+        } else {
+          await _inventoryRepository.releaseReservation(r.id);
+          await _inventoryRepository.reserveStock(
+            orderId: header.id,
+            orderLineId: r.orderLineId,
+            productId: productId,
+            cloudProductId: cloudProductId,
+            quantity: r.quantity - remainingToRelease,
+            eventDate: r.eventDate,
+            eventName: r.eventName,
+            notes: r.notes,
+          );
+          remainingToRelease = 0;
+        }
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Updated hold to $newReserved unit(s).')),
+        );
+      }
+    }
+
+    await _loadOrderReservations();
+  }
+
+  Widget _buildItemThumbnail(ProductImageResult imageResult, ColorScheme colorScheme) {
+    if (imageResult.hasImage) {
+      return SafePlatformImageView(
+        imagePath: imageResult.reference,
+        width: 56,
+        height: 56,
+        fit: BoxFit.cover,
+        fallbackIcon: Icons.local_florist_outlined,
+        errorIcon: Icons.local_florist_outlined,
+      );
+    }
+    return _buildItemPlaceholderIcon(colorScheme);
+  }
+
+  Widget _buildItemPlaceholderIcon(ColorScheme colorScheme, {double size = 56}) {
+    return Container(
+      width: size,
+      height: size,
+      color: colorScheme.primary.withValues(alpha: 0.08),
+      child: Center(
+        child: Icon(
+          Icons.local_florist_rounded,
+          size: size * 0.45,
+          color: colorScheme.primary.withValues(alpha: 0.6),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFinancialSummaryCard(
+    OrderDetailHeader header,
+    OrderDetailBundle? detail,
+    ColorScheme colorScheme,
+  ) {
+    final subtotal = header.subtotalPaise > 0
+        ? header.subtotalPaise
+        : _computeSubtotal(detail?.lines, header.grandTotalPaise);
+    final itemDiscount = _computeItemDiscount(detail?.lines);
+    final billDiscount = header.discountTotalPaise > 0
+        ? header.discountTotalPaise
+        : _readMarketplaceDiscount(detail);
+    final rewardDiscount = header.rewardDiscountAmountPaise;
+    final gstTotal = header.gstTotalPaise > 0
+        ? header.gstTotalPaise
+        : _computeGst(detail?.lines);
+    final deliveryFee = header.deliveryChargesPaise > 0
+        ? header.deliveryChargesPaise
+        : _readDeliveryFee(detail);
+    final roundOff = header.roundOffPaise;
+    final grandTotal = header.grandTotalPaise;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.receipt_long_rounded, size: 20, color: colorScheme.primary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Financial Summary',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildSummaryRow('Items Subtotal', _formatPaise(subtotal)),
+          if (itemDiscount > 0)
+            _buildSummaryRow('Item Discounts', '- ${_formatPaise(itemDiscount)}', isGreen: true),
+          if (billDiscount > 0)
+            _buildSummaryRow('Order Discount', '- ${_formatPaise(billDiscount)}', isGreen: true),
+          if (rewardDiscount > 0)
+            _buildSummaryRow(
+              'Reward Points (${header.rewardPointsRedeemed} pts)',
+              '- ${_formatPaise(rewardDiscount)}',
+              isGreen: true,
+            ),
+          if (gstTotal > 0)
+            _buildSummaryRow('GST / Taxes', _formatPaise(gstTotal)),
+          if (deliveryFee > 0)
+            _buildSummaryRow('Delivery Charges', _formatPaise(deliveryFee)),
+          if (roundOff != 0)
+            _buildSummaryRow('Round Off', _formatPaise(roundOff)),
+          const Divider(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Grand Total',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                _formatPaise(grandTotal),
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    Color? valueColor,
+    bool isGreen = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade700,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: isGreen ? Colors.green.shade700 : valueColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentDetailsCard(
+    OrderDetailHeader header,
+    OrderDetailBundle? detail,
+    ColorScheme colorScheme,
+  ) {
+    final outstanding = header.outstandingAmountPaise;
+    final paid = header.paidAmountPaise;
+    final grandTotal = header.grandTotalPaise;
+    final payments = detail?.payments ?? const <Map<String, Object?>>[];
+
+    // Classify payments according to Stage 3 rules:
+    final saleTenders = <Map<String, Object?>>[];
+    final creditCollections = <Map<String, Object?>>[];
+    final adjustments = <Map<String, Object?>>[];
+
+    for (final p in payments) {
+      final type = (p['payment_type'] as String?)?.trim().toLowerCase();
+      if (type == 'creditcollection') {
+        creditCollections.add(p);
+      } else if (type == 'adjustment') {
+        adjustments.add(p);
+      } else {
+        // Defaults to SaleTender
+        saleTenders.add(p);
+      }
+    }
+
+    // Credit created at sale:
+    final saleTenderSum = saleTenders.fold<int>(
+      0,
+      (sum, p) => sum + ((p['amount_paise'] as int?) ?? 0),
+    );
+    final creditCreated = (grandTotal - saleTenderSum).clamp(0, grandTotal);
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(Icons.payment_rounded, size: 20, color: colorScheme.primary),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Payment Details',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _buildPaymentStatusChip(header.paymentStatus),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Summary row inside payment card
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Order Total', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(_formatPaise(grandTotal), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Paid Amount', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(_formatPaise(paid), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Balance Due', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          _formatPaise(outstanding),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: outstanding > 0 ? Colors.red.shade700 : Colors.green.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (outstanding > 0) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                icon: const Icon(Icons.payments_outlined, size: 18),
+                label: Text('Collect Payment (${_formatPaise(outstanding)})'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.green.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => _collectPayment(header),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.alarm_add_outlined, size: 18),
+                label: const Text('Schedule Payment Follow-up'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  showSchedulePaymentFollowUpDialog(
+                    context: context,
+                    orderId: header.id,
+                    cloudOrderId: header.cloudOrderId,
+                    orderNo: header.orderNo,
+                    customerName: header.customerName,
+                    outstandingAmountPaise: header.outstandingAmountPaise,
+                  );
+                },
+              ),
+            ),
+          ],
+          if (paid > 0 && outstanding == 0) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.tune_rounded, size: 16),
+                label: const Text('Adjust Payment'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => _startPaymentAdjustment(header),
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           const Divider(height: 1),
           const SizedBox(height: 12),
-          // Assigned To row
+          const Text(
+            'Tender Breakdown',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey),
+          ),
+          const SizedBox(height: 8),
+          if (payments.isEmpty && creditCreated == 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text('No payments recorded.', style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontStyle: FontStyle.italic)),
+            )
+          else ...[
+            // 1. Sale Tenders
+            if (saleTenders.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 6),
+                child: Text('Sale Tenders (Checkout)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blueGrey.shade700)),
+              ),
+              ...saleTenders.map((p) => _buildPaymentRow(p, isSaleTender: true)),
+            ],
+            // 2. Credit Created
+            if (creditCreated > 0) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 6, bottom: 6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.amber.shade200),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(Icons.credit_card_off_rounded, size: 15, color: Colors.amber.shade900),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Credit Created at Checkout',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.amber.shade900),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(_formatPaise(creditCreated), style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber.shade900)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            // 3. Credit Collections
+            if (creditCollections.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 6),
+                child: Text('Credit Collections (Subsequent)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+              ),
+              ...creditCollections.map((p) => _buildPaymentRow(p, isCollection: true)),
+            ],
+            // 4. Adjustments
+            if (adjustments.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 6),
+                child: Text('Adjustments', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.purple.shade800)),
+              ),
+              ...adjustments.map((p) => _buildPaymentRow(p)),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentStatusChip(String status) {
+    final s = status.toLowerCase();
+    Color bg;
+    Color fg;
+    if (s == 'paid') {
+      bg = Colors.green.shade50;
+      fg = Colors.green.shade800;
+    } else if (s == 'partial' || s == 'partiallypaid') {
+      bg = Colors.amber.shade50;
+      fg = Colors.orange.shade900;
+    } else if (s == 'credit') {
+      bg = Colors.deepOrange.shade50;
+      fg = Colors.deepOrange.shade900;
+    } else {
+      bg = Colors.red.shade50;
+      fg = Colors.red.shade800;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        _pretty(status),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: fg,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentRow(Map<String, Object?> payment, {bool isSaleTender = false, bool isCollection = false}) {
+    final method = (payment['method'] as String?) ?? 'Unknown';
+    final amount = (payment['amount_paise'] as int?) ?? 0;
+    final reference = (payment['reference'] as String?) ?? (payment['transactionId'] as String?);
+    final createdAt = (payment['created_at'] as String?);
+    final dt = createdAt == null ? null : DateTime.tryParse(createdAt);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Icon(_getPaymentMethodIcon(method), size: 15, color: Colors.grey.shade600),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_pretty(method), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      if (reference != null && reference.isNotEmpty)
+                        Text(
+                          'Ref: $reference',
+                          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      if (dt != null)
+                        Text(
+                          _formatDateTime(dt),
+                          style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(_formatPaise(amount), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  IconData _getPaymentMethodIcon(String method) {
+    switch (method.toLowerCase()) {
+      case 'cash':
+        return Icons.money_rounded;
+      case 'upi':
+      case 'gpay':
+      case 'phonepe':
+      case 'paytm':
+        return Icons.qr_code_rounded;
+      case 'card':
+      case 'credit_card':
+      case 'debit_card':
+        return Icons.credit_card_rounded;
+      case 'banktransfer':
+      case 'bank_transfer':
+      case 'netbanking':
+        return Icons.account_balance_rounded;
+      case 'credit':
+        return Icons.credit_score_rounded;
+      default:
+        return Icons.payment_rounded;
+    }
+  }
+
+  Widget _buildFulfillmentCard(
+    OrderDetailHeader header,
+    OrderDetailBundle? detail,
+    ColorScheme colorScheme,
+  ) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.local_shipping_outlined, size: 20, color: colorScheme.primary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Fulfillment & Staff',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Fulfillment Type & Schedule Row
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            children: [
+              _headerValue('Fulfillment Type', _pretty(header.fulfilmentType)),
+              if (header.scheduledAt != null)
+                _headerValue('Scheduled Date', _formatDate(header.scheduledAt)),
+              if (header.deliverySlot.trim().isNotEmpty && header.deliverySlot != '-')
+                _headerValue('Delivery Slot', _pretty(header.deliverySlot)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          // Assigned Staff Row
           Row(
             children: [
               Expanded(
@@ -376,9 +1844,366 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ],
           ),
+          // Live Connectivity & Tracking CTA
+          if (_shouldShowDeliveryConnectivity(header)) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade100),
+              ),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
+                children: [
+                  _buildDeliveryConnectivityIndicator(header, colorScheme),
+                  OutlinedButton.icon(
+                    onPressed: () => _openLiveTracking(header),
+                    icon: const Icon(Icons.location_searching_rounded, size: 14),
+                    label: const Text('Track Live', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _buildNotesCard(
+    OrderDetailHeader header,
+    OrderDetailBundle? detail,
+    ColorScheme colorScheme,
+  ) {
+    final cardMessage = header.cardMessage.trim();
+    final instructions = header.specialInstructions.trim();
+    final internalNotes = header.internalNotes?.trim() ?? '';
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.notes_rounded, size: 20, color: colorScheme.primary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Notes & Instructions',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          if (cardMessage.isNotEmpty && cardMessage != '-') ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E7),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFFE0B2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.card_giftcard_rounded, size: 16, color: Color(0xFFE65100)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Card Message',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.amber.shade900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    cardMessage,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF4E342E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (instructions.isNotEmpty && instructions != '-') ...[
+            const SizedBox(height: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Delivery Instructions',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 2),
+                Text(instructions, style: const TextStyle(fontSize: 13)),
+              ],
+            ),
+          ],
+          if (internalNotes.isNotEmpty && internalNotes != instructions && internalNotes != '-') ...[
+            const SizedBox(height: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Internal Notes',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 2),
+                Text(internalNotes, style: TextStyle(fontSize: 13, color: Colors.grey.shade800)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionsSection(
+    OrderDetailHeader header,
+    OrderDetailBundle? detail,
+    ColorScheme colorScheme,
+  ) {
+    if (_isCloudOrder) {
+      return _buildCloudQuickActions(header, detail);
+    } else {
+      return _buildWorkflowQuickActions(header, detail);
+    }
+  }
+
+  Widget _buildTimelineCard(
+    OrderDetailHeader header,
+    OrderDetailBundle? detail,
+    ColorScheme colorScheme,
+  ) {
+    final timeline = detail?.timeline ?? const <OrderTimelineItem>[];
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.history_rounded, size: 20, color: colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text(
+                'Order Timeline',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (timeline.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No timeline events yet.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+              ),
+            )
+          else
+            ...timeline.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline_rounded,
+                      size: 16,
+                      color: _getStatusColor(item.status),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _pretty(item.status),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                          if (item.notes != null && item.notes!.trim().isNotEmpty)
+                            Text(
+                              item.notes!,
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                            ),
+                          Text(
+                            _formatDateTime(item.createdAt),
+                            style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLinkagesCard(OrderDetailBundle detail, ColorScheme colorScheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Linkages & Sync Status',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              _buildLinkageRow(
+                'Scheduler Tasks',
+                '${detail.schedulerTasks.length}',
+              ),
+              _buildLinkageRow(
+                'Inventory Impact Rows',
+                '${detail.inventoryTransactions.length}',
+              ),
+              _buildLinkageRow(
+                'Receipt Status',
+                (detail.receiptStatus ?? 'pending').toString(),
+              ),
+              _buildLinkageRow(
+                'WhatsApp Status',
+                (detail.whatsappStatus ?? 'pending').toString(),
+              ),
+            ],
+          ),
+        ),
+        if (detail.relayInfo.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildInfoCard('Relay Information', detail.relayInfo),
+        ],
+        if (detail.corporateInfo.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildInfoCard('Corporate Information', detail.corporateInfo),
+        ],
+        if (detail.marketplaceInfo.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildInfoCard('Marketplace Information', detail.marketplaceInfo),
+        ],
+      ],
+    );
+  }
+
+  bool _hasNotes(OrderDetailHeader header, OrderDetailBundle? detail) {
+    return (header.cardMessage.trim().isNotEmpty && header.cardMessage != '-') ||
+        (header.specialInstructions.trim().isNotEmpty && header.specialInstructions != '-') ||
+        (header.internalNotes != null &&
+            header.internalNotes!.trim().isNotEmpty &&
+            header.internalNotes != '-');
+  }
+
+  bool _hasLinkages(OrderDetailBundle? detail) {
+    if (detail == null) return false;
+    return detail.schedulerTasks.isNotEmpty ||
+        detail.inventoryTransactions.isNotEmpty ||
+        detail.relayInfo.isNotEmpty ||
+        detail.corporateInfo.isNotEmpty ||
+        detail.marketplaceInfo.isNotEmpty;
+  }
+
+  int _computeSubtotal(List<Map<String, Object?>>? lines, int fallbackTotal) {
+    if (lines == null || lines.isEmpty) return fallbackTotal;
+    int sum = 0;
+    for (final line in lines) {
+      final sub = line['line_subtotal_paise'] as int?;
+      final price = line['unit_price_paise'] as int?;
+      final qty = (line['qty'] as int?) ?? 1;
+      if (sub != null && sub > 0) {
+        sum += sub;
+      } else if (price != null && price > 0) {
+        sum += price * qty;
+      }
+    }
+    return sum > 0 ? sum : fallbackTotal;
+  }
+
+  int _computeItemDiscount(List<Map<String, Object?>>? lines) {
+    if (lines == null || lines.isEmpty) return 0;
+    int sum = 0;
+    for (final line in lines) {
+      sum += (line['discount_paise'] as int?) ?? 0;
+    }
+    return sum;
+  }
+
+  int _computeGst(List<Map<String, Object?>>? lines) {
+    if (lines == null || lines.isEmpty) return 0;
+    int sum = 0;
+    for (final line in lines) {
+      sum += (line['line_gst_paise'] as int?) ?? 0;
+    }
+    return sum;
+  }
+
+  int _readMarketplaceDiscount(OrderDetailBundle? detail) {
+    if (detail == null) return 0;
+    return (detail.marketplaceInfo['discount_amount_paise'] as int?) ?? 0;
+  }
+
+  int _readDeliveryFee(OrderDetailBundle? detail) {
+    if (detail == null) return 0;
+    return (detail.marketplaceInfo['delivery_fee_paise'] as int?) ?? 0;
+  }
+
+  Future<void> _callNumber(String? phone) async {
+    final clean = phone?.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (clean == null || clean.isEmpty) return;
+    final uri = Uri.parse('tel:$clean');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      _showSnack('Unable to place call to $clean');
+    }
+  }
+
+  Future<void> _whatsappNumber(String? phone) async {
+    final uri = WhatsAppPhoneUtils.buildUri(phone);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      _showSnack('Unable to open WhatsApp for $phone');
+    }
+  }
+
+  Future<void> _emailCustomer(String? email) async {
+    final clean = email?.trim();
+    if (clean == null || clean.isEmpty) return;
+    final uri = Uri.parse('mailto:$clean');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      _showSnack('Unable to send email to $clean');
+    }
+  }
+
+  void _copyOrderNumber(String orderNo) {
+    Clipboard.setData(ClipboardData(text: orderNo));
+    _showSnack('Copied $orderNo to clipboard');
   }
 
   Widget _headerValue(String label, String value, {bool isAlert = false}) {
@@ -454,12 +2279,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   void _ensureDeliveryConnectivityPolling(OrderDetailHeader header) {
-    if (_isCloudOrder) {
-      _deliveryConnectivityTimer?.cancel();
-      _deliveryConnectivityTimer = null;
-      _deliveryConnectivityOrderId = null;
-      return;
-    }
     if (!_shouldShowDeliveryConnectivity(header)) {
       _deliveryConnectivityTimer?.cancel();
       _deliveryConnectivityTimer = null;
@@ -473,10 +2292,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _deliveryConnectivityOrderId != header.id) return;
-      _refreshDeliveryConnectivity(header.id);
+      _refreshDeliveryConnectivity(header);
       _deliveryConnectivityTimer = Timer.periodic(
         const Duration(seconds: 30),
-        (_) => _refreshDeliveryConnectivity(header.id),
+        (_) => _refreshDeliveryConnectivity(header),
       );
     });
   }
@@ -488,16 +2307,37 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _isDeliveryInMotion(header.status);
   }
 
-  Future<void> _refreshDeliveryConnectivity(int orderId) async {
+  Future<void> _refreshDeliveryConnectivity(OrderDetailHeader header) async {
     if (_deliveryConnectivityLoading) return;
     if (mounted) {
       setState(() => _deliveryConnectivityLoading = true);
     }
 
     try {
-      final snapshot =
-          await _deliveryTrackingService.getTrackingForLocalOrder(orderId);
-      if (!mounted || _deliveryConnectivityOrderId != orderId) return;
+      DeliveryTrackingSnapshot snapshot;
+      final isCloud = _isCloudOrder ||
+          kIsWeb ||
+          (header.cloudOrderId?.trim().isNotEmpty == true);
+      if (isCloud) {
+        final cloudId = (header.cloudOrderId?.trim().isNotEmpty == true)
+            ? header.cloudOrderId!.trim()
+            : widget.cloudOrderId?.trim();
+        if (cloudId != null && cloudId.isNotEmpty) {
+          snapshot = await _deliveryTrackingService
+              .getTrackingForCloudOrder(cloudId);
+        } else {
+          final deliveryId = await _deliveryTrackingService.getCloudDeliveryId(
+            orderNo: header.orderNo,
+          );
+          if (deliveryId == null || deliveryId.trim().isEmpty) return;
+          snapshot = await _deliveryTrackingService
+              .getTrackingByAssignmentId(deliveryId.trim());
+        }
+      } else {
+        snapshot =
+            await _deliveryTrackingService.getTrackingForLocalOrder(header.id);
+      }
+      if (!mounted || _deliveryConnectivityOrderId != header.id) return;
       setState(() {
         _deliveryTrackingSnapshot = snapshot;
         _deliveryTrackingError = null;
@@ -505,7 +2345,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _deliveryConnectivityLoading = false;
       });
     } catch (error) {
-      if (!mounted || _deliveryConnectivityOrderId != orderId) return;
+      if (!mounted || _deliveryConnectivityOrderId != header.id) return;
       setState(() {
         _deliveryTrackingError = error;
         _deliveryConnectivityLoading = false;
@@ -706,7 +2546,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       FilledButton.icon(
                         onPressed: () {
                           Navigator.of(context).pop();
-                          _openLiveTracking(header.id);
+                          _openLiveTracking(header);
                         },
                         icon: const Icon(Icons.location_searching_rounded),
                         label: const Text('Track Driver'),
@@ -757,7 +2597,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () =>
-                            _refreshDeliveryConnectivity(header.id),
+                            _refreshDeliveryConnectivity(header),
                         icon: const Icon(Icons.refresh_rounded),
                         label: const Text('Refresh Now'),
                       ),
@@ -767,7 +2607,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () {
                           Navigator.of(context).pop();
-                          _openLiveTracking(header.id);
+                          _openLiveTracking(header);
                         },
                         icon: const Icon(Icons.map_outlined),
                         label: const Text('Track Driver'),
@@ -842,12 +2682,46 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return Consumer<OrderWorkflowProvider>(
       builder: (context, workflowProvider, _) {
         final disabled = workflowProvider.isLoading;
+        final isEventSale = header.fulfilmentType == 'event_sale';
         final deliveryAssigned =
             (header.deliveryName ?? '').trim().isNotEmpty ||
                 header.status == 'out_for_delivery' ||
                 header.status == 'delivered';
         final actions = [
-          if (header.isPaid == 1)
+          if (isEventSale) ...[
+            _OrderQuickAction(
+              'Produce / Prepare',
+              Icons.precision_manufacturing_outlined,
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BouquetProductionEntryScreen()),
+              ),
+            ),
+            if (header.status == OrderStatus.confirmed)
+              _OrderQuickAction(
+                'Start Preparing',
+                Icons.build_circle_outlined,
+                disabled ? null : () => _advanceEventStatus(header, detail, OrderStatus.preparing),
+              ),
+            if (header.status == OrderStatus.preparing)
+              _OrderQuickAction(
+                'Mark Ready',
+                Icons.check_circle_outline,
+                disabled ? null : () => _advanceEventStatus(header, detail, OrderStatus.ready),
+              ),
+            if (header.status == OrderStatus.ready)
+              _OrderQuickAction(
+                'Fulfill Event',
+                Icons.task_alt,
+                disabled ? null : () => _advanceEventStatus(header, detail, OrderStatus.delivered),
+              ),
+            _OrderQuickAction(
+              'Change Status',
+              Icons.swap_horiz_rounded,
+              disabled ? null : () => _showStatusChangeDialog(header, detail),
+            ),
+          ],
+          if (header.outstandingAmountPaise > 0)
             _OrderQuickAction(
               'Collect Payment',
               Icons.payments_outlined,
@@ -864,48 +2738,50 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             Icons.design_services,
             disabled ? null : () => _assignDesigner(header, detail),
           ),
-          if (!deliveryAssigned)
+          if (!deliveryAssigned && !isEventSale)
             _OrderQuickAction(
               'Assign Delivery',
               Icons.delivery_dining,
               disabled ? null : () => _assignDelivery(header, detail),
             ),
-          _OrderQuickAction(
-            _generatingStartDeliveryLink
-                ? 'Generating Link...'
-                : 'Generate Start Delivery Link',
-            Icons.local_shipping_outlined,
-            disabled || _generatingStartDeliveryLink
-                ? null
-                : () => _generateStartDeliveryLink(header),
-            isLoading: _generatingStartDeliveryLink,
-          ),
-          _OrderQuickAction(
-            'Call Driver',
-            Icons.call_rounded,
-            disabled || !deliveryAssigned ? null : () => _callDriver(header.id),
-          ),
-          _OrderQuickAction(
-            'Navigate',
-            Icons.near_me_rounded,
-            disabled || header.address.trim().isEmpty
-                ? null
-                : () => _navigateToCustomerAddress(header.address),
-          ),
-          _OrderQuickAction(
-            'Track Driver',
-            Icons.location_searching_rounded,
-            disabled || !deliveryAssigned
-                ? null
-                : () => _openLiveTracking(header.id),
-          ),
-          _OrderQuickAction(
-            'Share Tracking Link',
-            Icons.share_rounded,
-            disabled || !deliveryAssigned
-                ? null
-                : () => _shareTrackingLinkViaWhatsApp(header.id),
-          ),
+          if (!isEventSale) ...[
+            _OrderQuickAction(
+              _generatingStartDeliveryLink
+                  ? 'Generating Link...'
+                  : 'Generate Start Delivery Link',
+              Icons.local_shipping_outlined,
+              disabled || _generatingStartDeliveryLink
+                  ? null
+                  : () => _generateStartDeliveryLink(header),
+              isLoading: _generatingStartDeliveryLink,
+            ),
+            _OrderQuickAction(
+              'Call Driver',
+              Icons.call_rounded,
+              disabled || !deliveryAssigned ? null : () => _callDriver(header),
+            ),
+            _OrderQuickAction(
+              'Navigate',
+              Icons.near_me_rounded,
+              disabled || header.address.trim().isEmpty
+                  ? null
+                  : () => _navigateToCustomerAddress(header.address),
+            ),
+            _OrderQuickAction(
+              'Track Driver',
+              Icons.location_searching_rounded,
+              disabled || !deliveryAssigned
+                  ? null
+                  : () => _openLiveTracking(header),
+            ),
+            _OrderQuickAction(
+              'Share Tracking Link',
+              Icons.share_rounded,
+              disabled || !deliveryAssigned
+                  ? null
+                  : () => _shareTrackingLinkViaWhatsApp(header),
+            ),
+          ],
           _OrderQuickAction(
             'Forward Associate',
             Icons.forward_to_inbox,
@@ -940,7 +2816,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
-                  mainAxisExtent: 56,
+                  mainAxisExtent: 64,
                 ),
                 itemBuilder: (context, index) {
                   final action = actions[index];
@@ -950,8 +2826,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+                        horizontal: 10,
+                        vertical: 8,
                       ),
                       decoration: BoxDecoration(
                         border: Border.all(color: color.withValues(alpha: 0.3)),
@@ -1007,6 +2883,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     OrderDetailHeader header,
     OrderDetailBundle? detail,
   ) {
+    final isEventSale = header.fulfilmentType == 'event_sale';
     final canNavigate = header.address.trim().isNotEmpty && header.address != '-';
     final canCancel = OrderStatus.canCancel(header.status);
     final deliveryAssigned = (header.deliveryName ?? '').trim().isNotEmpty ||
@@ -1014,6 +2891,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         header.status == 'delivered';
 
     final actions = [
+      if (isEventSale) ...[
+        _OrderQuickAction(
+          'Produce / Prepare',
+          Icons.precision_manufacturing_outlined,
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const BouquetProductionEntryScreen()),
+          ),
+        ),
+        if (header.status == OrderStatus.confirmed)
+          _OrderQuickAction(
+            'Start Preparing',
+            Icons.build_circle_outlined,
+            () => _advanceEventStatus(header, detail, OrderStatus.preparing),
+          ),
+        if (header.status == OrderStatus.preparing)
+          _OrderQuickAction(
+            'Mark Ready',
+            Icons.check_circle_outline,
+            () => _advanceEventStatus(header, detail, OrderStatus.ready),
+          ),
+        if (header.status == OrderStatus.ready)
+          _OrderQuickAction(
+            'Fulfill Event',
+            Icons.task_alt,
+            () => _advanceEventStatus(header, detail, OrderStatus.delivered),
+          ),
+      ],
       _OrderQuickAction(
         'View Bill',
         Icons.receipt_long,
@@ -1046,36 +2951,38 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         Icons.design_services,
         () => _assignCloudDesigner(header),
       ),
-      _OrderQuickAction(
-        'Assign Delivery',
-        Icons.delivery_dining,
-        () => _assignCloudDelivery(header),
-      ),
-      _OrderQuickAction(
-        _generatingStartDeliveryLink
-            ? 'Generating Link...'
-            : 'Generate Start Delivery Link',
-        Icons.local_shipping_outlined,
-        _generatingStartDeliveryLink
-            ? null
-            : () => _generateStartDeliveryLink(header),
-        isLoading: _generatingStartDeliveryLink,
-      ),
-      _OrderQuickAction(
-        'Call Driver',
-        Icons.call_rounded,
-        deliveryAssigned ? () => _callDriver(header.id) : null,
-      ),
-      _OrderQuickAction(
-        'Track Driver',
-        Icons.location_searching_rounded,
-        deliveryAssigned ? () => _openLiveTracking(header.id) : null,
-      ),
-      _OrderQuickAction(
-        'Share Tracking Link',
-        Icons.share_rounded,
-        deliveryAssigned ? () => _shareTrackingLinkViaWhatsApp(header.id) : null,
-      ),
+      if (!isEventSale) ...[
+        _OrderQuickAction(
+          'Assign Delivery',
+          Icons.delivery_dining,
+          () => _assignCloudDelivery(header),
+        ),
+        _OrderQuickAction(
+          _generatingStartDeliveryLink
+              ? 'Generating Link...'
+              : 'Generate Start Delivery Link',
+          Icons.local_shipping_outlined,
+          _generatingStartDeliveryLink
+              ? null
+              : () => _generateStartDeliveryLink(header),
+          isLoading: _generatingStartDeliveryLink,
+        ),
+        _OrderQuickAction(
+          'Call Driver',
+          Icons.call_rounded,
+          deliveryAssigned ? () => _callDriver(header) : null,
+        ),
+        _OrderQuickAction(
+          'Track Driver',
+          Icons.location_searching_rounded,
+          deliveryAssigned ? () => _openLiveTracking(header) : null,
+        ),
+        _OrderQuickAction(
+          'Share Tracking Link',
+          Icons.share_rounded,
+          deliveryAssigned ? () => _shareTrackingLinkViaWhatsApp(header) : null,
+        ),
+      ],
       _OrderQuickAction(
         'Forward Associate',
         Icons.forward_to_inbox,
@@ -1084,7 +2991,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       _OrderQuickAction(
         'Change Status',
         Icons.swap_horiz_rounded,
-        () => _changeCloudStatus(header),
+        () => _showStatusChangeDialog(header, detail),
       ),
       _OrderQuickAction(
         'Cancel Order',
@@ -1110,7 +3017,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               crossAxisCount: 2,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
-              mainAxisExtent: 56,
+              mainAxisExtent: 64,
             ),
             itemBuilder: (context, index) {
               final action = actions[index];
@@ -1120,8 +3027,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
+                    horizontal: 10,
+                    vertical: 8,
                   ),
                   decoration: BoxDecoration(
                     border: Border.all(color: color.withValues(alpha: 0.3)),
@@ -1160,8 +3067,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     String? driverLink;
     Object? failure;
     try {
-      final deliveryId = await _deliveryTrackingService
-          .resolveOrCreateCloudDeliveryId(header.id);
+      String? deliveryId;
+      if (_isCloudOrder ||
+          kIsWeb ||
+          (header.cloudOrderId?.trim().isNotEmpty == true)) {
+        deliveryId = await _deliveryTrackingService.getCloudDeliveryId(
+          cloudOrderId: header.cloudOrderId,
+          orderNo: header.orderNo,
+        );
+      } else {
+        deliveryId = await _deliveryTrackingService
+            .resolveOrCreateCloudDeliveryId(header.id);
+      }
       if (deliveryId == null || deliveryId.trim().isEmpty) {
         throw const DeliveryTrackingException(
           'Unable to create or find delivery record.',
@@ -1259,21 +3176,61 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Future<void> _openLiveTracking(int orderId) async {
+  Future<void> _openLiveTracking(OrderDetailHeader header) async {
+    if (!mounted) return;
+    final isCloud = _isCloudOrder ||
+        kIsWeb ||
+        (header.cloudOrderId?.trim().isNotEmpty == true);
+    String? assignmentId;
+    if (isCloud) {
+      assignmentId = await _deliveryTrackingService.getCloudDeliveryId(
+        cloudOrderId: header.cloudOrderId,
+        orderNo: header.orderNo,
+      );
+    }
     if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => LiveDeliveryTrackingScreen(orderId: orderId),
+        builder: (_) => LiveDeliveryTrackingScreen(
+          orderId: isCloud ? null : header.id,
+          cloudOrderId:
+              isCloud ? (header.cloudOrderId ?? widget.cloudOrderId) : null,
+          assignmentId: assignmentId,
+        ),
       ),
     );
   }
 
-  Future<void> _callDriver(int orderId) async {
+  Future<void> _callDriver(OrderDetailHeader header) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final snapshot = _deliveryTrackingSnapshot ??
-          await _deliveryTrackingService.getTrackingForLocalOrder(orderId);
-      final phone = snapshot.driver?.phone.trim() ?? '';
+      DeliveryTrackingSnapshot? snapshot = _deliveryTrackingSnapshot;
+      if (snapshot == null) {
+        final isCloud = _isCloudOrder ||
+            kIsWeb ||
+            (header.cloudOrderId?.trim().isNotEmpty == true);
+        if (isCloud) {
+          final cloudId = (header.cloudOrderId?.trim().isNotEmpty == true)
+              ? header.cloudOrderId!.trim()
+              : widget.cloudOrderId?.trim();
+          if (cloudId != null && cloudId.isNotEmpty) {
+            snapshot = await _deliveryTrackingService
+                .getTrackingForCloudOrder(cloudId);
+          } else {
+            final deliveryId = await _deliveryTrackingService.getCloudDeliveryId(
+              orderNo: header.orderNo,
+            );
+            if (deliveryId != null && deliveryId.trim().isNotEmpty) {
+              snapshot = await _deliveryTrackingService
+                  .getTrackingByAssignmentId(deliveryId.trim());
+            }
+          }
+        } else {
+          snapshot = await _deliveryTrackingService
+              .getTrackingForLocalOrder(header.id);
+        }
+      }
+      final phone = snapshot?.driver?.phone.trim() ?? '';
       if (phone.isEmpty || phone == '-') {
         messenger.showSnackBar(
           const SnackBar(content: Text('Driver phone is not available yet.')),
@@ -1314,14 +3271,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Future<void> _shareTrackingLinkViaWhatsApp(int orderId) async {
+  Future<void> _shareTrackingLinkViaWhatsApp(OrderDetailHeader header) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final snapshot =
-          await _deliveryTrackingService.getTrackingForLocalOrder(orderId);
-      final link = (await _deliveryTrackingService.generateTrackingLinks(
-        snapshot.assignmentId.toString(),
-      )).customerLink.trim();
+      String? deliveryId;
+      if (_isCloudOrder ||
+          kIsWeb ||
+          (header.cloudOrderId?.trim().isNotEmpty == true)) {
+        deliveryId = await _deliveryTrackingService.getCloudDeliveryId(
+          cloudOrderId: header.cloudOrderId,
+          orderNo: header.orderNo,
+        );
+      } else {
+        deliveryId = await _deliveryTrackingService
+            .resolveOrCreateCloudDeliveryId(header.id);
+      }
+      if (deliveryId == null || deliveryId.trim().isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Tracking link is not available yet.')),
+        );
+        return;
+      }
+
+      final links = await _deliveryTrackingService.generateTrackingLinks(
+        deliveryId.trim(),
+      );
+      final link = links.customerLink.trim();
       if (link.isEmpty) {
         messenger.showSnackBar(
           const SnackBar(content: Text('Tracking link is not available yet.')),
@@ -1330,9 +3305,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       }
 
       final message = 'Track your delivery live:\n$link';
-      final waUri = Uri.parse(
-        'https://wa.me/?text=${Uri.encodeComponent(message)}',
-      );
+      final waUri = WhatsAppPhoneUtils.buildUri('', message: message) ??
+          Uri.parse('https://wa.me/?text=${Uri.encodeComponent(message)}');
 
       if (await launchUrl(waUri, mode: LaunchMode.externalApplication)) {
         return;
@@ -1359,10 +3333,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<Staff?> _selectStaff(String title, StaffRole role) async {
     final repository = StaffRepository();
-    final staff = await repository.searchStaff(
+    var staff = await repository.searchStaff(
       roles: [role],
       activeOnly: true,
     );
+    if (staff.isEmpty) {
+      staff = await repository.searchStaff(activeOnly: true);
+    }
 
     if (!mounted) return null;
 
@@ -1448,7 +3425,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       notes: 'Assigned to ${designer.name}',
     );
     if (!mounted) return;
-    await orderProvider.loadOrderDetailProgressive(header.id);
+    await orderProvider.loadOrderDetailProgressive(
+      header.id,
+      cloudOrderId: header.cloudOrderId ?? widget.cloudOrderId,
+    );
 
     final sendWhatsApp = await _showAssignmentChoiceDialog(
       title: 'Designer Assigned Successfully',
@@ -1541,14 +3521,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (!mounted) return;
 
     // Reload order to confirm cloud Delivery is Assigned
-    await orderProvider.loadOrderDetailProgressive(header.id);
+    await orderProvider.loadOrderDetailProgressive(
+      header.id,
+      cloudOrderId: header.cloudOrderId ?? widget.cloudOrderId,
+    );
     if (!mounted) return;
 
     // Generate tracking link for WhatsApp
     String? startDeliveryLink;
     try {
-      final deliveryId = await _deliveryTrackingService
-          .resolveOrCreateCloudDeliveryId(header.id);
+      final deliveryId = await _deliveryTrackingService.getCloudDeliveryId(
+            cloudOrderId: header.cloudOrderId,
+            orderNo: header.orderNo,
+          ) ??
+          (kIsWeb
+              ? null
+              : await _deliveryTrackingService
+                  .resolveOrCreateCloudDeliveryId(header.id));
       if (deliveryId != null && deliveryId.trim().isNotEmpty) {
         final links =
             await _deliveryTrackingService.generateTrackingLinks(deliveryId);
@@ -1616,8 +3605,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     // Resolve or create cloud Delivery and generate tracking link
     String? startDeliveryLink;
     try {
-      final deliveryId = await _deliveryTrackingService
-          .resolveOrCreateCloudDeliveryId(header.id);
+      final deliveryId = await _deliveryTrackingService.getCloudDeliveryId(
+            cloudOrderId: header.cloudOrderId,
+            orderNo: header.orderNo,
+          ) ??
+          (kIsWeb
+              ? null
+              : await _deliveryTrackingService
+                  .resolveOrCreateCloudDeliveryId(header.id));
       if (deliveryId != null && deliveryId.trim().isNotEmpty) {
         final links =
             await _deliveryTrackingService.generateTrackingLinks(deliveryId);
@@ -2138,6 +4133,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   ) async {
     final workflowProvider = context.read<OrderWorkflowProvider>();
     final orderProvider = context.read<OrderProvider>();
+    if (workflowProvider.associates.isEmpty) {
+      await workflowProvider.loadAssignableAssociates(
+        isCloud: _isCloudOrder || kIsWeb,
+      );
+    }
     final associates = List<AssociateRecord>.from(workflowProvider.associates);
 
     if (!mounted) return;
@@ -2200,7 +4200,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
     if (!mounted) return;
 
-    await orderProvider.loadOrderDetailProgressive(header.id);
+    await orderProvider.loadOrderDetailProgressive(
+      header.id,
+      cloudOrderId: header.cloudOrderId ?? widget.cloudOrderId,
+    );
     if (!mounted) return;
 
     await _waitForRouteTeardown();
@@ -2252,7 +4255,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           children: [
             const ListTile(
               title: Text(
-                'Print',
+                'Print & PDF',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
@@ -2278,6 +4281,31 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               onTap: () async {
                 Navigator.pop(sheetContext);
                 await workflowProvider.printMessageCard(header.id);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf),
+              title: const Text('Download Bill PDF'),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                await PdfDocumentService().downloadOrShareBillPdf(
+                  context: context,
+                  header: header,
+                  bundle: detail,
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('Download Delivery Slip PDF'),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                await PdfDocumentService().downloadOrShareDeliverySlipPdf(
+                  context: context,
+                  header: header,
+                  bundle: detail,
+                );
               },
             ),
           ],
@@ -2308,6 +4336,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               onTap: () {
                 Navigator.pop(sheetContext);
                 _showBill(header, detail);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf),
+              title: const Text('Download Bill PDF'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                PdfDocumentService().downloadOrShareBillPdf(
+                  context: context,
+                  header: header,
+                  bundle: detail,
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('Download Delivery Slip PDF'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                PdfDocumentService().downloadOrShareDeliverySlipPdf(
+                  context: context,
+                  header: header,
+                  bundle: detail,
+                );
               },
             ),
             ListTile(
@@ -2372,6 +4424,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Close'),
           ),
+          OutlinedButton.icon(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await PdfDocumentService().downloadOrShareBillPdf(
+                context: context,
+                header: header,
+                bundle: detail,
+              );
+            },
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text('Download PDF'),
+          ),
           if (!_isCloudOrder)
             FilledButton.icon(
               onPressed: () {
@@ -2386,12 +4450,422 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Future<void> _changeCloudStatus(OrderDetailHeader header) async {
-    final cloudOrderId = header.cloudOrderId?.trim();
-    if (cloudOrderId == null || cloudOrderId.isEmpty) return;
-    final nextStatuses = OrderStatus.nextStatuses(header.status)
+  Widget _buildEventPreparationCard(
+    OrderDetailHeader header,
+    OrderDetailBundle? detail,
+    ColorScheme colorScheme,
+  ) {
+    final lines = detail?.lines ?? const <Map<String, Object?>>[];
+
+    // Physical inventory items only (exclude service/decor lines with productId == null and cloudProductId == null)
+    final physicalLines = lines.where((line) {
+      final pid = line['product_id'] as int?;
+      final cpid = line['cloud_product_id'] as String?;
+      return (pid != null && pid > 0) || (cpid != null && cpid.trim().isNotEmpty);
+    }).toList();
+
+    int totalRequired = 0;
+    int totalReserved = 0;
+
+    for (final line in physicalLines) {
+      final qty = (line['qty'] as int?) ?? 1;
+      final pid = line['product_id'] as int?;
+      totalRequired += qty;
+
+      final matching = _orderReservations
+          .where((r) =>
+              r.status == 'active' &&
+              ((line['id'] != null && r.orderLineId == line['id']) ||
+               (pid != null && r.productId == pid)))
+          .toList();
+      totalReserved += matching.fold<int>(0, (sum, r) => sum + r.quantity);
+    }
+
+    final totalStillToArrange = (totalRequired - totalReserved).clamp(0, totalRequired);
+    final isDelivered = header.status == OrderStatus.delivered;
+    final isCancelled = header.status == OrderStatus.cancelled;
+    final isReady = header.status == OrderStatus.ready;
+    final isPreparing = header.status == OrderStatus.preparing;
+    final isConfirmed = header.status == OrderStatus.confirmed;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.event_available_rounded, size: 20, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Event Preparation & Readiness',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isDelivered
+                      ? Colors.green.shade50
+                      : isReady
+                          ? Colors.teal.shade50
+                          : isPreparing
+                              ? Colors.purple.shade50
+                              : Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isDelivered
+                        ? Colors.green.shade200
+                        : isReady
+                            ? Colors.teal.shade200
+                            : isPreparing
+                                ? Colors.purple.shade200
+                                : Colors.blue.shade200,
+                  ),
+                ),
+                child: Text(
+                  isDelivered
+                      ? 'Fulfilled'
+                      : isReady
+                          ? 'Ready for Event'
+                          : isPreparing
+                              ? 'In Preparation'
+                              : 'Stock Hold / Prep',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isDelivered
+                        ? Colors.green.shade800
+                        : isReady
+                            ? Colors.teal.shade800
+                            : isPreparing
+                                ? Colors.purple.shade800
+                                : Colors.blue.shade800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 3-Metric Summary Banner
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
+              children: [
+                _buildReservationMetric(
+                  'Total Required',
+                  '$totalRequired',
+                  Colors.blueGrey.shade800,
+                ),
+                const SizedBox(width: 8),
+                _buildReservationMetric(
+                  'Reserved / Held',
+                  '$totalReserved',
+                  totalReserved > 0 ? Colors.teal.shade800 : Colors.grey.shade600,
+                ),
+                const SizedBox(width: 8),
+                _buildReservationMetric(
+                  'Still to Arrange',
+                  '$totalStillToArrange',
+                  totalStillToArrange > 0 ? Colors.orange.shade800 : Colors.green.shade800,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Descriptive guidance
+          Text(
+            isDelivered
+                ? 'Event has been fulfilled. Physical inventory has been deducted.'
+                : totalStillToArrange > 0
+                    ? '$totalStillToArrange unit(s) still need to be produced or arranged before the event.'
+                    : 'All physical items are reserved/held in stock. Ready to prepare or fulfill.',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDelivered
+                  ? Colors.green.shade800
+                  : totalStillToArrange > 0
+                      ? Colors.orange.shade900
+                      : Colors.teal.shade900,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (!isDelivered && !isCancelled) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (totalStillToArrange > 0)
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const BouquetProductionEntryScreen()),
+                    ),
+                    icon: const Icon(Icons.precision_manufacturing_outlined, size: 16),
+                    label: const Text('Produce / Prepare Bouquet'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.orange.shade800,
+                      side: BorderSide(color: Colors.orange.shade300),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                if (isConfirmed)
+                  FilledButton.icon(
+                    onPressed: () => _advanceEventStatus(header, detail, OrderStatus.preparing),
+                    icon: const Icon(Icons.build_circle_outlined, size: 16),
+                    label: const Text('Start Preparing'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.purple.shade700,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
+                  ),
+                if (isPreparing)
+                  FilledButton.icon(
+                    onPressed: () => _advanceEventStatus(header, detail, OrderStatus.ready),
+                    icon: const Icon(Icons.check_circle_outline, size: 16),
+                    label: const Text('Mark Ready for Event'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.teal.shade700,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
+                  ),
+                if (isReady)
+                  FilledButton.icon(
+                    onPressed: () => _advanceEventStatus(header, detail, OrderStatus.delivered),
+                    icon: const Icon(Icons.task_alt, size: 16),
+                    label: const Text('Fulfill Event'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.green.shade700,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _preCheckEventFulfillmentStock({
+    required OrderDetailHeader header,
+    required OrderDetailBundle? detail,
+  }) async {
+    final isCloud = _isCloudOrder ||
+        kIsWeb ||
+        (header.cloudOrderId?.trim().isNotEmpty == true);
+
+    if (isCloud) {
+      try {
+        final cloudInventoryRepo = CloudInventoryRepository();
+        final inventoryItems = await cloudInventoryRepo.listInventoryProducts();
+        final stockByCloudId = <String, int>{};
+        for (final item in inventoryItems) {
+          if (item.cloudProductId != null && item.cloudProductId!.isNotEmpty) {
+            stockByCloudId[item.cloudProductId!] = item.currentQty;
+          }
+        }
+
+        final lines = detail?.lines ?? const <Map<String, Object?>>[];
+        final shortages = <Map<String, dynamic>>[];
+
+        for (final line in lines) {
+          final cloudProdId = line['cloud_product_id'] as String?;
+          final qty = (line['qty'] as int?) ?? 0;
+          final name = (line['product_name'] as String?) ?? (line['description'] as String?) ?? 'Product';
+          if (cloudProdId == null || cloudProdId.isEmpty || qty <= 0) continue;
+
+          final avail = stockByCloudId[cloudProdId] ?? 0;
+          if (avail < qty) {
+            shortages.add({
+              'productName': name,
+              'requiredQty': qty,
+              'availableQty': avail,
+              'shortageQty': qty - avail,
+            });
+          }
+        }
+
+        if (shortages.isNotEmpty) {
+          if (!mounted) return false;
+          await _showFulfillmentShortageDialog(shortages);
+          return false;
+        }
+      } catch (e) {
+        debugPrint('[OrderDetail] Cloud stock pre-check warning: $e');
+      }
+      return true;
+    }
+
+    final shortages = await _orderRepository.checkEventFulfillmentStock(header.id);
+    if (shortages.isNotEmpty) {
+      if (!mounted) return false;
+      await _showFulfillmentShortageDialog(
+        shortages.map((s) => {
+          'productName': s.productName,
+          'requiredQty': s.requiredQty,
+          'availableQty': s.availableQty,
+          'shortageQty': s.shortageQty,
+        }).toList(),
+      );
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _showFulfillmentShortageDialog(List<Map<String, dynamic>> shortages) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Insufficient Physical Stock')),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Cannot fulfill event. Current physical stock is less than required for the following item(s):',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              ...shortages.map((s) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      s['productName'] as String,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Required: ${s['requiredQty']}', style: const TextStyle(fontSize: 12)),
+                        Text('In Stock: ${s['availableQty']}', style: const TextStyle(fontSize: 12)),
+                        Text(
+                          'Shortage: ${s['shortageQty']}',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red.shade800),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              )),
+              const SizedBox(height: 8),
+              const Text(
+                'Please produce or procure the missing bouquets before marking the event as fulfilled.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BouquetProductionEntryScreen()),
+              );
+            },
+            icon: const Icon(Icons.precision_manufacturing_outlined, size: 16),
+            label: const Text('Open Bouquet Production'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _advanceEventStatus(
+    OrderDetailHeader header,
+    OrderDetailBundle? detail,
+    String targetStatus,
+  ) async {
+    if (targetStatus == OrderStatus.delivered) {
+      final canFulfill = await _preCheckEventFulfillmentStock(
+        header: header,
+        detail: detail,
+      );
+      if (!canFulfill || !mounted) return;
+    }
+
+    final isCloud = _isCloudOrder ||
+        kIsWeb ||
+        (header.cloudOrderId?.trim().isNotEmpty == true);
+
+    try {
+      if (isCloud) {
+        final cloudOrderId = (header.cloudOrderId?.trim().isNotEmpty == true)
+            ? header.cloudOrderId!.trim()
+            : widget.cloudOrderId?.trim();
+        if (cloudOrderId != null && cloudOrderId.isNotEmpty) {
+          await context.read<OrderProvider>().updateCloudOrderStatus(
+            cloudOrderId: cloudOrderId,
+            newStatus: targetStatus,
+          );
+        }
+      } else {
+        await context.read<OrderWorkflowProvider>().advanceStatus(
+          orderId: header.id,
+          currentStatus: header.status,
+          newStatus: targetStatus,
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Event status updated to ${OrderStatus.label(targetStatus)}.')),
+        );
+        await context.read<OrderProvider>().loadOrderDetailProgressive(
+          header.id,
+          cloudOrderId: header.cloudOrderId ?? widget.cloudOrderId,
+        );
+        await _loadOrderReservations();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update event status: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showStatusChangeDialog(
+    OrderDetailHeader header,
+    OrderDetailBundle? detail,
+  ) async {
+    final isEventSale = header.fulfilmentType == 'event_sale';
+    final nextStatuses = OrderStatus.nextStatuses(header.status, fulfilmentType: header.fulfilmentType)
         .where((status) => status != OrderStatus.cancelled)
         .toList(growable: false);
+
     if (nextStatuses.isEmpty) {
       _showSnack('No status changes are available for this order.');
       return;
@@ -2405,23 +4879,70 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           for (final status in nextStatuses)
             SimpleDialogOption(
               onPressed: () => Navigator.pop(dialogContext, status),
-              child: Text(OrderStatus.actionLabel(status)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(status),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(OrderStatus.actionLabel(status, fulfilmentType: header.fulfilmentType)),
+                  ],
+                ),
+              ),
             ),
         ],
       ),
     );
+
     if (selected == null || !mounted) return;
 
-    try {
-      await context.read<OrderProvider>().updateCloudOrderStatus(
-            cloudOrderId: cloudOrderId,
+    if (isEventSale) {
+      await _advanceEventStatus(header, detail, selected);
+    } else {
+      final isCloud = _isCloudOrder ||
+          kIsWeb ||
+          (header.cloudOrderId?.trim().isNotEmpty == true);
+      if (isCloud) {
+        final cloudOrderId = header.cloudOrderId?.trim();
+        if (cloudOrderId != null && cloudOrderId.isNotEmpty) {
+          try {
+            await context.read<OrderProvider>().updateCloudOrderStatus(
+                  cloudOrderId: cloudOrderId,
+                  newStatus: selected,
+                );
+            if (mounted) {
+              _showSnack('Order status updated.');
+              await context.read<OrderProvider>().loadOrderDetailProgressive(
+                header.id,
+                cloudOrderId: header.cloudOrderId ?? widget.cloudOrderId,
+              );
+            }
+          } catch (error) {
+            if (mounted) _showSnack('Unable to update order status: $error');
+          }
+        }
+      } else {
+        try {
+          await context.read<OrderWorkflowProvider>().advanceStatus(
+            orderId: header.id,
+            currentStatus: header.status,
             newStatus: selected,
           );
-      if (!mounted) return;
-      _showSnack('Order status updated.');
-    } catch (error) {
-      if (!mounted) return;
-      _showSnack('Unable to update order status: $error');
+          if (mounted) {
+            _showSnack('Order status updated.');
+            await context.read<OrderProvider>().loadOrderDetailProgressive(header.id);
+          }
+        } catch (error) {
+          if (mounted) _showSnack('Unable to update order status: $error');
+        }
+      }
     }
   }
 
@@ -2498,6 +5019,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final refreshedHeader = provider.detailHeader ?? header;
     final startDeliveryLink = await _resolveCloudStartDeliveryLink(
       refreshedHeader.orderNo,
+      cloudOrderId: cloudOrderId,
     );
     if (!mounted) return;
 
@@ -2514,10 +5036,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// Resolves the Cloud delivery created by assign-driver and mints its driver
   /// tracking link. A failure here must not undo the completed assignment.
-  Future<String?> _resolveCloudStartDeliveryLink(String orderNo) async {
+  Future<String?> _resolveCloudStartDeliveryLink(
+    String orderNo, {
+    String? cloudOrderId,
+  }) async {
     try {
-      final deliveryId =
-          await _deliveryTrackingService.getCloudDeliveryIdForOrder(orderNo);
+      final deliveryId = await _deliveryTrackingService.getCloudDeliveryId(
+        cloudOrderId: cloudOrderId,
+        orderNo: orderNo,
+      );
       if (deliveryId == null || deliveryId.trim().isEmpty) return null;
 
       final links =
@@ -2694,6 +5221,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           editingOrderId: currentHeader.id,
         );
         break;
+      case FulfilmentType.eventSale:
+        editor = EventSaleScreen(
+          initialSession: session,
+          editingOrderId: currentHeader.id,
+        );
+        break;
     }
 
     await Navigator.push(
@@ -2702,15 +5235,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
 
     if (!mounted) return;
-    await context
-        .read<OrderProvider>()
-        .loadOrderDetailProgressive(currentHeader.id);
+    await context.read<OrderProvider>().loadOrderDetailProgressive(
+          currentHeader.id,
+          cloudOrderId: currentHeader.cloudOrderId ?? widget.cloudOrderId,
+        );
+    await _loadOrderReservations();
   }
 
   FulfilmentType _parseFulfilmentType(String value) {
     return switch (value.toLowerCase()) {
-      'take_away' => FulfilmentType.takeAway,
-      'pickup_later' => FulfilmentType.pickupLater,
+      'take_away' || 'takeaway' => FulfilmentType.takeAway,
+      'pickup_later' || 'pickup' => FulfilmentType.pickupLater,
+      'event_sale' || 'event' => FulfilmentType.eventSale,
       _ => FulfilmentType.delivery,
     };
   }
@@ -2721,17 +5257,38 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   ) {
     final lines = detail.lines
         .map(
-          (line) => WalkInLineItem(
-            productId: line['product_id'] as int?,
-            description: (line['description'] as String?) ?? 'Item',
-            quantity: (line['qty'] as int?) ?? 1,
-            unitPricePaise: (line['unit_price_paise'] as int?) ?? 0,
-            discountPaise: (line['discount_paise'] as int?) ?? 0,
-            discountType: line['discount_type'] as String?,
-            discountValue: line['discount_value'] as int?,
-            gstPercent: (line['gst_percent'] as int?) ?? 0,
-            source: (line['source'] as String?) ?? 'manual',
-          ),
+          (line) {
+            final imageRef = (line['design_ref'] ??
+                    line['designRef'] ??
+                    line['order_reference_image_path'] ??
+                    line['reference_image_path'] ??
+                    line['attachment_path'] ??
+                    line['attachmentPath'] ??
+                    line['product_image_path'] ??
+                    line['image_url'] ??
+                    line['imageUrl'])
+                ?.toString();
+            final rawDescription = (line['description'] as String?)?.trim();
+            final rawProductName = (line['product_name'] as String?)?.trim();
+            final desc = (rawDescription != null && rawDescription.isNotEmpty)
+                ? rawDescription
+                : (rawProductName != null && rawProductName.isNotEmpty
+                    ? rawProductName
+                    : 'Item');
+            return WalkInLineItem(
+              productId: line['product_id'] as int?,
+              cloudProductId: line['cloud_product_id']?.toString(),
+              designRef: imageRef?.isNotEmpty == true ? imageRef : null,
+              description: desc,
+              quantity: (line['qty'] as int?) ?? 1,
+              unitPricePaise: (line['unit_price_paise'] as int?) ?? 0,
+              discountPaise: (line['discount_paise'] as int?) ?? 0,
+              discountType: line['discount_type'] as String?,
+              discountValue: line['discount_value'] as int?,
+              gstPercent: (line['gst_percent'] as int?) ?? 0,
+              source: (line['source'] as String?) ?? 'manual',
+            );
+          },
         )
         .toList(growable: false);
 
@@ -2800,7 +5357,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           reason: 'Cancelled from Order Details',
         );
     if (!mounted) return;
-    await context.read<OrderProvider>().loadOrderDetailProgressive(header.id);
+    await context.read<OrderProvider>().loadOrderDetailProgressive(
+          header.id,
+          cloudOrderId: header.cloudOrderId ?? widget.cloudOrderId,
+        );
   }
 
   String _designerChecklist(
@@ -2956,118 +5516,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _collectPayment(OrderDetailHeader header) async {
-    final amountController = TextEditingController(
-      text: (header.outstandingAmountPaise / 100).toStringAsFixed(0),
-    );
-    String method = 'cash';
-    final referenceController = TextEditingController();
-    var isSaving = false;
-
-    await showDialog<void>(
+    final success = await showCollectPaymentDialog(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setStateDialog) => AlertDialog(
-            title: const Text('Collect Payment'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                    'Outstanding: ${_formatPaise(header.outstandingAmountPaise)}'),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: amountController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Amount',
-                    prefixText: '₹ ',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: method,
-                  items: const [
-                    DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                    DropdownMenuItem(value: 'upi', child: Text('UPI')),
-                    DropdownMenuItem(value: 'card', child: Text('Card')),
-                    DropdownMenuItem(
-                        value: 'bank_transfer', child: Text('Bank Transfer')),
-                  ],
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setStateDialog(() => method = value);
-                  },
-                  decoration: const InputDecoration(labelText: 'Method'),
-                ),
-                if (!_isCloudOrder) ...[
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: referenceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Reference (optional)',
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: isSaving ? null : () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: isSaving
-                    ? null
-                    : () async {
-                        final amountPaise =
-                            _parseCurrencyToPaise(amountController.text);
-                        if (amountPaise <= 0) {
-                          _showSnack('Enter a valid payment amount.');
-                          return;
-                        }
-                        if (amountPaise > header.outstandingAmountPaise) {
-                          _showSnack(
-                              'Amount cannot exceed outstanding balance.');
-                          return;
-                        }
-
-                        setStateDialog(() => isSaving = true);
-                        try {
-                          final provider = context.read<OrderProvider>();
-                          if (_isCloudOrder) {
-                            await provider.collectCloudOrderPayment(
-                              cloudOrderId: header.cloudOrderId!.trim(),
-                              method: method,
-                              amountPaise: amountPaise,
-                            );
-                          } else {
-                            await provider.collectOrderPayment(
-                              orderId: header.id,
-                              method: method,
-                              amountPaise: amountPaise,
-                              reference: referenceController.text.trim().isEmpty
-                                  ? null
-                                  : referenceController.text.trim(),
-                            );
-                          }
-                          if (!mounted || !dialogContext.mounted) return;
-                          Navigator.pop(dialogContext);
-                          _showSnack('Payment collected successfully.');
-                        } catch (e) {
-                          if (!mounted || !dialogContext.mounted) return;
-                          _showSnack('Unable to collect payment: $e');
-                          setStateDialog(() => isSaving = false);
-                        }
-                      },
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        );
+      orderId: header.id,
+      cloudOrderId: header.cloudOrderId,
+      orderNo: header.orderNo,
+      customerName: header.customerName,
+      grandTotalPaise: header.grandTotalPaise,
+      paidAmountPaise: header.paidAmountPaise,
+      outstandingAmountPaise: header.outstandingAmountPaise,
+      onPaymentSuccess: () async {
+        final provider = context.read<OrderProvider>();
+        if (_isCloudOrder) {
+          await provider.loadOrderDetailProgressive(-1, cloudOrderId: header.cloudOrderId);
+        } else {
+          await provider.loadOrderDetailProgressive(header.id);
+        }
       },
     );
+    if (success == true && mounted) {
+      final provider = context.read<OrderProvider>();
+      if (_isCloudOrder) {
+        await provider.loadOrderDetailProgressive(-1, cloudOrderId: header.cloudOrderId);
+      } else {
+        await provider.loadOrderDetailProgressive(header.id);
+      }
+    }
   }
 
   Future<void> _startPaymentAdjustment(OrderDetailHeader header) async {
@@ -3286,34 +5760,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   String _pretty(String value) {
-    return value.replaceAll('_', ' ').replaceAllMapped(
-          RegExp(r'(^|\s)([a-z])'),
-          (m) => '${m.group(1)}${m.group(2)!.toUpperCase()}',
-        );
-  }
-
-  Widget _buildOrderItem(String name, String price, int quantity) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Text(
-            name,
-            style: const TextStyle(fontSize: 14),
-          ),
-        ),
-        Text(
-          'x$quantity',
-          style: TextStyle(color: Colors.grey.shade600),
-        ),
-        const SizedBox(width: 16),
-        Text(
-          price,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
+    final withSpaces = value
+        .replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (m) => '${m.group(1)} ${m.group(2)}')
+        .replaceAll('_', ' ');
+    return withSpaces.replaceAllMapped(
+      RegExp(r'(^|\s)([a-z])'),
+      (m) => '${m.group(1)}${m.group(2)!.toUpperCase()}',
     );
   }
 

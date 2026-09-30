@@ -9,13 +9,14 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../data/repositories/scheduler_repository.dart';
 import '../models/scheduler_task.dart';
-import '../models/smart_alert.dart';
 import 'smart_alert_engine.dart';
 import 'smart_alert_notification_service.dart';
 
 const _schedulerActionComplete = 'complete';
 const _schedulerActionSnooze5 = 'snooze_5';
 const _schedulerActionSnooze10 = 'snooze_10';
+const _schedulerActionSnooze15 = 'snooze_15';
+const _schedulerActionDismiss = 'dismiss';
 
 @pragma('vm:entry-point')
 void schedulerNotificationTapBackground(NotificationResponse response) {
@@ -74,52 +75,83 @@ class SchedulerService {
 
   Future<void> scheduleTask(int taskId) async {
     if (kIsWeb) return;
-    await initialize();
-    final task = await _repository.getTask(taskId);
-    if (task == null) return;
-    if (task.status == TaskStatus.completed ||
-        task.status == TaskStatus.cancelled) {
-      await cancelTask(taskId);
-      return;
-    }
+    try {
+      await initialize();
+      final task = await _repository.getTask(taskId);
+      if (task == null) return;
+      if (task.status == TaskStatus.completed ||
+          task.status == TaskStatus.cancelled) {
+        await cancelTask(taskId);
+        return;
+      }
 
-    await cancelTask(taskId, clearReminderState: false);
+      await cancelTask(taskId, clearReminderState: false);
 
-    final scheduledTimes = _buildScheduleTimes(task);
-    if (scheduledTimes.isEmpty) {
-      debugPrint('Scheduler: no future reminders for task $taskId');
-      return;
-    }
+      final scheduledTimes = _buildScheduleTimes(task);
+      if (scheduledTimes.isEmpty) {
+        debugPrint('Scheduler: no future reminders for task $taskId');
+        return;
+      }
 
-    final jobs = <({String action, DateTime runAt, String? payloadJson})>[];
-    for (var index = 0; index < scheduledTimes.length; index++) {
-      final when = scheduledTimes[index];
-      final payload = jsonEncode({
-        'taskId': taskId,
-        'scheduledAt': when.toIso8601String(),
-      });
-      await _notifications.zonedSchedule(
-        _notificationId(taskId, index),
-        task.title,
-        _bodyForTask(task),
-        tz.TZDateTime.from(when, tz.local),
-        _detailsForTask(task),
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        payload: payload,
+      final jobs = <({String action, DateTime runAt, String? payloadJson})>[];
+      final scheduleMode = task.requiresAlarm
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle;
+
+      for (var index = 0; index < scheduledTimes.length; index++) {
+        final when = scheduledTimes[index];
+        final payload = jsonEncode({
+          'taskId': taskId,
+          'cloudId': task.cloudId,
+          'scheduledAt': when.toIso8601String(),
+          'requiresAlarm': task.requiresAlarm,
+        });
+
+        try {
+          await _notifications.zonedSchedule(
+            _notificationId(taskId, index),
+            task.title,
+            _bodyForTask(task),
+            tz.TZDateTime.from(when, tz.local),
+            _detailsForTask(task),
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            androidScheduleMode: scheduleMode,
+            payload: payload,
+          );
+        } catch (e) {
+          // Fallback to inexact scheduling if exact alarm permission is denied
+          debugPrint('Scheduler: exact alarm failed, falling back to inexact: $e');
+          try {
+            await _notifications.zonedSchedule(
+              _notificationId(taskId, index),
+              task.title,
+              _bodyForTask(task),
+              tz.TZDateTime.from(when, tz.local),
+              _detailsForTask(task),
+              uiLocalNotificationDateInterpretation:
+                  UILocalNotificationDateInterpretation.absoluteTime,
+              androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+              payload: payload,
+            );
+          } catch (fallbackError) {
+            debugPrint('Scheduler: fallback scheduling also failed: $fallbackError');
+          }
+        }
+        jobs.add((action: 'schedule_created', runAt: when, payloadJson: payload));
+      }
+
+      await _repository.replaceNotificationJobs(taskId: taskId, jobs: jobs);
+      await _repository.updateReminderState(
+        taskId: taskId,
+        nextReminderAt: task.requiresAlarm && task.priority == TaskPriority.urgent
+            ? scheduledTimes.first
+            : null,
       );
-      jobs.add((action: 'schedule_created', runAt: when, payloadJson: payload));
+      debugPrint('Scheduler: schedule created for task $taskId');
+    } catch (e) {
+      debugPrint('SchedulerService.scheduleTask error: $e');
     }
-
-    await _repository.replaceNotificationJobs(taskId: taskId, jobs: jobs);
-    await _repository.updateReminderState(
-      taskId: taskId,
-      nextReminderAt: task.requiresAlarm && task.priority == TaskPriority.urgent
-          ? scheduledTimes.first
-          : null,
-    );
-    debugPrint('Scheduler: schedule created for task $taskId');
   }
 
   Future<void> cancelTask(
@@ -127,16 +159,32 @@ class SchedulerService {
     bool clearReminderState = true,
   }) async {
     if (kIsWeb) return;
-    await initialize();
-    for (var index = 0; index < 290; index++) {
-      await _notifications.cancel(_notificationId(taskId, index));
+    try {
+      await initialize();
+      final futures = <Future<void>>[];
+      for (var index = 0; index < 290; index++) {
+        futures.add(_notifications.cancel(_notificationId(taskId, index)));
+      }
+      await Future.wait(futures).catchError((_) => <void>[]);
+    } catch (e) {
+      debugPrint('SchedulerService.cancelTask notifications error: $e');
     }
-    await _repository.clearNotificationJobs(taskId);
+
+    try {
+      await _repository.clearNotificationJobs(taskId);
+    } catch (e) {
+      debugPrint('SchedulerService.cancelTask clearNotificationJobs error: $e');
+    }
+
     if (clearReminderState) {
-      await _repository.updateReminderState(
-        taskId: taskId,
-        nextReminderAt: null,
-      );
+      try {
+        await _repository.updateReminderState(
+          taskId: taskId,
+          nextReminderAt: null,
+        );
+      } catch (e) {
+        debugPrint('SchedulerService.cancelTask updateReminderState error: $e');
+      }
     }
   }
 
@@ -159,8 +207,11 @@ class SchedulerService {
   }
 
   Future<void> markCompleted(int taskId) async {
-    if (kIsWeb) return;
-    await cancelTask(taskId);
+    try {
+      await cancelTask(taskId);
+    } catch (e) {
+      debugPrint('SchedulerService.markCompleted cancelTask error: $e');
+    }
     await _repository.updateReminderState(
       taskId: taskId,
       status: TaskStatus.completed,
@@ -188,7 +239,10 @@ class SchedulerService {
     final payload = response.payload;
     if (payload == null || payload.trim().isEmpty) return;
     final decoded = jsonDecode(payload) as Map<String, dynamic>;
-    final taskId = decoded['taskId'] as int?;
+    final rawTaskId = decoded['taskId'];
+    final taskId = rawTaskId is int
+        ? rawTaskId
+        : int.tryParse(rawTaskId?.toString() ?? '');
     if (taskId == null) return;
 
     // Check if this is a smart alert response
@@ -206,6 +260,12 @@ class SchedulerService {
         break;
       case _schedulerActionSnooze10:
         await snoozeTask(taskId, const Duration(minutes: 10));
+        break;
+      case _schedulerActionSnooze15:
+        await snoozeTask(taskId, const Duration(minutes: 15));
+        break;
+      case _schedulerActionDismiss:
+        await cancelTask(taskId, clearReminderState: false);
         break;
       default:
         debugPrint('Scheduler: notification fired for task $taskId');
@@ -238,13 +298,8 @@ class SchedulerService {
   }
 
   NotificationDetails _detailsForTask(SchedulerTask task) {
-    // Use SmartAlertNotificationService for all notifications
-    final alertConfig = AlertConfig.fromPriority(task.priority);
-    final alertSettings = SmartAlertEngine.instance.customizationSettings;
-    final notificationService = SmartAlertNotificationService.instance;
-
-    return notificationService.getNotificationDetails(
-        alertConfig.level, alertSettings);
+    return SmartAlertNotificationService.instance
+        .getTaskReminderNotificationDetails(enableVibration: true);
   }
 
   String _bodyForTask(SchedulerTask task) {

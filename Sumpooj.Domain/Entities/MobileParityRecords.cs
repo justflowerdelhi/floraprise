@@ -100,13 +100,21 @@ public class CloudDesign : BaseEntity
     public string Notes { get; private set; } = string.Empty;
     public string Status { get; private set; } = "needs_review";
     public bool IsFavorite { get; private set; }
+    public Guid? SourceLibraryDesignId { get; private set; }
     public DateTime? DeletedAtUtc { get; private set; }
-        public void Update(string description, string? imageReference, int? sellingPricePaise, string? flowers,
-                string? occasion, string? color, string? collection, string? notes, bool favorite)
-        { Description = description.Trim(); ImageReference = imageReference; SellingPricePaise = sellingPricePaise; Flowers = flowers ?? "";
+
+    public void SetSourceLibraryDesignId(Guid? sourceLibraryDesignId)
+    {
+        SourceLibraryDesignId = sourceLibraryDesignId;
+        MarkUpdated();
+    }
+
+    public void Update(string description, string? imageReference, int? sellingPricePaise, string? flowers,
+            string? occasion, string? color, string? collection, string? notes, bool favorite)
+    { Description = description.Trim(); ImageReference = imageReference; SellingPricePaise = sellingPricePaise; Flowers = flowers ?? "";
       Occasion = occasion ?? ""; Color = color ?? ""; Collection = collection ?? ""; Notes = notes ?? "";
-            Status = !string.IsNullOrWhiteSpace(ImageReference) && Description.Length > 0 && SellingPricePaise > 0 ? "ready" : "needs_review";
-            IsFavorite = favorite; MarkUpdated(); }
+        Status = !string.IsNullOrWhiteSpace(ImageReference) && Description.Length > 0 && SellingPricePaise > 0 ? "ready" : "needs_review";
+        IsFavorite = favorite; MarkUpdated(); }
     public void Delete() { DeletedAtUtc = DateTime.UtcNow; MarkUpdated(); }
 }
 

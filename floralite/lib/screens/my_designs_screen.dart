@@ -1,21 +1,23 @@
-import 'dart:convert';
-import 'dart:io';
+import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../controllers/voice_dictation_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../models/design.dart';
 import '../models/share_branding.dart';
 import '../providers/design_provider.dart';
+import '../services/design_image_helper.dart';
 import '../services/design_share_image_service.dart';
 import '../services/share_branding_settings_service.dart';
 import '../services/speech_recognition_service.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/library/library_design_picker_sheet.dart';
 import '../widgets/safe_platform_image.dart';
 import '../widgets/voice_dictation_field_header.dart';
 
@@ -60,6 +62,13 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
     super.dispose();
   }
 
+  Future<void> _browseDesignLibrary() async {
+    final result = await LibraryDesignPickerSheet.show(context);
+    if (result != null && mounted) {
+      context.read<DesignProvider>().loadDesigns();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
@@ -78,6 +87,12 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
                         ? null
                         : _shareCatalogSelection,
                     icon: const Icon(Icons.share_rounded),
+                  ),
+                if (!_isCatalogSelectionMode)
+                  IconButton(
+                    tooltip: 'Browse Design Library',
+                    icon: const Icon(Icons.palette_outlined),
+                    onPressed: _browseDesignLibrary,
                   ),
                 TextButton(
                   onPressed: () {
@@ -184,6 +199,15 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
                                   color: Colors.grey.shade700,
                                 ),
                               ),
+                              const SizedBox(height: 16),
+                              OutlinedButton.icon(
+                                onPressed: _browseDesignLibrary,
+                                icon: const Icon(Icons.palette_rounded, color: Color(0xFF2E7D32)),
+                                label: const Text(
+                                  'Browse Design Library',
+                                  style: TextStyle(color: Color(0xFF2E7D32)),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -241,7 +265,11 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            design.bouquetId,
+                                            design.description.trim().isNotEmpty
+                                                ? design.description.trim()
+                                                : (design.bouquetId.isNotEmpty
+                                                    ? design.bouquetId
+                                                    : 'Design'),
                                             style: const TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 13,
@@ -395,6 +423,7 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
         designId: design.bouquetId,
         description: design.description,
         price: '₹${(amountPaise / 100).toStringAsFixed(0)}',
+        pricePaise: amountPaise,
         imagePath: design.imagePath,
       ),
     );
@@ -518,12 +547,23 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
       final settings = await _brandingSettingsService.loadSettings();
       final identity = await _brandingSettingsService.loadBrandingIdentity();
 
-      final String sharePath;
+      final XFile shareXFile;
       if (option == _DesignShareOption.original) {
-        sharePath = originalPath;
+        if (kIsWeb) {
+          final bytes =
+              await _shareImageService.generateBrandedJpegBytes(
+            design: design,
+            settings: settings,
+            variant: DesignShareVariant.brandedPreview,
+          );
+          final fileName = 'floraprise_design_${design.id}.jpg';
+          shareXFile = XFile.fromData(bytes, mimeType: 'image/jpeg', name: fileName);
+        } else {
+          shareXFile = XFile(originalPath);
+        }
       } else {
-        final generated = await _runWithPreparingDialog(
-          () => _shareImageService.generateBrandedJpeg(
+        shareXFile = await _runWithPreparingDialog(
+          () => _shareImageService.generateBrandedJpegXFile(
             design: design,
             settings: settings,
             variant: option == _DesignShareOption.quotation
@@ -531,8 +571,9 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
                 : DesignShareVariant.brandedPreview,
           ),
         );
-        sharePath = generated.path;
-        temporaryFiles.add(generated.path);
+        if (!kIsWeb && shareXFile.path.isNotEmpty) {
+          temporaryFiles.add(shareXFile.path);
+        }
       }
 
       final message = _shareMessage(
@@ -542,8 +583,8 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
       );
 
       if (!mounted) return;
-      await Share.shareXFiles(
-        [XFile(sharePath)],
+      await _deliverShareFiles(
+        files: [shareXFile],
         text: message,
         subject: design.description.trim().isEmpty
             ? design.bouquetId
@@ -557,10 +598,12 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
     } finally {
       if (!kIsWeb) {
         for (final path in temporaryFiles) {
-          final file = File(path);
-          if (await file.exists()) {
-            await file.delete();
-          }
+          try {
+            final file = io.File(path);
+            if (await file.exists()) {
+              await file.delete();
+            }
+          } catch (_) {}
         }
       }
     }
@@ -586,21 +629,34 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
       final settings = await _brandingSettingsService.loadSettings();
       final identity = await _brandingSettingsService.loadBrandingIdentity();
 
-      final sharePaths = <String>[];
+      final shareFiles = <XFile>[];
       if (option == _DesignShareOption.original) {
         for (final design in selectedDesigns) {
           final path = design.imagePath?.trim() ?? '';
-          if (path.isNotEmpty) {
-            sharePaths.add(path);
+          if (path.isEmpty) continue;
+          if (kIsWeb) {
+            try {
+              final bytes = await _shareImageService.generateBrandedJpegBytes(
+                design: design,
+                settings: settings,
+                variant: DesignShareVariant.brandedPreview,
+              );
+              final fileName = 'floraprise_design_${design.id}.jpg';
+              shareFiles.add(XFile.fromData(bytes, mimeType: 'image/jpeg', name: fileName));
+            } catch (_) {
+              shareFiles.add(XFile(path));
+            }
+          } else {
+            shareFiles.add(XFile(path));
           }
         }
       } else {
         final generatedFiles = await _runWithPreparingDialog(
           () async {
-            final files = <File>[];
+            final files = <XFile>[];
             for (final design in selectedDesigns) {
               if ((design.imagePath?.trim() ?? '').isEmpty) continue;
-              final created = await _shareImageService.generateBrandedJpeg(
+              final created = await _shareImageService.generateBrandedJpegXFile(
                 design: design,
                 settings: settings,
                 variant: option == _DesignShareOption.quotation
@@ -614,12 +670,14 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
         );
 
         for (final file in generatedFiles) {
-          sharePaths.add(file.path);
-          temporaryFiles.add(file.path);
+          shareFiles.add(file);
+          if (!kIsWeb && file.path.isNotEmpty) {
+            temporaryFiles.add(file.path);
+          }
         }
       }
 
-      if (sharePaths.isEmpty) {
+      if (shareFiles.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No shareable image found.')),
@@ -628,11 +686,11 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
       }
 
       final message =
-          '${_shareMessage(design: selectedDesigns.first, shopName: identity.shopName, includePrice: settings.showPrice)}\n\nCatalog includes ${sharePaths.length} designs.';
+          '${_shareMessage(design: selectedDesigns.first, shopName: identity.shopName, includePrice: settings.showPrice)}\n\nCatalog includes ${shareFiles.length} designs.';
 
       if (!mounted) return;
-      await Share.shareXFiles(
-        sharePaths.map(XFile.new).toList(),
+      await _deliverShareFiles(
+        files: shareFiles,
         text: message,
         subject: 'Bouquet Catalog',
       );
@@ -650,12 +708,48 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
     } finally {
       if (!kIsWeb) {
         for (final path in temporaryFiles) {
-          final file = File(path);
-          if (await file.exists()) {
-            await file.delete();
-          }
+          try {
+            final file = io.File(path);
+            if (await file.exists()) {
+              await file.delete();
+            }
+          } catch (_) {}
         }
       }
+    }
+  }
+
+  Future<void> _deliverShareFiles({
+    required List<XFile> files,
+    required String text,
+    required String subject,
+  }) async {
+    try {
+      await Share.shareXFiles(
+        files,
+        text: text,
+        subject: subject,
+      );
+    } catch (error) {
+      if (kIsWeb) {
+        // Fallback for browsers that do not support Web Share API with files
+        var downloaded = false;
+        for (final file in files) {
+          try {
+            final bytes = await file.readAsBytes();
+            final uri = Uri.dataFromBytes(bytes, mimeType: 'image/jpeg');
+            await launchUrl(uri);
+            downloaded = true;
+          } catch (_) {}
+        }
+        if (downloaded && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Catalog downloaded.')),
+          );
+          return;
+        }
+      }
+      rethrow;
     }
   }
 
@@ -771,10 +865,20 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
                 Navigator.pop(context);
                 final image = await ImagePicker().pickImage(
                   source: ImageSource.camera,
-                  imageQuality: 85,
+                  maxWidth: 1024,
+                  maxHeight: 1024,
+                  imageQuality: 80,
                 );
                 if (!mounted || image == null) return;
-                await _showDesignFormDialog(initialImagePath: image.path);
+                final String initialPath;
+                if (kIsWeb) {
+                  final bytes = await image.readAsBytes();
+                  initialPath = DesignImageHelper.processBytesToDataUri(bytes);
+                } else {
+                  initialPath = image.path;
+                }
+                if (!mounted) return;
+                await _showDesignFormDialog(initialImagePath: initialPath);
               },
             ),
             const Divider(),
@@ -788,10 +892,20 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
                 Navigator.pop(context);
                 final image = await ImagePicker().pickImage(
                   source: ImageSource.gallery,
-                  imageQuality: 85,
+                  maxWidth: 1024,
+                  maxHeight: 1024,
+                  imageQuality: 80,
                 );
                 if (!mounted || image == null) return;
-                await _showDesignFormDialog(initialImagePath: image.path);
+                final String initialPath;
+                if (kIsWeb) {
+                  final bytes = await image.readAsBytes();
+                  initialPath = DesignImageHelper.processBytesToDataUri(bytes);
+                } else {
+                  initialPath = image.path;
+                }
+                if (!mounted) return;
+                await _showDesignFormDialog(initialImagePath: initialPath);
               },
             ),
             const Divider(),
@@ -807,6 +921,25 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
                 await _startBulkImport();
               },
             ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(
+                Icons.palette_rounded,
+                size: 32,
+                color: Color(0xFF2E7D32),
+              ),
+              title: const Text(
+                'Browse Design Library',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              subtitle: const Text(
+                'Import curated designs from Floraprise Library',
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await _browseDesignLibrary();
+              },
+            ),
           ],
         ),
       ),
@@ -814,14 +947,18 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
   }
 
   Future<void> _startBulkImport() async {
-    final images = await ImagePicker().pickMultiImage(imageQuality: 85);
+    final images = await ImagePicker().pickMultiImage(
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
     if (!mounted || images.isEmpty) return;
 
     final List<String> selectedPaths;
     if (kIsWeb) {
       selectedPaths = await Future.wait(images.map((img) async {
         final bytes = await img.readAsBytes();
-        return 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        return DesignImageHelper.processBytesToDataUri(bytes);
       }));
     } else {
       selectedPaths = images.map((image) => image.path).toList();
@@ -1077,12 +1214,14 @@ class _MyDesignsScreenState extends State<MyDesignsScreen> {
             Future<void> pickImage(ImageSource source) async {
               final image = await ImagePicker().pickImage(
                 source: source,
-                imageQuality: 85,
+                maxWidth: 1024,
+                maxHeight: 1024,
+                imageQuality: 80,
               );
               if (image == null) return;
               if (kIsWeb) {
                 final bytes = await image.readAsBytes();
-                final dataUri = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                final dataUri = DesignImageHelper.processBytesToDataUri(bytes);
                 setDialogState(() {
                   imagePath = dataUri;
                   removeImage = false;
@@ -1288,12 +1427,14 @@ class SelectedDesign {
   final String designId;
   final String description;
   final String price;
+  final int? pricePaise;
   final String? imagePath;
 
   const SelectedDesign({
     required this.designId,
     required this.description,
     required this.price,
+    this.pricePaise,
     this.imagePath,
   });
 }

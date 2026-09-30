@@ -130,7 +130,10 @@ class WebDraftStorageService {
   Future<WalkInSession?> getLatestDraft(FulfilmentType type) async {
     final drafts = await _loadAllDrafts();
     for (final d in drafts) {
-      if (d['fulfilment_type'] == type.name) {
+      final rawType = d['fulfilment_type']?.toString();
+      if (rawType == type.name ||
+          (type == FulfilmentType.eventSale &&
+              (rawType == 'event_sale' || rawType == 'event'))) {
         return _toSession(d);
       }
     }
@@ -216,8 +219,12 @@ class WebDraftStorageService {
     final paymentsList =
         (d['payments'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
+    final rawFulfilment = d['fulfilment_type']?.toString();
     final fulfilmentType = FulfilmentType.values.firstWhere(
-      (f) => f.name == d['fulfilment_type'],
+      (f) =>
+          f.name == rawFulfilment ||
+          (f == FulfilmentType.eventSale &&
+              (rawFulfilment == 'event_sale' || rawFulfilment == 'event')),
       orElse: () => FulfilmentType.takeAway,
     );
 

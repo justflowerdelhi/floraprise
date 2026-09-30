@@ -132,9 +132,12 @@ class Attendance {
         break;
     }
 
+    final isZeroGuid = idStr == '00000000-0000-0000-0000-000000000000';
+    final hasValidId = idStr.isNotEmpty && !isZeroGuid;
+
     return Attendance(
-      id: int.tryParse(idStr) ?? (idStr.isEmpty ? 0 : idStr.hashCode.abs()),
-      cloudId: idStr.isEmpty ? null : idStr,
+      id: hasValidId ? (int.tryParse(idStr) ?? idStr.hashCode.abs()) : 0,
+      cloudId: hasValidId ? idStr : null,
       staffId:
           int.tryParse(sIdStr) ?? (sIdStr.isEmpty ? 0 : sIdStr.hashCode.abs()),
       cloudStaffId: sIdStr.isEmpty ? null : sIdStr,

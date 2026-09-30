@@ -24,6 +24,9 @@ public class MarketingController : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.BusinessEmail))
             return BadRequest(new { message = "Business email is required" });
 
+        if (string.IsNullOrWhiteSpace(dto.ResolvedPhone))
+            return BadRequest(new { message = "Phone / WhatsApp number is required" });
+
         await _service.SubmitAsync(dto);
 
         return Ok(new { success = true, message = "Demo request submitted successfully" });

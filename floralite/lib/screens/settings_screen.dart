@@ -8,6 +8,7 @@ import '../models/storage_mode.dart';
 import '../presentation/splash/splash_screen.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/library_provider.dart';
 import '../providers/storage_mode_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../services/storage_migration_service.dart';
@@ -265,6 +266,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _getLanguageLabel(),
                     Icons.language,
                     _showLanguageSelector,
+                  ),
+                  const Divider(height: 1),
+                  _buildSettingTile(
+                    context,
+                    'Floraprise Tutorials',
+                    'Watch video tutorials & florist guides',
+                    Icons.school_outlined,
+                    () {
+                      context.read<LibraryProvider>().setTab(LibraryTab.tutorials);
+                      Navigator.pushNamed(context, '/library');
+                    },
                   ),
                   const Divider(height: 1),
                   _buildSettingTile(

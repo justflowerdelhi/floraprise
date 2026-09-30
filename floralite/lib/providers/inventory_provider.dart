@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/repositories/cloud_inventory_repository.dart';
 import '../data/repositories/inventory_repository.dart';
+import '../data/repositories/production_repository.dart';
 import '../managers/inventory_manager.dart';
 import '../models/gst_calculation_type.dart';
 import '../services/business_data_event_bus.dart';
@@ -101,8 +102,7 @@ class InventoryProvider extends ChangeNotifier {
         case 'accessory':
           return product.category == 'Accessories';
         case 'finished_product':
-          return product.category == 'Finished Products' ||
-              product.category == 'Finished Product';
+          return ProductionRepository.isFinishedProductCategory(product.category);
         case 'low_stock':
           if (isCloud && _cloudLowStockProducts.isNotEmpty) {
             final cloudLowStockIds = _cloudLowStockProducts

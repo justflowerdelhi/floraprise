@@ -36,6 +36,52 @@ enum TaskPriority {
   urgent,
 }
 
+extension TaskPriorityX on TaskPriority {
+  String get displayLabel {
+    switch (this) {
+      case TaskPriority.low:
+      case TaskPriority.normal:
+        return 'Normal';
+      case TaskPriority.high:
+      case TaskPriority.urgent:
+        return 'Urgent';
+    }
+  }
+
+  TaskPriority get normalized {
+    switch (this) {
+      case TaskPriority.low:
+        return TaskPriority.normal;
+      case TaskPriority.high:
+        return TaskPriority.urgent;
+      case TaskPriority.normal:
+        return TaskPriority.normal;
+      case TaskPriority.urgent:
+        return TaskPriority.urgent;
+    }
+  }
+
+  static TaskPriority fromNormalizedString(String? value) {
+    if (value == null) return TaskPriority.normal;
+    final lower = value.trim().toLowerCase();
+    switch (lower) {
+      case 'urgent':
+      case 'high':
+        return TaskPriority.urgent;
+      case 'normal':
+      case 'low':
+      case 'medium':
+      default:
+        return TaskPriority.normal;
+    }
+  }
+
+  static List<TaskPriority> get userFacingValues => [
+        TaskPriority.normal,
+        TaskPriority.urgent,
+      ];
+}
+
 enum TaskStatus {
   pending,
   inProgress,
@@ -131,10 +177,7 @@ class SchedulerTask {
         (e) => e.name.toLowerCase() == catStr.toLowerCase(),
         orElse: () => TaskCategory.operational,
       ),
-      priority: TaskPriority.values.firstWhere(
-        (e) => e.name.toLowerCase() == prioStr.toLowerCase(),
-        orElse: () => TaskPriority.normal,
-      ),
+      priority: TaskPriorityX.fromNormalizedString(prioStr),
       status: TaskStatus.values.firstWhere(
         (e) => e.name.toLowerCase() == statStr.toLowerCase(),
         orElse: () => TaskStatus.pending,

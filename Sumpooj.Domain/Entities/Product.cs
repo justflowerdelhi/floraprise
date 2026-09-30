@@ -44,6 +44,9 @@ public class Product : BaseEntity
     public Guid? CategoryId { get; private set; }
     public ProductCategoryEntity? ProductCategoryRef { get; private set; }
 
+    // Library Provenance (reference provenance only, no live coupling)
+    public Guid? SourceLibraryProductId { get; private set; }
+
     // Taxation
     public Guid? TaxRuleId { get; private set; }
     public TaxRule? TaxRule { get; private set; }
@@ -104,6 +107,12 @@ public class Product : BaseEntity
     public void SetCategoryId(Guid? categoryId)
     {
         CategoryId = categoryId;
+        MarkUpdated();
+    }
+
+    public void SetSourceLibraryProductId(Guid? sourceLibraryProductId)
+    {
+        SourceLibraryProductId = sourceLibraryProductId;
         MarkUpdated();
     }
 

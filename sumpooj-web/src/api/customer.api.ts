@@ -16,6 +16,7 @@ import api from './axios';
 
 export interface CustomerSearchParams {
   Query?: string;
+  PurchasedCategories?: string[];
   Page?: number;
   PageSize?: number;
 }
@@ -74,5 +75,10 @@ export const deactivateCustomer = async (id: string) => {
 
 export const reactivateCustomer = async (id: string) => {
   const res = await api.put(`/customers/${id}/reactivate`);
+  return res.data;
+};
+
+export const getPurchaseInsights = async (id: string) => {
+  const res = await api.get(`/customers/${id}/purchase-insights`);
   return res.data;
 };

@@ -81,7 +81,7 @@ public sealed record MobileOrderDetailDto(
 
 public sealed record MobileOrderItemDto(
     Guid Id,
-    Guid ProductId,
+    Guid? ProductId,
     string ProductName,
     int Quantity,
     decimal UnitPrice,
@@ -92,7 +92,9 @@ public sealed record MobileOrderItemDto(
     decimal? LineTaxAmount,
     decimal LineTotal,
     string? SpecialInstructions,
-    string? ClientOrderLineId);
+    string? ClientOrderLineId,
+    string? Sku = null,
+    string? ImageUrl = null);
 
 public sealed record MobileOrderPaymentDto(
     Guid Id,
@@ -104,7 +106,8 @@ public sealed record MobileOrderPaymentDto(
     string? Reference,
     string? ClientPaymentId,
     string? TransactionId,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    string PaymentType = "SaleTender");
 
 public sealed record MobileOrderDeliverySummaryDto(
     Guid Id,

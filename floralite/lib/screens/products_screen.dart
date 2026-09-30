@@ -6,20 +6,22 @@ import 'package:provider/provider.dart';
 import '../controllers/voice_dictation_controller.dart';
 import '../data/repositories/cloud_product_repository.dart';
 import '../data/repositories/product_repository.dart';
-import '../models/gst_calculation_type.dart';
-import 'bouquet_builder_screen.dart';
+import '../data/repositories/production_repository.dart';
 import '../l10n/app_localizations.dart';
+import '../models/gst_calculation_type.dart';
 import '../providers/printer_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/storage_mode_provider.dart';
-import 'cloud_products_screen.dart';
 import '../services/product_cloud_linking_service.dart';
 import '../services/speech_recognition_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/floraprise_page_header.dart';
+import '../widgets/library/library_product_picker_sheet.dart';
 import '../widgets/voice_dictation_field_header.dart';
+import 'bouquet_builder_screen.dart';
+import 'cloud_products_screen.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -67,6 +69,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
     super.dispose();
   }
 
+  Future<void> _importFromLibrary() async {
+    final result = await LibraryProductPickerSheet.show(context);
+    if (result != null && mounted) {
+      context.read<ProductProvider>().refresh();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (context.watch<StorageModeProvider?>()?.isCloud ?? false) {
@@ -108,6 +117,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
             ],
           ),
           IconButton(
+            tooltip: 'Add from Library',
+            icon: const Icon(Icons.menu_book_rounded),
+            onPressed: _importFromLibrary,
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: provider.refresh,
           ),
@@ -134,6 +148,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   icon: Icons.add_rounded,
                   primary: true,
                   onPressed: _showCreateProduct,
+                ),
+                FloraprisePageHeaderAction(
+                  label: 'Add from Library',
+                  icon: Icons.menu_book_rounded,
+                  primary: false,
+                  onPressed: _importFromLibrary,
                 ),
               ],
               decorationAlignment: Alignment.centerLeft,
@@ -1305,23 +1325,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   bool _isFinishedProductCategory(String? value) {
-    final normalized = value?.trim().toLowerCase();
-    if (normalized == null) return false;
-    return normalized == 'finished products' ||
-        normalized == 'finished product' ||
-        normalized == 'bouquet' ||
-        normalized == 'bunch' ||
-        normalized == 'arrangement' ||
-        normalized == 'centerpiece' ||
-        normalized == 'basket arrangement' ||
-        normalized == 'vase arrangement' ||
-        normalized == 'wreath' ||
-        normalized == 'corsage' ||
-        normalized == 'boutonniere' ||
-        normalized == 'garland' ||
-        normalized == 'floral box' ||
-        normalized == 'gift hamper' ||
-        normalized == 'custom';
+    return ProductionRepository.isFinishedProductCategory(value);
   }
 }
 

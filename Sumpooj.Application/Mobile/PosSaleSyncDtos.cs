@@ -213,6 +213,8 @@ public sealed class PosSalePaymentSnapshot
     public int AmountPaise { get; set; }
     [JsonPropertyName("reference")]
     public string? Reference { get; set; }
+    [JsonPropertyName("payment_type")]
+    public string? PaymentType { get; set; }
     [JsonPropertyName("created_at")]
     public DateTime? CreatedAt { get; set; }
 }

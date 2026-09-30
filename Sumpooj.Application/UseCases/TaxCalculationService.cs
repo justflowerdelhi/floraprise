@@ -10,7 +10,7 @@ namespace Sumpooj.Application.UseCases;
 /// </summary>
 public class TaxableLineItem
 {
-    public Guid ProductId { get; set; }
+    public Guid? ProductId { get; set; }
     public string ProductName { get; set; } = default!;
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
@@ -145,7 +145,7 @@ public class TaxCalculationService
     {
         var lines = orderItems.Select(oi =>
         {
-            productMap.TryGetValue(oi.ProductId, out var product);
+            var product = oi.ProductId.HasValue && productMap.TryGetValue(oi.ProductId.Value, out var p) ? p : null;
             return new TaxableLineItem
             {
                 ProductId = oi.ProductId,

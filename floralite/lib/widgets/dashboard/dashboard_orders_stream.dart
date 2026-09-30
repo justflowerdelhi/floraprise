@@ -321,24 +321,28 @@ class _OrderRowState extends State<_OrderRow> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        order.customerName.trim().isEmpty ? 'Walk-in Customer' : order.customerName.trim(),
+                        order.customerName.trim().isEmpty
+                            ? 'Walk-in Customer'
+                            : order.customerName.trim(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Color(0xFF26332A),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1E2922),
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (order.recipientName.trim().isNotEmpty && order.recipientName != order.customerName) ...[
+                      if (order.recipientName.trim().isNotEmpty &&
+                          order.recipientName != order.customerName) ...[
                         const SizedBox(height: 2),
                         Text(
                           'For: ${order.recipientName}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Color(0xFF86948B),
-                            fontSize: 11,
+                            color: Color(0xFF5E6E64),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],

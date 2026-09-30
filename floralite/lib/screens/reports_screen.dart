@@ -27,6 +27,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
           const SizedBox(height: 12),
           _ReportCard(
+            icon: Icons.account_balance_wallet_outlined,
+            title: 'Pending Payments / Receivables',
+            description: 'Track outstanding balances, follow-ups & collect payments.',
+            color: Colors.red.shade700,
+            onTap: () => Navigator.pushNamed(context, '/reports/pending-payments'),
+          ),
+          const SizedBox(height: 12),
+          _ReportCard(
             icon: Icons.inventory_2_rounded,
             title: 'Order Status',
             description: 'What is the status of my orders?',

@@ -179,7 +179,7 @@ class CloudDayCloseRepository {
         cashSales: CloudExpenseRepository._paise(row, 'cashTotal'),
         upiSales: CloudExpenseRepository._paise(row, 'upiTotal'),
         cardSales: CloudExpenseRepository._paise(row, 'cardTotal'),
-        creditSales: 0,
+        creditSales: CloudExpenseRepository._paise(row, 'creditTotal'),
         cashExpenses: CloudExpenseRepository._paise(row, 'cashExpenses'),
         upiExpenses: 0,
         cardExpenses: 0,

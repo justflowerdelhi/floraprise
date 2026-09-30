@@ -165,7 +165,11 @@ class _DesignCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    design.bouquetId,
+                    design.description.trim().isNotEmpty
+                        ? design.description.trim()
+                        : (design.bouquetId.isNotEmpty
+                            ? design.bouquetId
+                            : 'Design'),
                     style: const TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 13),
                     maxLines: 1,

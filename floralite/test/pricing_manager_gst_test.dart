@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:floraprise/models/fiscal_profile.dart';
 import 'package:floraprise/managers/pricing_manager.dart';
 import 'package:floraprise/models/gst_calculation_type.dart';
 import 'package:floraprise/models/walk_in_line_item.dart';
@@ -6,6 +7,10 @@ import 'package:floraprise/models/walk_in_line_item.dart';
 void main() {
   test('inclusive GST splits selling price without increasing total', () {
     final totals = PricingManager().computeTotals(
+      fiscalProfile: CountryPresets.india().copyWith(
+        taxEnabled: true,
+        taxIdentifier: '29ABCDE1234F1Z5',
+      ),
       lines: const [
         WalkInLineItem(
           description: 'Rose bouquet',
@@ -25,6 +30,10 @@ void main() {
 
   test('exclusive GST adds tax above selling price', () {
     final totals = PricingManager().computeTotals(
+      fiscalProfile: CountryPresets.india().copyWith(
+        taxEnabled: true,
+        taxIdentifier: '29ABCDE1234F1Z5',
+      ),
       lines: const [
         WalkInLineItem(
           description: 'Corporate bouquet',

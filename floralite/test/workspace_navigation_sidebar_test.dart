@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:floraprise/models/dashboard_summary.dart';
+import 'package:floraprise/models/order_workspace_models.dart';
 import 'package:floraprise/models/workspace_destinations.dart';
 import 'package:floraprise/providers/app_shell_controller.dart';
 import 'package:floraprise/providers/dashboard_provider.dart';
+import 'package:floraprise/providers/order_provider.dart';
 import 'package:floraprise/providers/subscription_provider.dart';
 import 'package:floraprise/screens/main_shell_screen.dart';
 import 'package:floraprise/services/subscription_service.dart';
@@ -39,6 +41,8 @@ class _MockStorageModeService extends StorageModeService {
 
 DashboardSummary makeSummary({
   int pendingOrders = 0,
+  int todayDeliveryCount = 0,
+  int todayPickupCount = 0,
   int todayTaskCount = 0,
   int lowStockItems = 0,
   int outOfStockItems = 0,
@@ -53,8 +57,8 @@ DashboardSummary makeSummary({
     preparingOrders: 0,
     readyOrders: 0,
     outForDeliveryOrders: 0,
-    todayDeliveryCount: 0,
-    todayPickupCount: 0,
+    todayDeliveryCount: todayDeliveryCount,
+    todayPickupCount: todayPickupCount,
     todayTaskCount: todayTaskCount,
     lowStockItems: lowStockItems,
     outOfStockItems: outOfStockItems,
@@ -76,6 +80,8 @@ class _FakeDashboardProvider extends ChangeNotifier implements DashboardProvider
   @override
   DashboardSummary get summary => makeSummary(
         pendingOrders: 3,
+        todayDeliveryCount: 2,
+        todayPickupCount: 1,
         todayTaskCount: 2,
         lowStockItems: 1,
         outOfStockItems: 1,
@@ -95,6 +101,47 @@ class _FakeDashboardProvider extends ChangeNotifier implements DashboardProvider
 
   @override
   Future<void> refresh({bool showLoading = false}) async {}
+}
+
+class _FakeOrderProvider extends ChangeNotifier implements OrderProvider {
+  @override
+  String get activeTab => 'all';
+  @override
+  String get searchQuery => '';
+  @override
+  OrderWorkspaceFilters get filters => OrderWorkspaceFilters.empty;
+  @override
+  List<OrderListItem> get orders => const [];
+  @override
+  List<OrderListItem> get history => const [];
+  @override
+  bool get isLoading => false;
+  @override
+  String? get error => null;
+  @override
+  OrderDetailHeader? get detailHeader => null;
+  @override
+  OrderDetailBundle? get detailBundle => null;
+  @override
+  bool get isDetailLoading => false;
+
+  @override
+  Future<void> loadTodayOrders() async {}
+  @override
+  Future<void> setSelectedDate(DateTime? date) async {}
+  @override
+  Future<void> loadOrdersForTab(String tab) async {}
+  @override
+  Future<void> setSearchQuery(String query) async {}
+  @override
+  Future<void> applyFilters(OrderWorkspaceFilters filters) async {}
+  @override
+  Future<void> clearDateFilter() async {}
+  @override
+  Future<void> loadHistory({int limit = 100, int offset = 0}) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _ActiveSubscriptionProvider extends SubscriptionProvider {
@@ -148,51 +195,78 @@ void main() {
   });
 
   group('WorkspaceNavigation Shared Source of Truth', () {
-    test('contains all 5 grouped sections with 20 destinations plus Home (21 total)', () {
-      expect(WorkspaceNavigation.sections.length, 5);
+    test('contains all 6 grouped sections with 26 top-level destinations (31 total with Home and submenus)', () {
+      expect(WorkspaceNavigation.sections.length, 6);
 
       final sectionTitles =
           WorkspaceNavigation.sections.map((s) => s.title).toList();
       expect(sectionTitles, [
         'SALES & ORDERS',
+        'CRM',
         'CATALOGUE & INVENTORY',
         'TEAM',
         'ACCOUNTING',
         'UTILITIES',
       ]);
 
-      expect(WorkspaceNavigation.allDestinations.length, 21);
+      expect(WorkspaceNavigation.allDestinations.length, 31);
 
       // Section items count
       final salesSection = WorkspaceNavigation.sections[0];
-      expect(salesSection.items.length, 6);
+      expect(salesSection.items.length, 5);
       expect(salesSection.items.map((i) => i.route).toList(), [
         '/walkin-sales',
         '/orders',
         '/scheduler',
-        '/customers',
         '/associates',
         '/delivery-workspace',
       ]);
 
-      final catalogueSection = WorkspaceNavigation.sections[1];
-      expect(catalogueSection.items.length, 5);
+      final posItem = salesSection.items[0];
+      expect(posItem.id, 'pos');
+      expect(posItem.title, 'POS');
+      expect(posItem.route, '/walkin-sales');
+
+      final ordersItem = salesSection.items[1];
+      expect(ordersItem.hasChildren, isTrue);
+      expect(ordersItem.children.length, 4);
+      expect(ordersItem.children.map((c) => c.route).toList(), [
+        '/orders/walkin',
+        '/orders/delivery',
+        '/orders/pickup',
+        '/orders/search',
+      ]);
+
+      final crmSection = WorkspaceNavigation.sections[1];
+      expect(crmSection.items.length, 4);
+      expect(crmSection.items.map((i) => i.route).toList(), [
+        '/crm',
+        '/crm/enquiries',
+        '/crm/customers',
+        '/crm/occasions',
+      ]);
+
+      final catalogueSection = WorkspaceNavigation.sections[2];
+      expect(catalogueSection.items.length, 8);
       expect(catalogueSection.items.map((i) => i.route).toList(), [
         '/categories',
         '/products',
         '/my-designs',
         '/inventory',
+        '/production',
+        '/ready-bouquets',
+        '/library',
         '/purchase-list',
       ]);
 
-      final teamSection = WorkspaceNavigation.sections[2];
+      final teamSection = WorkspaceNavigation.sections[3];
       expect(teamSection.items.length, 2);
       expect(teamSection.items.map((i) => i.route).toList(), [
         '/staff',
         '/attendance',
       ]);
 
-      final accountingSection = WorkspaceNavigation.sections[3];
+      final accountingSection = WorkspaceNavigation.sections[4];
       expect(accountingSection.items.length, 5);
       expect(accountingSection.items.map((i) => i.route).toList(), [
         '/opening-cash',
@@ -202,7 +276,7 @@ void main() {
         '/reports',
       ]);
 
-      final utilitiesSection = WorkspaceNavigation.sections[4];
+      final utilitiesSection = WorkspaceNavigation.sections[5];
       expect(utilitiesSection.items.length, 2);
       expect(utilitiesSection.items.map((i) => i.route).toList(), [
         '/reminders',
@@ -210,7 +284,7 @@ void main() {
       ]);
     });
 
-    test('findByRoute resolves every route correctly', () {
+    test('findByRoute resolves every route correctly including child routes', () {
       for (final dest in WorkspaceNavigation.allDestinations) {
         final found = WorkspaceNavigation.findByRoute(dest.route);
         expect(found, isNotNull, reason: 'Route ${dest.route} should be found');
@@ -221,6 +295,8 @@ void main() {
     test('badge selectors return expected counts from dashboard summary', () {
       final summary = makeSummary(
         pendingOrders: 7,
+        todayDeliveryCount: 4,
+        todayPickupCount: 2,
         todayTaskCount: 3,
         lowStockItems: 2,
         outOfStockItems: 1,
@@ -231,6 +307,14 @@ void main() {
 
       final ordersItem = WorkspaceNavigation.findByRoute('/orders')!;
       expect(ordersItem.getBadge(summary), 7);
+
+      final deliveryOrdersItem =
+          WorkspaceNavigation.findByRoute('/orders/delivery')!;
+      expect(deliveryOrdersItem.getBadge(summary), 4);
+
+      final pickupOrdersItem =
+          WorkspaceNavigation.findByRoute('/orders/pickup')!;
+      expect(pickupOrdersItem.getBadge(summary), 2);
 
       final inventoryItem = WorkspaceNavigation.findByRoute('/inventory')!;
       expect(inventoryItem.getBadge(summary), 3); // 2 + 1
@@ -247,7 +331,7 @@ void main() {
   });
 
   group('MainShellScreen Desktop Sidebar vs Mobile Navigation', () {
-    Widget buildTestWidget({required Size screenSize}) {
+    Widget buildTestWidget({required Size screenSize, String initialRoute = '/backup-restore'}) {
       final storageMode = StorageModeProvider(_MockStorageModeService());
       storageMode.setMode(StorageMode.cloud);
 
@@ -262,6 +346,9 @@ void main() {
           ChangeNotifierProvider<DashboardProvider>(
             create: (_) => _FakeDashboardProvider(),
           ),
+          ChangeNotifierProvider<OrderProvider>(
+            create: (_) => _FakeOrderProvider(),
+          ),
           ChangeNotifierProvider<SubscriptionProvider>(
             create: (_) => _ActiveSubscriptionProvider(),
           ),
@@ -274,7 +361,7 @@ void main() {
           supportedLocales: AppLocalizations.supportedLocales,
           home: MediaQuery(
             data: MediaQueryData(size: screenSize),
-            child: const MainShellScreen(initialRoute: '/backup-restore'),
+            child: MainShellScreen(initialRoute: initialRoute),
           ),
         ),
       );
@@ -287,7 +374,7 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
-      await tester.pumpWidget(buildTestWidget(screenSize: const Size(1200, 800)));
+      await tester.pumpWidget(buildTestWidget(screenSize: const Size(1200, 800), initialRoute: '/orders'));
       await tester.pumpAndSettle();
 
       // Verify branding in desktop sidebar
@@ -301,15 +388,53 @@ void main() {
       expect(find.text('ACCOUNTING'), findsOneWidget);
       expect(find.text('UTILITIES'), findsOneWidget);
 
-      // Verify specific destinations in sidebar
-      expect(find.text('Walk-in Sales'), findsOneWidget);
+      // Verify POS destination in sidebar
+      expect(find.text('POS'), findsOneWidget);
+      expect(find.text('Orders'), findsWidgets);
+      expect(find.text('Walkin Orders'), findsOneWidget);
+      expect(find.text('Delivery Orders'), findsOneWidget);
+      expect(find.text('Pickup Orders'), findsOneWidget);
+      expect(find.text('Search Orders'), findsOneWidget);
       expect(find.text('Categories'), findsOneWidget);
       expect(find.text('Staff'), findsOneWidget);
       expect(find.text('Opening Cash'), findsOneWidget);
       expect(find.text('Reminders'), findsOneWidget);
+      expect(find.text('Customers'), findsOneWidget);
+
+      // Verify Delivery Orders (2) and Pickup Orders (1) badges
+      expect(find.text('2'), findsWidgets);
+      expect(find.text('1'), findsWidgets);
+
+      // Verify tapping Orders collapses submenu
+      final ordersTile =
+          find.widgetWithIcon(InkWell, Icons.receipt_long_rounded).first;
+      await tester.tap(ordersTile);
+      await tester.pumpAndSettle();
+      expect(find.text('Walkin Orders'), findsNothing);
+      expect(find.text('Delivery Orders'), findsNothing);
+
+      // Verify tapping Orders re-expands submenu
+      await tester.tap(ordersTile);
+      await tester.pumpAndSettle();
+      expect(find.text('Walkin Orders'), findsOneWidget);
+      expect(find.text('Delivery Orders'), findsOneWidget);
 
       // Verify no bottom NavigationBar on desktop
       expect(find.byType(NavigationBar), findsNothing);
+
+      // Verify Zone 3: Account footer and Logout button
+      expect(find.byIcon(Icons.logout_rounded), findsOneWidget);
+
+      // Verify tapping Logout shows confirmation dialog
+      await tester.tap(find.byIcon(Icons.logout_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('Confirm Logout'), findsOneWidget);
+      expect(find.text('Do you want to logout from this device?'), findsOneWidget);
+
+      // Cancel dialog
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Confirm Logout'), findsNothing);
     });
 
     testWidgets('Mobile mode displays bottom NavigationBar and no sidebar section headers', (

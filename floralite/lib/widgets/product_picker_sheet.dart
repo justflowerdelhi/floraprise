@@ -10,18 +10,22 @@ import '../providers/auth_provider.dart';
 import '../providers/inventory_provider.dart';
 import '../screens/purchase_list_screen.dart';
 
-Future<ProductRecord?> showProductPickerSheet(BuildContext context) {
+Future<ProductRecord?> showProductPickerSheet(
+  BuildContext context, {
+  bool isEventSale = false,
+}) {
   return showModalBottomSheet<ProductRecord>(
     context: context,
     useSafeArea: true,
     showDragHandle: true,
     isScrollControlled: true,
-    builder: (context) => const _ProductPickerSheet(),
+    builder: (context) => _ProductPickerSheet(isEventSale: isEventSale),
   );
 }
 
 class _ProductPickerSheet extends StatefulWidget {
-  const _ProductPickerSheet();
+  final bool isEventSale;
+  const _ProductPickerSheet({this.isEventSale = false});
 
   @override
   State<_ProductPickerSheet> createState() => _ProductPickerSheetState();
@@ -72,7 +76,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
       final products = isCloud
           ? productPickerRowsFromCloudInventory(
               await _loadCloudInventoryProducts(inventoryProvider),
-              await _cloudProductRepository.listProducts(),
+              await _loadCloudProducts(),
             )
           : await _repository.listActiveProductsWithInventory();
       if (!mounted) return;
@@ -86,6 +90,32 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
         _error = 'Could not load products. Please try again.';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<List<CloudProduct>> _loadCloudProducts() async {
+    try {
+      final results = await Future.wait([
+        _cloudProductRepository.listProducts(),
+        _cloudProductRepository.listSellableFinishedGoods(),
+      ]);
+      final regular = results[0];
+      final sellable = results[1];
+      final seen = <String>{};
+      final merged = <CloudProduct>[];
+      for (final p in regular) {
+        if (seen.add(p.id.trim().toLowerCase())) {
+          merged.add(p);
+        }
+      }
+      for (final p in sellable) {
+        if (seen.add(p.id.trim().toLowerCase())) {
+          merged.add(p);
+        }
+      }
+      return merged;
+    } catch (_) {
+      return _cloudProductRepository.listProducts();
     }
   }
 
@@ -179,7 +209,10 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final product = filtered[index];
-        final isOutOfStock = productPickerIsOutOfStock(product);
+        final isOutOfStock = productPickerIsOutOfStock(product, isEventSale: widget.isEventSale);
+        final canSelectDirectly = productPickerCanSelect(product, isEventSale: widget.isEventSale);
+        final isHeldForEvent = !widget.isEventSale && product.availableToSell <= 0 && product.reservedQty > 0;
+
         return ListTile(
           enabled: true,
           title: _buildProductTitle(product),
@@ -187,31 +220,40 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
           trailing: Text(
             '₹${(product.sellingPricePaise / 100).toStringAsFixed(0)}',
             style: TextStyle(
-              color: isOutOfStock ? Colors.grey : null,
+              color: isOutOfStock && !isHeldForEvent ? Colors.grey : null,
               fontWeight: FontWeight.w600,
             ),
           ),
-          onTap: productPickerCanSelect(product)
-              ? () => Navigator.pop(context, _toProductRecord(product))
-              : () => _showOutOfStockActions(product),
+          onTap: () {
+            if (canSelectDirectly) {
+              Navigator.pop(context, _toProductRecord(product));
+            } else if (isHeldForEvent) {
+              _showStockReservedForEventDialog(product);
+            } else {
+              _showOutOfStockActions(product);
+            }
+          },
         );
       },
     );
   }
 
   Widget _buildProductTitle(ProductInventoryRecord product) {
-    final isOutOfStock = productPickerIsOutOfStock(product);
-    final isLowStock = productPickerIsLowStock(product);
+    final isOutOfStock = productPickerIsOutOfStock(product, isEventSale: widget.isEventSale);
+    final isLowStock = productPickerIsLowStock(product, isEventSale: widget.isEventSale);
+    final isHeldForEvent = !widget.isEventSale && product.availableToSell <= 0 && product.reservedQty > 0;
 
     return Row(
       children: [
         Expanded(
           child: Text(
             product.name,
-            style: TextStyle(color: isOutOfStock ? Colors.grey : null),
+            style: TextStyle(color: isOutOfStock && !isHeldForEvent ? Colors.grey : null),
           ),
         ),
-        if (isOutOfStock)
+        if (isHeldForEvent)
+          _buildStockBadge('Reserved for Event', Colors.deepOrange)
+        else if (isOutOfStock)
           _buildStockBadge('Out of Stock', Colors.red)
         else if (isLowStock)
           _buildStockBadge('Low Stock', Colors.orange),
@@ -240,7 +282,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
   }
 
   Widget _buildStockSubtitle(ProductInventoryRecord product) {
-    final stockText = productPickerAvailabilityText(product);
+    final stockText = productPickerAvailabilityText(product, isEventSale: widget.isEventSale);
     if (stockText.isEmpty) {
       return Text(product.category);
     }
@@ -261,13 +303,130 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
   }
 
   Color _stockIndicatorColor(ProductInventoryRecord product) {
+    if (widget.isEventSale) {
+      return Colors.green;
+    }
     if (product.currentQty <= 0) {
       return Colors.red;
     }
-    if (product.minQty > 0 && product.currentQty <= product.minQty) {
+    if (product.availableToSell <= 0 && product.reservedQty > 0) {
+      return Colors.deepOrange;
+    }
+    if (product.minQty > 0 && product.availableToSell <= product.minQty) {
       return Colors.amber.shade700;
     }
     return Colors.green;
+  }
+
+  Future<void> _showStockReservedForEventDialog(ProductInventoryRecord product) async {
+    final inventoryRepo = InventoryRepository();
+    final reservations = await inventoryRepo.getActiveReservationsForProduct(product.id);
+
+    if (!mounted) return;
+
+    final releaseAndSell = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.event_busy, color: Colors.deepOrange),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'STOCK RESERVED FOR EVENT',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.deepOrange,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Physical stock on hand is ${product.currentQty}, but ${product.reservedQty} unit(s) are reserved for upcoming events:',
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Column(
+                    children: reservations.map((res) {
+                      final name = res.eventName ?? 'Event Order #${res.orderId}';
+                      final date = res.eventDate != null ? ' • ${res.eventDate}' : '';
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.event_seat, size: 16, color: Colors.deepOrange),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '$name$date',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                            Text(
+                              '${res.quantity} held',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.deepOrange,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Would you like to release 1 unit from the hold to complete this POS sale, or keep the stock reserved?',
+                  style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Keep Reserved'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(backgroundColor: Colors.deepOrange),
+              child: const Text('Release Hold & Sell'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (releaseAndSell == true && mounted) {
+      await inventoryRepo.releaseQuantityFromProductReservations(
+        productId: product.id,
+        quantityToRelease: 1,
+      );
+      if (!mounted) return;
+      Navigator.pop(context, _toProductRecord(product));
+    }
   }
 
   Future<void> _showOutOfStockActions(ProductInventoryRecord product) async {
@@ -512,22 +671,98 @@ List<ProductInventoryRecord> productPickerRowsFromCloudInventory(
   List<InventoryProductRecord> inventoryProducts,
   [List<CloudProduct> cloudProducts = const <CloudProduct>[]]
 ) {
-  final inventoryByCloudProductId = {
-    for (final product in inventoryProducts)
-      if (product.cloudProductId?.trim().isNotEmpty == true)
-        product.cloudProductId!.trim().toLowerCase(): product,
-  };
-
   // If cloud catalogue products are available, build rows primarily from them.
   if (cloudProducts.isNotEmpty) {
+    final matchedInventory = <InventoryProductRecord>{};
     final matchedCloudIds = <String>{};
     final rows = <ProductInventoryRecord>[];
+
+    // Build fast lookup indexes for inventory products
+    final invByBarcode = <String, InventoryProductRecord>{};
+    final invBySku = <String, InventoryProductRecord>{};
+    final invByCloudId = <String, InventoryProductRecord>{};
+    final invByName = <String, List<InventoryProductRecord>>{};
+
+    for (final inv in inventoryProducts) {
+      final barcode = inv.barcode.trim().toLowerCase();
+      if (barcode.isNotEmpty) invByBarcode[barcode] = inv;
+
+      final mfg = inv.manufacturerBarcode?.trim().toLowerCase();
+      if (mfg != null && mfg.isNotEmpty) invByBarcode[mfg] = inv;
+
+      final intl = inv.internalBarcode?.trim().toLowerCase();
+      if (intl != null && intl.isNotEmpty) invByBarcode[intl] = inv;
+
+      final sku = inv.sku.trim().toLowerCase();
+      if (sku.isNotEmpty) invBySku[sku] = inv;
+
+      final cloudId = inv.cloudProductId?.trim().toLowerCase();
+      if (cloudId != null && cloudId.isNotEmpty) invByCloudId[cloudId] = inv;
+
+      final name = inv.name.trim().toLowerCase();
+      if (name.isNotEmpty) {
+        invByName.putIfAbsent(name, () => []).add(inv);
+      }
+    }
+
+    InventoryProductRecord? findMatchingInventory(CloudProduct cp) {
+      // 1. Match by Barcode (strongest identifier)
+      final barcodes = [
+        cp.barcode?.trim().toLowerCase(),
+        cp.manufacturerBarcode?.trim().toLowerCase(),
+        cp.internalBarcode?.trim().toLowerCase(),
+      ].whereType<String>().where((b) => b.isNotEmpty);
+
+      for (final b in barcodes) {
+        final match = invByBarcode[b];
+        if (match != null) return match;
+      }
+
+      // 2. Match by SKU / BatchCode
+      final sku = cp.sku.trim().toLowerCase();
+      if (sku.isNotEmpty) {
+        final match = invBySku[sku];
+        if (match != null) return match;
+      }
+
+      // 3. Match by CloudProductId / Product.Id
+      final cloudId = cp.id.trim().toLowerCase();
+      if (cloudId.isNotEmpty) {
+        final match = invByCloudId[cloudId];
+        if (match != null) return match;
+      }
+
+      // 4. Controlled Name fallback (if category matches or single candidate)
+      final name = cp.name.trim().toLowerCase();
+      if (name.isNotEmpty && invByName.containsKey(name)) {
+        final candidates = invByName[name]!;
+        if (candidates.length == 1) {
+          return candidates.first;
+        }
+        final cpCat = cp.category.trim().toLowerCase();
+        for (final c in candidates) {
+          if (c.category.trim().toLowerCase() == cpCat) {
+            return c;
+          }
+        }
+        return candidates.first;
+      }
+
+      return null;
+    }
 
     for (final cloudProduct in cloudProducts) {
       if (!cloudProduct.isActive) continue;
       final cloudIdLower = cloudProduct.id.trim().toLowerCase();
       matchedCloudIds.add(cloudIdLower);
-      final inv = inventoryByCloudProductId[cloudIdLower];
+
+      final inv = findMatchingInventory(cloudProduct);
+      if (inv != null) {
+        matchedInventory.add(inv);
+        if (inv.cloudProductId?.trim().isNotEmpty == true) {
+          matchedCloudIds.add(inv.cloudProductId!.trim().toLowerCase());
+        }
+      }
 
       final sku = cloudProduct.sku.trim();
       final barcode = (cloudProduct.barcode?.trim().isNotEmpty == true
@@ -585,34 +820,39 @@ List<ProductInventoryRecord> productPickerRowsFromCloudInventory(
 
     // Preserve any inventory items whose cloudProductId wasn't matched above
     for (final inv in inventoryProducts) {
-      if (inv.cloudProductId == null || inv.cloudProductId!.trim().isEmpty) {
+      if (matchedInventory.contains(inv)) {
         continue;
       }
-      if (!matchedCloudIds.contains(inv.cloudProductId!.trim().toLowerCase())) {
-        rows.add(
-          ProductInventoryRecord(
-            id: inv.productId,
-            code: inv.sku,
-            name: inv.name,
-            category: inv.category.isEmpty ? 'Other' : inv.category,
-            defaultUnit: inv.unit.isEmpty ? 'Piece' : inv.unit,
-            sku: inv.sku,
-            barcode: inv.barcode,
-            manufacturerBarcode: inv.manufacturerBarcode ?? inv.barcode,
-            florapriseBarcode: inv.internalBarcode ?? '',
-            cloudProductId: inv.cloudProductId,
-            sellingPricePaise: 0,
-            purchasePricePaise: null,
-            gstPercent: inv.gstPercent,
-            gstCalculationType: inv.gstCalculationType,
-            trackInventory: inv.trackInventory,
-            active: true,
-            favorite: false,
-            currentQty: inv.currentQty,
-            minQty: inv.minQty,
-          ),
-        );
+      final invCloudId = inv.cloudProductId?.trim().toLowerCase();
+      if (invCloudId != null &&
+          invCloudId.isNotEmpty &&
+          matchedCloudIds.contains(invCloudId)) {
+        continue;
       }
+
+      rows.add(
+        ProductInventoryRecord(
+          id: inv.productId,
+          code: inv.sku,
+          name: inv.name,
+          category: inv.category.isEmpty ? 'Other' : inv.category,
+          defaultUnit: inv.unit.isEmpty ? 'Piece' : inv.unit,
+          sku: inv.sku,
+          barcode: inv.barcode,
+          manufacturerBarcode: inv.manufacturerBarcode ?? inv.barcode,
+          florapriseBarcode: inv.internalBarcode ?? '',
+          cloudProductId: inv.cloudProductId,
+          sellingPricePaise: 0,
+          purchasePricePaise: null,
+          gstPercent: inv.gstPercent,
+          gstCalculationType: inv.gstCalculationType,
+          trackInventory: inv.trackInventory,
+          active: true,
+          favorite: false,
+          currentQty: inv.currentQty,
+          minQty: inv.minQty,
+        ),
+      );
     }
 
     return rows;
@@ -718,30 +958,43 @@ List<ProductInventoryRecord> productPickerVisibleProducts(
 }
 
 @visibleForTesting
-bool productPickerCanSelect(ProductInventoryRecord product) {
-  return !productPickerIsOutOfStock(product);
+bool productPickerCanSelect(ProductInventoryRecord product, {bool isEventSale = false}) {
+  if (isEventSale) return true;
+  if (!product.trackInventory) return true;
+  return product.availableToSell > 0;
 }
 
 @visibleForTesting
-bool productPickerIsOutOfStock(ProductInventoryRecord product) {
-  return product.trackInventory && product.currentQty <= 0;
+bool productPickerIsOutOfStock(ProductInventoryRecord product, {bool isEventSale = false}) {
+  if (isEventSale) return false;
+  return product.trackInventory && product.availableToSell <= 0;
 }
 
 @visibleForTesting
-bool productPickerIsLowStock(ProductInventoryRecord product) {
+bool productPickerIsLowStock(ProductInventoryRecord product, {bool isEventSale = false}) {
+  if (isEventSale) return false;
   return product.trackInventory &&
-      product.currentQty > 0 &&
+      product.availableToSell > 0 &&
       product.minQty > 0 &&
-      product.currentQty <= product.minQty;
+      product.availableToSell <= product.minQty;
 }
 
 @visibleForTesting
-String productPickerAvailabilityText(ProductInventoryRecord product) {
+String productPickerAvailabilityText(ProductInventoryRecord product, {bool isEventSale = false}) {
   if (!product.trackInventory) {
     return '';
   }
+  if (isEventSale) {
+    return 'Stock: ${_formatStockQuantity(product.currentQty, product.defaultUnit)}${product.reservedQty > 0 ? ' (Held: ${product.reservedQty})' : ''}';
+  }
   if (product.currentQty <= 0) {
     return 'Out of Stock';
+  }
+  if (product.availableToSell <= 0 && product.reservedQty > 0) {
+    return 'Stock: ${product.currentQty} (All held for Events)';
+  }
+  if (product.reservedQty > 0) {
+    return 'Stock: ${product.currentQty} (Avail: ${product.availableToSell}, Held: ${product.reservedQty})';
   }
   return 'Stock: ${_formatStockQuantity(product.currentQty, product.defaultUnit)}';
 }

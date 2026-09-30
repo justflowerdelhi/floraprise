@@ -67,17 +67,43 @@ public class DayCloseService
             .Sum(o => o.TotalAmount);
 
         var payments = await _paymentRepository.GetByDateAsync(companyId, locationId, date);
+        var orderIds = orders.Select(o => o.Id).ToHashSet();
 
-        var cardSales = payments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount);
-        var upiSales = payments.Where(p => p.Method == PaymentMethod.Upi).Sum(p => p.Amount);
-        var otherPayments = payments
-            .Where(p => p.Method != PaymentMethod.Cash && p.Method != PaymentMethod.Card && p.Method != PaymentMethod.Upi)
+        var saleTendersForTodayOrders = payments
+            .Where(p => p.Status == PaymentTransactionStatus.Approved && p.PaymentType == PaymentType.SaleTender && orderIds.Contains(p.OrderId))
+            .ToList();
+
+        var collectionsToday = payments
+            .Where(p => p.Status == PaymentTransactionStatus.Approved && p.PaymentType == PaymentType.CreditCollection)
+            .ToList();
+
+        var cashSales = saleTendersForTodayOrders.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount);
+        var cardSales = saleTendersForTodayOrders.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount);
+        var upiSales = saleTendersForTodayOrders.Where(p => p.Method == PaymentMethod.Upi).Sum(p => p.Amount);
+        var bankTransferSales = saleTendersForTodayOrders.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount);
+        var otherPayments = saleTendersForTodayOrders
+            .Where(p => p.Method != PaymentMethod.Cash && p.Method != PaymentMethod.Card && p.Method != PaymentMethod.Upi && p.Method != PaymentMethod.BankTransfer)
             .Sum(p => p.Amount);
+
+        var creditSales = orders.Sum(o => Math.Max(0m, o.TotalAmount - saleTendersForTodayOrders.Where(p => p.OrderId == o.Id).Sum(p => p.Amount)));
+
+        var cashCollections = collectionsToday.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount);
+        var upiCollections = collectionsToday.Where(p => p.Method == PaymentMethod.Upi).Sum(p => p.Amount);
+        var cardCollections = collectionsToday.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount);
+        var otherCollections = collectionsToday.Where(p => p.Method != PaymentMethod.Cash && p.Method != PaymentMethod.Upi && p.Method != PaymentMethod.Card).Sum(p => p.Amount);
+        var totalCollections = collectionsToday.Sum(p => p.Amount);
 
         var cashDrawer = await _cashDrawerRepository.GetSummaryAsync(companyId, date);
 
         var refundCount = 0;
         var totalRefunds = 0m;
+        var netSales = totalSales - totalRefunds;
+
+        var openingCash = cashDrawer.OpeningCash;
+        var cashExpenses = cashDrawer.CashExpenses;
+        var cashReceived = cashDrawer.CashReceived;
+        var cashPaid = cashDrawer.CashPaid;
+        var expectedCash = openingCash + cashSales + cashCollections + cashReceived - cashExpenses - cashPaid - totalRefunds;
 
         return new
         {
@@ -85,6 +111,8 @@ public class DayCloseService
 
             totalOrders,
             totalSales,
+            grossSales = totalSales,
+            netSales,
 
             walkInOrders,
             phoneOrders,
@@ -94,16 +122,25 @@ public class DayCloseService
             phoneOrdersAmount,
             onlineOrdersAmount,
 
+            cashSales,
             cardSales,
             upiSales,
+            bankTransferSales,
             otherPayments,
+            creditSales,
+            creditTotal = creditSales,
 
-            openingCash = cashDrawer.OpeningCash,
-            cashSales = cashDrawer.CashSales,
-            cashExpenses = cashDrawer.CashExpenses,
-            cashReceived = cashDrawer.CashReceived,
-            cashPaid = cashDrawer.CashPaid,
-            expectedCash = cashDrawer.OpeningCash + cashDrawer.CashSales + cashDrawer.CashReceived - cashDrawer.CashExpenses - cashDrawer.CashPaid,
+            cashCollections,
+            upiCollections,
+            cardCollections,
+            otherCollections,
+            totalCollections,
+
+            openingCash,
+            cashExpenses,
+            cashReceived,
+            cashPaid,
+            expectedCash,
 
             refundCount,
             totalRefunds,
@@ -145,13 +182,14 @@ public class DayCloseService
 
         var summary = await GetSummaryAsync(companyId, request.LocationId, businessDateUtc);
 
-        // Extract values from dynamic summary
+        // Extract values from summary
         var totalOrders = (int)(summary.GetType().GetProperty("totalOrders")?.GetValue(summary) ?? 0);
         var totalSales = (decimal)(summary.GetType().GetProperty("totalSales")?.GetValue(summary) ?? 0m);
         var totalRefunds = (decimal)(summary.GetType().GetProperty("totalRefunds")?.GetValue(summary) ?? 0m);
         var cashSales = (decimal)(summary.GetType().GetProperty("cashSales")?.GetValue(summary) ?? 0m);
         var cardSales = (decimal)(summary.GetType().GetProperty("cardSales")?.GetValue(summary) ?? 0m);
         var upiSales = (decimal)(summary.GetType().GetProperty("upiSales")?.GetValue(summary) ?? 0m);
+        var bankTransferSales = (decimal)(summary.GetType().GetProperty("bankTransferSales")?.GetValue(summary) ?? 0m);
         var otherPaymentsVal = (decimal)(summary.GetType().GetProperty("otherPayments")?.GetValue(summary) ?? 0m);
         var expectedCash = (decimal)(summary.GetType().GetProperty("expectedCash")?.GetValue(summary) ?? 0m);
         var cashExpenses = (decimal)(summary.GetType().GetProperty("cashExpenses")?.GetValue(summary) ?? 0m);
@@ -163,7 +201,7 @@ public class DayCloseService
             userId);
 
         dayClose.SetSalesSummary(totalOrders, totalSales, totalRefunds);
-        dayClose.SetPaymentBreakdown(cashSales, cardSales, upiSales, 0m, otherPaymentsVal);
+        dayClose.SetPaymentBreakdown(cashSales, cardSales, upiSales, 0m, otherPaymentsVal + bankTransferSales);
         dayClose.SetExpectedCash(expectedCash);
         dayClose.SetCashCount(request.ActualCash);
         dayClose.SetCashExpenses(cashExpenses);
@@ -192,6 +230,7 @@ public class DayCloseService
         UpiTotal = dc.UpiTotal,
         GiftCardTotal = dc.GiftCardTotal,
         OtherPaymentsTotal = dc.OtherPaymentsTotal,
+        CreditTotal = Math.Max(0m, dc.TotalSales - (dc.CashTotal + dc.CardTotal + dc.UpiTotal + dc.GiftCardTotal + dc.OtherPaymentsTotal)),
         ExpectedCash = dc.ExpectedCash,
         ActualCash = dc.ActualCash,
         CashVariance = dc.CashVariance,

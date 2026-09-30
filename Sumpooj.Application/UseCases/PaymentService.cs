@@ -37,7 +37,13 @@ public class PaymentService
         if (!Enum.TryParse<PaymentMethod>(request.Method, true, out var method))
             throw new ArgumentException($"Invalid payment method: {request.Method}");
 
-        var payment = new Payment(companyId, request.OrderId, method, request.Amount);
+        var paymentType = PaymentType.CreditCollection;
+        if (!string.IsNullOrWhiteSpace(request.PaymentType) && Enum.TryParse<PaymentType>(request.PaymentType, true, out var parsedType))
+        {
+            paymentType = parsedType;
+        }
+
+        var payment = new Payment(companyId, request.OrderId, method, request.Amount, paymentType);
 
         if (request.LocationId.HasValue)
             payment.SetLocation(request.LocationId.Value);
@@ -106,9 +112,15 @@ public class PaymentService
 
         payment.Void();
         await _paymentRepository.UpdateAsync(payment);
+    }
 
-        // Update order payment status
-        await UpdateOrderPaymentStatusAsync(payment.CompanyId, payment.OrderId);
+    public async Task RefundAsync(Guid id)
+    {
+        var payment = await _paymentRepository.GetByIdAsync(id)
+            ?? throw new KeyNotFoundException("Payment not found");
+
+        payment.Refund();
+        await _paymentRepository.UpdateAsync(payment);
     }
 
     private async Task UpdateOrderPaymentStatusAsync(Guid companyId, Guid orderId)
@@ -116,7 +128,10 @@ public class PaymentService
         var order = await _orderRepository.GetByIdAsync(companyId, orderId);
         if (order == null) return;
 
-        var totalPaid = await _paymentRepository.GetTotalPaidForOrderAsync(orderId);
+        var payments = await _paymentRepository.GetByOrderIdAsync(orderId);
+        var totalPaid = payments
+            .Where(p => p.Status == "Approved")
+            .Sum(p => p.Amount);
 
         if (totalPaid >= order.TotalAmount)
         {
@@ -137,6 +152,7 @@ public class PaymentService
         LocationId = payment.LocationId,
         Method = payment.Method.ToString(),
         Amount = payment.Amount,
+        PaymentType = payment.PaymentType.ToString(),
         Status = payment.Status.ToString(),
         TransactionId = payment.TransactionId,
         AuthorizationCode = payment.AuthorizationCode,

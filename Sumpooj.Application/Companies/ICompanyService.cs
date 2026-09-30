@@ -1,4 +1,4 @@
-﻿namespace Sumpooj.Application.Companies;
+namespace Sumpooj.Application.Companies;
 
 public interface ICompanyService
 {
@@ -21,4 +21,9 @@ public class UpdateCompanySettingsRequest
     public string? TimeZone { get; set; }
     public string? CurrencyCode { get; set; }
     public string? TaxIdentifier { get; set; }
+    public string? OwnerName { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? PinCode { get; set; }
+    public string? LogoPath { get; set; }
 }

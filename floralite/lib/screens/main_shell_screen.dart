@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../models/order_workspace_models.dart';
 import '../models/workspace_destinations.dart';
 import '../providers/app_shell_controller.dart';
 import '../providers/dashboard_provider.dart';
+import '../providers/library_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../managers/business_settings_manager.dart';
 import '../widgets/common_widgets.dart';
-import '../widgets/business_identity.dart';
+import '../widgets/business_logo.dart';
 import '../widgets/floraprise_brand.dart';
+import '../providers/auth_provider.dart';
 import 'about_screen.dart';
 import 'associates_screen.dart';
 import 'attendance_home_screen.dart';
@@ -18,6 +21,7 @@ import 'attendance_monthly_summary_screen.dart';
 import 'attendance_today_screen.dart';
 import 'backup_restore_screen.dart';
 import 'barcode_screen.dart';
+import 'business_registration_screen.dart';
 import 'cash_book_screen.dart';
 import 'categories_screen.dart';
 import 'customers_screen.dart';
@@ -27,10 +31,13 @@ import 'delivery_workspace_screen.dart';
 import 'draft_orders_screen.dart';
 import 'expenses_screen.dart';
 import 'inventory_screen.dart';
+import 'library/library_home_screen.dart';
 import 'voice_stock_entry_screen.dart';
 import 'my_designs_screen.dart';
 import 'order_workflow_screen.dart';
 import 'orders_screen.dart';
+import 'order_detail_screen.dart';
+import 'order_view_screen.dart';
 import 'opening_cash_screen.dart';
 import 'payment_history_screen.dart';
 import 'products_screen.dart';
@@ -44,6 +51,7 @@ import 'reports/day_closing_report_screen.dart';
 import 'reports/expense_report_screen.dart';
 import 'reports/low_stock_report_screen.dart';
 import 'reports/order_status_report_screen.dart';
+import 'reports/pending_payments_screen.dart';
 import 'reports/production_report_screen.dart';
 import 'reports/profit_margin_report_screen.dart';
 import 'reports/sales_report_screen.dart';
@@ -58,6 +66,10 @@ import 'shop_details_screen.dart';
 import 'cloud_staff_screen.dart';
 import 'subscription_screen.dart';
 import 'walkin_sales_screen.dart';
+import 'crm/crm_today_screen.dart';
+import 'crm/crm_enquiries_screen.dart';
+import 'crm/crm_customers_screen.dart';
+import 'crm/crm_occasions_screen.dart';
 
 class MainShellScreen extends StatefulWidget {
   const MainShellScreen({super.key, this.initialRoute});
@@ -378,6 +390,115 @@ class _MainShellScreenState extends State<MainShellScreen> {
         OrderWorkflowScreen(orderId: args?['orderId'] as int),
       );
     }
+    if (routeName == '/library') {
+      final args = settings.arguments as Map<String, dynamic>?;
+      final initialTab = args?['initialTab'] as LibraryTab?;
+      return _materialRoute(
+        settings,
+        LibraryHomeScreen(initialTab: initialTab),
+      );
+    }
+    final routeUri = Uri.tryParse(routeName ?? '');
+    final routePath = routeUri?.path ?? routeName ?? '';
+    if (routePath == '/order-view' ||
+        routePath == '/order-views') {
+      int? orderId;
+      String? cloudOrderId;
+
+      if (settings.arguments is Map) {
+        final args = settings.arguments as Map<dynamic, dynamic>;
+        if (args['orderId'] is int) {
+          orderId = args['orderId'] as int;
+        } else if (args['orderId'] != null) {
+          orderId = int.tryParse(args['orderId'].toString());
+        }
+        cloudOrderId = args['cloudOrderId']?.toString();
+      }
+
+      if (orderId == null && routeUri != null) {
+        final queryOrderId = routeUri.queryParameters['orderId'] ??
+            routeUri.queryParameters['id'];
+        if (queryOrderId != null) {
+          orderId = int.tryParse(queryOrderId);
+        }
+        cloudOrderId ??= routeUri.queryParameters['cloudOrderId'];
+        if (orderId == null && routeUri.pathSegments.isNotEmpty) {
+          final lastSegment = routeUri.pathSegments.last;
+          final parsed = int.tryParse(lastSegment);
+          if (parsed != null) {
+            orderId = parsed;
+          } else if (lastSegment != 'order-view' &&
+              lastSegment != 'order-views') {
+            cloudOrderId ??= lastSegment;
+          }
+        }
+      }
+
+      if ((orderId != null && orderId > 0) ||
+          (cloudOrderId != null && cloudOrderId.isNotEmpty)) {
+        return _materialRoute(
+          settings,
+          OrderViewScreen(
+            orderId: orderId ?? 0,
+            cloudOrderId: cloudOrderId,
+          ),
+        );
+      }
+    }
+
+    if (routePath == '/order-detail' ||
+        routePath == '/order-details' ||
+        routePath.startsWith('/orders/') ||
+        routePath.startsWith('/order/')) {
+      int? orderId;
+      String? cloudOrderId;
+
+      if (settings.arguments is Map) {
+        final args = settings.arguments as Map<dynamic, dynamic>;
+        if (args['orderId'] is int) {
+          orderId = args['orderId'] as int;
+        } else if (args['orderId'] != null) {
+          orderId = int.tryParse(args['orderId'].toString());
+        }
+        cloudOrderId = args['cloudOrderId']?.toString();
+      }
+
+      if (orderId == null && routeUri != null) {
+        final queryOrderId = routeUri.queryParameters['orderId'] ??
+            routeUri.queryParameters['id'];
+        if (queryOrderId != null) {
+          orderId = int.tryParse(queryOrderId);
+        }
+        cloudOrderId ??= routeUri.queryParameters['cloudOrderId'];
+        if (orderId == null && routeUri.pathSegments.isNotEmpty) {
+          final lastSegment = routeUri.pathSegments.last;
+          final parsed = int.tryParse(lastSegment);
+          if (parsed != null) {
+            orderId = parsed;
+          } else if (lastSegment != 'orders' &&
+              lastSegment != 'order' &&
+              lastSegment != 'order-detail' &&
+              lastSegment != 'order-details' &&
+              lastSegment != 'walkin' &&
+              lastSegment != 'delivery' &&
+              lastSegment != 'pickup' &&
+              lastSegment != 'search') {
+            cloudOrderId ??= lastSegment;
+          }
+        }
+      }
+
+      if ((orderId != null && orderId > 0) ||
+          (cloudOrderId != null && cloudOrderId.isNotEmpty)) {
+        return _materialRoute(
+          settings,
+          OrderDetailScreen(
+            orderId: orderId ?? 0,
+            cloudOrderId: cloudOrderId,
+          ),
+        );
+      }
+    }
 
     return _materialRoute(
       settings,
@@ -390,12 +511,25 @@ class _MainShellScreenState extends State<MainShellScreen> {
         '/about' => const AboutScreen(),
         '/my-designs' => const MyDesignsScreen(),
         '/orders' => const OrdersScreen(),
+        '/orders/walkin' => const OrdersScreen(
+            initialFilters: OrderWorkspaceFilters(takeAway: true),
+          ),
+        '/orders/delivery' => const OrdersScreen(
+            initialFilters: OrderWorkspaceFilters(delivery: true),
+          ),
+        '/orders/pickup' => const OrdersScreen(
+            initialFilters: OrderWorkspaceFilters(pickup: true),
+          ),
+        '/orders/search' => const OrdersScreen(
+            focusSearch: true,
+          ),
         '/delivery-workspace' => const DeliveryWorkspaceScreen(),
         '/customers' => const CustomersScreen(),
         '/staff' => const StaffModeScreen(),
         '/reminders' => const RemindersScreen(),
         '/products' => const ProductsScreen(),
         '/categories' => const CategoriesScreen(),
+        '/library' => const LibraryHomeScreen(),
         '/scheduler' => const SchedulerScreen(),
         '/settings' => const SettingsScreen(),
         '/share-branding' => const ShareBrandingSettingsScreen(),
@@ -419,6 +553,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
         '/day-closing' => const DayClosingScreen(),
         '/reports' => const ReportsScreen(),
         '/reports/sales' => const SalesReportScreen(),
+        '/reports/pending-payments' => const PendingPaymentsScreen(),
         '/reports/order-status' => const OrderStatusReportScreen(),
         '/reports/top-customers' => const TopCustomersReportScreen(),
         '/reports/top-products' => const TopProductsReportScreen(),
@@ -428,6 +563,10 @@ class _MainShellScreenState extends State<MainShellScreen> {
         '/reports/wastage' => const WastageReportScreen(),
         '/reports/production' => const ProductionReportScreen(),
         '/reports/profit-margin' => const ProfitMarginReportScreen(),
+        '/crm' => const CrmTodayScreen(),
+        '/crm/enquiries' => const CrmEnquiriesScreen(),
+        '/crm/customers' => const CrmCustomersScreen(),
+        '/crm/occasions' => const CrmOccasionsScreen(),
         _ => const DashboardScreen(),
       },
     );
@@ -455,7 +594,7 @@ class _OrdersTab extends StatelessWidget {
       children: [
         _WorkspaceAction(
           icon: Icons.point_of_sale_rounded,
-          title: 'Walk-in Sales',
+          title: 'POS',
           subtitle: 'Start a counter sale.',
           onTap: () => Navigator.pushNamed(context, '/walkin-sales'),
         ),
@@ -463,13 +602,13 @@ class _OrdersTab extends StatelessWidget {
           icon: Icons.local_shipping_rounded,
           title: 'Delivery Orders',
           subtitle: 'Create or review delivery work.',
-          onTap: () => Navigator.pushNamed(context, '/walkin-sales'),
+          onTap: () => Navigator.pushNamed(context, '/orders/delivery'),
         ),
         _WorkspaceAction(
           icon: Icons.shopping_bag_rounded,
           title: 'Pickup Orders',
           subtitle: 'Create or review pickup work.',
-          onTap: () => Navigator.pushNamed(context, '/walkin-sales'),
+          onTap: () => Navigator.pushNamed(context, '/orders/pickup'),
         ),
         _WorkspaceAction(
           icon: Icons.receipt_long_rounded,
@@ -481,7 +620,7 @@ class _OrdersTab extends StatelessWidget {
           icon: Icons.search_rounded,
           title: 'Search Orders',
           subtitle: 'Find by customer, order number, or date.',
-          onTap: () => Navigator.pushNamed(context, '/orders'),
+          onTap: () => Navigator.pushNamed(context, '/orders/search'),
         ),
         _WorkspaceAction(
           icon: Icons.location_searching_rounded,
@@ -768,6 +907,7 @@ class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
   final BusinessSettingsManager _businessSettingsManager =
       BusinessSettingsManager();
   final ScrollController _sidebarScrollController = ScrollController();
+  final Set<String> _expandedItemIds = {'orders'};
   String _shopName = '';
   String _businessSubtitle = '';
   String _logoPath = '';
@@ -775,8 +915,15 @@ class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
   @override
   void initState() {
     super.initState();
+    _syncExpansionWithRoute();
     BusinessSettingsManager.changeNotifier.addListener(_loadBusinessIdentity);
     _loadBusinessIdentity();
+  }
+
+  void _syncExpansionWithRoute() {
+    if (widget.currentRoute.startsWith('/orders')) {
+      _expandedItemIds.add('orders');
+    }
   }
 
   @override
@@ -798,6 +945,18 @@ class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
     } catch (_) {}
   }
 
+  String _visibleSubtitle(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized.isEmpty ||
+        normalized.contains('registered from mobile onboarding') ||
+        normalized.contains('mobile onboarding') ||
+        normalized.contains('registration method') ||
+        normalized.contains('onboarding method')) {
+      return '';
+    }
+    return value.trim();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -805,50 +964,12 @@ class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
     final summary = context.watch<DashboardProvider>().summary;
 
     return Container(
-      width: 236,
+      width: 240,
       color: theme.scaffoldBackgroundColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const FlorapriseBrand(
-                  iconSize: 24,
-                  wordmarkHeight: 19,
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0x1F2E7D32),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'Pro Cloud',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF2E7D32),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                BusinessIdentity(
-                  name: _shopName,
-                  subtitle: _businessSubtitle,
-                  logoPath: _logoPath,
-                  logoSize: 36,
-                  nameFontSize: 13,
-                ),
-              ],
-            ),
-          ),
+          _buildBrandAndShopHeader(context),
           const Divider(height: 1, thickness: 1),
           Expanded(
             child: Scrollbar(
@@ -893,8 +1014,322 @@ class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
               ),
             ),
           ),
+          _buildAccountFooter(context),
         ],
       ),
+    );
+  }
+
+  Widget _buildBrandAndShopHeader(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFF4F9F5),
+            Color(0xFFEBF5EE),
+          ],
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const FlorapriseBrand(
+                iconSize: 32,
+                wordmarkHeight: 22,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 7,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0x1F2E7D32),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: const Color(0x332E7D32),
+                    width: 0.8,
+                  ),
+                ),
+                child: const Text(
+                  'Pro Cloud',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF2E7D32),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildShopIdentityCard(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShopIdentityCard(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final displayName =
+        _shopName.trim().isEmpty ? 'Business' : _shopName.trim();
+    final displaySubtitle = _visibleSubtitle(_businessSubtitle);
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 1.5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                width: 0.8,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: buildBusinessLogo(_logoPath, size: 36),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  displayName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                if (displaySubtitle.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    displaySubtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountFooter(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    AuthProvider? authProvider;
+    try {
+      authProvider = Provider.of<AuthProvider?>(context, listen: false);
+    } catch (_) {}
+
+    final bootstrap = authProvider?.bootstrap;
+    final user = bootstrap != null && bootstrap['user'] is Map
+        ? bootstrap['user'] as Map<String, dynamic>
+        : null;
+
+    String? userName;
+    if (user != null) {
+      final rawName = (user['name'] ??
+              user['ownerName'] ??
+              user['fullName'] ??
+              user['shopName'] ??
+              '')
+          .toString()
+          .trim();
+      if (rawName.isNotEmpty) {
+        userName = rawName;
+      } else {
+        final email = (user['email'] ?? user['mobile'] ?? '').toString().trim();
+        if (email.isNotEmpty) {
+          userName = email;
+        }
+      }
+    }
+
+    String? lastLoginStr;
+    if (user != null) {
+      final rawTime = (user['lastLoginAt'] ??
+              user['lastLoginUtc'] ??
+              user['lastLogin'] ??
+              '')
+          .toString()
+          .trim();
+      if (rawTime.isNotEmpty) {
+        final dt = DateTime.tryParse(rawTime)?.toLocal();
+        if (dt != null) {
+          lastLoginStr = 'Last: ${dt.day}/${dt.month}/${dt.year}';
+        }
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(
+          top: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  userName ??
+                      (_shopName.isNotEmpty ? _shopName : 'Active Session'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF2E7D32),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        lastLoginStr ?? 'Cloud Connected',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Tooltip(
+            message: 'Logout',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => _handleLogout(context),
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant
+                          .withValues(alpha: 0.4),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.logout_rounded,
+                    size: 16,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Confirm Logout'),
+        content: const Text('Do you want to logout from this device?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+
+    try {
+      final auth = Provider.of<AuthProvider?>(context, listen: false);
+      if (auth != null) {
+        await auth.logout();
+      }
+    } catch (_) {}
+
+    if (!context.mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => const BusinessRegistrationScreen(),
+      ),
+      (route) => false,
     );
   }
 
@@ -903,13 +1338,34 @@ class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
     required WorkspaceDestination destination,
     required dynamic summary,
   }) {
+    if (destination.hasChildren) {
+      return _buildExpandableDestinationTile(
+        context: context,
+        destination: destination,
+        summary: summary,
+      );
+    }
+    return _buildSingleDestinationTile(
+      context: context,
+      destination: destination,
+      summary: summary,
+    );
+  }
+
+  Widget _buildSingleDestinationTile({
+    required BuildContext context,
+    required WorkspaceDestination destination,
+    required dynamic summary,
+    bool isChild = false,
+  }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isHome = destination.route == '/dashboard';
     final isSelected = isHome
-      ? widget.currentRoute == '/dashboard'
-      : (widget.currentRoute == destination.route ||
-        widget.currentRoute.startsWith('${destination.route}/'));
+        ? widget.currentRoute == '/dashboard'
+        : (widget.currentRoute == destination.route ||
+            (!isChild &&
+                widget.currentRoute.startsWith('${destination.route}/')));
 
     final iconData = (isSelected && destination.selectedIcon != null)
         ? destination.selectedIcon!
@@ -921,7 +1377,11 @@ class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
       message: label,
       waitDuration: const Duration(milliseconds: 500),
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 1.5),
+        margin: EdgeInsets.only(
+          left: isChild ? 14 : 0,
+          top: 1.5,
+          bottom: 1.5,
+        ),
         decoration: BoxDecoration(
           color: isSelected
               ? colorScheme.primaryContainer.withValues(alpha: 0.6)
@@ -934,12 +1394,15 @@ class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
             borderRadius: BorderRadius.circular(8),
             onTap: () => widget.onDestinationSelected(destination),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              padding: EdgeInsets.symmetric(
+                horizontal: isChild ? 8 : 10,
+                vertical: isChild ? 6 : 7,
+              ),
               child: Row(
                 children: [
                   Icon(
                     iconData,
-                    size: 20,
+                    size: isChild ? 17 : 20,
                     color: isSelected
                         ? colorScheme.primary
                         : colorScheme.onSurfaceVariant,
@@ -949,9 +1412,9 @@ class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
                     child: Text(
                       label,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: isChild ? 13 : 13.5,
                         fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
                         color: isSelected
                             ? colorScheme.primary
                             : colorScheme.onSurface,
@@ -987,6 +1450,139 @@ class _DesktopNavigationSidebarState extends State<_DesktopNavigationSidebar> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildExpandableDestinationTile({
+    required BuildContext context,
+    required WorkspaceDestination destination,
+    required dynamic summary,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isExpanded = _expandedItemIds.contains(destination.id);
+    final isParentSelected = widget.currentRoute == destination.route;
+
+    final iconData = (isParentSelected && destination.selectedIcon != null)
+        ? destination.selectedIcon!
+        : destination.icon;
+    final label = destination.getLabel(context);
+    final badgeCount = summary != null ? destination.getBadge(summary) : 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Tooltip(
+          message: label,
+          waitDuration: const Duration(milliseconds: 500),
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 1.5),
+            decoration: BoxDecoration(
+              color: isParentSelected
+                  ? colorScheme.primaryContainer.withValues(alpha: 0.6)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () {
+                  setState(() {
+                    if (isExpanded) {
+                      _expandedItemIds.remove(destination.id);
+                    } else {
+                      _expandedItemIds.add(destination.id);
+                    }
+                  });
+                  if (widget.currentRoute != destination.route) {
+                    widget.onDestinationSelected(destination);
+                  }
+                },
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  child: Row(
+                    children: [
+                      Icon(
+                        iconData,
+                        size: 20,
+                        color: isParentSelected
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: isParentSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: isParentSelected
+                                ? colorScheme.primary
+                                : colorScheme.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (badgeCount > 0 && !isExpanded)
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isParentSelected
+                                ? colorScheme.primary
+                                : colorScheme.error,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            badgeCount > 99 ? '99+' : '$badgeCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      Icon(
+                        isExpanded
+                            ? Icons.keyboard_arrow_down_rounded
+                            : Icons.keyboard_arrow_right_rounded,
+                        size: 18,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (isExpanded)
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final child in destination.children)
+                  _buildSingleDestinationTile(
+                    context: context,
+                    destination: child,
+                    summary: summary,
+                    isChild: true,
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -29,9 +29,11 @@ import '../providers/printer_provider.dart';
 import '../providers/storage_mode_provider.dart';
 import '../providers/customer_provider.dart';
 import '../providers/walk_in_session_provider.dart';
+import '../widgets/customer_name_autocomplete.dart';
 import '../widgets/customer_search_sheet.dart';
 import '../services/discount_service.dart';
 import '../services/mobile_auth_service.dart';
+import '../services/pdf/pdf_document_service.dart';
 import '../services/product_cloud_syncability_service.dart';
 import '../services/reward_summary_formatter.dart';
 import '../services/speech_recognition_service.dart';
@@ -46,6 +48,7 @@ import '../widgets/line_item_discount_dialog.dart';
 import '../widgets/product_picker_sheet.dart';
 import '../widgets/quantity_input_stepper.dart';
 import '../widgets/reward_summary_card.dart';
+import '../widgets/safe_platform_image.dart';
 import '../widgets/voice_dictation_field_header.dart';
 import 'my_designs_screen.dart';
 
@@ -134,7 +137,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   TimeOfDay? _customDeliveryTime;
   _CustomerInfo? _customerInfo;
   bool _senderSameAsCustomer = true;
-  bool _gstRegistered = true;
+  bool _gstRegistered = false;
   FiscalProfile _fiscalProfile = CountryPresets.india();
   int _defaultDeliveryChargePaise = 0;
   int _minimumPreparationBufferMinutes = 60;
@@ -197,8 +200,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       if (!mounted) return;
 
       setState(() {
-        _gstRegistered = settings.gstRegistered;
         _fiscalProfile = settings.resolvedFiscalProfile;
+        _gstRegistered = _fiscalProfile.taxEnabled;
         _defaultDeliveryChargePaise = settings.defaultDeliveryChargePaise;
         _minimumPreparationBufferMinutes =
             settings.minimumPreparationBufferMinutes;
@@ -264,6 +267,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         (product) => WalkInLineItem(
           productId: product.productId,
           cloudProductId: product.cloudProductId,
+          designRef: product.attachmentPath,
           description: product.designId,
           quantity: product.quantity,
           unitPricePaise: _parseCurrencyToPaise(product.price),
@@ -295,6 +299,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           activeSession.lines.map(
             (line) => _ProductItem(
               productId: line.productId,
+              cloudProductId: line.cloudProductId,
               trackInventory: line.productId != null,
               designId: line.description,
               quantity: line.quantity,
@@ -311,6 +316,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               gstPercent: line.gstPercent,
               gstCalculationType: line.gstCalculationType,
               source: line.source,
+              attachmentPath: line.designRef,
             ),
           ),
         );
@@ -474,6 +480,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.unsavedChangesTitle),
+        actionsOverflowButtonSpacing: 8,
         actions: [
           TextButton(
             onPressed: () =>
@@ -538,29 +545,18 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                           product.attachmentPath!.isNotEmpty) ...[
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: kIsWeb
-                              ? Container(
-                                  width: 52,
-                                  height: 52,
-                                  color: Colors.grey.shade200,
-                                  alignment: Alignment.center,
-                                  child: const Icon(Icons.image),
-                                )
-                              : Image.file(
-                                  File(product.attachmentPath!),
-                                  width: 52,
-                                  height: 52,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      width: 52,
-                                      height: 52,
-                                      color: Colors.grey.shade200,
-                                      alignment: Alignment.center,
-                                      child: const Icon(Icons.image_not_supported),
-                                    );
-                                  },
-                                ),
+                          child: SizedBox(
+                            width: 52,
+                            height: 52,
+                            child: SafePlatformImageView(
+                              imagePath: product.attachmentPath,
+                              width: 52,
+                              height: 52,
+                              fit: BoxFit.cover,
+                              fallbackIcon: Icons.image_outlined,
+                              errorIcon: Icons.image_not_supported_outlined,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 10),
                       ],
@@ -972,18 +968,22 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              TextField(
+              CustomerNameAutocomplete(
                 controller: _customerNameController,
-                decoration: InputDecoration(
-                  labelText: l10n.name,
-                  prefixIcon: const Icon(Icons.person),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                ),
+                labelText: l10n.name,
                 onChanged: (_) => _syncSenderFromCustomerIfNeeded(),
+                onCustomerSelected: (customer) {
+                  setState(() {
+                    _customerNameController.text = customer.name;
+                    if (customer.phone.isNotEmpty) {
+                      _customerPhoneController.text = customer.phone;
+                    }
+                  });
+                  _syncSenderFromCustomerIfNeeded();
+                  if (customer.phone.isNotEmpty) {
+                    _lookupCustomer(customer.phone);
+                  }
+                },
               ),
               const SizedBox(height: 8),
               TextField(
@@ -1675,10 +1675,16 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     );
     if (image == null || !mounted) return;
 
+    String attachmentPath = image.path;
+    if (kIsWeb) {
+      final bytes = await image.readAsBytes();
+      attachmentPath = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    }
+
     await _showBillItemDialog(
       source: 'camera',
       initialDescription: 'Camera: ${p.basename(image.path)}',
-      attachmentPath: image.path,
+      attachmentPath: attachmentPath,
       showPreview: true,
       showSaveAsDesign: true,
     );
@@ -1692,10 +1698,16 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     );
     if (image == null || !mounted) return;
 
+    String attachmentPath = image.path;
+    if (kIsWeb) {
+      final bytes = await image.readAsBytes();
+      attachmentPath = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    }
+
     await _showBillItemDialog(
       source: 'gallery',
       initialDescription: 'Gallery: ${p.basename(image.path)}',
-      attachmentPath: image.path,
+      attachmentPath: attachmentPath,
       showPreview: true,
       showSaveAsDesign: true,
     );
@@ -1708,19 +1720,39 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         builder: (context) => const MyDesignsScreen(isSelectionMode: true),
       ),
     );
-    if (selected == null || !mounted) return;
+    if (selected == null || !mounted || !context.mounted) return;
 
     final description = selected.description.trim().isNotEmpty
         ? selected.description.trim()
         : selected.designId.trim();
 
-    await _showBillItemDialog(
-      source: 'design',
-      initialDescription: description,
-      initialAmount: selected.price,
-      attachmentPath: selected.imagePath,
-      note: selected.description,
-      showPreview: selected.imagePath != null,
+    final pricePaise =
+        selected.pricePaise ?? _parseCurrencyToPaise(selected.price);
+
+    setState(() {
+      _products.add(
+        _ProductItem(
+          productId: null,
+          cloudProductId: null,
+          trackInventory: false,
+          designId: description,
+          quantity: 1,
+          price: _formatPaise(context, pricePaise),
+          gstPercent: _fiscalProfile.taxEnabled
+              ? _fiscalProfile.taxRatePercent.round()
+              : 0,
+          gstCalculationType: _fiscalProfile.taxInclusive
+              ? GstCalculationType.inclusive
+              : GstCalculationType.exclusive,
+          source: 'design',
+          attachmentPath: selected.imagePath,
+          note: selected.description,
+        ),
+      );
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context)!.addedToCart)),
     );
   }
 
@@ -1767,28 +1799,18 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                       const SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: kIsWeb
-                            ? Container(
-                                height: 140,
-                                width: double.infinity,
-                                color: Colors.grey.shade200,
-                                alignment: Alignment.center,
-                                child: const Icon(Icons.image, size: 48),
-                              )
-                            : Image.file(
-                                File(attachmentPath),
-                                height: 140,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    height: 140,
-                                    color: Colors.grey.shade200,
-                                    alignment: Alignment.center,
-                                    child: const Text('Preview not available'),
-                                  );
-                                },
-                              ),
+                        child: SizedBox(
+                          height: 140,
+                          width: double.infinity,
+                          child: SafePlatformImageView(
+                            imagePath: attachmentPath,
+                            height: 140,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            fallbackIcon: Icons.image_outlined,
+                            errorIcon: Icons.image_not_supported_outlined,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -2407,6 +2429,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             );
           },
         ),
+        actionsOverflowButtonSpacing: 8,
         actions: [
           TextButton.icon(
             onPressed: () {
@@ -2422,6 +2445,20 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             },
             icon: const Icon(Icons.print),
             label: const Text('Print Delivery Challan'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await _downloadDeliverySlipPdf(context, orderId);
+            },
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            label: const Text('Delivery Slip PDF'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await _downloadBillPdf(context, orderId);
+            },
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text('Bill PDF'),
           ),
           OutlinedButton.icon(
             onPressed: () async {
@@ -2494,6 +2531,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Draft Saved Successfully'),
+        actionsOverflowButtonSpacing: 8,
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -2596,6 +2634,36 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     return (parsed * 100).round();
   }
 
+  int _paidAmountPaiseFromPayments(List<PaymentSplit> payments) {
+    return payments
+        .where((payment) => !payment.isCreditOutstanding)
+        .fold<int>(0, (sum, payment) => sum + payment.amountPaise);
+  }
+
+  String _displayPaymentMethodLabel(PaymentSplit payment) {
+    return switch (payment.method) {
+      PaymentMethod.cash => 'Cash',
+      PaymentMethod.upi => 'UPI',
+      PaymentMethod.card => 'Card',
+      PaymentMethod.bank => 'Bank',
+      PaymentMethod.other => 'Other',
+    };
+  }
+
+  int get _billDiscountPaise {
+    if (_billDiscountType == null || _billDiscountValue == null) return 0;
+    return DiscountService.calculateBillDiscount(
+      subtotalPaise: _subtotalPaise,
+      discountType: _billDiscountType!,
+      discountValue: _billDiscountValue!,
+    );
+  }
+
+  int get _deliveryFeePaise {
+    final chargeRupees = int.tryParse(_deliveryChargeController.text.trim()) ?? 0;
+    return chargeRupees * 100;
+  }
+
   String _formatPaise(BuildContext context, int paise) {
     return LocaleFormatter.formatCurrency(context, paise);
   }
@@ -2636,6 +2704,72 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                   : 'Delivery challan queued for printing.'),
         ),
       ),
+    );
+  }
+
+  Future<void> _downloadDeliverySlipPdf(BuildContext context, int orderId) async {
+    final payload = {
+      'orderNo': orderId.toString(),
+      'deliveryTime': _resolveScheduledAt()?.toIso8601String() ?? '',
+      'recipientName': _recipientNameController.text.trim(),
+      'recipientPhone': _recipientPhoneController.text.trim(),
+      'senderName': _senderNameController.text.trim(),
+      'senderPhone': _senderPhoneController.text.trim(),
+      'address': _addressController.text.trim(),
+      'landmark': _landmarkController.text.trim(),
+      'pinCode': _pinCodeController.text.trim(),
+      'deliveryInstructions': _specialInstructionsController.text.trim(),
+      'messageCardIncluded': _cardMessageController.text.trim().isNotEmpty,
+      'items': _printItems(),
+    };
+    await PdfDocumentService().downloadOrShareDeliverySlipPdfFromPayload(
+      context: context,
+      payload: payload,
+    );
+  }
+
+  Future<void> _downloadBillPdf(BuildContext context, int orderId) async {
+    if (_products.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add at least one product.')),
+      );
+      return;
+    }
+
+    final payments = _buildPayments(_totalAmountPaise);
+    final paidPaise = _paidAmountPaiseFromPayments(payments);
+    final outstandingPaise =
+        (_totalAmountPaise - paidPaise).clamp(0, _totalAmountPaise);
+    final payload = {
+      'invoiceNumber': orderId.toString(),
+      'dateTime': DateTime.now().toString().split('.').first,
+      'customerName': _customerNameController.text.trim(),
+      'customerPhone': _customerPhoneController.text.trim(),
+      'items': _printItems(),
+      'basicAmountPaise': _subtotalPaise,
+      'discountPaise': _billDiscountPaise,
+      'deliveryChargePaise': _deliveryFeePaise,
+      'gstPaise': _gstAmountPaise,
+      'taxLabel': '${_fiscalProfile.taxLabel} Amount',
+      'roundOffPaise': _orderTotals.roundOffPaise,
+      'grandTotalPaise': _totalAmountPaise,
+      'paymentMode': _selectedPayment ?? 'Pending',
+      'paymentSummary': payments
+          .map(
+            (payment) => {
+              'method': _displayPaymentMethodLabel(payment),
+              'amountPaise': payment.amountPaise,
+              'isCredit': payment.isCreditOutstanding,
+            },
+          )
+          .toList(growable: false),
+      'paidPaise': paidPaise,
+      'outstandingPaise': outstandingPaise,
+    };
+
+    await PdfDocumentService().downloadOrShareBillPdfFromPayload(
+      context: context,
+      payload: payload,
     );
   }
 

@@ -22,6 +22,7 @@ public class FloralRecipeDto
     public decimal? LaborCost { get; set; }
     public List<RecipeComponentDto> Components { get; set; } = new();
     public List<string>? SampleImages { get; set; }
+    public Guid? SourceLibraryRecipeId { get; set; }
     public bool IsActive { get; set; }
     public string CreatedAt { get; set; } = default!;
     public string UpdatedAt { get; set; } = default!;

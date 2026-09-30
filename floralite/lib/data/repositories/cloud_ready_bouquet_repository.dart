@@ -32,6 +32,8 @@ class CloudReadyBouquetRepository {
       case 'expired':
         return ReadyBouquetStatus.expired;
       case 'fresh':
+      case 'active':
+      case 'available':
       default:
         return ReadyBouquetStatus.fresh;
     }
@@ -42,24 +44,24 @@ class CloudReadyBouquetRepository {
         item['batch'] is Map<String, dynamic> ? item['batch'] as Map<String, dynamic> : item;
 
     final idStr = (b['id'] ?? b['Id'])?.toString() ?? '';
-    final fpIdStr = (b['finishedProductId'] ?? b['FinishedProductId'])?.toString() ?? '';
+    final fpIdStr = (b['finishedProductId'] ?? b['FinishedProductId'] ?? b['recipeId'] ?? b['RecipeId'])?.toString() ?? '';
     final recipeIdStr = (b['recipeId'] ?? b['RecipeId'])?.toString();
     final prodIdStr = (b['productionId'] ?? b['ProductionId'])?.toString();
 
-    final pName = (b['productName'] ?? b['ProductName'])?.toString() ?? 'Bouquet';
+    final pName = (b['recipeName'] ?? b['RecipeName'] ?? b['productName'] ?? b['ProductName'])?.toString() ?? 'Bouquet';
     final unit = (b['unit'] ?? b['Unit'])?.toString() ?? 'Piece';
 
-    final initQty = (b['initialQuantity'] ?? b['InitialQuantity'] ?? 0) as int;
-    final remQty = (b['remainingQuantity'] ?? b['RemainingQuantity'] ?? 0) as int;
+    final initQty = (b['quantityProduced'] ?? b['QuantityProduced'] ?? b['initialQuantity'] ?? b['InitialQuantity'] ?? 0) as int;
+    final remQty = (b['quantityAvailable'] ?? b['QuantityAvailable'] ?? b['remainingQuantity'] ?? b['RemainingQuantity'] ?? 0) as int;
     final shelfLife = (b['shelfLifeDays'] ?? b['ShelfLifeDays'] ?? 3) as int;
     final refreshDays = (b['refreshAfterDays'] ?? b['RefreshAfterDays'] ?? 2) as int;
 
     final prodStr = (b['producedAt'] ?? b['ProducedAt'])?.toString() ?? '';
     final refStr = (b['lastRefreshAt'] ?? b['LastRefreshAt'])?.toString();
-    final expStr = (b['expiryAt'] ?? b['ExpiryAt'])?.toString() ?? '';
+    final expStr = (b['expectedExpiry'] ?? b['ExpectedExpiry'] ?? b['expiryAt'] ?? b['ExpiryAt'])?.toString() ?? '';
 
-    final loc = (b['location'] ?? b['Location'])?.toString() ?? 'Store';
-    final note = (b['note'] ?? b['Note'])?.toString();
+    final loc = (b['locationName'] ?? b['LocationName'] ?? b['location'] ?? b['Location'])?.toString() ?? 'Store';
+    final note = (b['batchCode'] ?? b['BatchCode'] ?? b['note'] ?? b['Note'])?.toString();
 
     final statusStr = (item['computedStatus'] ?? b['status'] ?? b['Status'])?.toString();
     final status = _parseStatus(statusStr);
@@ -112,44 +114,76 @@ class CloudReadyBouquetRepository {
   }
 
   Future<List<ReadyBouquetBatch>> listAllBatches({bool attentionOnly = false}) async {
-    final uri = Uri.parse('${_auth.baseUrl}/api/ready-bouquets').replace(
-      queryParameters: attentionOnly ? {'attentionOnly': 'true'} : null,
-    );
+    final finishedBatchesFuture = () async {
+      try {
+        final uri = Uri.parse('${_auth.baseUrl}/api/production/finished-goods');
+        final response = await _request('GET', uri);
+        if (response is List) {
+          return response.whereType<Map<String, dynamic>>().map(_parseBatch).toList();
+        }
+      } catch (_) {}
+      return <ReadyBouquetBatch>[];
+    }();
 
-    final response = await _request('GET', uri);
-    if (response is! List) return const [];
+    final readyBouquetsFuture = () async {
+      try {
+        final uri = Uri.parse('${_auth.baseUrl}/api/ready-bouquets').replace(
+          queryParameters: attentionOnly ? {'attentionOnly': 'true'} : null,
+        );
+        final response = await _request('GET', uri);
+        if (response is List) {
+          return response.whereType<Map<String, dynamic>>().map(_parseBatch).toList();
+        }
+      } catch (_) {}
+      return <ReadyBouquetBatch>[];
+    }();
+
+    final results = await Future.wait([finishedBatchesFuture, readyBouquetsFuture]);
+    final allBatches = <ReadyBouquetBatch>[...results[0], ...results[1]];
+    if (allBatches.isEmpty) return const [];
 
     final productNames = await _getProductNames();
+    final seenIds = <String>{};
+    final deduplicated = <ReadyBouquetBatch>[];
 
-    return response.whereType<Map<String, dynamic>>().map((item) {
-      final batch = _parseBatch(item);
-      final resolvedName = productNames[batch.cloudFinishedProductId] ?? batch.productName;
-      if (resolvedName != batch.productName && resolvedName.isNotEmpty) {
-        return ReadyBouquetBatch(
-          id: batch.id,
-          cloudId: batch.cloudId,
-          finishedProductId: batch.finishedProductId,
-          cloudFinishedProductId: batch.cloudFinishedProductId,
-          productName: resolvedName,
-          unit: batch.unit,
-          recipeId: batch.recipeId,
-          cloudRecipeId: batch.cloudRecipeId,
-          productionId: batch.productionId,
-          cloudProductionId: batch.cloudProductionId,
-          initialQuantity: batch.initialQuantity,
-          remainingQuantity: batch.remainingQuantity,
-          shelfLifeDays: batch.shelfLifeDays,
-          refreshAfterDays: batch.refreshAfterDays,
-          producedAt: batch.producedAt,
-          lastRefreshAt: batch.lastRefreshAt,
-          expiryAt: batch.expiryAt,
-          location: batch.location,
-          status: batch.status,
-          note: batch.note,
-        );
+    for (final batch in allBatches) {
+      final idKey = batch.cloudId?.trim().isNotEmpty == true
+          ? batch.cloudId!.trim()
+          : batch.id.toString();
+      if (seenIds.add(idKey)) {
+        final resolvedName = productNames[batch.cloudFinishedProductId] ?? batch.productName;
+        if (resolvedName != batch.productName && resolvedName.isNotEmpty) {
+          deduplicated.add(
+            ReadyBouquetBatch(
+              id: batch.id,
+              cloudId: batch.cloudId,
+              finishedProductId: batch.finishedProductId,
+              cloudFinishedProductId: batch.cloudFinishedProductId,
+              productName: resolvedName,
+              unit: batch.unit,
+              recipeId: batch.recipeId,
+              cloudRecipeId: batch.cloudRecipeId,
+              productionId: batch.productionId,
+              cloudProductionId: batch.cloudProductionId,
+              initialQuantity: batch.initialQuantity,
+              remainingQuantity: batch.remainingQuantity,
+              shelfLifeDays: batch.shelfLifeDays,
+              refreshAfterDays: batch.refreshAfterDays,
+              producedAt: batch.producedAt,
+              lastRefreshAt: batch.lastRefreshAt,
+              expiryAt: batch.expiryAt,
+              location: batch.location,
+              status: batch.status,
+              note: batch.note,
+            ),
+          );
+        } else {
+          deduplicated.add(batch);
+        }
       }
-      return batch;
-    }).toList();
+    }
+
+    return deduplicated;
   }
 
   Future<List<ReadyBouquetSummary>> listReadyBouquets() async {
@@ -278,14 +312,25 @@ class CloudReadyBouquetRepository {
     return const [];
   }
 
+  static final RegExp _guidRegex = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
+  static bool _isValidGuid(String str) {
+    final trimmed = str.trim();
+    if (_guidRegex.hasMatch(trimmed)) return true;
+    if (trimmed.length == 32 && RegExp(r'^[0-9a-fA-F]{32}$').hasMatch(trimmed)) return true;
+    return false;
+  }
+
   Future<String> _resolveBatchId(dynamic batchId) async {
-    final str = batchId.toString();
-    if (str.contains('-') || str.length >= 32) return str;
+    final str = batchId.toString().trim();
+    if (_isValidGuid(str)) return str;
     try {
       final all = await listAllBatches();
       for (final b in all) {
         if (b.id.toString() == str || b.cloudId == str) {
-          if (b.cloudId != null && b.cloudId!.isNotEmpty) {
+          if (b.cloudId != null && b.cloudId!.isNotEmpty && _isValidGuid(b.cloudId!)) {
             return b.cloudId!;
           }
         }
@@ -295,13 +340,29 @@ class CloudReadyBouquetRepository {
   }
 
   Future<String> _resolveProductId(dynamic productId) async {
-    final str = productId.toString();
-    if (str.contains('-') || str.length >= 32) return str;
+    final str = productId.toString().trim();
+    if (_isValidGuid(str)) return str;
     try {
       final names = await _getProductNames();
       if (names.containsKey(str)) return str;
     } catch (_) {}
     return str;
+  }
+
+  Future<List<Map<String, dynamic>>> getBatchConsumptions(dynamic batchId) async {
+    final cloudId = await _resolveBatchId(batchId);
+    if (!_isValidGuid(cloudId)) return const [];
+    try {
+      final uri = Uri.parse('${_auth.baseUrl}/api/production/finished-goods/$cloudId');
+      final res = await _request('GET', uri);
+      if (res is Map<String, dynamic>) {
+        final consumptions = res['consumptions'] ?? res['Consumptions'];
+        if (consumptions is List) {
+          return consumptions.whereType<Map<String, dynamic>>().toList();
+        }
+      }
+    } catch (_) {}
+    return const [];
   }
 
   Future<void> expireBouquet({
@@ -324,6 +385,7 @@ class CloudReadyBouquetRepository {
     required dynamic batchId,
     required String actionType,
     required dynamic productId,
+    String? productName,
     required int quantity,
     bool returnToInventory = false,
     String? reason,
@@ -331,16 +393,47 @@ class CloudReadyBouquetRepository {
   }) async {
     final idStr = await _resolveBatchId(batchId);
     final pIdStr = await _resolveProductId(productId);
-    final uri = Uri.parse('${_auth.baseUrl}/api/ready-bouquets/$idStr/refresh');
-    final body = {
-      'actionType': actionType,
-      'productId': pIdStr,
-      'quantity': quantity,
-      'returnToInventory': returnToInventory,
-      'reason': reason,
-      'note': note?.trim(),
-    };
-    await _request('POST', uri, body: body);
+
+    var resolvedProductName = productName?.trim();
+    if (resolvedProductName == null || resolvedProductName.isEmpty) {
+      try {
+        final names = await _getProductNames();
+        resolvedProductName = names[pIdStr] ?? 'Component Replacement';
+      } catch (_) {
+        resolvedProductName = 'Component Replacement';
+      }
+    }
+
+    // Try production maintenance endpoint first
+    try {
+      final maintenanceUri = Uri.parse('${_auth.baseUrl}/api/production/maintenance');
+      final maintenanceBody = {
+        'finishedBatchId': idStr,
+        'notes': note?.trim() ?? reason,
+        'replacements': [
+          {
+            'productId': pIdStr,
+            'productName': resolvedProductName,
+            'quantityReplaced': quantity,
+            'reason': reason ?? 'WiltedFlowerReplacement',
+          }
+        ],
+      };
+      await _request('POST', maintenanceUri, body: maintenanceBody);
+      return;
+    } catch (_) {
+      // Fall back to ready-bouquets refresh endpoint
+      final uri = Uri.parse('${_auth.baseUrl}/api/ready-bouquets/$idStr/refresh');
+      final body = {
+        'actionType': actionType,
+        'productId': pIdStr,
+        'quantity': quantity,
+        'returnToInventory': returnToInventory,
+        'reason': reason,
+        'note': note?.trim(),
+      };
+      await _request('POST', uri, body: body);
+    }
   }
 
   Future<ReadyBouquetBatch> createBatch({

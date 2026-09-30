@@ -137,6 +137,23 @@ $_driverLink''');
       expect(uri.queryParameters['text'], contains(_driverLink));
       expect(uri.queryParameters['text'], contains('🚚 DELIVERY ASSIGNMENT'));
     });
+
+    test('builds web fallback URL containing start delivery link', () {
+      final message = deliveryAssignmentMessage(
+        _cloudHeader(),
+        _cloudDetail(),
+        '9876500002',
+        startDeliveryLink: _driverLink,
+      );
+
+      final fallbackUri = WhatsAppPhoneUtils.buildFallbackUri('9876500002', message: message);
+      expect(fallbackUri, isNotNull);
+      expect(fallbackUri!.host, 'api.whatsapp.com');
+      expect(fallbackUri.path, '/send');
+      expect(fallbackUri.queryParameters['phone'], '919876500002');
+      expect(fallbackUri.queryParameters['text'], contains('▶ START DELIVERY'));
+      expect(fallbackUri.queryParameters['text'], contains(_driverLink));
+    });
   });
 }
 

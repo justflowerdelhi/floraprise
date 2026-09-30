@@ -30,7 +30,16 @@ public class FloralRecipe : BaseEntity
     public string? SampleImages { get; private set; }
     public bool IsActive { get; private set; }
 
+    // Library Provenance (reference provenance only, no live coupling)
+    public Guid? SourceLibraryRecipeId { get; private set; }
+
     public List<RecipeComponent> Components { get; private set; } = new();
+
+    public void SetSourceLibraryRecipeId(Guid? sourceLibraryRecipeId)
+    {
+        SourceLibraryRecipeId = sourceLibraryRecipeId;
+        MarkUpdated();
+    }
 
     public void Update(string name, string? category, decimal sellingPrice, decimal laborCost, string? sampleImages)
     {

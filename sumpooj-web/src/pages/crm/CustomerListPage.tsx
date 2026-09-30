@@ -175,6 +175,36 @@ function FilterPanel({ filters, onFilterChange, onClear }: FilterPanelProps) {
           </Stack>
         </Grid>
 
+        {/* Purchased Category Filter */}
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Typography variant="caption" sx={{ opacity: 0.7, mb: 1, display: 'block' }}>
+            Purchased Category
+          </Typography>
+          <Stack direction="row" flexWrap="wrap" gap={0.5}>
+            {['Flowers', 'Gifts', 'Cakes', 'Bakery', 'Stationery', 'Plants', 'Other'].map((cat) => {
+              return (
+                <Chip
+                  key={cat}
+                  label={cat}
+                  size="small"
+                  onClick={() => {
+                    const currentCats = filters.purchasedCategories || [];
+                    const newCats = currentCats.includes(cat)
+                      ? currentCats.filter((c) => c !== cat)
+                      : [...currentCats, cat];
+                    onFilterChange({ ...filters, purchasedCategories: newCats });
+                  }}
+                  sx={{
+                    bgcolor: filters.purchasedCategories?.includes(cat) ? 'rgba(33, 150, 243, 0.2)' : 'transparent',
+                    color: filters.purchasedCategories?.includes(cat) ? '#2196f3' : 'inherit',
+                    border: `1px solid ${filters.purchasedCategories?.includes(cat) ? '#2196f3' : 'rgba(255,255,255,0.2)'}`,
+                  }}
+                />
+              );
+            })}
+          </Stack>
+        </Grid>
+
         {/* Quick Filters */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Typography variant="caption" sx={{ opacity: 0.7, mb: 1, display: 'block' }}>
@@ -565,7 +595,11 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
       setLoading(true);
       setError(null);
       try {
-        const result = await getCrmCustomers({ page: 1, pageSize: 500 });
+        const result = await getCrmCustomers({
+          page: 1,
+          pageSize: 500,
+          purchasedCategories: filters.purchasedCategories
+        });
         if (active) {
           setCustomers(result.items);
         }
@@ -586,7 +620,7 @@ export default function CustomerListPage({ onViewCustomer }: CustomerListPagePro
     return () => {
       active = false;
     };
-  }, []);
+  }, [filters.purchasedCategories]);
 
   // Filter customers
   const filteredCustomers = useMemo(() => {

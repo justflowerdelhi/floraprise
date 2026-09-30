@@ -71,11 +71,19 @@ class DesignRecord {
   }
 
   factory DesignRecord.fromMap(Map<String, Object?> row) {
+    final imageRef = (row['image_path'] ??
+            row['imagePath'] ??
+            row['imageReference'] ??
+            row['image_url'] ??
+            row['imageUrl'] ??
+            row['design_ref'] ??
+            row['designRef'])
+        ?.toString();
     return DesignRecord(
       id: row['id'] as int,
-      bouquetId: row['bouquet_id'] as String,
-      imagePath: row['image_path'] as String?,
-      description: row['description'] as String,
+      bouquetId: (row['bouquet_id'] ?? row['bouquetId'] ?? '') as String,
+      imagePath: imageRef?.trim().isNotEmpty == true ? imageRef!.trim() : null,
+      description: (row['description'] ?? '') as String,
       sellingPricePaise: row['selling_price_paise'] as int?,
       flowers: row['flowers'] as String?,
       occasion: row['occasion'] as String?,
@@ -84,21 +92,40 @@ class DesignRecord {
       notes: row['notes'] as String?,
       status: (row['status'] as String?) ?? 'needs_review',
       isFavorite: (row['is_favorite'] as int? ?? 0) == 1,
-      createdAt: row['created_at'] as String,
-      updatedAt: row['updated_at'] as String,
+      createdAt: (row['created_at'] ?? '') as String,
+      updatedAt: (row['updated_at'] ?? '') as String,
     );
   }
 
   factory DesignRecord.fromCloudJson(Map<String, dynamic> json) {
     final guid = (json['id'] ?? json['Id'])?.toString() ?? '';
     final idInt = int.tryParse(guid) ?? guid.hashCode;
+    final imageRef = (json['imageReference'] ??
+            json['ImageReference'] ??
+            json['imageUrl'] ??
+            json['ImageUrl'] ??
+            json['image_url'] ??
+            json['imagePath'] ??
+            json['ImagePath'] ??
+            json['referenceImageUrl'] ??
+            json['ReferenceImageUrl'] ??
+            json['photoUrl'] ??
+            json['PhotoUrl'] ??
+            json['designRef'] ??
+            json['design_ref'])
+        ?.toString();
+    final rawSellingPrice =
+        json['sellingPricePaise'] ?? json['SellingPricePaise'];
+    final sellingPricePaise =
+        rawSellingPrice is num ? rawSellingPrice.toInt() : null;
+
     return DesignRecord(
       id: idInt,
       cloudId: guid,
-      bouquetId: (json['bouquetId'] ?? json['BouquetId'])?.toString() ?? '',
-      imagePath: (json['imageReference'] ?? json['ImageReference'])?.toString(),
+      bouquetId: (json['bouquetId'] ?? json['BouquetId'] ?? json['bouquet_id'])?.toString() ?? '',
+      imagePath: imageRef?.trim().isNotEmpty == true ? imageRef!.trim() : null,
       description: (json['description'] ?? json['Description'])?.toString() ?? '',
-      sellingPricePaise: json['sellingPricePaise'] ?? json['SellingPricePaise'] as int?,
+      sellingPricePaise: sellingPricePaise,
       flowers: (json['flowers'] ?? json['Flowers'])?.toString(),
       occasion: (json['occasion'] ?? json['Occasion'])?.toString(),
       color: (json['color'] ?? json['Color'])?.toString(),

@@ -22,9 +22,11 @@ public class DemoRequestService
 
     public async Task SubmitAsync(DemoRequestDto dto)
     {
+        var phone = dto.ResolvedPhone;
         var demoRequest = new DemoRequest(
             dto.FullName,
             dto.BusinessEmail,
+            phone,
             dto.BusinessType,
             dto.CurrentSoftware,
             dto.Notes);
@@ -32,8 +34,8 @@ public class DemoRequestService
         await _repo.AddAsync(demoRequest);
 
         _logger.LogInformation(
-            "New demo request saved — {FullName} ({Email})",
-            dto.FullName, dto.BusinessEmail);
+            "New demo request saved — {FullName} ({Email}, {Phone})",
+            dto.FullName, dto.BusinessEmail, phone);
 
         var submittedAt = dto.SubmittedAt ?? DateTime.UtcNow;
 
@@ -43,6 +45,7 @@ public class DemoRequestService
             await _notificationService.NotifyNewDemoRequestAsync(
                 dto.FullName,
                 dto.BusinessEmail,
+                phone,
                 dto.BusinessType,
                 dto.CurrentSoftware,
                 dto.Notes,

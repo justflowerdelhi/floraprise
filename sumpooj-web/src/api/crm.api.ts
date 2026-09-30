@@ -21,13 +21,18 @@ export interface CrmCustomer360Response {
   loyaltyTransactions: LoyaltyTransaction[];
 }
 
-export async function getCrmCustomers(params?: { query?: string; page?: number; pageSize?: number }) {
-  const response = await api.get<PagedResult<Customer>>('/crm/customers', {
-    params: {
+export async function getCrmCustomers(params?: { query?: string; purchasedCategories?: string[]; page?: number; pageSize?: number }) {
+  const qParams: any = {
       query: params?.query,
       page: params?.page ?? 1,
       pageSize: params?.pageSize ?? 500,
-    },
+  };
+  if (params?.purchasedCategories && params.purchasedCategories.length > 0) {
+      qParams.PurchasedCategories = params.purchasedCategories;
+  }
+
+  const response = await api.get<PagedResult<Customer>>('/crm/customers', {
+    params: qParams,
   });
 
   return response.data;

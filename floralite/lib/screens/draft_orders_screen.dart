@@ -5,6 +5,7 @@ import '../models/walk_in_enums.dart';
 import '../models/walk_in_session.dart';
 import '../utils/locale_formatter.dart';
 import 'delivery_screen.dart';
+import 'event_sale_screen.dart';
 import 'pickup_later_screen.dart';
 import 'take_away_screen.dart';
 
@@ -170,6 +171,7 @@ class _DraftOrdersScreenState extends State<DraftOrdersScreen> {
       FulfilmentType.pickupLater => PickupLaterScreen(initialSession: session),
       FulfilmentType.delivery => DeliveryScreen(initialSession: session),
       FulfilmentType.takeAway => TakeAwayScreen(initialSession: session),
+      FulfilmentType.eventSale => EventSaleScreen(initialSession: session),
     };
   }
 
@@ -329,6 +331,7 @@ class _DraftOrderCard extends StatelessWidget {
       FulfilmentType.takeAway => 'Walk-in Sale',
       FulfilmentType.pickupLater => 'Pickup Later',
       FulfilmentType.delivery => 'Delivery',
+      FulfilmentType.eventSale => 'Event / Decoration Sale',
     };
   }
 

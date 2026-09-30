@@ -12,13 +12,19 @@ class CustomerManager {
 
   CustomerRepository get customerRepository => _customerRepository;
 
-  String normalizePhone(String raw) {
+  static String normalizeDigits(String raw) {
     final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.length >= 10) {
       return digits.substring(digits.length - 10);
     }
     return digits;
   }
+
+  static bool isValidPhone(String raw) {
+    return normalizeDigits(raw).length == 10;
+  }
+
+  String normalizePhone(String raw) => normalizeDigits(raw);
 
   Future<CustomerRecord?> lookupByPhone(String phone) async {
     final normalized = normalizePhone(phone);
@@ -88,7 +94,14 @@ class CustomerManager {
     return _customerRepository.getAll();
   }
 
-  Future<List<CustomerRecord>> searchCustomers(String query) async {
+  Future<List<CustomerRecord>> searchCustomers(
+    String query, {
+    bool isCloud = false,
+  }) async {
+    final cloudLookup = _cloudLookup;
+    if (cloudLookup != null) {
+      return cloudLookup.search(query, isCloud: isCloud);
+    }
     return _customerRepository.search(query);
   }
 

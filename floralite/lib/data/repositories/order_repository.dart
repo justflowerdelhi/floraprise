@@ -38,6 +38,42 @@ class OrderTotals {
   });
 }
 
+class SalesBreakdown {
+  final int totalOrders;
+  final int grossSalesPaise;
+  final int cashSalesPaise;
+  final int upiSalesPaise;
+  final int cardSalesPaise;
+  final int bankTransferSalesPaise;
+  final int otherSalesPaise;
+  final int creditCreatedPaise;
+  final int totalRefundsPaise;
+  final int netSalesPaise;
+  final int cashCollectionsPaise;
+  final int upiCollectionsPaise;
+  final int cardCollectionsPaise;
+  final int otherCollectionsPaise;
+  final int totalCollectionsPaise;
+
+  const SalesBreakdown({
+    required this.totalOrders,
+    required this.grossSalesPaise,
+    required this.cashSalesPaise,
+    required this.upiSalesPaise,
+    required this.cardSalesPaise,
+    this.bankTransferSalesPaise = 0,
+    this.otherSalesPaise = 0,
+    required this.creditCreatedPaise,
+    this.totalRefundsPaise = 0,
+    required this.netSalesPaise,
+    this.cashCollectionsPaise = 0,
+    this.upiCollectionsPaise = 0,
+    this.cardCollectionsPaise = 0,
+    this.otherCollectionsPaise = 0,
+    this.totalCollectionsPaise = 0,
+  });
+}
+
 class ConfirmedOrder {
   final int orderId;
   final List<Map<String, int>> lineProductLinks;
@@ -115,6 +151,24 @@ class CustomerOrderStatistics {
   }
 }
 
+class EventFulfillmentShortage {
+  final int? productId;
+  final String? cloudProductId;
+  final String productName;
+  final int requiredQty;
+  final int availableQty;
+  final int shortageQty;
+
+  const EventFulfillmentShortage({
+    this.productId,
+    this.cloudProductId,
+    required this.productName,
+    required this.requiredQty,
+    required this.availableQty,
+    required this.shortageQty,
+  });
+}
+
 class OrderRepository {
   OrderRepository({
     ProductCloudSyncabilityService? productCloudSyncabilityService,
@@ -145,15 +199,20 @@ class OrderRepository {
         return 'pickup_later';
       case FulfilmentType.delivery:
         return 'delivery';
+      case FulfilmentType.eventSale:
+        return 'event_sale';
     }
   }
 
   FulfilmentType _dbToFulfilment(String value) {
-    switch (value) {
+    switch (value.toLowerCase()) {
       case 'pickup_later':
         return FulfilmentType.pickupLater;
       case 'delivery':
         return FulfilmentType.delivery;
+      case 'event_sale':
+      case 'event':
+        return FulfilmentType.eventSale;
       default:
         return FulfilmentType.takeAway;
     }
@@ -529,6 +588,7 @@ class OrderRepository {
           'order_id': orderId,
           'method': payment.persistenceMethod,
           'amount_paise': payment.amountPaise,
+          'payment_type': 'SaleTender',
           'reference': payment.reference,
           'created_at': now,
         });
@@ -585,6 +645,7 @@ class OrderRepository {
         'orders',
         columns: [
           'status',
+          'fulfilment_type',
           'customer_id',
           'is_paid',
           'grand_total_paise',
@@ -708,18 +769,21 @@ class OrderRepository {
         createdAt: now,
       );
 
+      final isEventSale = order['fulfilment_type'] == 'event_sale';
       final inventoryTransactionIds = <int>[];
-      for (final link in lineProductLinks) {
-        inventoryTransactionIds.add(
-          await inventoryRepository.createConfirmedOrderSaleTransactionInTransaction(
-            transaction: txn,
-            productId: link['productId']!,
-            orderId: orderId,
-            orderLineId: link['orderLineId']!,
-            quantity: link['qty']!,
-            note: 'Walk-in confirmed order deduction',
-          ),
-        );
+      if (!isEventSale) {
+        for (final link in lineProductLinks) {
+          inventoryTransactionIds.add(
+            await inventoryRepository.createConfirmedOrderSaleTransactionInTransaction(
+              transaction: txn,
+              productId: link['productId']!,
+              orderId: orderId,
+              orderLineId: link['orderLineId']!,
+              quantity: link['qty']!,
+              note: 'Walk-in confirmed order deduction',
+            ),
+          );
+        }
       }
 
       if (requireCloudInventory) {
@@ -806,6 +870,16 @@ class OrderRepository {
   }) async {
     final db = await AppDatabase.instance.database;
     return db.transaction<Map<String, dynamic>>((txn) async {
+      final orderRows = await txn.query(
+        'orders',
+        columns: ['fulfilment_type'],
+        where: 'id = ?',
+        whereArgs: [orderId],
+        limit: 1,
+      );
+      final isEventSale = orderRows.isNotEmpty &&
+          orderRows.first['fulfilment_type'] == 'event_sale';
+
       final lineProductLinks = <Map<String, int>>[];
       final cloudProductIdsByLocalProductId = <int, String>{};
       final lines = await txn.query(
@@ -843,15 +917,17 @@ class OrderRepository {
         orderId: orderId,
         clientSyncId: clientSyncId,
         orderNo: orderNo,
-        inventoryRows: lineProductLinks
-            .map((link) => {
-                  'id': link['orderLineId'],
-                  'product_id': link['productId'],
-                  'qty': link['qty'],
-                  'txn_type': 'sale',
-                  'created_at': DateTime.now().toIso8601String(),
-                })
-            .toList(),
+        inventoryRows: isEventSale
+            ? <Map<String, Object?>>[]
+            : lineProductLinks
+                .map((link) => {
+                      'id': link['orderLineId'],
+                      'product_id': link['productId'],
+                      'qty': link['qty'],
+                      'txn_type': 'sale',
+                      'created_at': DateTime.now().toIso8601String(),
+                    })
+                .toList(),
         cloudProductIdsByLocalProductId: cloudProductIdsByLocalProductId,
       );
     });
@@ -915,6 +991,7 @@ class OrderRepository {
         'orders',
         columns: [
           'status',
+          'fulfilment_type',
           'customer_id',
           'is_paid',
           'grand_total_paise',
@@ -1030,15 +1107,18 @@ class OrderRepository {
         createdAt: now,
       );
 
-      for (final link in lineProductLinks) {
-        await inventoryRepository.createConfirmedOrderSaleTransactionInTransaction(
-          transaction: txn,
-          productId: link['productId']!,
-          orderId: orderId,
-          orderLineId: link['orderLineId']!,
-          quantity: link['qty']!,
-          note: 'Cloud-confirmed walk-in deduction',
-        );
+      final isEventSale = order['fulfilment_type'] == 'event_sale';
+      if (!isEventSale) {
+        for (final link in lineProductLinks) {
+          await inventoryRepository.createConfirmedOrderSaleTransactionInTransaction(
+            transaction: txn,
+            productId: link['productId']!,
+            orderId: orderId,
+            orderLineId: link['orderLineId']!,
+            quantity: link['qty']!,
+            note: 'Cloud-confirmed walk-in deduction',
+          );
+        }
       }
 
       return ConfirmedOrder(
@@ -1222,6 +1302,183 @@ class OrderRepository {
     );
   }
 
+  Future<SalesBreakdown> getSalesBreakdown({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    if (kIsWeb) {
+      return const SalesBreakdown(
+        totalOrders: 0,
+        grossSalesPaise: 0,
+        cashSalesPaise: 0,
+        upiSalesPaise: 0,
+        cardSalesPaise: 0,
+        bankTransferSalesPaise: 0,
+        otherSalesPaise: 0,
+        creditCreatedPaise: 0,
+        totalRefundsPaise: 0,
+        netSalesPaise: 0,
+      );
+    }
+
+    final db = await AppDatabase.instance.database;
+    final whereParts = <String>["status NOT IN ('draft', 'cancelled')"];
+    final whereArgs = <Object?>[];
+
+    String? startIso;
+    String? endIso;
+
+    if (startDate != null && endDate != null) {
+      startIso = DateTime(startDate.year, startDate.month, startDate.day).toIso8601String();
+      endIso = DateTime(endDate.year, endDate.month, endDate.day)
+          .add(const Duration(days: 1))
+          .toIso8601String();
+      whereParts.add('created_at >= ? AND created_at < ?');
+      whereArgs.addAll([startIso, endIso]);
+    } else if (startDate != null) {
+      startIso = DateTime(startDate.year, startDate.month, startDate.day).toIso8601String();
+      endIso = DateTime(startDate.year, startDate.month, startDate.day)
+          .add(const Duration(days: 1))
+          .toIso8601String();
+      whereParts.add('created_at >= ? AND created_at < ?');
+      whereArgs.addAll([startIso, endIso]);
+    }
+
+    final whereClause = whereParts.join(' AND ');
+    final orderRows = await db.query(
+      'orders',
+      columns: ['id', 'grand_total_paise'],
+      where: whereClause,
+      whereArgs: whereArgs,
+    );
+
+    int grossSalesPaise = 0;
+    int cashSalesPaise = 0;
+    int upiSalesPaise = 0;
+    int cardSalesPaise = 0;
+    int bankTransferSalesPaise = 0;
+    int otherSalesPaise = 0;
+    int creditCreatedPaise = 0;
+
+    if (orderRows.isNotEmpty) {
+      final orderIds = orderRows.map((r) => r['id'] as int).toList();
+      final placeholders = List.filled(orderIds.length, '?').join(',');
+
+      final paymentRows = await db.rawQuery(
+        '''
+        SELECT order_id, LOWER(COALESCE(method, '')) AS method, amount_paise
+        FROM order_payments
+        WHERE order_id IN ($placeholders)
+          AND LOWER(COALESCE(payment_type, 'saletender')) = 'saletender'
+        ''',
+        orderIds,
+      );
+
+      final paymentsByOrder = <int, List<Map<String, Object?>>>{};
+      for (final p in paymentRows) {
+        final oid = p['order_id'] as int;
+        paymentsByOrder.putIfAbsent(oid, () => []).add(p);
+      }
+
+      for (final order in orderRows) {
+        final oid = order['id'] as int;
+        final grandTotal = (order['grand_total_paise'] as int?) ?? 0;
+        grossSalesPaise += grandTotal;
+
+        final payments = paymentsByOrder[oid] ?? const [];
+        int orderPaidPaise = 0;
+
+        for (final p in payments) {
+          final method = (p['method'] as String?) ?? '';
+          final amount = (p['amount_paise'] as int?) ?? 0;
+          if (amount <= 0) continue;
+
+          if (method == 'cash') {
+            cashSalesPaise += amount;
+            orderPaidPaise += amount;
+          } else if (method == 'upi') {
+            upiSalesPaise += amount;
+            orderPaidPaise += amount;
+          } else if (method == 'card') {
+            cardSalesPaise += amount;
+            orderPaidPaise += amount;
+          } else if (method == 'bank_transfer' || method == 'bank' || method == 'banktransfer') {
+            bankTransferSalesPaise += amount;
+            orderPaidPaise += amount;
+          } else if (method != 'credit') {
+            otherSalesPaise += amount;
+            orderPaidPaise += amount;
+          }
+        }
+
+        final creditForOrder = (grandTotal - orderPaidPaise).clamp(0, grandTotal);
+        creditCreatedPaise += creditForOrder;
+      }
+    }
+
+    int cashCollectionsPaise = 0;
+    int upiCollectionsPaise = 0;
+    int cardCollectionsPaise = 0;
+    int otherCollectionsPaise = 0;
+
+    final collectionWhere = <String>[
+      "LOWER(COALESCE(payment_type, 'saletender')) = 'creditcollection'"
+    ];
+    final collectionArgs = <Object?>[];
+    if (startIso != null && endIso != null) {
+      collectionWhere.add('created_at >= ? AND created_at < ?');
+      collectionArgs.addAll([startIso, endIso]);
+    }
+
+    final collectionRows = await db.rawQuery(
+      '''
+      SELECT LOWER(COALESCE(method, '')) AS method, amount_paise
+      FROM order_payments
+      WHERE ${collectionWhere.join(' AND ')}
+      ''',
+      collectionArgs,
+    );
+
+    for (final c in collectionRows) {
+      final method = (c['method'] as String?) ?? '';
+      final amount = (c['amount_paise'] as int?) ?? 0;
+      if (amount <= 0) continue;
+
+      if (method == 'cash') {
+        cashCollectionsPaise += amount;
+      } else if (method == 'upi') {
+        upiCollectionsPaise += amount;
+      } else if (method == 'card') {
+        cardCollectionsPaise += amount;
+      } else {
+        otherCollectionsPaise += amount;
+      }
+    }
+
+    final totalCollectionsPaise = cashCollectionsPaise +
+        upiCollectionsPaise +
+        cardCollectionsPaise +
+        otherCollectionsPaise;
+
+    return SalesBreakdown(
+      totalOrders: orderRows.length,
+      grossSalesPaise: grossSalesPaise,
+      cashSalesPaise: cashSalesPaise,
+      upiSalesPaise: upiSalesPaise,
+      cardSalesPaise: cardSalesPaise,
+      bankTransferSalesPaise: bankTransferSalesPaise,
+      otherSalesPaise: otherSalesPaise,
+      creditCreatedPaise: creditCreatedPaise,
+      totalRefundsPaise: 0,
+      netSalesPaise: grossSalesPaise,
+      cashCollectionsPaise: cashCollectionsPaise,
+      upiCollectionsPaise: upiCollectionsPaise,
+      cardCollectionsPaise: cardCollectionsPaise,
+      otherCollectionsPaise: otherCollectionsPaise,
+      totalCollectionsPaise: totalCollectionsPaise,
+    );
+  }
+
   Future<List<OrderListItem>> getOrdersForWorkspace({
     required String tab,
     required String searchQuery,
@@ -1293,6 +1550,9 @@ class OrderRepository {
     }
     if (filters.takeAway) {
       whereParts.add("fulfilment_type = 'take_away'");
+    }
+    if (filters.eventSale) {
+      whereParts.add("fulfilment_type = 'event_sale'");
     }
     if (filters.relay) {
       whereParts.add("source IN ('relayIn', 'relayOut')");
@@ -1476,6 +1736,7 @@ class OrderRepository {
           'order_id': orderId,
           'method': payment.persistenceMethod,
           'amount_paise': payment.amountPaise,
+          'payment_type': 'SaleTender',
           'reference': payment.reference,
           'created_at': now,
         });
@@ -1496,6 +1757,7 @@ class OrderRepository {
     final rows = await db.rawQuery(
       '''
       SELECT o.*,
+        c.notes AS customer_notes,
         COALESCE((
           SELECT SUM(op.amount_paise)
           FROM order_payments op
@@ -1514,6 +1776,7 @@ class OrderRepository {
           LIMIT 1
         ) AS delivery_name
       FROM orders o
+      LEFT JOIN customers c ON c.id = o.customer_id
       WHERE o.id = ?
       LIMIT 1
       ''',
@@ -1530,18 +1793,28 @@ class OrderRepository {
       status: (row['status'] as String?) ?? 'draft',
       customerName: (row['customer_name'] as String?) ?? '-',
       customerPhone: (row['customer_phone'] as String?) ?? '-',
+      customerAddress: row['delivery_address'] as String?,
       recipientName: (row['recipient_name'] as String?) ?? '-',
       recipientPhone: (row['recipient_phone'] as String?) ?? '-',
       fulfilmentType: (row['fulfilment_type'] as String?) ?? 'delivery',
       source: (row['source'] as String?) ?? 'walkIn',
       grandTotalPaise: (row['grand_total_paise'] as int?) ?? 0,
+      subtotalPaise: (row['subtotal_paise'] as int?) ?? 0,
+      discountTotalPaise: (row['discount_total_paise'] as int?) ?? 0,
+      gstTotalPaise: (row['gst_total_paise'] as int?) ?? 0,
+      roundOffPaise: (row['round_off_paise'] as int?) ?? 0,
       address: (row['delivery_address'] as String?) ?? '-',
+      createdAt: row['created_at'] == null
+          ? null
+          : DateTime.tryParse(row['created_at'] as String),
       scheduledAt: row['scheduled_at'] == null
           ? null
           : DateTime.tryParse(row['scheduled_at'] as String),
       occasion: (row['occasion'] as String?) ?? '-',
       deliverySlot: (row['delivery_slot'] as String?) ?? '-',
       cardMessage: (row['card_message'] as String?) ?? '',
+      internalNotes: (row['special_instructions'] as String?) ??
+          (row['customer_notes'] as String?),
       isPaid: (row['is_paid'] as int?) ?? 0,
       paidAmountPaise: (row['paid_amount_paise'] as int?) ?? 0,
       rewardPointsEarned: (row['reward_points_earned'] as int?) ?? 0,
@@ -1562,7 +1835,8 @@ class OrderRepository {
       SELECT
         ol.*,
         p.name AS product_name,
-        p.image_path AS product_image_path
+        p.image_path AS product_image_path,
+        p.sku AS product_sku
       FROM order_lines ol
       LEFT JOIN products p ON p.id = ol.product_id
       WHERE ol.order_id = ?
@@ -1682,6 +1956,16 @@ class OrderRepository {
     final db = await AppDatabase.instance.database;
     final now = DateTime.now().toIso8601String();
     await db.transaction((txn) async {
+      final orderRows = await txn.query(
+        'orders',
+        columns: ['fulfilment_type', 'status'],
+        where: 'id = ?',
+        whereArgs: [orderId],
+        limit: 1,
+      );
+      final currentOrder = orderRows.isNotEmpty ? orderRows.first : null;
+      final fulfilmentType = currentOrder?['fulfilment_type'] as String?;
+
       await txn.update(
         'orders',
         {
@@ -1699,7 +1983,93 @@ class OrderRepository {
         'created_at': now,
         'created_by': createdBy,
       });
+
+      if (fulfilmentType == 'event_sale') {
+        final inventoryRepo = InventoryRepository();
+        if (newStatus == 'cancelled') {
+          await inventoryRepo.releaseActiveReservationsForOrder(orderId, txn);
+        } else if (newStatus == 'delivered') {
+          await inventoryRepo.consumeActiveReservationsForOrder(orderId, txn);
+
+          final existingTxns = await txn.query(
+            'inventory_transactions',
+            columns: ['id'],
+            where: 'order_id = ? AND txn_type = ?',
+            whereArgs: [orderId, 'sale'],
+          );
+
+          if (existingTxns.isEmpty) {
+            final lines = await txn.query(
+              'order_lines',
+              columns: ['id', 'product_id', 'qty'],
+              where: 'order_id = ?',
+              whereArgs: [orderId],
+            );
+            for (final line in lines) {
+              final productId = line['product_id'] as int?;
+              final qty = (line['qty'] as int?) ?? 0;
+              if (productId != null && qty > 0) {
+                await inventoryRepo.createConfirmedOrderSaleTransactionInTransaction(
+                  transaction: txn,
+                  productId: productId,
+                  orderId: orderId,
+                  orderLineId: line['id'] as int,
+                  quantity: qty,
+                  note: 'Event sale fulfillment deduction',
+                );
+              }
+            }
+          }
+        }
+      }
     });
+  }
+
+  Future<List<EventFulfillmentShortage>> checkEventFulfillmentStock(int orderId) async {
+    final db = await AppDatabase.instance.database;
+    final lines = await db.query(
+      'order_lines',
+      where: 'order_id = ?',
+      whereArgs: [orderId],
+    );
+    final shortages = <EventFulfillmentShortage>[];
+    for (final line in lines) {
+      final productId = line['product_id'] as int?;
+      final qty = (line['qty'] as int?) ?? 0;
+      final description = (line['description'] as String?)?.trim() ?? 'Product #$productId';
+      if (productId == null || qty <= 0) continue;
+
+      final prod = await db.query(
+        'products',
+        columns: ['track_inventory', 'name'],
+        where: 'id = ?',
+        whereArgs: [productId],
+        limit: 1,
+      );
+      if (prod.isEmpty) continue;
+      final trackInv = (prod.first['track_inventory'] as int? ?? 0) == 1;
+      final name = (prod.first['name'] as String?)?.trim() ?? description;
+      if (!trackInv) continue;
+
+      final item = await db.query(
+        'inventory_items',
+        columns: ['current_qty'],
+        where: 'product_id = ?',
+        whereArgs: [productId],
+        limit: 1,
+      );
+      final currentQty = item.isNotEmpty ? (item.first['current_qty'] as int? ?? 0) : 0;
+      if (currentQty < qty) {
+        shortages.add(EventFulfillmentShortage(
+          productId: productId,
+          productName: name,
+          requiredQty: qty,
+          availableQty: currentQty,
+          shortageQty: qty - currentQty,
+        ));
+      }
+    }
+    return shortages;
   }
 
   Future<void> addOrderPaymentTransaction({
@@ -1724,6 +2094,7 @@ class OrderRepository {
         'order_id': orderId,
         'method': method,
         'amount_paise': amountPaise,
+        'payment_type': 'CreditCollection',
         'reference': reference,
         'created_at': now,
       });
@@ -1750,6 +2121,46 @@ class OrderRepository {
         'created_at': now,
         'created_by': actor,
       });
+
+      if (method.trim().toLowerCase() == 'cash') {
+        final orderRows = await txn.query(
+          'orders',
+          columns: ['order_no'],
+          where: 'id = ?',
+          whereArgs: [orderId],
+          limit: 1,
+        );
+        final orderNo = (orderRows.isNotEmpty
+                ? orderRows.first['order_no'] as String?
+                : null) ??
+            '#$orderId';
+
+        final created = DateTime.parse(now);
+        final dateStr = DateTime(created.year, created.month, created.day)
+            .toIso8601String();
+
+        final balanceRows = await txn.rawQuery('''
+          SELECT running_balance
+          FROM cash_book
+          WHERE date = ?
+          ORDER BY created_at DESC
+          LIMIT 1
+        ''', [dateStr]);
+        final currentBalance = balanceRows.isEmpty
+            ? 0
+            : (balanceRows.first['running_balance'] as int? ?? 0);
+
+        await txn.insert('cash_book', {
+          'date': dateStr,
+          'transaction_type': 'cashReceived',
+          'description': 'Payment collection for order $orderNo',
+          'amount': amountPaise,
+          'cash_in': amountPaise,
+          'cash_out': 0,
+          'running_balance': currentBalance + amountPaise,
+          'created_at': now,
+        });
+      }
     });
   }
 
@@ -1796,6 +2207,7 @@ class OrderRepository {
         'order_id': orderId,
         'method': method,
         'amount_paise': -amountPaise,
+        'payment_type': 'Adjustment',
         'reference': reference,
         'created_at': now,
       });

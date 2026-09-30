@@ -28,7 +28,10 @@ void main() {
     final pricingManager = PricingManager();
 
     test('1. India standard: INR 1000 inclusive @ 18% GST', () {
-      final fiscal = CountryPresets.india();
+      final fiscal = CountryPresets.india().copyWith(
+        taxEnabled: true,
+        taxIdentifier: '29ABCDE1234F1Z5',
+      );
       final List<WalkInLineItem> lines = [
         const WalkInLineItem(
           description: 'Rose Bouquet',
@@ -167,7 +170,10 @@ void main() {
     });
 
     test('4. UAE standard: AED 1050 inclusive @ 5% VAT', () {
-      final fiscal = CountryPresets.uae();
+      final fiscal = CountryPresets.uae().copyWith(
+        taxEnabled: true,
+        taxIdentifier: '100200300400003',
+      );
       final List<WalkInLineItem> lines = [
         const WalkInLineItem(
           description: 'Luxury Orchid Pot',
@@ -241,7 +247,10 @@ void main() {
     });
 
     test('6. Line item discount + Bill discount + Tax calculation', () {
-      final fiscal = CountryPresets.india(); // 18% inclusive
+      final fiscal = CountryPresets.india().copyWith(
+        taxEnabled: true,
+        taxIdentifier: '29ABCDE1234F1Z5',
+      ); // 18% inclusive
       final List<WalkInLineItem> lines = [
         const WalkInLineItem(
           description: 'Bouquet with Line Discount',
@@ -291,7 +300,10 @@ void main() {
     });
 
     test('8. Receipt Builder formats dynamic tax labels and identifiers', () async {
-      final uaeProfile = CountryPresets.uae().copyWith(taxIdentifier: '100200300');
+      final uaeProfile = CountryPresets.uae().copyWith(
+        taxIdentifier: '100200300',
+        taxEnabled: true,
+      );
       final fakeManager = _FakeBusinessSettingsManager(
         BusinessSettings(
           shopName: 'Dubai Flowers',

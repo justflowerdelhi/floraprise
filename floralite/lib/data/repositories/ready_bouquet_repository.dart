@@ -116,6 +116,20 @@ class RefreshEventRecord {
   });
 }
 
+class ReadyBouquetConsumptionRecord {
+  final String rawProductId;
+  final String productName;
+  final String unit;
+  final int quantity;
+
+  const ReadyBouquetConsumptionRecord({
+    required this.rawProductId,
+    required this.productName,
+    required this.unit,
+    required this.quantity,
+  });
+}
+
 class ReadyBouquetRepository {
   ReadyBouquetRepository({
     StorageModeService? storageModeService,
@@ -383,11 +397,34 @@ class ReadyBouquetRepository {
     });
   }
 
+  Future<List<ReadyBouquetConsumptionRecord>> getBatchConsumptions({
+    required int batchId,
+    String? cloudBatchId,
+  }) async {
+    if (await _isCloud) {
+      final list = await _cloudRepository.getBatchConsumptions(cloudBatchId ?? batchId);
+      return list.map((item) {
+        final rawProductId = (item['rawProductId'] ?? item['RawProductId'] ?? item['productId'] ?? item['ProductId'])?.toString() ?? '';
+        final productName = (item['productName'] ?? item['ProductName'])?.toString() ?? 'Component';
+        final unit = (item['unit'] ?? item['Unit'])?.toString() ?? 'Stems';
+        final qty = (item['quantity'] ?? item['Quantity'] ?? 0) as int;
+        return ReadyBouquetConsumptionRecord(
+          rawProductId: rawProductId,
+          productName: productName,
+          unit: unit,
+          quantity: qty,
+        );
+      }).toList();
+    }
+    return const [];
+  }
+
   Future<void> refreshReplaceComponent({
     required int batchId,
     String? cloudBatchId,
     required int productId,
     String? cloudProductId,
+    String? productName,
     required int quantity,
     String? reason,
     String? note,
@@ -396,7 +433,8 @@ class ReadyBouquetRepository {
       return _cloudRepository.refreshBouquet(
         batchId: cloudBatchId ?? batchId,
         actionType: 'replace',
-        productId: cloudProductId ?? productId,
+        productId: (cloudProductId != null && cloudProductId.trim().isNotEmpty) ? cloudProductId : productId,
+        productName: productName,
         quantity: quantity,
         reason: reason,
         note: note,
@@ -432,6 +470,7 @@ class ReadyBouquetRepository {
     String? cloudBatchId,
     required int productId,
     String? cloudProductId,
+    String? productName,
     required int quantity,
     String? reason,
     String? note,
@@ -440,7 +479,8 @@ class ReadyBouquetRepository {
       return _cloudRepository.refreshBouquet(
         batchId: cloudBatchId ?? batchId,
         actionType: 'add',
-        productId: cloudProductId ?? productId,
+        productId: (cloudProductId != null && cloudProductId.trim().isNotEmpty) ? cloudProductId : productId,
+        productName: productName,
         quantity: quantity,
         reason: reason,
         note: note,
@@ -474,6 +514,7 @@ class ReadyBouquetRepository {
     String? cloudBatchId,
     required int productId,
     String? cloudProductId,
+    String? productName,
     required int quantity,
     required bool returnToInventory,
     String? reason,
@@ -483,7 +524,8 @@ class ReadyBouquetRepository {
       return _cloudRepository.refreshBouquet(
         batchId: cloudBatchId ?? batchId,
         actionType: 'remove',
-        productId: cloudProductId ?? productId,
+        productId: (cloudProductId != null && cloudProductId.trim().isNotEmpty) ? cloudProductId : productId,
+        productName: productName,
         quantity: quantity,
         returnToInventory: returnToInventory,
         reason: reason,

@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../database/app_database.dart';
 import '../../services/barcode_service.dart';
+import '../../services/storage_mode_service.dart';
+import 'cloud_production_repository.dart';
 
 class ProductionProduct {
   final int id;
@@ -27,6 +30,7 @@ class ProductionProduct {
 
 class RecipeItem {
   final int rawProductId;
+  final String? cloudProductId;
   final String productName;
   final String unit;
   final int quantity;
@@ -35,6 +39,7 @@ class RecipeItem {
 
   const RecipeItem({
     required this.rawProductId,
+    this.cloudProductId,
     required this.productName,
     required this.unit,
     required this.quantity,
@@ -48,12 +53,46 @@ class ProductionResult {
   final int productionCostPaise;
   final int finishedQuantity;
   final int finishedProductId;
+  final String? barcode;
+  final String? productName;
+  final int? sellingPricePaise;
 
   const ProductionResult({
     required this.productionId,
     required this.productionCostPaise,
     required this.finishedQuantity,
     required this.finishedProductId,
+    this.barcode,
+    this.productName,
+    this.sellingPricePaise,
+  });
+}
+
+class ProductionRecipeDetail {
+  final int finishedProductId;
+  final String? cloudRecipeId;
+  final String name;
+  final String category;
+  final int sellingPricePaise;
+  final int labourCostPaise;
+  final String? imagePath;
+  final int shelfLifeDays;
+  final int refreshAfterDays;
+  final String? occasion;
+  final List<RecipeItem> items;
+
+  const ProductionRecipeDetail({
+    required this.finishedProductId,
+    this.cloudRecipeId,
+    required this.name,
+    required this.category,
+    required this.sellingPricePaise,
+    this.labourCostPaise = 0,
+    this.imagePath,
+    this.shelfLifeDays = 3,
+    this.refreshAfterDays = 2,
+    this.occasion,
+    required this.items,
   });
 }
 
@@ -129,27 +168,57 @@ class ProductionConsumptionDetail {
 }
 
 class ProductionRepository {
+  ProductionRepository({
+    StorageModeService? storageModeService,
+    CloudProductionRepository? cloudRepository,
+  })  : _storageModeService = storageModeService ?? StorageModeService(),
+        _cloudRepository = cloudRepository ?? CloudProductionRepository();
+
+  final StorageModeService _storageModeService;
+  final CloudProductionRepository _cloudRepository;
+
+  Future<bool> get _isCloud async =>
+      kIsWeb || await _storageModeService.isCloud();
+
+  static const List<String> finishedProductCategories = [
+    'finished products',
+    'finished product',
+    'bouquet',
+    'bouquets',
+    'bunch',
+    'bunches',
+    'arrangement',
+    'arrangements',
+    'centerpiece',
+    'centerpieces',
+    'basket arrangement',
+    'vase arrangement',
+    'wreath',
+    'wreaths',
+    'corsage',
+    'corsages',
+    'boutonniere',
+    'boutonnieres',
+    'garland',
+    'garlands',
+    'floral box',
+    'floral boxes',
+    'gift hamper',
+    'gift hampers',
+    'custom',
+  ];
+
   static bool isFinishedProductCategory(String? category) {
     final normalized = category?.trim().toLowerCase();
-    if (normalized == null) return false;
-    return normalized == 'finished products' ||
-        normalized == 'finished product' ||
-        normalized == 'bouquet' ||
-        normalized == 'bunch' ||
-        normalized == 'arrangement' ||
-        normalized == 'centerpiece' ||
-        normalized == 'basket arrangement' ||
-        normalized == 'vase arrangement' ||
-        normalized == 'wreath' ||
-        normalized == 'corsage' ||
-        normalized == 'boutonniere' ||
-        normalized == 'garland' ||
-        normalized == 'floral box' ||
-        normalized == 'gift hamper' ||
-        normalized == 'custom';
+    if (normalized == null || normalized.isEmpty) return false;
+    return finishedProductCategories.contains(normalized);
   }
 
   Future<List<ProductionProduct>> listFinishedProducts() async {
+    if (await _isCloud) {
+      return _cloudRepository.listFinishedProducts();
+    }
+
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery('''
       SELECT
@@ -179,6 +248,10 @@ class ProductionRepository {
   }
 
   Future<List<ProductionProduct>> listRawProducts() async {
+    if (await _isCloud) {
+      return _cloudRepository.listRawProducts();
+    }
+
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery('''
       SELECT
@@ -208,6 +281,10 @@ class ProductionRepository {
   }
 
   Future<List<RecipeItem>> getRecipeItems(int finishedProductId) async {
+    if (await _isCloud) {
+      return _cloudRepository.getRecipeItems(finishedProductId);
+    }
+
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery('''
       SELECT
@@ -244,6 +321,36 @@ class ProductionRepository {
         .toList();
   }
 
+  Future<ProductionRecipeDetail?> getRecipeDetail(int finishedProductId) async {
+    if (await _isCloud) {
+      return _cloudRepository.getRecipeDetail(finishedProductId);
+    }
+
+    final db = await AppDatabase.instance.database;
+    final productRows = await db.query(
+      'products',
+      where: 'id = ? AND deleted_at IS NULL',
+      whereArgs: [finishedProductId],
+      limit: 1,
+    );
+    if (productRows.isEmpty) return null;
+    final p = productRows.first;
+    final items = await getRecipeItems(finishedProductId);
+    final meta = await getRecipeMetadata(finishedProductId);
+
+    return ProductionRecipeDetail(
+      finishedProductId: finishedProductId,
+      name: p['name'] as String? ?? '',
+      category: p['category'] as String? ?? 'Bouquet',
+      sellingPricePaise: p['selling_price_paise'] as int? ?? 0,
+      imagePath: p['image_path'] as String?,
+      shelfLifeDays: meta?['shelf_life_days'] as int? ?? 3,
+      refreshAfterDays: meta?['refresh_after_days'] as int? ?? 2,
+      occasion: meta?['occasion'] as String?,
+      items: items,
+    );
+  }
+
   Future<void> saveRecipe({
     required int finishedProductId,
     required List<RecipeItem> items,
@@ -251,6 +358,16 @@ class ProductionRepository {
     int refreshAfterDays = 2,
     String? occasion,
   }) async {
+    if (await _isCloud) {
+      return _cloudRepository.saveRecipe(
+        finishedProductId: finishedProductId,
+        items: items,
+        shelfLifeDays: shelfLifeDays,
+        refreshAfterDays: refreshAfterDays,
+        occasion: occasion,
+      );
+    }
+
     if (items.isEmpty) {
       throw StateError('Add at least one raw product to the recipe');
     }
@@ -348,7 +465,23 @@ class ProductionRepository {
     int refreshAfterDays = 2,
     String? occasion,
     String? imagePath,
+    int labourCostPaise = 0,
   }) async {
+    if (await _isCloud) {
+      return _cloudRepository.saveBouquetRecipe(
+        finishedProductId: finishedProductId,
+        productName: productName,
+        category: category,
+        items: items,
+        sellingPricePaise: sellingPricePaise,
+        shelfLifeDays: shelfLifeDays,
+        refreshAfterDays: refreshAfterDays,
+        occasion: occasion,
+        imagePath: imagePath,
+        labourCostPaise: labourCostPaise,
+      );
+    }
+
     if (items.isEmpty) {
       throw StateError('Add at least one component to the recipe');
     }
@@ -402,35 +535,57 @@ class ProductionRepository {
         if (trimmedName.isEmpty) {
           throw StateError('Recipe name is required');
         }
-        final trimmedCategory = (category ?? 'Bouquet').trim();
-        productId = await txn.insert('products', {
-          'name': trimmedName,
-          'category': trimmedCategory.isEmpty ? 'Bouquet' : trimmedCategory,
-          'default_unit': 'Piece',
-          'selling_price_paise': sellingPricePaise,
-          'purchase_price_paise': 0,
-          'gst_percent': 0,
-          'track_inventory': 1,
-          'min_stock': 0,
-          'active': 1,
-          'image_path':
-              imagePath?.trim().isEmpty ?? true ? null : imagePath!.trim(),
-          'created_at': now,
-          'updated_at': now,
-          'deleted_at': null,
-        });
-        await txn.update(
+        final existingByName = await txn.query(
           'products',
-          {'floraprise_barcode': 'FLR-$productId'},
-          where: 'id = ?',
-          whereArgs: [productId],
+          columns: ['id', 'category', 'track_inventory', 'active', 'deleted_at'],
+          where: 'LOWER(name) = ? AND deleted_at IS NULL AND active = 1',
+          whereArgs: [trimmedName.toLowerCase()],
+          limit: 1,
         );
-        await txn.insert('inventory_items', {
-          'product_id': productId,
-          'current_qty': 0,
-          'min_qty': 0,
-          'updated_at': now,
-        });
+        if (existingByName.isNotEmpty) {
+          productId = existingByName.first['id'] as int;
+          await txn.update(
+            'products',
+            {
+              'selling_price_paise': sellingPricePaise,
+              if (imagePath?.trim().isNotEmpty ?? false)
+                'image_path': imagePath!.trim(),
+              'updated_at': now,
+            },
+            where: 'id = ?',
+            whereArgs: [productId],
+          );
+        } else {
+          final trimmedCategory = (category ?? 'Bouquet').trim();
+          productId = await txn.insert('products', {
+            'name': trimmedName,
+            'category': trimmedCategory.isEmpty ? 'Bouquet' : trimmedCategory,
+            'default_unit': 'Piece',
+            'selling_price_paise': sellingPricePaise,
+            'purchase_price_paise': 0,
+            'gst_percent': 0,
+            'track_inventory': 1,
+            'min_stock': 0,
+            'active': 1,
+            'image_path':
+                imagePath?.trim().isEmpty ?? true ? null : imagePath!.trim(),
+            'created_at': now,
+            'updated_at': now,
+            'deleted_at': null,
+          });
+          await txn.update(
+            'products',
+            {'floraprise_barcode': 'FLR-$productId'},
+            where: 'id = ?',
+            whereArgs: [productId],
+          );
+          await txn.insert('inventory_items', {
+            'product_id': productId,
+            'current_qty': 0,
+            'min_qty': 0,
+            'updated_at': now,
+          });
+        }
       }
 
       final recipeRows = await txn.query(
@@ -494,6 +649,10 @@ class ProductionRepository {
   }
 
   Future<Map<String, dynamic>?> getRecipeMetadata(int finishedProductId) async {
+    if (await _isCloud) {
+      return _cloudRepository.getRecipeMetadata(finishedProductId);
+    }
+
     final db = await AppDatabase.instance.database;
     final rows = await db.query(
       'product_recipes',
@@ -507,6 +666,10 @@ class ProductionRepository {
   }
 
   Future<int> getMaximumProducibleQuantity(int finishedProductId) async {
+    if (await _isCloud) {
+      return _cloudRepository.getMaximumProducibleQuantity(finishedProductId);
+    }
+
     final items = await getRecipeItems(finishedProductId);
     if (items.isEmpty) return 0;
     return items
@@ -521,6 +684,16 @@ class ProductionRepository {
     String operatorName = 'Admin',
     String? deviceName,
   }) async {
+    if (await _isCloud) {
+      return _cloudRepository.produce(
+        finishedProductId: finishedProductId,
+        quantity: quantity,
+        note: note,
+        operatorName: operatorName,
+        deviceName: deviceName,
+      );
+    }
+
     if (quantity <= 0) {
       throw StateError('Production quantity must be greater than zero');
     }
@@ -715,6 +888,24 @@ class ProductionRepository {
     String operatorName = 'Admin',
     String? deviceName,
   }) async {
+    if (await _isCloud) {
+      return _cloudRepository.produceBouquet(
+        finishedProductId: finishedProductId,
+        productName: productName,
+        category: category,
+        quantity: quantity,
+        components: components,
+        sellingPricePaise: sellingPricePaise,
+        labourCostPaise: labourCostPaise,
+        imagePath: imagePath,
+        shelfLifeDays: shelfLifeDays,
+        refreshAfterDays: refreshAfterDays,
+        note: note,
+        operatorName: operatorName,
+        deviceName: deviceName,
+      );
+    }
+
     if (quantity <= 0) {
       throw StateError('Production quantity must be greater than zero');
     }
@@ -770,33 +961,55 @@ class ProductionRepository {
         if (trimmedName.isEmpty) {
           throw StateError('Bouquet name is required');
         }
-        final trimmedCategory = category.trim();
-        productId = await txn.insert('products', {
-          'name': trimmedName,
-          'category': trimmedCategory.isEmpty ? 'Bouquet' : trimmedCategory,
-          'default_unit': 'Piece',
-          'selling_price_paise': sellingPricePaise,
-          'purchase_price_paise': 0,
-          'gst_percent': 0,
-          'track_inventory': 1,
-          'min_stock': 0,
-          'active': 1,
-          'image_path':
-              imagePath?.trim().isEmpty ?? true ? null : imagePath!.trim(),
-          'created_at': now,
-          'updated_at': now,
-          'deleted_at': null,
-        });
-        await const BarcodeService().generateInternalBarcodeForProductInDb(
-          txn,
-          productId,
+        final existingByName = await txn.query(
+          'products',
+          columns: ['id', 'category', 'track_inventory', 'active', 'deleted_at'],
+          where: 'LOWER(name) = ? AND deleted_at IS NULL AND active = 1',
+          whereArgs: [trimmedName.toLowerCase()],
+          limit: 1,
         );
-        await txn.insert('inventory_items', {
-          'product_id': productId,
-          'current_qty': 0,
-          'min_qty': 0,
-          'updated_at': now,
-        });
+        if (existingByName.isNotEmpty) {
+          productId = existingByName.first['id'] as int;
+          await txn.update(
+            'products',
+            {
+              'selling_price_paise': sellingPricePaise,
+              if (imagePath?.trim().isNotEmpty ?? false)
+                'image_path': imagePath!.trim(),
+              'updated_at': now,
+            },
+            where: 'id = ?',
+            whereArgs: [productId],
+          );
+        } else {
+          final trimmedCategory = category.trim();
+          productId = await txn.insert('products', {
+            'name': trimmedName,
+            'category': trimmedCategory.isEmpty ? 'Bouquet' : trimmedCategory,
+            'default_unit': 'Piece',
+            'selling_price_paise': sellingPricePaise,
+            'purchase_price_paise': 0,
+            'gst_percent': 0,
+            'track_inventory': 1,
+            'min_stock': 0,
+            'active': 1,
+            'image_path':
+                imagePath?.trim().isEmpty ?? true ? null : imagePath!.trim(),
+            'created_at': now,
+            'updated_at': now,
+            'deleted_at': null,
+          });
+          await const BarcodeService().generateInternalBarcodeForProductInDb(
+            txn,
+            productId,
+          );
+          await txn.insert('inventory_items', {
+            'product_id': productId,
+            'current_qty': 0,
+            'min_qty': 0,
+            'updated_at': now,
+          });
+        }
       }
 
       var materialCost = 0;
@@ -926,11 +1139,29 @@ class ProductionRepository {
         'created_at': now,
       });
 
+      final productRows = await txn.query(
+        'products',
+        columns: ['floraprise_barcode', 'manufacturer_barcode', 'code'],
+        where: 'id = ?',
+        whereArgs: [productId],
+        limit: 1,
+      );
+      final barcodeVal = productRows.isNotEmpty
+          ? ((productRows.first['floraprise_barcode'] as String?)?.trim().isNotEmpty == true
+              ? productRows.first['floraprise_barcode'] as String
+              : (productRows.first['manufacturer_barcode'] as String?) ?? '')
+          : null;
+
       return ProductionResult(
         productionId: productionId,
         productionCostPaise: totalCost,
         finishedQuantity: quantity,
         finishedProductId: productId,
+        barcode: (barcodeVal != null && barcodeVal.trim().isNotEmpty)
+            ? barcodeVal.trim()
+            : 'BATCH-$productionId',
+        productName: productName,
+        sellingPricePaise: sellingPricePaise,
       );
     });
   }
@@ -940,6 +1171,14 @@ class ProductionRepository {
     required DateTime endDate,
     int? productId,
   }) async {
+    if (await _isCloud) {
+      return _cloudRepository.getProductionReport(
+        startDate: startDate,
+        endDate: endDate,
+        productId: productId,
+      );
+    }
+
     final db = await AppDatabase.instance.database;
     final where = <String>['pr.produced_at >= ?', 'pr.produced_at <= ?'];
     final args = <Object?>[
@@ -976,6 +1215,10 @@ class ProductionRepository {
   }
 
   Future<ProductionDetail?> getProductionDetail(int productionId) async {
+    if (await _isCloud) {
+      return _cloudRepository.getProductionDetail(productionId);
+    }
+
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery('''
       SELECT pr.id, pr.finished_product_id, pr.quantity, pr.production_cost_paise, pr.produced_at,
@@ -1023,6 +1266,13 @@ class ProductionRepository {
     required int productionId,
     String? note,
   }) async {
+    if (await _isCloud) {
+      return _cloudRepository.reverseProduction(
+        productionId: productionId,
+        note: note,
+      );
+    }
+
     final db = await AppDatabase.instance.database;
     await db.transaction((txn) async {
       final now = DateTime.now().toIso8601String();

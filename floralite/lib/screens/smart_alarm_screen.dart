@@ -594,8 +594,18 @@ class _SmartAlarmScreenState extends State<SmartAlarmScreen>
 
   void _openOrder() {
     SmartAlertEngine.instance.acknowledgeAlert(widget.task.id!);
-    Navigator.of(context).pop();
-    // TODO: Navigate to order screen
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    final orderId = widget.task.linkedOrderId;
+    if (orderId != null && orderId > 0) {
+      navigator.pushNamed(
+        '/order-detail',
+        arguments: {
+          'orderId': orderId,
+          'cloudOrderId': widget.task.cloudLinkedOrderId,
+        },
+      );
+    }
   }
 
   void _markCompleted() {

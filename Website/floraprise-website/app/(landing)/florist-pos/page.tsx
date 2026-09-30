@@ -1,185 +1,183 @@
-export default function FloristPOSIndiaLanding() {
+import Link from "next/link";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Florist POS Software & Inventory System — Floraprise",
+  description:
+    "Purpose-built Point of Sale (POS) and inventory software for retail flower shops, studio florists, and floral delivery businesses. Offline-first, WhatsApp billing, and perishable batch tracking.",
+  alternates: {
+    canonical: "https://floraprise.com/florist-pos",
+  },
+};
+
+export default function FloristPOSLandingPage() {
   return (
-    <div className="bg-white">
-
-      {/* HERO */}
-      <section className="py-28 text-center bg-gradient-to-b from-[#f8f8f6] to-white">
+    <div className="bg-[#f5f6f1] text-[#142219]">
+      {/* ================= HERO ================= */}
+      <section className="pt-24 pb-16 text-center bg-gradient-to-b from-[#e6ede5] to-[#f5f6f1]">
         <div className="max-w-4xl mx-auto px-6">
-
-          <div className="mb-10 flex justify-center">
-            <img
-              src="/pos-ui.png"
-              alt="Floraprise POS Dashboard"
-              className="rounded-2xl shadow-xl max-w-4xl w-full"
-            />
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-[#c4d6c2] text-xs font-bold text-[#124e2c] uppercase tracking-wider mb-6 shadow-xs">
+            <span>🌸</span> Built Exclusively for Florists
           </div>
 
-          <div className="flex justify-center mb-6">
-            <div className="border border-green-600 text-green-700 px-5 py-2 rounded-full text-sm font-semibold">
-              Made for Indian Florists
-            </div>
-          </div>
-
-          <p className="text-green-700 font-semibold mb-4">
-            Built for Indian Flower Shops
-          </p>
-
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            India’s Complete Florist POS & ERP Platform
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-normal mb-6 text-[#142219] leading-tight">
+            The Point of Sale Built for the Reality of Flowers
           </h1>
 
-          {/* Hindi Sub Heading */}
-          <p className="text-lg text-gray-700 mb-6 font-medium">
-            आपके फूलों के व्यवसाय के लिए एक स्मार्ट और पूरा मैनेजमेंट सिस्टम
+          <p className="text-lg md:text-xl text-gray-700 max-w-2xl mx-auto mb-8 leading-relaxed">
+            Standard retail POS systems treat bouquets like dry cans on a shelf. Floraprise is built for perishable stems, custom arrangements, advance event bookings, and delivery rush.
           </p>
 
-          <p className="text-gray-600 mb-10">
-            Manage GST billing, perishable inventory, bouquet production,
-            delivery routing, and Tally-ready accounting —
-            all in one powerful system built specifically for Indian florists.
-          </p>
-
-          <div className="flex justify-center gap-4 flex-wrap">
-            <a
+          <div className="flex flex-wrap justify-center gap-4 mb-12">
+            <Link
+              href="/pricing"
+              className="bg-[#124e2c] text-white px-8 py-4 rounded-xl font-bold hover:bg-[#0b3c20] transition shadow-md"
+            >
+              View Plans & Pricing
+            </Link>
+            <Link
               href="/demo"
-              className="bg-green-700 text-white px-8 py-4 rounded-lg font-semibold hover:opacity-90 transition"
+              className="bg-white text-[#142219] px-8 py-4 rounded-xl font-bold hover:bg-gray-100 transition border border-[#d9dfd7] shadow-xs"
             >
-              Book Free Demo
-            </a>
-
-            <a
-              href="https://wa.me/919990224611"
-              className="bg-green-500 text-white px-8 py-4 rounded-lg font-semibold hover:opacity-90 transition"
-            >
-              WhatsApp Us
-            </a>
+              Book a Live Demo
+            </Link>
           </div>
 
-          <div className="mt-6 text-sm text-gray-500">
-            GST-ready • Tally-friendly • UPI-supported • Built in India
+          <div className="text-xs text-gray-500 font-medium">
+            Offline POS • WhatsApp Bills • Perishable Batches • Thermal & Card Printing • Multi-Device
           </div>
-
         </div>
       </section>
 
-
-      {/* TRUST STRIP */}
-      <section className="py-12 border-t">
-        <div className="max-w-5xl mx-auto px-6 text-center">
-          <p className="text-gray-600">
-            Designed for retail florists, wedding decorators, and delivery-focused flower businesses across India.
-          </p>
-        </div>
-      </section>
-
-
-      {/* PROBLEMS IN INDIA */}
-      <section className="py-16">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-
-          <h2 className="text-3xl font-semibold mb-10">
-            Common Problems Indian Florists Face
-          </h2>
+      {/* ================= CORE POS PILLARS ================= */}
+      <section className="py-20 px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <span className="text-[#25784a] text-xs font-extrabold uppercase tracking-widest block mb-2">
+              Why Florists Choose Floraprise
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-serif font-normal text-[#142219]">
+              Designed for Flower Shop Speed and Complexity
+            </h2>
+          </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-
-            <div className="bg-white p-8 rounded-2xl shadow-sm">
-              <h3 className="font-semibold mb-4">Manual GST Billing</h3>
-              <p className="text-gray-600">
-                Separate GST software or manual invoice generation.
+            <div className="bg-white p-8 rounded-3xl border border-[#d9dfd7] shadow-xs">
+              <div className="text-2xl mb-4">⚡</div>
+              <h3 className="text-xl font-serif font-normal text-[#142219] mb-3">
+                Intent-Based Checkout
+              </h3>
+              <p className="text-gray-600 text-sm leading-relaxed mb-4">
+                Instantly tag each sale as Take Away, Delivery, or Pickup. Automatically route card messages and delivery slots to the right team members without confusion.
               </p>
+              <ul className="text-xs text-gray-500 space-y-1.5 font-medium">
+                <li>• Quick counter cash & split tender</li>
+                <li>• Advance deposit collection</li>
+                <li>• WhatsApp digital receipts</li>
+              </ul>
             </div>
 
-            <div className="bg-white p-8 rounded-2xl shadow-sm">
-              <h3 className="font-semibold mb-4">Stock Wastage</h3>
-              <p className="text-gray-600">
-                No FIFO tracking for perishable flowers and fillers.
+            <div className="bg-white p-8 rounded-3xl border border-[#d9dfd7] shadow-xs">
+              <div className="text-2xl mb-4">🌹</div>
+              <h3 className="text-xl font-serif font-normal text-[#142219] mb-3">
+                Perishable Stem Control
+              </h3>
+              <p className="text-gray-600 text-sm leading-relaxed mb-4">
+                Track flower batches with FIFO rotation. When you sell a 12-rose bouquet, Floraprise automatically deducts stems, greenery, wrapping, and ribbon from live inventory.
               </p>
+              <ul className="text-xs text-gray-500 space-y-1.5 font-medium">
+                <li>• Batch arrival date tracking</li>
+                <li>• Flower spoilage recording</li>
+                <li>• Recipe margin protection</li>
+              </ul>
             </div>
 
-            <div className="bg-white p-8 rounded-2xl shadow-sm">
-              <h3 className="font-semibold mb-4">Delivery Confusion</h3>
-              <p className="text-gray-600">
-                WhatsApp orders without structured routing system.
+            <div className="bg-white p-8 rounded-3xl border border-[#d9dfd7] shadow-xs">
+              <div className="text-2xl mb-4">📶</div>
+              <h3 className="text-xl font-serif font-normal text-[#142219] mb-3">
+                Offline-First Reliability
+              </h3>
+              <p className="text-gray-600 text-sm leading-relaxed mb-4">
+                Never lose a sale when your internet fails. Take orders, print thermal receipts, and accept cash offline. Floraprise syncs everything automatically upon reconnection.
               </p>
+              <ul className="text-xs text-gray-500 space-y-1.5 font-medium">
+                <li>• Android phone/tablet counter POS</li>
+                <li>• Zero disruption during festive rush</li>
+                <li>• Secure cloud backup sync</li>
+              </ul>
             </div>
+          </div>
+        </div>
+      </section>
 
+      {/* ================= COMPARISON STRIP ================= */}
+      <section className="py-20 bg-white border-t border-[#d9dfd7]">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-serif font-normal text-[#142219] mb-4">
+              Generic POS vs Floraprise Florist POS
+            </h2>
+            <p className="text-gray-600">
+              Why generic retail or restaurant software fails in a flower shop.
+            </p>
           </div>
 
-          <p className="text-gray-600 mt-8">
-            Designed by florists to support florists across India — from metro cities to growing regional markets.
-          </p>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="p-6 bg-red-50/60 rounded-2xl border border-red-200">
+              <h3 className="font-bold text-red-900 text-lg mb-4 flex items-center gap-2">
+                <span>✕</span> Generic Retail POS
+              </h3>
+              <ul className="space-y-3 text-sm text-red-800/90">
+                <li>• Treats flowers as non-perishable barcodes</li>
+                <li>• No bouquet recipe breakdown (stems, foliage, ribbons)</li>
+                <li>• No card message printing or designer workflow</li>
+                <li>• No time-slot delivery dispatch or driver routing</li>
+                <li>• Forces workarounds for advance event bookings</li>
+              </ul>
+            </div>
 
+            <div className="p-6 bg-green-50/60 rounded-2xl border border-green-200">
+              <h3 className="font-bold text-green-900 text-lg mb-4 flex items-center gap-2">
+                <span>✓</span> Floraprise Florist POS
+              </h3>
+              <ul className="space-y-3 text-sm text-green-900/90">
+                <li>• Perishable batch tracking with FIFO stem rotation</li>
+                <li>• Standardized bouquet recipes with live COGS margin</li>
+                <li>• Built-in greeting card message capture & thermal printing</li>
+                <li>• Dispatch board with driver assignment & delivery proof</li>
+                <li>• Native advance deposits & split payment tracking</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </section>
 
-
-      {/* MINI SOCIAL PROOF */}
-      <section className="py-14 bg-[#f8f8f6] text-center">
-        <h2 className="text-2xl font-semibold mb-6">
-          Built for Modern Indian Florists
-        </h2>
-        <p className="text-gray-600">
-          Whether you process 20 orders or 200 per day —
-          Floraprise scales with your growth.
-        </p>
-      </section>
-
-
-      {/* SOLUTION */}
-      <section className="py-16 bg-[#f8f8f6]">
-        <div className="max-w-5xl mx-auto px-6 text-center">
-
-          <h2 className="text-3xl font-semibold mb-10">
-            Floraprise Solves It All
+      {/* ================= FINAL CTA ================= */}
+      <section className="py-20 bg-[#124e2c] text-white text-center">
+        <div className="max-w-3xl mx-auto px-6">
+          <h2 className="text-3xl sm:text-4xl font-serif font-normal mb-4">
+            Try Floraprise for Your Flower Shop
           </h2>
-
-          <ul className="space-y-4 text-gray-700 text-lg">
-            <li>✔ GST-Ready Professional Billing</li>
-            <li>✔ Perishable Inventory with FIFO Logic</li>
-            <li>✔ Bouquet Recipe & Production Tracking</li>
-            <li>✔ Delivery & Route Management</li>
-            <li>✔ Tally Integration Support</li>
-            <li>✔ Staff & Shift Monitoring</li>
-            <li>✔ Wedding & Event Order Management</li>
-          </ul>
-
-        </div>
-      </section>
-
-
-      {/* SEASONAL RUSH SECTION */}
-      <section className="py-16">
-        <div className="max-w-5xl mx-auto px-6 text-center">
-
-          <h2 className="text-3xl font-semibold mb-6">
-            Built for India’s Peak Floral Seasons
-          </h2>
-
-          <p className="text-gray-600 mb-8">
-            Valentine’s Day, Mother’s Day, Wedding Season, Rakhi,
-            Diwali, Corporate Gifting — manage high-volume orders
-            without operational chaos.
+          <p className="text-green-100 text-base sm:text-lg mb-8 leading-relaxed max-w-xl mx-auto">
+            Experience why florists trust Floraprise to organize counter sales, protect flower margins, and deliver on time.
           </p>
-
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link
+              href="/pricing"
+              className="bg-white text-[#124e2c] px-8 py-4 rounded-xl font-bold hover:bg-green-50 transition shadow-md"
+              style={{ color: "#124e2c" }}
+            >
+              View Plans & Pricing
+            </Link>
+            <Link
+              href="/demo"
+              className="bg-[#25784a] text-white px-8 py-4 rounded-xl font-bold hover:bg-[#1a5b36] transition border border-green-400/30"
+            >
+              Book a Live Demo
+            </Link>
+          </div>
         </div>
       </section>
-
-
-      {/* FINAL CTA */}
-      <section className="py-20 text-center bg-green-700 text-white">
-        <h2 className="text-3xl font-semibold mb-6">
-          Ready to Digitize Your Flower Shop?
-        </h2>
-
-        <a
-          href="/demo"
-          className="bg-orange-500 text-white px-8 py-4 rounded-lg font-semibold hover:opacity-90 transition"
-        >
-          Schedule Free Demo
-        </a>
-      </section>
-
     </div>
   );
 }

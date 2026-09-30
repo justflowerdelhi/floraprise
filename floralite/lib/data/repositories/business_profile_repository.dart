@@ -120,13 +120,13 @@ class BusinessProfileRepository {
       if (cloudProfile != null && cloudProfile.name.trim().isNotEmpty) {
         return BusinessProfile(
           shopName: cloudProfile.name.trim(),
-          ownerName: '',
+          ownerName: cloudProfile.ownerName?.trim() ?? '',
           mobileNumber: cloudProfile.phone?.trim() ?? '',
           email: cloudProfile.email?.trim(),
           address: cloudProfile.address?.trim(),
-          city: '',
-          state: '',
-          pinCode: '',
+          city: cloudProfile.city?.trim() ?? '',
+          state: cloudProfile.state?.trim() ?? '',
+          pinCode: cloudProfile.pinCode?.trim() ?? '',
           gstRegistered: (cloudProfile.taxIdentifier ?? '').trim().isNotEmpty,
           gstNumber: cloudProfile.taxIdentifier?.trim(),
           createdAt: cloudProfile.createdAtUtc.toIso8601String(),
@@ -164,6 +164,8 @@ class BusinessProfileRepository {
 
     final existing = await getBusinessProfile();
 
+    final hasGst = gstNumber != null && gstNumber.trim().isNotEmpty;
+    final effectiveGstRegistered = gstRegistered && hasGst;
     final data = {
       'shop_name': shopName,
       'owner_name': ownerName,
@@ -173,8 +175,8 @@ class BusinessProfileRepository {
       'city': city,
       'state': state,
       'pin_code': pinCode,
-      'gst_registered': gstRegistered ? 1 : 0,
-      'gst_number': gstRegistered ? gstNumber : null,
+      'gst_registered': effectiveGstRegistered ? 1 : 0,
+      'gst_number': effectiveGstRegistered ? gstNumber.trim() : null,
       'updated_at': now,
     };
 

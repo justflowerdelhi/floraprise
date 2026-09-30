@@ -5,10 +5,11 @@ import '../data/repositories/category_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../providers/category_provider.dart';
 import '../providers/storage_mode_provider.dart';
-import 'cloud_categories_screen.dart';
 import '../widgets/app_header.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/floraprise_page_header.dart';
+import '../widgets/library/library_category_picker_sheet.dart';
+import 'cloud_categories_screen.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -26,6 +27,51 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         context.read<CategoryProvider>().loadCategories();
       }
     });
+  }
+
+  Future<void> _importFromLibrary() async {
+    final selectedCategory = await LibraryCategoryPickerSheet.show(context);
+    if (selectedCategory == null || !mounted) return;
+
+    final provider = context.read<CategoryProvider>();
+    final exists = provider.categories.any(
+      (c) =>
+          c.name.trim().toLowerCase() ==
+          selectedCategory.name.trim().toLowerCase(),
+    );
+
+    if (exists) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Category "${selectedCategory.name}" is already in your catalogue.',
+          ),
+          backgroundColor: Colors.orange.shade800,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await provider.createCategory(
+        name: selectedCategory.name,
+        defaultUnit: 'Stem',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Category "${selectedCategory.name}" imported from Floraprise Library!',
+          ),
+          backgroundColor: const Color(0xFF2E7D32),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not import category: $e')),
+      );
+    }
   }
 
   Future<void> _showCategoryEditor({ProductCategoryRecord? category}) async {
@@ -108,6 +154,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         title: FloraprisePageHeader.isDesktop(context) ? null : 'Categories',
         actions: [
           IconButton(
+            tooltip: 'Import from Library',
+            icon: const Icon(Icons.menu_book_rounded),
+            onPressed: _importFromLibrary,
+          ),
+          IconButton(
             tooltip: 'Refresh',
             onPressed: () => provider.loadCategories(),
             icon: const Icon(Icons.refresh),
@@ -128,6 +179,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   icon: Icons.add_rounded,
                   primary: true,
                   onPressed: () => _showCategoryEditor(),
+                ),
+                FloraprisePageHeaderAction(
+                  label: 'Import from Library',
+                  icon: Icons.menu_book_rounded,
+                  primary: false,
+                  onPressed: _importFromLibrary,
                 ),
               ],
             ),

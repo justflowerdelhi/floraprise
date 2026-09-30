@@ -51,6 +51,7 @@ public sealed class MobileAuthLoginTests : IDisposable
         services.AddDbContext<SumpoojDbContext>(options =>
             options.UseInMemoryDatabase($"MobileAuthLogin_{Guid.NewGuid():N}")
                 .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
+        services.AddSingleton<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>(new TestWebHostEnv());
         services.AddSingleton<ITenantContext, TestTenantContext>();
         services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
         {
@@ -306,6 +307,74 @@ public sealed class MobileAuthLoginTests : IDisposable
         Assert.Equal("Jai Bajrang Bali", updatedCompany.Name);
         var untouchedCompany = await _db.Companies.SingleAsync(c => c.Id == otherCompany.Id);
         Assert.Equal("Other Florist", untouchedCompany.Name);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_UpdatesOwnerName_City_State_PinCode_And_LogoPath()
+    {
+        var seeded = await SeedCompanyUserAsync();
+        AuthenticateAs(_companyController, seeded.Company.Id, "CompanyAdmin");
+
+        var result = await _companyController.UpdateProfile(new UpdateCompanySettingsRequest
+        {
+            Name = "Lotus Florist Pro",
+            OwnerName = "Rajesh Sharma",
+            Phone = "9876543210",
+            Email = "rajesh@lotusflowers.com",
+            Address = "101 MG Road",
+            City = "Bangalore",
+            State = "Karnataka",
+            PinCode = "560001",
+            LogoPath = "/uploads/logos/custom_logo.png",
+            TaxIdentifier = "29ABCDE1234F1Z5",
+        }, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var profile = Assert.IsType<MobileCompanyProfileDto>(ok.Value);
+        Assert.Equal("Lotus Florist Pro", profile.Name);
+        Assert.Equal("Rajesh Sharma", profile.OwnerName);
+        Assert.Equal("Bangalore", profile.City);
+        Assert.Equal("Karnataka", profile.State);
+        Assert.Equal("560001", profile.PinCode);
+        Assert.Equal("/uploads/logos/custom_logo.png", profile.LogoPath);
+        Assert.Equal("29ABCDE1234F1Z5", profile.TaxIdentifier);
+
+        // Verify GetProfile returns the same updated fields (survives refresh)
+        var getResult = await _companyController.GetProfile(CancellationToken.None);
+        var getOk = Assert.IsType<OkObjectResult>(getResult);
+        var refreshedProfile = Assert.IsType<MobileCompanyProfileDto>(getOk.Value);
+        Assert.Equal("Rajesh Sharma", refreshedProfile.OwnerName);
+        Assert.Equal("Bangalore", refreshedProfile.City);
+        Assert.Equal("Karnataka", refreshedProfile.State);
+        Assert.Equal("560001", refreshedProfile.PinCode);
+        Assert.Equal("/uploads/logos/custom_logo.png", refreshedProfile.LogoPath);
+    }
+
+    [Fact]
+    public async Task UploadLogo_And_DeleteLogo_WorkCorrectly()
+    {
+        var seeded = await SeedCompanyUserAsync();
+        AuthenticateAs(_companyController, seeded.Company.Id, "CompanyAdmin");
+
+        var content = "fake image content"u8.ToArray();
+        var formFile = new FormFile(new MemoryStream(content), 0, content.Length, "file", "shop_logo.png")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "image/png"
+        };
+
+        var uploadResult = await _companyController.UploadLogo(formFile, CancellationToken.None);
+        var uploadOk = Assert.IsType<OkObjectResult>(uploadResult);
+        var uploadedProfile = Assert.IsType<MobileCompanyProfileDto>(uploadOk.Value);
+        Assert.NotNull(uploadedProfile.LogoPath);
+        Assert.StartsWith("/uploads/logos/logo_", uploadedProfile.LogoPath);
+        Assert.EndsWith(".png", uploadedProfile.LogoPath);
+
+        // Delete logo
+        var deleteResult = await _companyController.DeleteLogo(CancellationToken.None);
+        var deleteOk = Assert.IsType<OkObjectResult>(deleteResult);
+        var deletedProfile = Assert.IsType<MobileCompanyProfileDto>(deleteOk.Value);
+        Assert.Null(deletedProfile.LogoPath);
     }
 
     [Fact]
@@ -592,8 +661,10 @@ public sealed class MobileAuthLoginTests : IDisposable
         var result = await _controller.Register(request, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        var response = Assert.IsType<MobileAuthTokenResponse>(ok.Value);
-        Assert.False(string.IsNullOrWhiteSpace(response.AccessToken));
+        var response = Assert.IsType<MobileApiRegisterResponse>(ok.Value);
+        Assert.Equal("PendingOnboarding", response.Status);
+        Assert.NotEqual(Guid.Empty, response.CompanyId);
+        Assert.NotEqual(Guid.Empty, response.MobileUserId);
     }
 
     [Fact]
@@ -655,5 +726,15 @@ public sealed class MobileAuthLoginTests : IDisposable
         public Guid? CompanyId => null;
         public string? Region => null;
         public bool IsPlatformUser => true;
+    }
+
+    private sealed class TestWebHostEnv : Microsoft.AspNetCore.Hosting.IWebHostEnvironment
+    {
+        public string WebRootPath { get; set; } = Path.Combine(Path.GetTempPath(), $"FlorapriseTest_{Guid.NewGuid():N}", "wwwroot");
+        public Microsoft.Extensions.FileProviders.IFileProvider WebRootFileProvider { get; set; } = null!;
+        public string ApplicationName { get; set; } = "Floraprise.Mobile.Tests";
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = null!;
+        public string ContentRootPath { get; set; } = Path.GetTempPath();
+        public string EnvironmentName { get; set; } = "Testing";
     }
 }

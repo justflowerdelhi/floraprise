@@ -277,8 +277,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 isLoading: _ordersLoading,
                                 onViewAllOrders: () =>
                                     Navigator.pushNamed(context, '/orders'),
-                                onOrderTap: (_) =>
-                                    Navigator.pushNamed(context, '/orders'),
+                                onOrderTap: (order) => Navigator.pushNamed(
+                                  context,
+                                  '/order-detail',
+                                  arguments: {
+                                    'orderId': order.id,
+                                    'cloudOrderId': order.cloudOrderId,
+                                  },
+                                ),
                                 onNewSale: () =>
                                     Navigator.pushNamed(context, '/walkin-sales'),
                               ),
@@ -335,8 +341,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                           isLoading: _ordersLoading,
                           onViewAllOrders: () =>
                               Navigator.pushNamed(context, '/orders'),
-                          onOrderTap: (_) =>
-                              Navigator.pushNamed(context, '/orders'),
+                          onOrderTap: (order) => Navigator.pushNamed(
+                            context,
+                            '/order-detail',
+                            arguments: {
+                              'orderId': order.id,
+                              'cloudOrderId': order.cloudOrderId,
+                            },
+                          ),
                           onNewSale: () =>
                               Navigator.pushNamed(context, '/walkin-sales'),
                         ),
@@ -609,16 +621,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   String _taskPriorityLabel(TaskPriority priority) {
-    switch (priority) {
-      case TaskPriority.low:
-        return 'Low';
-      case TaskPriority.normal:
-        return 'Normal';
-      case TaskPriority.high:
-        return 'High';
-      case TaskPriority.urgent:
-        return 'Critical';
-    }
+    return priority.displayLabel;
   }
 
   Widget _buildWorkspaces(BuildContext context) {

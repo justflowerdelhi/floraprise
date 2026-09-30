@@ -61,6 +61,17 @@ public class SumpoojDbContext
     public DbSet<ProductCategoryEntity> ProductCategories => Set<ProductCategoryEntity>();
     public DbSet<Barcode> Barcodes => Set<Barcode>();
 
+    // Floraprise Library (Global Reference Data)
+    public DbSet<LibraryCategory> LibraryCategories => Set<LibraryCategory>();
+    public DbSet<LibraryProduct> LibraryProducts => Set<LibraryProduct>();
+    public DbSet<LibraryRecipe> LibraryRecipes => Set<LibraryRecipe>();
+    public DbSet<LibraryRecipeItem> LibraryRecipeItems => Set<LibraryRecipeItem>();
+    public DbSet<LibraryDesign> LibraryDesigns => Set<LibraryDesign>();
+    public DbSet<LibraryCardTemplate> LibraryCardTemplates => Set<LibraryCardTemplate>();
+    public DbSet<LibraryTutorial> LibraryTutorials => Set<LibraryTutorial>();
+    public DbSet<LibraryFestival> LibraryFestivals => Set<LibraryFestival>();
+    public DbSet<LibraryWeddingDate> LibraryWeddingDates => Set<LibraryWeddingDate>();
+
     // New entities
     public DbSet<DeliveryZone> DeliveryZones => Set<DeliveryZone>();
     public DbSet<WireOrder> WireOrders => Set<WireOrder>();
@@ -122,6 +133,7 @@ public class SumpoojDbContext
     public DbSet<CloudDesign> CloudDesigns => Set<CloudDesign>();
     public DbSet<ReadyBouquetRecord> ReadyBouquetRecords => Set<ReadyBouquetRecord>();
     public DbSet<ReadyBouquetRefreshEvent> ReadyBouquetRefreshEvents => Set<ReadyBouquetRefreshEvent>();
+    public DbSet<CrmEnquiry> CrmEnquiries => Set<CrmEnquiry>();
 
     // Marketing
     public DbSet<DemoRequest> DemoRequests => Set<DemoRequest>();
@@ -616,6 +628,9 @@ public class SumpoojDbContext
             .HasIndex(p => new { p.CompanyId, p.Sku })
             .IsUnique();
 
+        modelBuilder.Entity<Product>()
+            .HasIndex(p => p.SourceLibraryProductId);
+
         modelBuilder.Entity<ProductBatch>()
             .HasIndex(b => new { b.CompanyId, b.BatchNumber });
 
@@ -666,6 +681,11 @@ public class SumpoojDbContext
         modelBuilder.Entity<Payment>()
             .Property(p => p.Reference)
             .HasMaxLength(256);
+        modelBuilder.Entity<Payment>()
+            .Property(p => p.PaymentType)
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .HasDefaultValue(PaymentType.SaleTender);
         modelBuilder.Entity<Payment>()
             .HasIndex(p => new { p.OrderId, p.ClientPaymentId })
             .IsUnique()
@@ -897,6 +917,9 @@ public class SumpoojDbContext
             .HasForeignKey(c => c.RecipeId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<FloralRecipe>()
+            .HasIndex(r => r.SourceLibraryRecipeId);
+
         modelBuilder.Entity<ProductionJob>()
             .HasMany(j => j.MaterialUsages)
             .WithOne()
@@ -927,5 +950,28 @@ public class SumpoojDbContext
             .HasIndex(w => w.PhoneNumberId)
             .IsUnique();
 
+        modelBuilder.Entity<CloudDesign>()
+            .HasIndex(d => d.SourceLibraryDesignId);
+
+        // ===============================
+        // CRM Enquiries
+        // ===============================
+        modelBuilder.Entity<CrmEnquiry>(entity =>
+        {
+            entity.ToTable("CrmEnquiries");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.CompanyId, e.ClientSyncId }).IsUnique();
+            entity.HasIndex(e => new { e.CompanyId, e.CustomerId });
+            entity.HasIndex(e => new { e.CompanyId, e.Status });
+            entity.HasIndex(e => new { e.CompanyId, e.NextFollowUpAtUtc });
+            entity.HasIndex(e => new { e.CompanyId, e.CreatedAtUtc });
+            entity.Property(e => e.ClientSyncId).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.Category).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.NextAction).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Location).HasMaxLength(255);
+            entity.Property(e => e.LostReason).HasMaxLength(255);
+            entity.Property(e => e.BudgetAmount).HasColumnType("decimal(18,2)");
+        });
     }
 }

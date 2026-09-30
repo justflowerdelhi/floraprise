@@ -102,6 +102,7 @@ class AssociateRecord {
   final String? website;
   final String? notes;
   final List<AssociateType> types;
+  final List<String> rawTypes;
   final bool isActive;
   final String createdAt;
   final String updatedAt;
@@ -124,6 +125,7 @@ class AssociateRecord {
     this.website,
     this.notes,
     this.types = const [AssociateType.other],
+    this.rawTypes = const [],
     this.isActive = true,
     required this.createdAt,
     required this.updatedAt,
@@ -153,12 +155,22 @@ class AssociateRecord {
     final deleted = (json['deletedAtUtc'] ?? json['DeletedAtUtc'])?.toString();
 
     List<AssociateType> typesList = const [AssociateType.other];
+    List<String> rawTypesList = [];
     final rawTypes = json['types'] ?? json['Types'];
     if (rawTypes is List) {
-      typesList = rawTypes
-          .map((t) => AssociateTypeExtension.fromStorageValue(t.toString().trim()))
+      rawTypesList = rawTypes
+          .map((t) => t.toString().trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
+      typesList = rawTypesList
+          .map((t) => AssociateTypeExtension.fromStorageValue(t))
           .toList();
     } else if (rawTypes is String) {
+      rawTypesList = rawTypes
+          .split(',')
+          .map((p) => p.trim())
+          .where((p) => p.isNotEmpty)
+          .toList();
       typesList = AssociateRecord.parseTypes(rawTypes);
     }
 
@@ -179,6 +191,7 @@ class AssociateRecord {
       website: website,
       notes: notes,
       types: typesList.isEmpty ? const [AssociateType.other] : typesList,
+      rawTypes: rawTypesList,
       isActive: active,
       createdAt: created,
       updatedAt: updated,
@@ -187,10 +200,16 @@ class AssociateRecord {
   }
 
   String get typesDisplay {
+    if (rawTypes.isNotEmpty) {
+      return rawTypes.join(', ');
+    }
     return types.map((t) => t.displayName).join(', ');
   }
 
   String get typesStorage {
+    if (rawTypes.isNotEmpty) {
+      return rawTypes.join(',');
+    }
     return types.map((t) => t.storageValue).join(',');
   }
 
@@ -218,6 +237,7 @@ class AssociateUpsertInput {
   final String? website;
   final String? notes;
   final List<AssociateType> types;
+  final List<String> rawTypes;
   final bool isActive;
 
   const AssociateUpsertInput({
@@ -234,12 +254,20 @@ class AssociateUpsertInput {
     this.website,
     this.notes,
     this.types = const [AssociateType.other],
+    this.rawTypes = const [],
     this.isActive = true,
   });
 }
 
 class AssociateRepository {
   AssociateRecord _mapAssociateRow(Map<String, Object?> row) {
+    final rawTypesString = row['types'] as String? ?? 'Other';
+    final parsedRawTypes = rawTypesString
+        .split(',')
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+
     return AssociateRecord(
       id: row['id'] as int,
       associateCode: row['associate_code'] as String,
@@ -255,7 +283,8 @@ class AssociateRepository {
       gstNumber: row['gst_number'] as String?,
       website: row['website'] as String?,
       notes: row['notes'] as String?,
-      types: AssociateRecord.parseTypes(row['types'] as String? ?? 'Other'),
+      types: AssociateRecord.parseTypes(rawTypesString),
+      rawTypes: parsedRawTypes,
       isActive: (row['is_active'] as int) == 1,
       createdAt: row['created_at'] as String,
       updatedAt: row['updated_at'] as String,
@@ -478,7 +507,9 @@ class AssociateRepository {
       'gst_number': input.gstNumber?.trim(),
       'website': input.website?.trim(),
       'notes': input.notes?.trim(),
-      'types': input.types.map((t) => t.storageValue).join(','),
+      'types': input.rawTypes.isNotEmpty
+          ? input.rawTypes.join(',')
+          : input.types.map((t) => t.storageValue).join(','),
       'is_active': input.isActive ? 1 : 0,
       'created_at': now,
       'updated_at': now,
@@ -521,7 +552,9 @@ class AssociateRepository {
         'gst_number': input.gstNumber?.trim(),
         'website': input.website?.trim(),
         'notes': input.notes?.trim(),
-        'types': input.types.map((t) => t.storageValue).join(','),
+        'types': input.rawTypes.isNotEmpty
+            ? input.rawTypes.join(',')
+            : input.types.map((t) => t.storageValue).join(','),
         'is_active': input.isActive ? 1 : 0,
         'updated_at': now,
       },

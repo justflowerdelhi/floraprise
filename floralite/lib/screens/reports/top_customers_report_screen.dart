@@ -286,8 +286,9 @@ class _CustomerRow extends StatelessWidget {
                 Text(
                   customer.customerName,
                   style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E2922),
                   ),
                 ),
                 const SizedBox(height: 2),

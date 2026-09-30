@@ -256,6 +256,26 @@ class MobileAuthService {
   Future<String?> getStoredAccessToken() =>
       _secureStorage.read(key: _accessTokenKey);
 
+  /// Registers or updates the push notification token for the current device on backend.
+  Future<void> updatePushToken(String pushToken) async {
+    final token = await _secureStorage.read(key: _accessTokenKey);
+    if (token == null || token.trim().isEmpty) return;
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      await _postJson(
+        '/api/v1/mobile/device/push-token',
+        {
+          'pushToken': pushToken.trim(),
+          'appVersion': '${packageInfo.version}+${packageInfo.buildNumber}',
+        },
+        bearerToken: token,
+      );
+      debugPrint('[MobileAuthService] Push token registered successfully.');
+    } catch (e) {
+      debugPrint('[MobileAuthService] Failed to update push token: $e');
+    }
+  }
+
   Future<Map<String, dynamic>?> readBootstrap() async {
     final user = await _secureStorage.read(key: _userKey);
     if (user == null || user.trim().isEmpty) return null;

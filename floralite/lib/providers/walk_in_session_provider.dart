@@ -26,8 +26,16 @@ class WalkInSessionProvider extends ChangeNotifier {
   WalkInSession get session => _session;
   bool get isBusy => _isBusy;
   String? get error => _error;
+  WalkInManager get walkInManager => _walkInManager;
 
   int get grandTotalPaise => _walkInManager.currentGrandTotal(_session);
+
+  String _formatError(dynamic error) {
+    if (error is StateError) {
+      return error.message;
+    }
+    return error.toString();
+  }
 
   Future<void> initialize(FulfilmentType type) async {
     _isBusy = true;
@@ -36,7 +44,7 @@ class WalkInSessionProvider extends ChangeNotifier {
     try {
       _session = await _walkInManager.startOrResume(type);
     } catch (e) {
-      _error = e.toString();
+      _error = _formatError(e);
       _session = WalkInSession.empty(type);
     } finally {
       _isBusy = false;
@@ -55,7 +63,7 @@ class WalkInSessionProvider extends ChangeNotifier {
       }
       _session = draft;
     } catch (e) {
-      _error = e.toString();
+      _error = _formatError(e);
     } finally {
       _isBusy = false;
       notifyListeners();
@@ -82,7 +90,7 @@ class WalkInSessionProvider extends ChangeNotifier {
         occasion: occasion,
       );
     } catch (e) {
-      _error = e.toString();
+      _error = _formatError(e);
       _session = WalkInSession.empty(type);
     } finally {
       _isBusy = false;
@@ -142,7 +150,7 @@ class WalkInSessionProvider extends ChangeNotifier {
       _session = result.session;
       _businessDataEvents?.publish(source: BusinessDataChangeSource.sale);
     } catch (e) {
-      _error = e.toString();
+      _error = _formatError(e);
     } finally {
       _isBusy = false;
       notifyListeners();
@@ -161,7 +169,7 @@ class WalkInSessionProvider extends ChangeNotifier {
       _businessDataEvents?.publish(source: BusinessDataChangeSource.sale);
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _formatError(e);
       return false;
     } finally {
       _isBusy = false;
@@ -185,7 +193,7 @@ class WalkInSessionProvider extends ChangeNotifier {
       _businessDataEvents?.publish(source: BusinessDataChangeSource.sale);
       return result.orderId;
     } catch (e) {
-      _error = e.toString();
+      _error = _formatError(e);
       return null;
     } finally {
       _isBusy = false;

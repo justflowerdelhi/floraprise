@@ -621,17 +621,10 @@ class _PurchaseListScreenState extends State<PurchaseListScreen> {
   }
 
   Widget _buildPriorityBadge(String priority) {
-    Color color;
-    switch (priority.toLowerCase()) {
-      case 'high':
-        color = Colors.red;
-        break;
-      case 'low':
-        color = Colors.green;
-        break;
-      default:
-        color = Colors.orange;
-    }
+    final isUrgent = priority.toLowerCase() == 'urgent' ||
+        priority.toLowerCase() == 'high';
+    final label = isUrgent ? 'Urgent' : 'Normal';
+    final color = isUrgent ? Colors.red : Colors.orange;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -641,7 +634,7 @@ class _PurchaseListScreenState extends State<PurchaseListScreen> {
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
-        priority,
+        label,
         style: TextStyle(
           color: color,
           fontSize: 12,
@@ -1066,9 +1059,8 @@ class _AddItemDialogState extends State<_AddItemDialog> {
                   decoration: const InputDecoration(labelText: 'Priority'),
                   initialValue: _priority,
                   items: const [
-                    DropdownMenuItem(value: 'High', child: Text('High')),
                     DropdownMenuItem(value: 'Normal', child: Text('Normal')),
-                    DropdownMenuItem(value: 'Low', child: Text('Low')),
+                    DropdownMenuItem(value: 'Urgent', child: Text('Urgent')),
                   ],
                   onChanged: (value) => _priority = value!,
                 ),
@@ -1166,7 +1158,10 @@ class _EditItemDialogState extends State<_EditItemDialog> {
     _quantity = widget.item.quantity;
     _unit = widget.item.unit;
     _supplier = widget.item.supplier ?? '';
-    _priority = widget.item.priority;
+    final rawPriority = widget.item.priority.toLowerCase();
+    _priority = (rawPriority == 'urgent' || rawPriority == 'high')
+        ? 'Urgent'
+        : 'Normal';
     _remarks = widget.item.remarks ?? '';
     _remarksController = TextEditingController(text: _remarks);
     _remarksDictationController = VoiceDictationController(
@@ -1210,9 +1205,8 @@ class _EditItemDialogState extends State<_EditItemDialog> {
                 decoration: const InputDecoration(labelText: 'Priority'),
                 initialValue: _priority,
                 items: const [
-                  DropdownMenuItem(value: 'High', child: Text('High')),
                   DropdownMenuItem(value: 'Normal', child: Text('Normal')),
-                  DropdownMenuItem(value: 'Low', child: Text('Low')),
+                  DropdownMenuItem(value: 'Urgent', child: Text('Urgent')),
                 ],
                 onChanged: (value) => _priority = value!,
               ),

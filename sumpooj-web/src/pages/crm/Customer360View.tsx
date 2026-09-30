@@ -74,8 +74,15 @@ import {
   getPointsToNextTier,
   daysSince,
 } from './CRMTypes';
-import { updateCustomerNotes } from '../../api/customer.api';
+import { updateCustomerNotes, getPurchaseInsights } from '../../api/customer.api';
 import { getCrmCustomer360 } from '../../api/crm.api';
+
+interface PurchaseInsight {
+  categoryName: string;
+  orderCount: number;
+  totalAmountSpent: number;
+  lastPurchaseDate: string;
+}
 
 // -----------------------------------------------------------------------------
 // Tab Panel Component
@@ -494,6 +501,7 @@ export default function Customer360View({ customerId, onBack }: Customer360ViewP
   const [orders, setOrders] = useState<CustomerOrderSummary[]>([]);
   const [events, setEvents] = useState<CustomerEventSummary[]>([]);
   const [loyaltyTransactions, setLoyaltyTransactions] = useState<LoyaltyTransaction[]>([]);
+  const [purchaseInsights, setPurchaseInsights] = useState<PurchaseInsight[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -509,12 +517,16 @@ export default function Customer360View({ customerId, onBack }: Customer360ViewP
       setLoading(true);
       setError(null);
       try {
-        const result = await getCrmCustomer360(resolvedCustomerId);
+        const [result, insights] = await Promise.all([
+           getCrmCustomer360(resolvedCustomerId!),
+           getPurchaseInsights(resolvedCustomerId!).catch(() => [])
+        ]);
         if (active) {
           setCustomer(result.customer);
           setOrders(result.orders);
           setEvents(result.events);
           setLoyaltyTransactions(result.loyaltyTransactions);
+          setPurchaseInsights(insights || []);
         }
       } catch (err) {
         console.error('Failed to load customer 360:', err);
@@ -732,6 +744,55 @@ export default function Customer360View({ customerId, onBack }: Customer360ViewP
 
           {/* Loyalty Card */}
           <LoyaltyStatusCard customer={customer} />
+
+          {/* Purchase Insights */}
+          <Paper sx={{ p: 3, mt: 3, borderRadius: 3, bgcolor: dk ? '#1a1a2e' : '#fff' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+              Purchase Insights
+            </Typography>
+            {purchaseInsights.length === 0 ? (
+              <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                No purchase history found.
+              </Typography>
+            ) : (
+              <Stack spacing={2}>
+                <Box>
+                  <Typography variant="body2" sx={{ opacity: 0.7, mb: 1 }}>
+                    Categories Purchased
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {purchaseInsights.map((insight) => (
+                      <Chip
+                        key={insight.categoryName}
+                        label={insight.categoryName}
+                        size="small"
+                        sx={{ bgcolor: 'rgba(33, 150, 243, 0.1)', color: '#2196f3', fontSize: 11 }}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+                <Divider sx={{ borderColor: dk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }} />
+                {purchaseInsights.map((insight) => (
+                  <Box key={insight.categoryName}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                      {insight.categoryName}
+                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
+                      <Typography variant="body2" sx={{ fontSize: 12 }}>
+                        Orders: {insight.orderCount}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontSize: 12 }}>
+                        Spent: {formatCurrency(insight.totalAmountSpent)}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontSize: 12 }}>
+                        Last: {insight.lastPurchaseDate ? new Date(insight.lastPurchaseDate).toLocaleDateString('en-IN') : '-'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                ))}
+              </Stack>
+            )}
+          </Paper>
         </Grid>
 
         {/* Right Column - Metrics & History */}

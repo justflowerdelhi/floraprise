@@ -15,10 +15,10 @@ export default function ContactPage() {
           <div className="space-y-3 text-gray-700">
             <p>
               <a
-                href="tel:+919990224611"
+                href="tel:+919971060931"
                 className="hover:text-green-700 font-medium"
               >
-                +91-9990224611
+                +91-9971060931
               </a>
             </p>
             <p>

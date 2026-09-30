@@ -1,9 +1,10 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sumpooj.Application.Authorization;
 using Sumpooj.Application.Companies;
+using Sumpooj.Domain.Entities;
 using Sumpooj.Infrastructure;
 using Sumpooj.Infrastructure.Identity;
 using Sumpooj.Infrastructure.Persistence;
@@ -151,6 +152,73 @@ public class CompaniesController : ControllerBase
             companyName = company.Name,
             adminEmail = adminUser.Email,
             tempPassword,
+        });
+    }
+
+    [HttpPost("{companyId:guid}/remediate-default-location")]
+    public async Task<IActionResult> RemediateDefaultLocation(Guid companyId)
+    {
+        var company = await _service.GetByIdAsync(companyId);
+        if (company == null) return NotFound(new { message = "Company not found." });
+
+        var locations = await _db.Locations
+            .Where(l => l.CompanyId == companyId)
+            .ToListAsync();
+
+        var existingDefault = locations.FirstOrDefault(l => l.IsDefault && l.IsActive);
+        if (existingDefault != null)
+        {
+            return Ok(new
+            {
+                success = true,
+                message = "Active default location already exists.",
+                location = new
+                {
+                    id = existingDefault.Id,
+                    name = existingDefault.Name,
+                    code = existingDefault.Code,
+                    type = existingDefault.LocationType.ToString(),
+                    isDefault = existingDefault.IsDefault,
+                    isActive = existingDefault.IsActive
+                }
+            });
+        }
+
+        var target = locations.FirstOrDefault(l => l.Name.Equals("Main Store", StringComparison.OrdinalIgnoreCase) || l.Code.Equals("MAIN-01", StringComparison.OrdinalIgnoreCase))
+            ?? locations.FirstOrDefault();
+
+        if (target != null)
+        {
+            target.Activate();
+            target.SetAsDefault();
+        }
+        else
+        {
+            target = new Location(
+                companyId,
+                name: "Main Store",
+                code: "MAIN-01",
+                locationType: LocationType.Store,
+                address: company.Address);
+            target.SetAsDefault();
+            _db.Locations.Add(target);
+        }
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            message = "Default location provisioned successfully.",
+            location = new
+            {
+                id = target.Id,
+                name = target.Name,
+                code = target.Code,
+                type = target.LocationType.ToString(),
+                isDefault = target.IsDefault,
+                isActive = target.IsActive
+            }
         });
     }
 

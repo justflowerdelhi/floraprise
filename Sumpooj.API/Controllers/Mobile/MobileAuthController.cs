@@ -124,6 +124,8 @@ public sealed class MobileAuthController : MobileApiControllerBase
                 taxIdentifier: null
             );
 
+            company.Deactivate();
+
             // Company + its default Location must be created atomically.
             var companyCreationStrategy = _db.Database.CreateExecutionStrategy();
             await companyCreationStrategy.ExecuteAsync(async () =>
@@ -168,44 +170,39 @@ public sealed class MobileAuthController : MobileApiControllerBase
                 throw new InvalidOperationException($"Failed to add user to role: {errors}");
             }
 
-            _logger.LogInformation("[Mobile Register] Calling MobileClientService.LoginAsync for companyId: {CompanyId}, deviceId: {DeviceId}", companyId, request.DeviceId);
-            var loginResponse = await _mobileClientService.LoginAsync(
-                new MobileApiLoginRequest(
-                    CompanyId: companyId,
-                    Identifier: email,
-                    Password: request.Password,
-                    DeviceId: request.DeviceId,
-                    Platform: request.Platform,
-                    Manufacturer: request.Manufacturer,
-                    Model: request.Model,
-                    OsVersion: request.OsVersion,
-                    AppVersion: request.AppVersion,
-                    PushToken: request.PushToken,
-                    IpAddress: request.IpAddress),
-                new RegisterMobileCustomerRequest(
-                    CompanyId: companyId,
-                    BusinessName: request.CompanyName.Trim(),
-                    OwnerName: request.OwnerName.Trim(),
-                    Mobile: mobile,
-                    Email: email,
-                    City: request.City.Trim(),
-                    State: null,
-                    Country: "IN",
-                    FullName: request.OwnerName.Trim(),
-                    DeviceId: request.DeviceId,
-                    Platform: request.Platform,
-                    Manufacturer: request.Manufacturer,
-                    Model: request.Model,
-                    OsVersion: request.OsVersion,
-                    AppVersion: request.AppVersion,
-                    PushToken: request.PushToken,
-                    IpAddress: request.IpAddress,
-                    IdentityUserId: user.Id,
-                    ActorUserId: user.Id),
-                cancellationToken);
+            _logger.LogInformation("[Mobile Register] Creating MobileCustomer and MobileUser in PendingOnboarding state for: {Email}", email);
+            var customer = new Domain.Entities.MobileCustomer(
+                companyId: companyId,
+                businessName: request.CompanyName.Trim(),
+                ownerName: request.OwnerName.Trim(),
+                mobile: mobile);
+            customer.UpdateProfile(email, string.IsNullOrWhiteSpace(request.City) ? null : request.City.Trim(), null, "IN", user.Id);
+            customer.SetCreatedBy(user.Id);
+            _db.MobileCustomers.Add(customer);
+            await _db.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("[Mobile Register] Registration completed successfully for email: {Email}", email);
-            return Ok(loginResponse);
+            var mobileUser = new Domain.Entities.MobileUser(
+                companyId: companyId,
+                mobileCustomerId: customer.Id,
+                fullName: request.OwnerName.Trim(),
+                mobile: mobile,
+                email: email);
+            mobileUser.SetPendingOnboarding(user.Id);
+            mobileUser.SetCreatedBy(user.Id);
+            _db.MobileUsers.Add(mobileUser);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("[Mobile Register] Registration completed in PendingOnboarding state for email: {Email}, mobileUserId: {MobileUserId}", email, mobileUser.Id);
+
+            return Ok(new MobileApiRegisterResponse(
+                Status: "PendingOnboarding",
+                CompanyId: companyId,
+                MobileUserId: mobileUser.Id,
+                BusinessName: company.Name,
+                OwnerName: request.OwnerName.Trim(),
+                Mobile: mobile,
+                Email: email,
+                Message: "Registration submitted successfully. Your Floraprise account is awaiting activation by Central Admin."));
         }
         catch (Exception ex)
         {
@@ -317,6 +314,17 @@ public sealed class MobileAuthController : MobileApiControllerBase
         {
             var response = await _mobileClientService.LoginAsync(request, cancellationToken);
             return Ok(response);
+        }
+        catch (UnauthorizedAccessException uex) when (uex.Message.Contains("ACCOUNT_PENDING_ACTIVATION"))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                errorCode = "ACCOUNT_PENDING_ACTIVATION",
+                code = "ACCOUNT_PENDING_ACTIVATION",
+                title = "Account awaiting activation",
+                detail = "Your Floraprise account is awaiting activation.",
+                message = "Your Floraprise account is awaiting activation."
+            });
         }
         catch (Exception ex)
         {

@@ -5,6 +5,7 @@ import '../data/repositories/associate_repository.dart';
 import '../controllers/voice_dictation_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/associate_provider.dart';
+import '../services/associate_type_service.dart';
 import '../services/contact_picker_service.dart';
 import '../services/speech_recognition_service.dart';
 import '../widgets/common_widgets.dart';
@@ -669,9 +670,25 @@ class _AssociatesScreenState extends State<AssociatesScreen> {
     addressDictationController.bindController(addressController);
     notesDictationController.bindController(notesController);
 
-    var selectedTypes = existing?.types ?? [AssociateType.other];
+    final associateTypeService = AssociateTypeService();
+    var availableTypes = await associateTypeService.getTypes();
+    String selectedType;
+    if (existing != null && existing.rawTypes.isNotEmpty) {
+      selectedType = existing.rawTypes.first;
+    } else if (existing != null && existing.types.isNotEmpty) {
+      selectedType = existing.types.first.displayName;
+    } else {
+      selectedType =
+          availableTypes.isNotEmpty ? availableTypes.first : 'Florist';
+    }
+    if (!availableTypes.contains(selectedType)) {
+      availableTypes = [...availableTypes, selectedType];
+    }
+
     var isActive = existing?.isActive ?? true;
     var sameAsPhone = existing == null || existing.whatsapp == existing.phone;
+
+    if (!mounted) return null;
 
     final result = await showDialog<AssociateUpsertInput>(
       context: context,
@@ -811,36 +828,82 @@ class _AssociatesScreenState extends State<AssociatesScreen> {
                       decoration: const InputDecoration(),
                     ),
                     const SizedBox(height: 10),
-                    const Text(
-                      'Associate Types *',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: AssociateTypeExtension.allTypes.map((type) {
-                        final isSelected = selectedTypes.contains(type);
-                        return FilterChip(
-                          label: Text(type.displayName),
-                          selected: isSelected,
-                          onSelected: (selected) {
-                            setStateDialog(() {
-                              if (selected) {
-                                if (!selectedTypes.contains(type)) {
-                                  selectedTypes = [...selectedTypes, type];
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            key: const Key('associate_type_dropdown'),
+                            initialValue: availableTypes.contains(selectedType)
+                                ? selectedType
+                                : null,
+                            decoration: const InputDecoration(
+                              labelText: 'Associate Type *',
+                            ),
+                            items: [
+                              ...availableTypes.map((type) => DropdownMenuItem<String>(
+                                    value: type,
+                                    child: Text(type),
+                                  )),
+                              const DropdownMenuItem<String>(
+                                value: '__add_new__',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.add_circle_outline, size: 18),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      '+ Add Associate Type',
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) async {
+                              if (value == '__add_new__') {
+                                final newType = await _showAddAssociateTypeDialog(
+                                  context,
+                                  availableTypes,
+                                );
+                                if (newType != null && newType.isNotEmpty) {
+                                  final updatedTypes =
+                                      await associateTypeService.getTypes();
+                                  setStateDialog(() {
+                                    availableTypes = updatedTypes;
+                                    selectedType = newType;
+                                  });
+                                } else {
+                                  setStateDialog(() {});
                                 }
-                              } else {
-                                if (selectedTypes.length > 1) {
-                                  selectedTypes = selectedTypes
-                                      .where((t) => t != type)
-                                      .toList();
-                                }
+                              } else if (value != null) {
+                                setStateDialog(() {
+                                  selectedType = value;
+                                });
                               }
-                            });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          key: const Key('add_associate_type_button'),
+                          tooltip: 'Add Associate Type',
+                          onPressed: () async {
+                            final newType = await _showAddAssociateTypeDialog(
+                              context,
+                              availableTypes,
+                            );
+                            if (newType != null && newType.isNotEmpty) {
+                              final updatedTypes =
+                                  await associateTypeService.getTypes();
+                              setStateDialog(() {
+                                availableTypes = updatedTypes;
+                                selectedType = newType;
+                              });
+                            }
                           },
-                        );
-                      }).toList(),
+                          icon: const Icon(Icons.add),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 10),
                     SwitchListTile(
@@ -895,13 +958,16 @@ class _AssociatesScreenState extends State<AssociatesScreen> {
                   return;
                 }
 
-                if (selectedTypes.isEmpty) {
+                if (selectedType.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('At least one type is required.')),
+                        content: Text('Associate type is required.')),
                   );
                   return;
                 }
+
+                final parsedEnum =
+                    AssociateTypeExtension.fromStorageValue(selectedType);
 
                 Navigator.pop(
                   context,
@@ -918,7 +984,8 @@ class _AssociatesScreenState extends State<AssociatesScreen> {
                     gstNumber: gstNumberController.text.trim(),
                     website: websiteController.text.trim(),
                     notes: notesController.text.trim(),
-                    types: selectedTypes,
+                    types: [parsedEnum],
+                    rawTypes: [selectedType],
                     isActive: isActive,
                   ),
                 );
@@ -931,6 +998,63 @@ class _AssociatesScreenState extends State<AssociatesScreen> {
     );
     addressDictationController.dispose();
     notesDictationController.dispose();
+    return result;
+  }
+
+  Future<String?> _showAddAssociateTypeDialog(
+    BuildContext context,
+    List<String> currentTypes,
+  ) async {
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final typeService = AssociateTypeService();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add Associate Type'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            key: const Key('add_associate_type_field'),
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Associate Type Name *',
+              hintText: 'e.g. Wholesaler, Decorator',
+            ),
+            validator: (val) {
+              final text = val?.trim() ?? '';
+              if (text.isEmpty) {
+                return 'Please enter an associate type name.';
+              }
+              if (typeService.isDuplicate(text, currentTypes)) {
+                return 'Associate type already exists.';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const Key('add_associate_type_confirm_button'),
+            onPressed: () async {
+              if (formKey.currentState?.validate() != true) return;
+              final newType = controller.text.trim();
+              await typeService.addCustomType(newType);
+              if (!dialogContext.mounted) return;
+              Navigator.pop(dialogContext, newType);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
     return result;
   }
 

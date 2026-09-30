@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -19,19 +19,22 @@ public class AuthController : ControllerBase
     private readonly ILogger<AuthController> _logger;
     private readonly AuditLogService _auditLogService;
     private readonly SumpoojDbContext _db;
+    private readonly IWebHostEnvironment _env;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         IConfiguration config,
         ILogger<AuthController> logger,
         AuditLogService auditLogService,
-        SumpoojDbContext db)
+        SumpoojDbContext db,
+        IWebHostEnvironment env)
     {
         _userManager = userManager;
         _config = config;
         _logger = logger;
         _auditLogService = auditLogService;
         _db = db;
+        _env = env;
     }
 
     [HttpPost("login")]
@@ -46,8 +49,24 @@ public class AuthController : ControllerBase
 
             request = request with { Email = request.Email.Trim() };
 
-            using var dbTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            if (!await _db.Database.CanConnectAsync(dbTimeout.Token))
+            var timeoutDuration = _env.IsDevelopment() ? TimeSpan.FromSeconds(10) : TimeSpan.FromSeconds(2);
+            using var dbTimeout = new CancellationTokenSource(timeoutDuration);
+            bool canConnect;
+            try
+            {
+                canConnect = await _db.Database.CanConnectAsync(dbTimeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                canConnect = false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Database connectivity check threw an exception.");
+                canConnect = false;
+            }
+
+            if (!canConnect)
             {
                 _logger.LogWarning("Login blocked because database connectivity check failed.");
                 return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "Login temporarily unavailable. Please try again shortly." });
@@ -105,6 +124,24 @@ public class AuthController : ControllerBase
                 }
 
                 return Unauthorized(new { message = "Invalid email or password" });
+            }
+
+            if (user.CompanyId.HasValue)
+            {
+                var company = await _db.Companies.AsNoTracking().FirstOrDefaultAsync(c => c.Id == user.CompanyId.Value);
+                var mobileUser = await _db.MobileUsers.AsNoTracking().FirstOrDefaultAsync(
+                    u => u.CompanyId == user.CompanyId.Value && (u.Email == user.Email || u.Mobile == user.PhoneNumber) && !u.IsDeleted);
+
+                if ((company != null && !company.IsActive) || (mobileUser != null && mobileUser.Status == MobileUserStatus.PendingOnboarding))
+                {
+                    _logger.LogWarning("Login blocked because account is awaiting activation for: {Email}", request.Email);
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        errorCode = "ACCOUNT_PENDING_ACTIVATION",
+                        code = "ACCOUNT_PENDING_ACTIVATION",
+                        message = "Your Floraprise account is awaiting activation."
+                    });
+                }
             }
 
             var roles = await _userManager.GetRolesAsync(user);

@@ -5,6 +5,7 @@ import '../data/database/app_database.dart';
 import '../data/repositories/business_profile_repository.dart';
 import '../data/repositories/cloud_company_profile_repository.dart';
 import '../models/fiscal_profile.dart';
+import '../services/api_base_url.dart';
 import '../services/storage_mode_service.dart';
 
 class SettingsChangeNotifier extends ChangeNotifier {
@@ -41,8 +42,8 @@ class BusinessSettings {
   FiscalProfile get resolvedFiscalProfile =>
       fiscalProfile ??
       CountryPresets.india().copyWith(
-        taxIdentifier: gstNumber.isEmpty ? null : gstNumber,
-        taxEnabled: gstRegistered,
+        taxIdentifier: gstNumber.trim().isEmpty ? null : gstNumber.trim(),
+        taxEnabled: gstRegistered && gstNumber.trim().isNotEmpty,
       );
 }
 
@@ -107,9 +108,9 @@ class BusinessSettingsManager {
           final taxId = cloudProfile.taxIdentifier?.trim() ?? '';
           return BusinessSettings(
             shopName: cloudProfile.name.trim(),
-            ownerName: '',
+            ownerName: cloudProfile.ownerName?.trim() ?? '',
             subtitle: cloudProfile.shortDescription?.trim() ?? '',
-            logoPath: '',
+            logoPath: resolveBusinessLogoUrl(cloudProfile.logoPath),
             phone: cloudProfile.phone?.trim() ?? '',
             address: cloudProfile.address?.trim() ?? '',
             gstRegistered: taxId.isNotEmpty,
@@ -143,9 +144,9 @@ class BusinessSettingsManager {
         final taxId = cloudProfile.taxIdentifier?.trim() ?? '';
         return BusinessSettings(
           shopName: cloudProfile.name.trim(),
-          ownerName: '',
+          ownerName: cloudProfile.ownerName?.trim() ?? '',
           subtitle: cloudProfile.shortDescription?.trim() ?? '',
-          logoPath: '',
+          logoPath: resolveBusinessLogoUrl(cloudProfile.logoPath),
           phone: cloudProfile.phone?.trim() ?? '',
           address: cloudProfile.address?.trim() ?? '',
           gstRegistered: taxId.isNotEmpty,
@@ -187,8 +188,9 @@ class BusinessSettingsManager {
     final deliveryRaw = await _readValue(db, _deliveryChargeKey);
     final preparationBufferRaw =
         await _readValue(db, _minimumPreparationBufferMinutesKey);
-
-    final gstRegistered = gstRaw == null ? true : gstRaw == '1';
+    final hasGstNumber = gstNumber != null && gstNumber.trim().isNotEmpty;
+    final gstRegistered =
+        (gstRaw == null ? false : gstRaw == '1') && hasGstNumber;
     final defaultDeliveryChargePaise = int.tryParse(deliveryRaw ?? '') ?? 0;
     final minimumPreparationBufferMinutes =
         _normalizePreparationBufferMinutes(preparationBufferRaw);
@@ -383,23 +385,36 @@ class BusinessSettingsManager {
         final cloudProfile =
             await _cloudCompanyProfileRepository.getCachedProfile();
         if (cloudProfile != null && cloudProfile.name.trim().isNotEmpty) {
-          final region = cloudProfile.region.trim().isNotEmpty
-              ? cloudProfile.region.trim()
-              : CountryPresets.countryCodeForCurrency(cloudProfile.currencyCode);
-          final preset = CountryPresets.forCountry(
-              region.isNotEmpty ? region : cloudProfile.currencyCode);
-          final curr = cloudProfile.currencyCode.trim().isNotEmpty
-              ? cloudProfile.currencyCode.trim()
-              : preset.currencyCode;
-          final symbol = curr.toUpperCase() == 'USD'
-              ? '\$'
-              : (curr.toUpperCase() == 'AED'
-                  ? 'د.إ'
-                  : (curr.toUpperCase() == 'INR' ? '₹' : preset.currencySymbol));
-          final taxId = cloudProfile.taxIdentifier?.trim();
+          final region = cloudProfile.region.trim();
+          final explicitCurr = cloudProfile.currencyCode?.trim();
+          final hasExplicitCurr =
+              explicitCurr != null && explicitCurr.isNotEmpty;
 
-          final taxEnabled = cloudProfile.taxEnabled ??
-              ((taxId != null && taxId.isNotEmpty) || preset.taxEnabled);
+          // Country resolution:
+          // 1. From explicit region
+          // 2. If region is empty, from explicit currencyCode
+          // 3. Fallback to IN (India)
+          final resolvedCountry = region.isNotEmpty
+              ? region
+              : (hasExplicitCurr
+                  ? CountryPresets.countryCodeForCurrency(explicitCurr)
+                  : 'IN');
+
+          final preset = CountryPresets.forCountry(resolvedCountry);
+
+          // Currency resolution:
+          // A. Explicit company currency if present
+          // B. Otherwise, country preset default currency
+          // C. Safe fallback
+          final curr = hasExplicitCurr
+              ? explicitCurr.toUpperCase()
+              : preset.currencyCode;
+          final currInfo = CountryPresets.currencyForCode(curr);
+          final symbol = currInfo?.symbol ?? preset.currencySymbol;
+
+          final taxId = cloudProfile.taxIdentifier?.trim();
+          final hasTaxId = taxId != null && taxId.isNotEmpty;
+          final taxEnabled = cloudProfile.taxEnabled ?? hasTaxId;
           final taxLabel = cloudProfile.taxLabel?.trim().isNotEmpty == true
               ? cloudProfile.taxLabel!.trim()
               : preset.taxLabel;
@@ -416,7 +431,7 @@ class BusinessSettingsManager {
             taxLabel: taxLabel,
             taxRatePercent: taxRatePercent,
             taxInclusive: taxInclusive,
-            taxIdentifier: taxId,
+            taxIdentifier: hasTaxId ? taxId : null,
             locale: preset.locale,
             timeZone: cloudProfile.timeZone.isNotEmpty
                 ? cloudProfile.timeZone
@@ -453,15 +468,29 @@ class BusinessSettingsManager {
       final taxRatePercent =
           double.tryParse(storedTaxRate ?? '') ?? preset.taxRatePercent;
 
+      final hasStoredCurrency =
+          storedCurrency != null && storedCurrency.trim().isNotEmpty;
+      final curr = hasStoredCurrency
+          ? storedCurrency.trim().toUpperCase()
+          : preset.currencyCode;
+      final currInfo = CountryPresets.currencyForCode(curr);
+      final symbol = (storedSymbol != null && storedSymbol.trim().isNotEmpty)
+          ? storedSymbol.trim()
+          : (currInfo?.symbol ?? preset.currencySymbol);
+
+      final hasStoredTaxId =
+          storedTaxId != null && storedTaxId.trim().isNotEmpty;
+      final effectiveTaxEnabled = taxEnabled && hasStoredTaxId;
+
       return FiscalProfile(
-        countryCode: storedCountry.trim().toUpperCase(),
-        currencyCode: _fallback(storedCurrency, preset.currencyCode),
-        currencySymbol: _fallback(storedSymbol, preset.currencySymbol),
-        taxEnabled: taxEnabled,
+        countryCode: preset.countryCode,
+        currencyCode: curr,
+        currencySymbol: symbol,
+        taxEnabled: effectiveTaxEnabled,
         taxLabel: _fallback(storedTaxLabel, preset.taxLabel),
         taxRatePercent: taxRatePercent,
         taxInclusive: taxInclusive,
-        taxIdentifier: storedTaxId?.trim(),
+        taxIdentifier: hasStoredTaxId ? storedTaxId.trim() : null,
         locale: _fallback(storedLocale, preset.locale),
         timeZone: _fallback(storedTimeZone, preset.timeZone),
       );
@@ -470,56 +499,92 @@ class BusinessSettingsManager {
     // Fallback: Check business_profile table
     final profile = await _businessProfileRepository.getBusinessProfile();
     if (profile != null) {
+      final hasGst = profile.gstNumber?.trim().isNotEmpty == true;
       return CountryPresets.india().copyWith(
-        taxEnabled: profile.gstRegistered,
-        taxIdentifier: profile.gstNumber,
+        taxEnabled: profile.gstRegistered && hasGst,
+        taxIdentifier: hasGst ? profile.gstNumber!.trim() : null,
       );
     }
 
     // Fallback: Check legacy settings table
     final gstRaw = await _readValue(db, _gstRegisteredKey);
     final gstNumber = await _readValue(db, _gstNumberKey);
-    final gstRegistered = gstRaw == null ? true : gstRaw == '1';
+    final hasGstNumber = gstNumber != null && gstNumber.trim().isNotEmpty;
+    final gstRegistered =
+        (gstRaw == null ? false : gstRaw == '1') && hasGstNumber;
 
     return CountryPresets.india().copyWith(
       taxEnabled: gstRegistered,
-      taxIdentifier: gstNumber?.trim(),
+      taxIdentifier: hasGstNumber ? gstNumber.trim() : null,
     );
   }
 
   Future<void> setFiscalProfile(FiscalProfile profile) async {
-    activeFiscalProfile = profile;
+    final hasTaxId = profile.taxIdentifier != null &&
+        profile.taxIdentifier!.trim().isNotEmpty;
+    final isTaxActive = profile.taxEnabled && hasTaxId;
+    final effectiveProfile = profile.copyWith(
+      taxEnabled: isTaxActive,
+      taxIdentifier: isTaxActive ? profile.taxIdentifier!.trim() : null,
+      clearTaxIdentifier: !isTaxActive,
+    );
+    activeFiscalProfile = effectiveProfile;
+
     if (!kIsWeb) {
       final db = await AppDatabase.instance.database;
-      await _writeValue(db, _countryCodeKey, profile.countryCode);
-      await _writeValue(db, _currencyCodeKey, profile.currencyCode);
-      await _writeValue(db, _currencySymbolKey, profile.currencySymbol);
-      await _writeValue(db, _taxEnabledKey, profile.taxEnabled ? '1' : '0');
-      await _writeValue(db, _taxLabelKey, profile.taxLabel);
+      await _writeValue(db, _countryCodeKey, effectiveProfile.countryCode);
+      await _writeValue(db, _currencyCodeKey, effectiveProfile.currencyCode);
+      await _writeValue(db, _currencySymbolKey, effectiveProfile.currencySymbol);
+      await _writeValue(db, _taxEnabledKey, isTaxActive ? '1' : '0');
+      await _writeValue(db, _taxLabelKey, effectiveProfile.taxLabel);
       await _writeValue(
-          db, _taxRatePercentKey, profile.taxRatePercent.toString());
-      await _writeValue(db, _taxInclusiveKey, profile.taxInclusive ? '1' : '0');
-      if (profile.taxIdentifier != null) {
-        await _writeValue(db, _taxIdentifierKey, profile.taxIdentifier!.trim());
-        await _writeValue(db, _gstNumberKey, profile.taxIdentifier!.trim());
+          db, _taxRatePercentKey, effectiveProfile.taxRatePercent.toString());
+      await _writeValue(
+          db, _taxInclusiveKey, effectiveProfile.taxInclusive ? '1' : '0');
+      if (isTaxActive && effectiveProfile.taxIdentifier != null) {
+        await _writeValue(
+            db, _taxIdentifierKey, effectiveProfile.taxIdentifier!.trim());
+        await _writeValue(
+            db, _gstNumberKey, effectiveProfile.taxIdentifier!.trim());
+      } else {
+        await _writeValue(db, _taxIdentifierKey, '');
+        await _writeValue(db, _gstNumberKey, '');
       }
-      await _writeValue(db, _gstRegisteredKey, profile.taxEnabled ? '1' : '0');
-      await _writeValue(db, _localeKey, profile.locale);
-      await _writeValue(db, _timeZoneKey, profile.timeZone);
+      await _writeValue(db, _gstRegisteredKey, isTaxActive ? '1' : '0');
+      await _writeValue(db, _localeKey, effectiveProfile.locale);
+      await _writeValue(db, _timeZoneKey, effectiveProfile.timeZone);
+
+      // Keep business_profile in sync
+      final existingProfile =
+          await _businessProfileRepository.getBusinessProfile();
+      if (existingProfile != null) {
+        await db.update(
+          'business_profile',
+          {
+            'gst_registered': isTaxActive ? 1 : 0,
+            'gst_number':
+                isTaxActive ? effectiveProfile.taxIdentifier!.trim() : null,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [existingProfile.id],
+        );
+      }
     }
 
     if (kIsWeb || await _storageModeService.isCloud()) {
       final cached = await _cloudCompanyProfileRepository.getCachedProfile();
       if (cached != null) {
         final updated = cached.copyWith(
-          region: profile.countryCode,
-          currencyCode: profile.currencyCode,
-          timeZone: profile.timeZone,
-          taxIdentifier: profile.taxIdentifier,
-          taxEnabled: profile.taxEnabled,
-          taxLabel: profile.taxLabel,
-          taxRatePercent: profile.taxRatePercent,
-          taxInclusive: profile.taxInclusive,
+          region: effectiveProfile.countryCode,
+          currencyCode: effectiveProfile.currencyCode,
+          timeZone: effectiveProfile.timeZone,
+          taxIdentifier: isTaxActive ? effectiveProfile.taxIdentifier : null,
+          clearTaxIdentifier: !isTaxActive,
+          taxEnabled: isTaxActive,
+          taxLabel: effectiveProfile.taxLabel,
+          taxRatePercent: effectiveProfile.taxRatePercent,
+          taxInclusive: effectiveProfile.taxInclusive,
         );
         await _cloudCompanyProfileRepository.saveCachedProfile(updated);
       }

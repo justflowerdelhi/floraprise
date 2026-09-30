@@ -1,17 +1,26 @@
 import 'package:flutter/foundation.dart';
 
 import '../data/repositories/associate_repository.dart';
+import '../data/repositories/cloud_associate_repository.dart';
 import '../managers/order_workflow_manager.dart';
 import '../models/order_status.dart';
+import '../providers/storage_mode_provider.dart';
 
 /// Provider for the Order Workflow screen.
 ///
 /// It re-uses [OrderWorkflowManager] and exposes the current workflow state,
 /// pending actions and loading state.
 class OrderWorkflowProvider extends ChangeNotifier {
-  OrderWorkflowProvider(this._manager);
+  OrderWorkflowProvider(
+    this._manager, {
+    CloudAssociateRepository? cloudAssociateRepository,
+    StorageModeProvider? storageModeProvider,
+  })  : _cloudRepo = cloudAssociateRepository,
+        _storageMode = storageModeProvider;
 
   final OrderWorkflowManager _manager;
+  final CloudAssociateRepository? _cloudRepo;
+  final StorageModeProvider? _storageMode;
 
   OrderWorkflowView? _workflow;
   bool _isLoading = false;
@@ -27,11 +36,21 @@ class OrderWorkflowProvider extends ChangeNotifier {
   List<AssociateRecord> get associates => _associates;
   bool get associatesLoading => _associatesLoading;
 
-  Future<void> loadAssignableAssociates() async {
+  Future<void> loadAssignableAssociates({bool? isCloud}) async {
     _associatesLoading = true;
     notifyListeners();
     try {
-      _associates = await _manager.getAssignableAssociates();
+      final useCloud = isCloud ?? (_storageMode?.isCloud == true || kIsWeb);
+      if (useCloud && _cloudRepo != null) {
+        final cloudRows = await _cloudRepo!.getAll(activeOnly: true);
+        _associates = cloudRows
+            .where((a) =>
+                a.isActive &&
+                (a.types.isNotEmpty || a.rawTypes.isNotEmpty))
+            .toList(growable: false);
+      } else {
+        _associates = await _manager.getAssignableAssociates(isCloud: useCloud);
+      }
     } catch (e) {
       _error = e.toString();
     } finally {

@@ -17,6 +17,7 @@ public class ProductDto
     public string Category { get; set; } = default!;
     public Guid? CategoryId { get; set; }
     public string? CategoryName { get; set; }
+    public Guid? SourceLibraryProductId { get; set; }
     public string? Description { get; set; }
     public string UnitOfMeasure { get; set; } = default!;
     public bool IsActive { get; set; }

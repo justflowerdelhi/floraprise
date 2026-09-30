@@ -13,6 +13,7 @@ class WorkspaceDestination {
     this.selectedIcon,
     this.localizedTitleBuilder,
     this.badgeSelector,
+    this.children = const [],
   });
 
   final String id;
@@ -22,6 +23,9 @@ class WorkspaceDestination {
   final IconData? selectedIcon;
   final String Function(AppLocalizations l10n)? localizedTitleBuilder;
   final int Function(DashboardSummary summary)? badgeSelector;
+  final List<WorkspaceDestination> children;
+
+  bool get hasChildren => children.isNotEmpty;
 
   String getLabel(BuildContext context) {
     if (localizedTitleBuilder != null) {
@@ -75,11 +79,11 @@ class WorkspaceNavigation {
       color: const Color(0xFFD97706),
       items: [
         WorkspaceDestination(
-          id: 'walkin_sales',
-          title: 'Walk-in Sales',
+          id: 'pos',
+          title: 'POS',
           route: '/walkin-sales',
           icon: Icons.point_of_sale_rounded,
-          localizedTitleBuilder: (l10n) => l10n.navWalkinSales,
+          localizedTitleBuilder: (l10n) => 'POS',
         ),
         WorkspaceDestination(
           id: 'orders',
@@ -88,6 +92,37 @@ class WorkspaceNavigation {
           icon: Icons.receipt_long_rounded,
           localizedTitleBuilder: (l10n) => l10n.orders,
           badgeSelector: (s) => s.pendingOrders,
+          children: [
+            const WorkspaceDestination(
+              id: 'orders_walkin',
+              title: 'Walkin Orders',
+              route: '/orders/walkin',
+              icon: Icons.storefront_outlined,
+              selectedIcon: Icons.storefront_rounded,
+            ),
+            WorkspaceDestination(
+              id: 'orders_delivery',
+              title: 'Delivery Orders',
+              route: '/orders/delivery',
+              icon: Icons.local_shipping_outlined,
+              selectedIcon: Icons.local_shipping_rounded,
+              badgeSelector: (s) => s.todayDeliveryCount,
+            ),
+            WorkspaceDestination(
+              id: 'orders_pickup',
+              title: 'Pickup Orders',
+              route: '/orders/pickup',
+              icon: Icons.shopping_bag_outlined,
+              selectedIcon: Icons.shopping_bag_rounded,
+              badgeSelector: (s) => s.todayPickupCount,
+            ),
+            const WorkspaceDestination(
+              id: 'orders_search',
+              title: 'Search Orders',
+              route: '/orders/search',
+              icon: Icons.search_rounded,
+            ),
+          ],
         ),
         WorkspaceDestination(
           id: 'scheduled_tasks',
@@ -95,13 +130,6 @@ class WorkspaceNavigation {
           route: '/scheduler',
           icon: Icons.event_note_rounded,
           badgeSelector: (s) => s.todayTaskCount,
-        ),
-        WorkspaceDestination(
-          id: 'customers',
-          title: 'Customers',
-          route: '/customers',
-          icon: Icons.groups_rounded,
-          localizedTitleBuilder: (l10n) => l10n.customers,
         ),
         const WorkspaceDestination(
           id: 'associates',
@@ -114,6 +142,47 @@ class WorkspaceNavigation {
           title: 'Delivery Workspace',
           route: '/delivery-workspace',
           icon: Icons.location_searching_rounded,
+        ),
+      ],
+    ),
+    WorkspaceSectionData(
+      id: 'crm',
+      title: 'CRM',
+      icon: Icons.support_agent_rounded,
+      color: const Color(0xFF0D9488),
+      items: [
+        WorkspaceDestination(
+          id: 'crm_today',
+          title: 'Today',
+          route: '/crm',
+          icon: Icons.today_outlined,
+          selectedIcon: Icons.today_rounded,
+          localizedTitleBuilder: (l10n) => l10n.crmToday,
+          badgeSelector: (s) => s.todayFollowUps,
+        ),
+        WorkspaceDestination(
+          id: 'crm_enquiries',
+          title: 'Enquiries',
+          route: '/crm/enquiries',
+          icon: Icons.question_answer_outlined,
+          selectedIcon: Icons.question_answer_rounded,
+          localizedTitleBuilder: (l10n) => l10n.crmEnquiries,
+        ),
+        WorkspaceDestination(
+          id: 'crm_customers',
+          title: 'Customers',
+          route: '/crm/customers',
+          icon: Icons.people_outline_rounded,
+          selectedIcon: Icons.people_rounded,
+          localizedTitleBuilder: (l10n) => l10n.customers,
+        ),
+        WorkspaceDestination(
+          id: 'crm_occasions',
+          title: 'Occasions',
+          route: '/crm/occasions',
+          icon: Icons.cake_outlined,
+          selectedIcon: Icons.cake_rounded,
+          localizedTitleBuilder: (l10n) => l10n.crmOccasions,
         ),
       ],
     ),
@@ -149,6 +218,26 @@ class WorkspaceNavigation {
           icon: Icons.inventory_2_rounded,
           localizedTitleBuilder: (l10n) => l10n.inventoryTitle,
           badgeSelector: (s) => s.lowStockItems + s.outOfStockItems,
+        ),
+        const WorkspaceDestination(
+          id: 'production',
+          title: 'Production',
+          route: '/production',
+          icon: Icons.precision_manufacturing_outlined,
+          selectedIcon: Icons.precision_manufacturing_rounded,
+        ),
+        const WorkspaceDestination(
+          id: 'ready_bouquets',
+          title: 'Ready Bouquets',
+          route: '/ready-bouquets',
+          icon: Icons.local_florist_outlined,
+          selectedIcon: Icons.local_florist_rounded,
+        ),
+        const WorkspaceDestination(
+          id: 'library',
+          title: 'Floraprise Library',
+          route: '/library',
+          icon: Icons.menu_book_rounded,
         ),
         WorkspaceDestination(
           id: 'purchase_list',
@@ -245,10 +334,14 @@ class WorkspaceNavigation {
     ),
   ];
 
-  /// Flat list of all workspace destinations (including Home).
+  /// Flat list of all workspace destinations (including Home and child destinations).
   static List<WorkspaceDestination> get allDestinations => [
         homeDestination,
-        for (final section in sections) ...section.items,
+        for (final section in sections)
+          for (final item in section.items) ...[
+            item,
+            ...item.children,
+          ],
       ];
 
   /// Find destination by route.
@@ -257,6 +350,9 @@ class WorkspaceNavigation {
     for (final section in sections) {
       for (final item in section.items) {
         if (item.route == route) return item;
+        for (final child in item.children) {
+          if (child.route == route) return child;
+        }
       }
     }
     return null;

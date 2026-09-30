@@ -262,6 +262,13 @@ public enum PaymentTransactionStatus
     Refunded
 }
 
+public enum PaymentType
+{
+    SaleTender = 1,
+    CreditCollection = 2,
+    Adjustment = 3
+}
+
 // Task Enums
 public enum TaskStatus
 {

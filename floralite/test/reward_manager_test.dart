@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:floraprise/models/fiscal_profile.dart';
 import 'package:floraprise/managers/pricing_manager.dart';
 import 'package:floraprise/managers/reward_manager.dart';
 import 'package:floraprise/models/gst_calculation_type.dart';
@@ -29,6 +30,10 @@ void main() {
 
   test('reward discount applies after GST pricing', () {
     final totals = PricingManager().computeTotals(
+      fiscalProfile: CountryPresets.india().copyWith(
+        taxEnabled: true,
+        taxIdentifier: '29ABCDE1234F1Z5',
+      ),
       lines: const [
         WalkInLineItem(
           description: 'Inclusive bouquet',

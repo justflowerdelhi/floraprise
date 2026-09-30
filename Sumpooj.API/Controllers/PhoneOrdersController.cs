@@ -369,7 +369,7 @@ public class PhoneOrdersController : ControllerBase
             Items = order.Items.Select(i => new PhoneOrderItemResponse
             {
                 Id = i.Id.ToString(),
-                ProductId = i.ProductId.ToString(),
+                ProductId = i.ProductId?.ToString(),
                 ProductName = i.ProductName,
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,

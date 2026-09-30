@@ -3,6 +3,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/subscription.dart';
+import '../providers/library_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../widgets/common_widgets.dart';
 
@@ -163,6 +164,16 @@ class _AboutScreenState extends State<AboutScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  _buildContactTile(
+                    Icons.school_outlined,
+                    'Floraprise Tutorials',
+                    'Learn how to use Floraprise with videos and guides',
+                    () {
+                      context.read<LibraryProvider>().setTab(LibraryTab.tutorials);
+                      Navigator.pushNamed(context, '/library');
+                    },
+                  ),
+                  const Divider(),
                   _buildContactTile(
                     Icons.description,
                     'Privacy Policy',

@@ -227,8 +227,22 @@ class StaffRepository {
       args.addAll([pattern, pattern, pattern]);
     }
     if (roles != null && roles.isNotEmpty) {
-      where.add('role IN (${List.filled(roles.length, '?').join(', ')})');
-      args.addAll(roles.map((role) => role.displayName));
+      final roleClauses = <String>[];
+      for (final role in roles) {
+        if (role == StaffRole.delivery) {
+          roleClauses.add(
+            "(role COLLATE NOCASE IN ('Delivery', 'Driver', 'Delivery Person', 'Delivery Boy') OR can_deliver = 1)",
+          );
+        } else if (role == StaffRole.designer) {
+          roleClauses.add(
+            "(role COLLATE NOCASE IN ('Designer', 'Florist') OR can_design = 1)",
+          );
+        } else {
+          roleClauses.add('role COLLATE NOCASE = ?');
+          args.add(role.displayName);
+        }
+      }
+      where.add('(${roleClauses.join(' OR ')})');
     }
 
     final rows = await db.query(

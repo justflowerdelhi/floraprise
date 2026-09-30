@@ -435,6 +435,7 @@ export interface CustomerSearchFilters {
   query?: string;
   tags?: CustomerTagType[];
   loyaltyTiers?: LoyaltyTier[];
+  purchasedCategories?: string[];
   minLifetimeValue?: number;
   maxLifetimeValue?: number;
   hasUpcomingBirthday?: boolean;

@@ -32,6 +32,7 @@ public class PaymentRepository : IPaymentRepository
                 LocationId = p.LocationId,
                 Method = p.Method.ToString(),
                 Amount = p.Amount,
+                PaymentType = p.PaymentType.ToString(),
                 Status = p.Status.ToString(),
                 TransactionId = p.TransactionId,
                 AuthorizationCode = p.AuthorizationCode,
@@ -60,8 +61,7 @@ public class PaymentRepository : IPaymentRepository
 
     public async Task<List<Payment>> GetByDateAsync(Guid companyId, Guid locationId, DateTime date)
     {
-        var dayStart = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
-        var dayEnd = dayStart.AddDays(1);
+        var (dayStart, dayEnd) = GetUtcRangeForBusinessDate(date);
         var query = _db.Payments
             .Where(p => p.CompanyId == companyId
                 && p.CreatedAtUtc >= dayStart && p.CreatedAtUtc < dayEnd
@@ -73,6 +73,22 @@ public class PaymentRepository : IPaymentRepository
             query = query.Where(p => p.LocationId == locationId || p.LocationId == null);
 
         return await query.ToListAsync();
+    }
+
+    private static (DateTime utcStart, DateTime utcEnd) GetUtcRangeForBusinessDate(DateTime businessDate)
+    {
+        if (TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Kolkata", out var tz) ||
+            TimeZoneInfo.TryFindSystemTimeZoneById("India Standard Time", out tz))
+        {
+            var istMidnight = new DateTime(businessDate.Year, businessDate.Month, businessDate.Day, 0, 0, 0, DateTimeKind.Unspecified);
+            var istEnd = istMidnight.AddDays(1);
+            var utcStart = TimeZoneInfo.ConvertTimeToUtc(istMidnight, tz);
+            var utcEnd = TimeZoneInfo.ConvertTimeToUtc(istEnd, tz);
+            return (utcStart, utcEnd);
+        }
+
+        var dayStart = DateTime.SpecifyKind(businessDate.Date, DateTimeKind.Utc);
+        return (dayStart, dayStart.AddDays(1));
     }
 
     public async Task AddAsync(Payment payment, DateTime? businessDate = null)

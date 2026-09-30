@@ -440,7 +440,7 @@ public class ProductService
 
     private static ProductListDto ToListDto(Product p) => ToListDto(p, null);
 
-    private static ProductDto ToDto(Product p, List<Barcode>? barcodes = null)
+    public static ProductDto ToDto(Product p, List<Barcode>? barcodes = null)
     {
         var mfgBarcode = barcodes?.FirstOrDefault(b => b.Type == BarcodeType.Manufacturer)?.Value ?? p.Barcode;
         var intBarcode = barcodes?.FirstOrDefault(b => b.Type == BarcodeType.Internal)?.Value;
@@ -459,6 +459,7 @@ public class ProductService
         Category = p.Category.ToString(),
         CategoryId = p.CategoryId,
         CategoryName = p.ProductCategoryRef?.Name,
+        SourceLibraryProductId = p.SourceLibraryProductId,
         Description = p.Description,
         UnitOfMeasure = p.UnitOfMeasure.ToString(),
         IsActive = p.IsActive,

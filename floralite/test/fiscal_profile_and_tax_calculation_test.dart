@@ -11,7 +11,7 @@ void main() {
       expect(preset.countryCode, 'IN');
       expect(preset.currencyCode, 'INR');
       expect(preset.currencySymbol, '₹');
-      expect(preset.taxEnabled, isTrue);
+      expect(preset.taxEnabled, isFalse);
       expect(preset.taxLabel, 'GST');
       expect(preset.taxRatePercent, 18.0);
       expect(preset.taxInclusive, isTrue);
@@ -25,7 +25,7 @@ void main() {
       expect(preset.countryCode, 'AE');
       expect(preset.currencyCode, 'AED');
       expect(preset.currencySymbol, 'د.إ');
-      expect(preset.taxEnabled, isTrue);
+      expect(preset.taxEnabled, isFalse);
       expect(preset.taxLabel, 'VAT');
       expect(preset.taxRatePercent, 5.0);
       expect(preset.taxInclusive, isTrue);
@@ -39,7 +39,7 @@ void main() {
       expect(preset.countryCode, 'US');
       expect(preset.currencyCode, 'USD');
       expect(preset.currencySymbol, '\$');
-      expect(preset.taxEnabled, isTrue);
+      expect(preset.taxEnabled, isFalse);
       expect(preset.taxLabel, 'Sales Tax');
       expect(preset.taxRatePercent, 0.0);
       expect(preset.taxInclusive, isFalse);
@@ -69,8 +69,8 @@ void main() {
 
     test('allPresets returns all supported presets', () {
       final list = CountryPresets.allPresets;
-      expect(list.length, 3);
-      expect(list.map((p) => p.countryCode), containsAll(['IN', 'AE', 'US']));
+      expect(list.length, greaterThanOrEqualTo(3));
+      expect(list.map((p) => p.countryCode), containsAll(['IN', 'AE', 'US', 'GB']));
     });
   });
 

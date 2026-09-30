@@ -150,6 +150,7 @@ class CloudOrderRepository {
       if (filters.delivery) 'fulfilmentType': 'delivery',
       if (filters.pickup) 'fulfilmentType': 'pickup_later',
       if (filters.takeAway) 'fulfilmentType': 'take_away',
+      if (filters.eventSale) 'fulfilmentType': 'event_sale',
       if (filters.paid) 'paymentStatus': 'paid',
       if (filters.unpaid) 'paymentStatus': 'unpaid',
     };
@@ -463,6 +464,7 @@ class CloudOrderRepository {
       createdAt: _date(json, 'orderDate'),
       scheduledAt: _dateOrNull(json, 'deliveryDate'),
       isPaid: paid >= total && total > 0 ? 1 : 0,
+      paidAmountPaise: paid,
       designerName: _nullableString(json, 'designerName'),
       deliveryName: _nullableString(json, 'deliveryPersonName'),
     );
@@ -492,17 +494,26 @@ class CloudOrderRepository {
       status: _string(json, 'status', fallback: 'confirmed'),
       customerName: _string(json, 'customerName', fallback: '-'),
       customerPhone: _string(json, 'customerPhone', fallback: '-'),
+      customerEmail: _nullableString(json, 'customerEmail'),
+      customerAddress: _nullableString(json, 'deliveryAddress'),
       recipientName: _string(json, 'recipientName', fallback: '-'),
       recipientPhone: _string(json, 'recipientPhone', fallback: '-'),
       fulfilmentType: _string(json, 'fulfilmentType', fallback: 'delivery'),
       source: _string(json, 'orderSource', fallback: 'cloud'),
       grandTotalPaise: total,
+      subtotalPaise: _moneyPaise(json, 'subTotal'),
+      discountTotalPaise: _moneyPaise(json, 'discountAmount'),
+      gstTotalPaise: _moneyPaise(json, 'taxAmount'),
+      deliveryChargesPaise: _moneyPaise(json, 'deliveryFee'),
+      roundOffPaise: 0,
       address: _string(json, 'deliveryAddress', fallback: '-'),
       deliveryPincode: _string(json, 'deliveryPincode'),
+      createdAt: _dateOrNull(json, 'orderDate') ?? _dateOrNull(json, 'createdAtUtc'),
       scheduledAt: _dateOrNull(json, 'deliveryDate'),
       occasion: '-',
       deliverySlot: _string(json, 'timeSlot', fallback: '-'),
       cardMessage: _string(json, 'cardMessage'),
+      internalNotes: _nullableString(json, 'internalNotes'),
       isPaid: paid >= total && total > 0 ? 1 : 0,
       paidAmountPaise: paid,
       rewardPointsEarned: _int(json, 'rewardPointsEarned'),
@@ -533,28 +544,55 @@ class CloudOrderRepository {
     );
   }
 
-  static Map<String, Object?> _lineMap(Map<String, dynamic> json) => {
-        'id': _string(json, 'id'),
-        'product_id': _string(json, 'productId'),
-        'product_name': _string(json, 'productName'),
-        'description': _string(json, 'productName', fallback: 'Item'),
-        'qty': _int(json, 'quantity'),
-        'unit_price_paise': _moneyPaise(json, 'unitPrice'),
-        'discount_paise': _moneyPaise(json, 'discountAmount'),
-        'discount_type': null,
-        'discount_value': null,
-        'gst_percent': _int(json, 'taxRatePercent'),
-        'line_subtotal_paise': _moneyPaise(json, 'lineSubtotal'),
-        'line_gst_paise': _moneyPaise(json, 'lineTaxAmount'),
-        'line_total_paise': _moneyPaise(json, 'lineTotal'),
-        'source': 'cloud',
-      };
+  static Map<String, Object?> _lineMap(Map<String, dynamic> json) {
+    final explicitDescription = _nullableString(json, 'description') ??
+        _nullableString(json, 'Description') ??
+        _nullableString(json, 'itemDescription') ??
+        _nullableString(json, 'lineDescription');
+    final productName = _string(json, 'productName', fallback: 'Item');
+    final imageRef = _nullableString(json, 'imageUrl') ??
+        _nullableString(json, 'imageReference') ??
+        _nullableString(json, 'ImageReference') ??
+        _nullableString(json, 'image_url') ??
+        _nullableString(json, 'imagePath') ??
+        _nullableString(json, 'ImagePath') ??
+        _nullableString(json, 'referenceImageUrl') ??
+        _nullableString(json, 'ReferenceImageUrl') ??
+        _nullableString(json, 'photoUrl') ??
+        _nullableString(json, 'designRef') ??
+        _nullableString(json, 'design_ref');
+
+    return {
+      'id': _string(json, 'id'),
+      'product_id': _string(json, 'productId'),
+      'product_name': productName,
+      'description': explicitDescription ?? productName,
+      'product_sku': _nullableString(json, 'sku'),
+      'sku': _nullableString(json, 'sku'),
+      'product_image_path': imageRef,
+      'image_url': imageRef,
+      'design_ref': imageRef,
+      'special_instructions': _nullableString(json, 'specialInstructions'),
+      'notes': _nullableString(json, 'specialInstructions'),
+      'qty': _int(json, 'quantity'),
+      'unit_price_paise': _moneyPaise(json, 'unitPrice'),
+      'discount_paise': _moneyPaise(json, 'discountAmount'),
+      'discount_type': null,
+      'discount_value': null,
+      'gst_percent': _int(json, 'taxRatePercent'),
+      'line_subtotal_paise': _moneyPaise(json, 'lineSubtotal'),
+      'line_gst_paise': _moneyPaise(json, 'lineTaxAmount'),
+      'line_total_paise': _moneyPaise(json, 'lineTotal'),
+      'source': 'cloud',
+    };
+  }
 
   static Map<String, Object?> _paymentMap(Map<String, dynamic> json) => {
         'id': _string(json, 'id'),
         'order_id': _string(json, 'orderId'),
         'method': _string(json, 'method'),
         'amount_paise': _moneyPaise(json, 'amount'),
+        'payment_type': _string(json, 'paymentType', fallback: 'SaleTender'),
         'reference': _nullableString(json, 'reference') ??
             _nullableString(json, 'transactionId'),
         'created_at': _string(json, 'createdAtUtc'),

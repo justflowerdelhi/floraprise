@@ -8,12 +8,14 @@ public class Payment : BaseEntity
         Guid companyId,
         Guid orderId,
         PaymentMethod method,
-        decimal amount)
+        decimal amount,
+        PaymentType paymentType = PaymentType.SaleTender)
     {
         CompanyId = companyId;
         OrderId = orderId;
         Method = method;
         Amount = amount;
+        PaymentType = paymentType;
         Status = PaymentTransactionStatus.Pending;
     }
 
@@ -22,6 +24,7 @@ public class Payment : BaseEntity
     public Guid? LocationId { get; private set; }
     public PaymentMethod Method { get; private set; }
     public decimal Amount { get; private set; }
+    public PaymentType PaymentType { get; private set; }
     public PaymentTransactionStatus Status { get; private set; }
 
     // Transaction Details
@@ -98,6 +101,12 @@ public class Payment : BaseEntity
     {
         ClientPaymentId = string.IsNullOrWhiteSpace(clientPaymentId) ? null : clientPaymentId.Trim();
         Reference = string.IsNullOrWhiteSpace(reference) ? null : reference.Trim();
+        MarkUpdated();
+    }
+
+    public void SetPaymentType(PaymentType paymentType)
+    {
+        PaymentType = paymentType;
         MarkUpdated();
     }
 }

@@ -143,9 +143,19 @@ class AttendanceProvider extends ChangeNotifier {
   Future<void> updateAttendance(int id, AttendanceUpsertInput input) async {
     if (isCloud && _cloudRepo != null) {
       final cloudId = _findAttendanceCloudId(id) ?? id.toString();
-      await _cloudRepo!.update(cloudId, input);
+      if (cloudId == '0' ||
+          cloudId.isEmpty ||
+          cloudId == '00000000-0000-0000-0000-000000000000') {
+        await _cloudRepo!.create(input);
+      } else {
+        await _cloudRepo!.update(cloudId, input);
+      }
     } else {
-      await _repository.update(id, input);
+      if (id == 0) {
+        await _repository.create(input);
+      } else {
+        await _repository.update(id, input);
+      }
     }
     await loadAttendanceForDate(_selectedDate);
   }

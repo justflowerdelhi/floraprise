@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Sumpooj.Application.Companies;
 using Sumpooj.Application.Interfaces;
 using Sumpooj.Domain.Entities;
@@ -52,7 +52,7 @@ public class CompanyService : ICompanyService
         if (existingDefault != null)
             return;
 
-        var location = new Location(companyId, "Main Location", "MAIN-01", LocationType.Store, null);
+        var location = new Location(companyId, "Main Store", "MAIN-01", LocationType.Store, null);
         location.SetAsDefault();
         await _locationRepository.AddAsync(location);
     }
@@ -126,6 +126,52 @@ public class CompanyService : ICompanyService
         if (request.TaxIdentifier != null)
         {
             company.UpdateTax(request.TaxIdentifier);
+        }
+
+        if (request.LogoPath != null)
+        {
+            company.UpdateBranding(string.IsNullOrWhiteSpace(request.LogoPath) ? null : request.LogoPath.Trim());
+        }
+
+        if (request.OwnerName != null || request.City != null || request.State != null || request.PinCode != null)
+        {
+            var customer = await _db.MobileCustomers.FirstOrDefaultAsync(x => x.CompanyId == companyId && !x.IsDeleted);
+            if (customer != null)
+            {
+                if (request.OwnerName != null && !string.IsNullOrWhiteSpace(request.OwnerName))
+                {
+                    customer.UpdateOwnerName(request.OwnerName.Trim());
+                }
+
+                var city = request.City != null ? (string.IsNullOrWhiteSpace(request.City) ? null : request.City.Trim()) : customer.City;
+                var state = request.State != null ? (string.IsNullOrWhiteSpace(request.State) ? null : request.State.Trim()) : customer.State;
+                var pinCode = request.PinCode != null ? (string.IsNullOrWhiteSpace(request.PinCode) ? null : request.PinCode.Trim()) : customer.Country;
+                customer.UpdateProfile(customer.Email, city, state, pinCode, null);
+            }
+            else
+            {
+                var newCustomer = new MobileCustomer(
+                    companyId: companyId,
+                    businessName: company.Name,
+                    ownerName: string.IsNullOrWhiteSpace(request.OwnerName) ? "Owner" : request.OwnerName.Trim(),
+                    mobile: company.Phone ?? "0000000000");
+                newCustomer.UpdateProfile(
+                    company.Email,
+                    string.IsNullOrWhiteSpace(request.City) ? null : request.City.Trim(),
+                    string.IsNullOrWhiteSpace(request.State) ? null : request.State.Trim(),
+                    string.IsNullOrWhiteSpace(request.PinCode) ? null : request.PinCode.Trim(),
+                    null);
+                _db.MobileCustomers.Add(newCustomer);
+            }
+
+            if (request.OwnerName != null && !string.IsNullOrWhiteSpace(request.OwnerName))
+            {
+                var users = await _db.MobileUsers.Where(x => x.CompanyId == companyId && !x.IsDeleted).ToListAsync();
+                foreach (var user in users)
+                {
+                    user.UpdateFullName(request.OwnerName.Trim());
+                }
+            }
         }
 
         await _db.SaveChangesAsync();

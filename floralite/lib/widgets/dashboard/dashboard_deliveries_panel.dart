@@ -222,12 +222,14 @@ class DashboardDeliveriesPanel extends StatelessWidget {
                                     child: Text(
                                       item.recipientName.trim().isNotEmpty
                                           ? item.recipientName
-                                          : item.customerName,
+                                          : (item.customerName.trim().isNotEmpty
+                                              ? item.customerName
+                                              : 'Customer'),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: Color(0xFF1E2922),
-                                        fontSize: 13,
+                                        fontSize: 14.5,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),

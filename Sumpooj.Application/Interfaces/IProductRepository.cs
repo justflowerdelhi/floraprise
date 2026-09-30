@@ -42,4 +42,9 @@ public interface IProductRepository
     /// Bypasses tenant filter.
     /// </summary>
     Task<List<Product>> GetProductsWithoutCategoryAsync();
+
+    /// <summary>
+    /// Fetch product by company and source library product ID.
+    /// </summary>
+    Task<Product?> GetBySourceLibraryProductIdAsync(Guid companyId, Guid sourceLibraryProductId);
 }

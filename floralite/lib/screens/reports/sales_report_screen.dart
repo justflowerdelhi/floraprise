@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../data/repositories/cloud_dashboard_repository.dart';
 import '../../data/repositories/order_repository.dart';
-import '../../models/order_workspace_models.dart';
 import '../../managers/business_settings_manager.dart';
 import '../../providers/storage_mode_provider.dart';
 import '../../widgets/common_widgets.dart';
@@ -34,6 +33,10 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
   int _upiSales = 0;
   int _cardSales = 0;
   int _creditSales = 0;
+  int _cashCollections = 0;
+  int _upiCollections = 0;
+  int _cardCollections = 0;
+  int _totalCollections = 0;
   int _orderCount = 0;
 
   @override
@@ -70,54 +73,33 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
           _upiSales = summary?.upiPaise ?? 0;
           _cardSales = summary?.cardPaise ?? 0;
           _creditSales = summary?.creditPaise ?? 0;
+          _cashCollections = 0;
+          _upiCollections = 0;
+          _cardCollections = 0;
+          _totalCollections = 0;
           _orderCount = summary?.orderCount ?? 0;
           _isLoading = false;
         });
         return;
       }
 
-      final orders = await _orderRepository.getOrdersForWorkspace(
-        tab: 'all',
-        searchQuery: '',
-        filters: const OrderWorkspaceFilters(),
-        limit: 10000,
+      final breakdown = await _orderRepository.getSalesBreakdown(
+        startDate: _startDate,
+        endDate: _endDate,
       );
-
-      int totalSales = 0;
-      int cashSales = 0;
-      int upiSales = 0;
-      int cardSales = 0;
-      int creditSales = 0;
-
-      for (final order in orders) {
-        final amount = order.grandTotalPaise;
-        totalSales += amount;
-        final paymentSummary = await _orderRepository.getOrderSummary(order.id);
-        final paymentMode = (paymentSummary['payment_mode'] as String?)?.toLowerCase() ?? 'cash';
-        switch (paymentMode) {
-          case 'cash':
-            cashSales += amount;
-            break;
-          case 'upi':
-            upiSales += amount;
-            break;
-          case 'card':
-            cardSales += amount;
-            break;
-          case 'credit':
-            creditSales += amount;
-            break;
-        }
-      }
 
       if (!mounted) return;
       setState(() {
-        _totalSales = totalSales;
-        _cashSales = cashSales;
-        _upiSales = upiSales;
-        _cardSales = cardSales;
-        _creditSales = creditSales;
-        _orderCount = orders.length;
+        _totalSales = breakdown.grossSalesPaise;
+        _cashSales = breakdown.cashSalesPaise;
+        _upiSales = breakdown.upiSalesPaise;
+        _cardSales = breakdown.cardSalesPaise;
+        _creditSales = breakdown.creditCreatedPaise;
+        _cashCollections = breakdown.cashCollectionsPaise;
+        _upiCollections = breakdown.upiCollectionsPaise;
+        _cardCollections = breakdown.cardCollectionsPaise;
+        _totalCollections = breakdown.totalCollectionsPaise;
+        _orderCount = breakdown.totalOrders;
         _isLoading = false;
       });
     } catch (e) {
@@ -194,6 +176,10 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                 _buildSummaryCard(),
                 const SizedBox(height: 16),
                 _buildPaymentModeBreakdown(),
+                if (_totalCollections > 0) ...[
+                  const SizedBox(height: 16),
+                  _buildCollectionsBreakdown(),
+                ],
                 const SizedBox(height: 16),
                 _buildTransactionCounts(),
                 const SizedBox(height: 16),
@@ -332,6 +318,52 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
             label: 'Credit',
             amount: _creditSales,
             color: Colors.orange,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCollectionsBreakdown() {
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Credit Collections',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _PaymentModeRow(
+            label: 'Cash Collections',
+            amount: _cashCollections,
+            color: Colors.green,
+          ),
+          if (_upiCollections > 0) ...[
+            const SizedBox(height: 12),
+            _PaymentModeRow(
+              label: 'UPI Collections',
+              amount: _upiCollections,
+              color: Colors.blue,
+            ),
+          ],
+          if (_cardCollections > 0) ...[
+            const SizedBox(height: 12),
+            _PaymentModeRow(
+              label: 'Card Collections',
+              amount: _cardCollections,
+              color: Colors.purple,
+            ),
+          ],
+          const Divider(height: 24),
+          _PaymentModeRow(
+            label: 'Total Collections',
+            amount: _totalCollections,
+            color: Colors.teal,
           ),
         ],
       ),

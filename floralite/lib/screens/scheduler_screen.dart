@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,6 +7,8 @@ import '../l10n/app_localizations.dart';
 import '../models/scheduler_task.dart';
 import '../providers/scheduler_provider.dart';
 import '../services/speech_recognition_service.dart';
+import '../services/web_notification/web_notification_service.dart';
+import '../services/web_notification/web_scheduler_reminder_service.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/voice_dictation_field_header.dart';
 
@@ -18,10 +21,17 @@ class SchedulerScreen extends StatefulWidget {
 
 class _SchedulerScreenState extends State<SchedulerScreen> {
   final TextEditingController _searchController = TextEditingController();
+  WebNotificationPermission _webNotificationPermission =
+      WebNotificationPermission.unsupported;
 
   @override
   void initState() {
     super.initState();
+    if (kIsWeb) {
+      _webNotificationPermission = WebNotificationService.instance.permission;
+      // Start or refresh Web Scheduler Reminder Service
+      WebSchedulerReminderService.instance.start();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = ModalRoute.of(context)?.settings.arguments;
       final focusTodayScheduledTasks = args is Map<String, dynamic> &&
@@ -32,6 +42,79 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
       }
       context.read<SchedulerProvider>().loadOperationalQueue();
     });
+  }
+
+  Future<void> _requestWebNotificationPermission() async {
+    final granted = await WebNotificationService.instance.requestPermission();
+    if (!mounted) return;
+    setState(() {
+      _webNotificationPermission = WebNotificationService.instance.permission;
+    });
+    if (granted) {
+      WebSchedulerReminderService.instance.checkDueTasks();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Browser notifications enabled for scheduled tasks.')),
+      );
+    }
+  }
+
+  Widget _buildWebNotificationBanner(ColorScheme colorScheme) {
+    if (!kIsWeb) return const SizedBox.shrink();
+
+    if (_webNotificationPermission == WebNotificationPermission.defaultPermission) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.notifications_active_outlined, color: colorScheme.primary, size: 20),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Enable browser notifications to receive audible alerts for due tasks.',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton.tonal(
+              onPressed: _requestWebNotificationPermission,
+              child: const Text('Enable'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_webNotificationPermission == WebNotificationPermission.denied) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFCD34D)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.notifications_off_outlined, color: Color(0xFFB45309), size: 20),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Browser notifications are blocked. Please allow notifications for Floraprise in Chrome site settings.',
+                style: TextStyle(fontSize: 13, color: Color(0xFF92400E)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   @override
@@ -49,12 +132,23 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.scheduler),
+        actions: [
+          if (kIsWeb && _webNotificationPermission == WebNotificationPermission.granted)
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Tooltip(
+                message: 'Browser notifications active',
+                child: Icon(Icons.notifications_active, color: Color(0xFF15803D), size: 20),
+              ),
+            ),
+        ],
       ),
       body: SafeArea(
         top: false,
         child: Column(
           children: [
             _buildDateHeader(context, colorScheme),
+            _buildWebNotificationBanner(colorScheme),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: TextField(
@@ -182,7 +276,8 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
     TimeOfDay selectedTime = existing == null
         ? const TimeOfDay(hour: 9, minute: 0)
         : TimeOfDay.fromDateTime(existing.scheduledAt.toLocal());
-    TaskPriority priority = existing?.priority ?? TaskPriority.normal;
+    TaskPriority priority =
+        existing?.priority.normalized ?? TaskPriority.normal;
     bool requiresAlarm = existing?.requiresAlarm ?? false;
 
     final result = await showDialog<bool>(
@@ -247,13 +342,13 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
                         },
                       ),
                     DropdownButtonFormField<TaskPriority>(
-                      initialValue: priority,
+                      initialValue: priority.normalized,
                       decoration: const InputDecoration(labelText: 'Priority'),
-                      items: TaskPriority.values
+                      items: TaskPriorityX.userFacingValues
                           .map(
                             (p) => DropdownMenuItem(
                               value: p,
-                              child: Text(_priorityLabel(p)),
+                              child: Text(p.displayLabel),
                             ),
                           )
                           .toList(),
@@ -320,6 +415,9 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
                       useTime ? selectedTime.minute : 0,
                     );
 
+                    final messenger = ScaffoldMessenger.of(this.context);
+                    final nav = Navigator.of(dialogContext);
+
                     final ok = existing == null
                         ? await provider.createTask(
                             title: title,
@@ -337,20 +435,20 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
                             notes: notesController.text.trim(),
                           );
 
-                    if (!mounted) return;
                     if (ok) {
-                      if (!dialogContext.mounted) return;
-                      Navigator.of(dialogContext).pop(true);
+                      nav.pop(true);
                       return;
                     }
 
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          provider.error ?? 'Could not save task.',
+                    if (mounted) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            provider.error ?? 'Could not save task.',
+                          ),
                         ),
-                      ),
-                    );
+                      );
+                    }
                   },
                   child: const Text('Save'),
                 ),
@@ -366,15 +464,19 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
 
   Future<void> _showTaskActions(SchedulerTask task) async {
     final taskId = task.id;
+    final provider = context.read<SchedulerProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final currentNavigator = Navigator.of(context);
+
     await showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.85,
+            maxHeight: MediaQuery.of(sheetContext).size.height * 0.85,
           ),
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -405,13 +507,31 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
                         Icon(Icons.warning_amber_rounded, color: Colors.red),
                     title: Text('Overdue'),
                   ),
+                if (task.linkedOrderId != null ||
+                    (task.cloudLinkedOrderId != null &&
+                        task.cloudLinkedOrderId!.trim().isNotEmpty))
+                  ListTile(
+                    leading:
+                        const Icon(Icons.receipt_long_rounded, color: Colors.teal),
+                    title: const Text('View Order Details'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      currentNavigator.pushNamed(
+                        '/order-detail',
+                        arguments: {
+                          'orderId': task.linkedOrderId ?? -1,
+                          'cloudOrderId': task.cloudLinkedOrderId,
+                        },
+                      );
+                    },
+                  ),
                 ListTile(
                   leading: const Icon(Icons.edit),
                   title: const Text('Edit Task'),
                   onTap: taskId == null
                       ? null
                       : () async {
-                          Navigator.pop(context);
+                          Navigator.pop(sheetContext);
                           await _showEditTaskDialog(task);
                         },
                 ),
@@ -421,10 +541,16 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
                   onTap: taskId == null
                       ? null
                       : () async {
-                          Navigator.pop(context);
-                          await context
-                              .read<SchedulerProvider>()
-                              .markTaskCompleted(taskId);
+                          Navigator.pop(sheetContext);
+                          final ok = await provider.markTaskCompleted(taskId);
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(ok
+                                  ? 'Task marked as completed.'
+                                  : 'Could not complete task.'),
+                            ),
+                          );
                         },
                 ),
                 if (task.status == TaskStatus.pending)
@@ -434,10 +560,16 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
                     onTap: taskId == null
                         ? null
                         : () async {
-                            Navigator.pop(context);
-                            await context
-                                .read<SchedulerProvider>()
-                                .markTaskInProgress(taskId);
+                            Navigator.pop(sheetContext);
+                            final ok = await provider.markTaskInProgress(taskId);
+                            if (!mounted) return;
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(ok
+                                    ? 'Task marked in progress.'
+                                    : 'Could not update task.'),
+                              ),
+                            );
                           },
                   ),
                 if (task.status != TaskStatus.completed &&
@@ -448,10 +580,16 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
                     onTap: taskId == null
                         ? null
                         : () async {
-                            Navigator.pop(context);
-                            await context
-                                .read<SchedulerProvider>()
-                                .snoozeTask(taskId, const Duration(minutes: 5));
+                            Navigator.pop(sheetContext);
+                            final ok = await provider.snoozeTask(taskId, const Duration(minutes: 5));
+                            if (!mounted) return;
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(ok
+                                    ? 'Task snoozed for 5 minutes.'
+                                    : 'Could not snooze task.'),
+                              ),
+                            );
                           },
                   ),
                 if (task.status != TaskStatus.completed &&
@@ -462,9 +600,16 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
                     onTap: taskId == null
                         ? null
                         : () async {
-                            Navigator.pop(context);
-                            await context.read<SchedulerProvider>().snoozeTask(
-                                taskId, const Duration(minutes: 10));
+                            Navigator.pop(sheetContext);
+                            final ok = await provider.snoozeTask(taskId, const Duration(minutes: 10));
+                            if (!mounted) return;
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(ok
+                                    ? 'Task snoozed for 10 minutes.'
+                                    : 'Could not snooze task.'),
+                              ),
+                            );
                           },
                   ),
                 ListTile(
@@ -473,10 +618,15 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
                   onTap: taskId == null
                       ? null
                       : () async {
-                          Navigator.pop(context);
-                          await context
-                              .read<SchedulerProvider>()
-                              .deleteTask(taskId);
+                          Navigator.pop(sheetContext);
+                          final ok = await provider.deleteTask(taskId);
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  ok ? 'Task deleted.' : 'Could not delete task.'),
+                            ),
+                          );
                         },
                 ),
               ],
@@ -485,19 +635,6 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
         ),
       ),
     );
-  }
-
-  String _priorityLabel(TaskPriority priority) {
-    switch (priority) {
-      case TaskPriority.low:
-        return 'Low';
-      case TaskPriority.normal:
-        return 'Normal';
-      case TaskPriority.high:
-        return 'High';
-      case TaskPriority.urgent:
-        return 'Urgent';
-    }
   }
 
   Widget _buildDateHeader(BuildContext context, ColorScheme colorScheme) {
@@ -641,23 +778,23 @@ class _SchedulerScreenState extends State<SchedulerScreen> {
   }
 
   Color _colorForPriority(TaskPriority priority) {
-    switch (priority) {
+    switch (priority.normalized) {
       case TaskPriority.urgent:
         return Colors.red;
-      case TaskPriority.high:
-        return Colors.orange;
       case TaskPriority.normal:
         return Colors.blue;
-      case TaskPriority.low:
-        return Colors.green;
+      default:
+        return Colors.blue;
     }
   }
 
   String _buildSubtitle(SchedulerTask task) {
-    final pieces = <String>[
-      task.type.name,
-      task.status.name,
-    ];
+    final pieces = <String>[];
+    if (task.priority.normalized == TaskPriority.urgent) {
+      pieces.add('🔥 URGENT');
+    }
+    pieces.add(task.type.name);
+    pieces.add(task.status.name);
     if (task.linkedOrderId != null) {
       pieces.add('Order #${task.linkedOrderId}');
     }

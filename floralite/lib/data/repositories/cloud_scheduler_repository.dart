@@ -121,13 +121,27 @@ class CloudSchedulerRepository {
     final to = from.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
 
     final tasks = await listTasks(from: from, to: to, query: searchQuery);
-    return tasks.where((t) => t.status != TaskStatus.cancelled).toList();
+    final filtered = tasks.where((t) => t.status != TaskStatus.cancelled).toList();
+    filtered.sort((a, b) {
+      final aUrgent = a.priority.normalized == TaskPriority.urgent ? 0 : 1;
+      final bUrgent = b.priority.normalized == TaskPriority.urgent ? 0 : 1;
+      if (aUrgent != bUrgent) return aUrgent.compareTo(bUrgent);
+      return a.effectiveReminderAt.compareTo(b.effectiveReminderAt);
+    });
+    return filtered;
   }
 
   Future<List<SchedulerTask>> getTodayScheduledTasks(DateTime date) async {
     final from = DateTime(date.year, date.month, date.day);
     final to = from.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
-    return listTasks(from: from, to: to);
+    final tasks = await listTasks(from: from, to: to);
+    tasks.sort((a, b) {
+      final aUrgent = a.priority.normalized == TaskPriority.urgent ? 0 : 1;
+      final bUrgent = b.priority.normalized == TaskPriority.urgent ? 0 : 1;
+      if (aUrgent != bUrgent) return aUrgent.compareTo(bUrgent);
+      return a.effectiveReminderAt.compareTo(b.effectiveReminderAt);
+    });
+    return tasks;
   }
 
   Future<SchedulerTodaySummary> getTodaySummary() async {
@@ -150,7 +164,7 @@ class CloudSchedulerRepository {
       } else if (task.status == TaskStatus.pending || task.status == TaskStatus.inProgress) {
         pending++;
         if (task.isOverdue) overdue++;
-        if (task.priority == TaskPriority.urgent) urgent++;
+        if (task.priority.normalized == TaskPriority.urgent) urgent++;
       }
 
       if (task.type == TaskType.delivery) deliveries++;

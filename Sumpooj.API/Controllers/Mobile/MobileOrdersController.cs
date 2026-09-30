@@ -57,7 +57,8 @@ public sealed class MobileOrdersController : MobileApiControllerBase
                     o.DeliveryAddress,
                     o.TimeSlot,
                     o.DeliveryDate,
-                    o.OrderDate
+                    o.OrderDate,
+                    o.InternalNotes
                 })
                 .ToListAsync(cancellationToken);
 
@@ -116,12 +117,13 @@ public sealed class MobileOrdersController : MobileApiControllerBase
                         break;
                 }
 
-                var hasDelivery = deliveryOrderIds.Contains(order.Id) || !string.IsNullOrWhiteSpace(order.DeliveryAddress);
+                var isEvent = order.InternalNotes?.Contains("[fulfilment:event_sale]", StringComparison.OrdinalIgnoreCase) == true;
+                var hasDelivery = !isEvent && (deliveryOrderIds.Contains(order.Id) || !string.IsNullOrWhiteSpace(order.DeliveryAddress));
                 if (hasDelivery)
                 {
                     deliveryCount++;
                 }
-                else if (!string.IsNullOrWhiteSpace(order.TimeSlot) || order.DeliveryDate.Date > order.OrderDate.Date)
+                else if (!isEvent && (!string.IsNullOrWhiteSpace(order.TimeSlot) || order.DeliveryDate.Date > order.OrderDate.Date))
                 {
                     pickupCount++;
                 }
@@ -178,8 +180,34 @@ public sealed class MobileOrdersController : MobileApiControllerBase
             if (!string.IsNullOrWhiteSpace(request.Status) && Enum.TryParse<OrderStatus>(NormalizePascal(request.Status), true, out var status))
                 query = query.Where(o => o.Status == status);
 
-            if (!string.IsNullOrWhiteSpace(request.PaymentStatus) && Enum.TryParse<PaymentStatus>(NormalizePascal(request.PaymentStatus), true, out var paymentStatus))
-                query = query.Where(o => o.PaymentStatus == paymentStatus);
+            if (!string.IsNullOrWhiteSpace(request.PaymentStatus))
+            {
+                var normalized = request.PaymentStatus.Trim().ToLowerInvariant().Replace("-", "_");
+                if (normalized is "unpaid" or "pending" or "outstanding")
+                {
+                    query = query.Where(o => o.PaymentStatus != PaymentStatus.Paid && o.PaymentStatus != PaymentStatus.Refunded && o.Status != OrderStatus.Cancelled);
+                }
+                else if (normalized == "paid")
+                {
+                    query = query.Where(o => o.PaymentStatus == PaymentStatus.Paid);
+                }
+                else if (normalized is "partially_paid" or "partiallypaid")
+                {
+                    query = query.Where(o => o.PaymentStatus == PaymentStatus.PartiallyPaid);
+                }
+                else if (normalized == "credit")
+                {
+                    query = query.Where(o => o.PaymentStatus == PaymentStatus.Credit);
+                }
+                else if (normalized == "unpaid_only")
+                {
+                    query = query.Where(o => o.PaymentStatus == PaymentStatus.Unpaid);
+                }
+                else if (Enum.TryParse<PaymentStatus>(NormalizePascal(request.PaymentStatus), true, out var paymentStatus))
+                {
+                    query = query.Where(o => o.PaymentStatus == paymentStatus);
+                }
+            }
 
             if (request.FromDate.HasValue)
                 query = query.Where(o => o.OrderDate >= EnsureUtc(request.FromDate.Value));
@@ -270,6 +298,67 @@ public sealed class MobileOrdersController : MobileApiControllerBase
         var timeline = BuildTimeline(order, payments, delivery, helpers.DeliveryTimelineByDeliveryId.GetValueOrDefault(delivery?.Id ?? Guid.Empty, new List<DeliveryTimeline>()));
         var paidAmount = PaidAmount(payments);
 
+        var posLines = await _db.PosSaleSyncOrderLines
+            .AsNoTracking()
+            .Where(l => l.CompanyId == companyId && l.CloudOrderId == order.Id)
+            .ToListAsync(cancellationToken);
+        var posLinesByClientLineId = posLines
+            .Where(l => !string.IsNullOrWhiteSpace(l.ClientOrderLineId))
+            .GroupBy(l => l.ClientOrderLineId.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        var items = new List<MobileOrderItemDto>();
+        var coveredClientLineIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in order.Items.OrderBy(i => i.ProductName))
+        {
+            PosSaleSyncOrderLine? posLine = null;
+            if (!string.IsNullOrWhiteSpace(item.ClientOrderLineId) && posLinesByClientLineId.TryGetValue(item.ClientOrderLineId.Trim(), out var matched))
+            {
+                posLine = matched;
+                coveredClientLineIds.Add(item.ClientOrderLineId.Trim());
+            }
+
+            var imageUrl = posLine?.DesignRef;
+            items.Add(new MobileOrderItemDto(
+                item.Id,
+                item.ProductId,
+                item.ProductName,
+                item.Quantity,
+                item.UnitPrice,
+                item.TotalPrice,
+                item.DiscountAmount,
+                item.TaxRatePercent,
+                item.LineSubtotal,
+                item.LineTaxAmount,
+                (item.LineSubtotal ?? item.TotalPrice) + (item.LineTaxAmount ?? 0),
+                item.SpecialInstructions,
+                item.ClientOrderLineId,
+                Sku: null,
+                ImageUrl: imageUrl));
+        }
+
+        // Fallback for historical bugged orders: synthesize missing lines from PosSaleSyncOrderLines if any are missing from OrderItems
+        foreach (var missingPosLine in posLines.Where(l => string.IsNullOrWhiteSpace(l.ClientOrderLineId) || !coveredClientLineIds.Contains(l.ClientOrderLineId.Trim())))
+        {
+            items.Add(new MobileOrderItemDto(
+                missingPosLine.Id,
+                missingPosLine.CloudProductId,
+                missingPosLine.Description,
+                missingPosLine.Quantity,
+                missingPosLine.UnitPrice,
+                missingPosLine.LineTotal,
+                missingPosLine.DiscountAmount,
+                missingPosLine.TaxRatePercent,
+                missingPosLine.LineSubtotal,
+                missingPosLine.LineTaxAmount,
+                missingPosLine.LineTotal,
+                SpecialInstructions: null,
+                ClientOrderLineId: missingPosLine.ClientOrderLineId,
+                Sku: null,
+                ImageUrl: missingPosLine.DesignRef));
+        }
+
         return new MobileOrderDetailDto(
             order.Id,
             order.OrderNumber,
@@ -306,7 +395,7 @@ public sealed class MobileOrdersController : MobileApiControllerBase
             order.CardMessage,
             order.TimeSlot,
             order.InternalNotes,
-            order.Items.OrderBy(i => i.ProductName).Select(ToItemDto).ToList(),
+            items,
             payments.OrderByDescending(p => p.CreatedAtUtc).Select(ToPaymentDto).ToList(),
             delivery == null ? null : ToDeliverySummary(delivery, helpers),
             timeline,
@@ -406,7 +495,8 @@ public sealed class MobileOrdersController : MobileApiControllerBase
         payment.Reference,
         payment.ClientPaymentId,
         payment.TransactionId,
-        payment.CreatedAtUtc);
+        payment.CreatedAtUtc,
+        payment.PaymentType.ToString());
 
     private static MobileOrderDeliverySummaryDto ToDeliverySummary(Delivery delivery, MobileOrderHelpers helpers) => new(
         delivery.Id,
@@ -465,6 +555,7 @@ public sealed class MobileOrdersController : MobileApiControllerBase
 
     private static string NormalizedFulfilmentType(Order order, Delivery? delivery)
     {
+        if (order.InternalNotes?.Contains("[fulfilment:event_sale]", StringComparison.OrdinalIgnoreCase) == true) return "event_sale";
         if (delivery != null || !string.IsNullOrWhiteSpace(order.DeliveryAddress)) return "delivery";
         if (!string.IsNullOrWhiteSpace(order.TimeSlot) || order.DeliveryDate.Date > order.OrderDate.Date) return "pickup_later";
         return "take_away";

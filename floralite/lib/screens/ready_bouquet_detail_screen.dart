@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../data/repositories/ready_bouquet_repository.dart';
+import '../services/business_data_event_bus.dart';
 import '../widgets/common_widgets.dart';
 import 'expire_bouquet_screen.dart';
 import 'refresh_bouquet_screen.dart';
@@ -26,11 +28,39 @@ class _ReadyBouquetDetailScreenState extends State<ReadyBouquetDetailScreen> {
   List<ReadyBouquetBatch> _batches = const [];
   bool _isLoading = true;
   String? _error;
+  BusinessDataEventBus? _eventBus;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final bus = context.read<BusinessDataEventBus?>();
+    if (bus != _eventBus) {
+      _eventBus?.removeListener(_onEventBusChanged);
+      _eventBus = bus;
+      _eventBus?.addListener(_onEventBusChanged);
+    }
+  }
+
+  void _onEventBusChanged() {
+    final change = _eventBus?.lastChange;
+    if (change == null) return;
+    if (change.source == BusinessDataChangeSource.inventory ||
+        change.source == BusinessDataChangeSource.production ||
+        change.source == BusinessDataChangeSource.product) {
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _eventBus?.removeListener(_onEventBusChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -125,7 +155,7 @@ class _ReadyBouquetDetailScreenState extends State<ReadyBouquetDetailScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Batches',
+            'Ready Bouquets',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -177,6 +207,9 @@ class _BatchCard extends StatelessWidget {
         .difference(batch.lastRefreshAt ?? batch.producedAt)
         .inDays;
     final color = _statusColor(batch.status);
+    final unitLabel = batch.cloudId != null && batch.cloudId!.isNotEmpty
+        ? 'Bouquet #${batch.cloudId!.length > 8 ? batch.cloudId!.substring(0, 8) : batch.cloudId}'
+        : 'Bouquet #${batch.id}';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -188,7 +221,7 @@ class _BatchCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Produced ${DateFormat.yMMMd().format(batch.producedAt)}',
+                    unitLabel,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -211,7 +244,7 @@ class _BatchCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text('Remaining: ${batch.remainingQuantity} ${batch.unit}'),
+            Text('Produced: ${DateFormat.yMMMd().format(batch.producedAt)}'),
             Text('Age: $ageDays day${ageDays == 1 ? '' : 's'}'),
             if (batch.lastRefreshAt != null)
               Text(

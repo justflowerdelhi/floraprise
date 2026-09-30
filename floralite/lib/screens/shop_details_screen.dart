@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -10,8 +7,10 @@ import '../data/repositories/cloud_company_profile_repository.dart';
 import '../managers/business_settings_manager.dart';
 import '../models/fiscal_profile.dart';
 import '../providers/storage_mode_provider.dart';
+import '../services/api_base_url.dart';
 import '../services/mobile_auth_service.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/safe_platform_image.dart';
 
 class ShopDetailsScreen extends StatefulWidget {
   const ShopDetailsScreen({super.key});
@@ -41,7 +40,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   String _city = '';
   String _state = '';
   String _pinCode = '';
-  bool _gstRegistered = true;
+  bool _gstRegistered = false;
   String _gstNumber = '';
   FiscalProfile _fiscalProfile = CountryPresets.india();
   String _logoPath = '';
@@ -73,12 +72,15 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         await _loadCloudCompanyProfile();
       } else {
         await _loadLocalBusinessProfile();
+        final logoPath = await _businessSettingsManager.getLogoPath();
+        if (!mounted) return;
+        setState(() {
+          _logoPath = logoPath;
+        });
       }
       
-      final logoPath = await _businessSettingsManager.getLogoPath();
       if (!mounted) return;
       setState(() {
-        _logoPath = logoPath;
         _isLoading = false;
       });
     } catch (e) {
@@ -113,17 +115,22 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
       if (!mounted) return;
       
       if (cloudProfile != null) {
+        final logoUrl = resolveBusinessLogoUrl(
+          cloudProfile.logoPath,
+          explicitBaseUrl: baseUrl,
+        );
         setState(() {
           _shopName = cloudProfile.name;
-          _ownerName = ''; // Not available in current API
+          _ownerName = cloudProfile.ownerName ?? '';
           _businessPhone = cloudProfile.phone ?? '';
           _businessEmail = cloudProfile.email ?? '';
           _businessAddress = cloudProfile.address ?? '';
-          _city = ''; // Not available in current API
-          _state = ''; // Not available in current API
-          _pinCode = ''; // Not available in current API
+          _city = cloudProfile.city ?? '';
+          _state = cloudProfile.state ?? '';
+          _pinCode = cloudProfile.pinCode ?? '';
           _gstRegistered = _fiscalProfile.taxEnabled;
           _gstNumber = _fiscalProfile.taxIdentifier ?? cloudProfile.taxIdentifier ?? '';
+          _logoPath = logoUrl;
         });
       } else {
         setState(() {
@@ -170,7 +177,6 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     }
   }
 
-
   Future<void> _pickBusinessLogo(ImageSource source) async {
     final image = await _imagePicker.pickImage(
       source: source,
@@ -179,16 +185,86 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     );
     if (image == null) return;
 
-    final selectedPath = image.path.trim();
-    await _businessSettingsManager.setLogoPath(selectedPath);
-    if (!mounted) return;
-    setState(() => _logoPath = selectedPath);
+    if (_isCloudMode) {
+      try {
+        final baseUrl = _mobileAuthService.baseUrl;
+        final accessToken = await _mobileAuthService.getStoredAccessToken();
+        if (accessToken == null || accessToken.trim().isEmpty) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Not authenticated. Please log in again.')),
+          );
+          return;
+        }
+        final bytes = await image.readAsBytes();
+        final fileName = image.name.isNotEmpty ? image.name : 'logo.jpg';
+        final updatedProfile = await _cloudCompanyProfileRepository.uploadLogo(
+          baseUrl: baseUrl,
+          accessToken: accessToken,
+          bytes: bytes,
+          fileName: fileName,
+        );
+        if (!mounted) return;
+        final logoUrl = resolveBusinessLogoUrl(
+          updatedProfile.logoPath,
+          explicitBaseUrl: baseUrl,
+        );
+        setState(() => _logoPath = logoUrl);
+        await _loadCloudCompanyProfile();
+        BusinessSettingsManager.notifySettingsChanged();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Logo updated successfully')),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload logo: $e')),
+        );
+      }
+    } else {
+      final selectedPath = image.path.trim();
+      await _businessSettingsManager.setLogoPath(selectedPath);
+      if (!mounted) return;
+      setState(() => _logoPath = selectedPath);
+    }
   }
 
   Future<void> _removeBusinessLogo() async {
-    await _businessSettingsManager.setLogoPath('');
-    if (!mounted) return;
-    setState(() => _logoPath = '');
+    if (_isCloudMode) {
+      try {
+        final baseUrl = _mobileAuthService.baseUrl;
+        final accessToken = await _mobileAuthService.getStoredAccessToken();
+        if (accessToken == null || accessToken.trim().isEmpty) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Not authenticated. Please log in again.')),
+          );
+          return;
+        }
+        await _cloudCompanyProfileRepository.deleteLogo(
+          baseUrl: baseUrl,
+          accessToken: accessToken,
+        );
+        if (!mounted) return;
+        setState(() => _logoPath = '');
+        await _loadCloudCompanyProfile();
+        BusinessSettingsManager.notifySettingsChanged();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Logo removed successfully')),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete logo: $e')),
+        );
+      }
+    } else {
+      await _businessSettingsManager.setLogoPath('');
+      if (!mounted) return;
+      setState(() => _logoPath = '');
+    }
   }
 
   Future<void> _showBusinessLogoSheet() async {
@@ -299,6 +375,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
       return;
     }
 
+    final hasGst = _gstRegistered && _gstNumber.trim().isNotEmpty;
     try {
       await _businessProfileRepository.saveBusinessProfile(
         shopName: _shopName.trim(),
@@ -309,15 +386,20 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         city: _city.trim().isEmpty ? null : _city.trim(),
         state: _state.trim().isEmpty ? null : _state.trim(),
         pinCode: _pinCode.trim().isEmpty ? null : _pinCode.trim(),
-        gstRegistered: _gstRegistered,
-        gstNumber: _gstRegistered ? _gstNumber.trim() : null,
+        gstRegistered: hasGst,
+        gstNumber: hasGst ? _gstNumber.trim() : null,
       );
       await _businessSettingsManager.setShopName(_shopName.trim());
       await _businessSettingsManager.setOwnerName(_ownerName.trim());
       await _businessSettingsManager.setPhone(_businessPhone.trim());
       await _businessSettingsManager.setAddress(_businessAddress.trim());
-      await _businessSettingsManager.setGstRegistered(_gstRegistered);
-      await _businessSettingsManager.setGstNumber(_gstRegistered ? _gstNumber.trim() : '');
+      await _businessSettingsManager.setGstRegistered(hasGst);
+      await _businessSettingsManager.setGstNumber(hasGst ? _gstNumber.trim() : '');
+      _fiscalProfile = _fiscalProfile.copyWith(
+        taxEnabled: hasGst,
+        taxIdentifier: hasGst ? _gstNumber.trim() : null,
+      );
+      await _businessSettingsManager.setFiscalProfile(_fiscalProfile);
       BusinessSettingsManager.notifySettingsChanged();
       
       if (!mounted) return;
@@ -370,15 +452,27 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         return;
       }
 
+      final hasGst = _gstRegistered && _gstNumber.trim().isNotEmpty;
       await _cloudCompanyProfileRepository.updateCompanyProfile(
         baseUrl: baseUrl,
         accessToken: accessToken,
         name: _shopName.trim(),
+        ownerName: _ownerName.trim().isEmpty ? null : _ownerName.trim(),
         phone: _businessPhone.trim(),
         email: _businessEmail.trim().isEmpty ? null : _businessEmail.trim(),
         address: _businessAddress.trim().isEmpty ? null : _businessAddress.trim(),
-        taxIdentifier: _gstRegistered ? _gstNumber.trim() : null,
+        city: _city.trim().isEmpty ? null : _city.trim(),
+        state: _state.trim().isEmpty ? null : _state.trim(),
+        pinCode: _pinCode.trim().isEmpty ? null : _pinCode.trim(),
+        taxIdentifier: hasGst ? _gstNumber.trim() : '',
+        taxEnabled: hasGst,
       );
+      _fiscalProfile = _fiscalProfile.copyWith(
+        taxEnabled: hasGst,
+        taxIdentifier: hasGst ? _gstNumber.trim() : null,
+      );
+      await _businessSettingsManager.setFiscalProfile(_fiscalProfile);
+      await _loadCloudCompanyProfile();
       BusinessSettingsManager.notifySettingsChanged();
 
       if (!mounted) return;
@@ -404,19 +498,16 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
 
     final colorScheme = Theme.of(context).colorScheme;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
-    final hasLogo = _logoPath.trim().isNotEmpty && !kIsWeb;
-    final logoExists = hasLogo && File(_logoPath).existsSync();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Shop Details'),
         actions: [
-          if (!_isCloudMode)
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () => _showBusinessLogoSheet(),
-              tooltip: 'Edit Logo',
-            ),
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () => _showBusinessLogoSheet(),
+            tooltip: 'Edit Logo',
+          ),
         ],
       ),
       body: SafeArea(
@@ -474,7 +565,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                'Shop Name, Mobile Number, Email, Address and GST details can be edited here. Owner Name, Logo, City, State and PIN Code are read-only in Cloud mode.',
+                                'Shop details and settings are synchronized with your Cloud account.',
                                 style: TextStyle(
                                   color: Colors.blue.shade900,
                                   fontSize: 14,
@@ -487,7 +578,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                     ),
                   Center(
                     child: InkWell(
-                      onTap: _isCloudMode ? null : _showBusinessLogoSheet,
+                      onTap: _showBusinessLogoSheet,
                       borderRadius: BorderRadius.circular(16),
                       child: Column(
                         children: [
@@ -497,53 +588,62 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                             child: Stack(
                               clipBehavior: Clip.none,
                               children: [
-                                CircleAvatar(
-                                  radius: 60,
-                                  backgroundColor: Colors.grey.shade100,
-                                  backgroundImage: logoExists ? FileImage(File(_logoPath)) : null,
-                                  child: logoExists
-                                      ? null
-                                      : Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            const Text('🏪', style: TextStyle(fontSize: 36)),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Logo',
-                                              style: TextStyle(
-                                                color: Colors.grey.shade700,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 12,
-                                              ),
+                                ClipOval(
+                                  child: SizedBox(
+                                    width: 120,
+                                    height: 120,
+                                    child: _logoPath.trim().isNotEmpty
+                                        ? SafePlatformImageView(
+                                            imagePath: _logoPath,
+                                            width: 120,
+                                            height: 120,
+                                            fit: BoxFit.cover,
+                                            fallbackIcon: Icons.store,
+                                          )
+                                        : Container(
+                                            color: Colors.grey.shade100,
+                                            child: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                const Text('🏪', style: TextStyle(fontSize: 36)),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  'Logo',
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade700,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                          ],
-                                        ),
+                                          ),
+                                  ),
                                 ),
-                                if (!_isCloudMode)
-                                  Positioned(
-                                    right: -2,
-                                    bottom: -2,
-                                    child: Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(
-                                        color: colorScheme.primary,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 2),
-                                      ),
-                                      child: const Icon(
-                                        Icons.edit,
-                                        size: 18,
-                                        color: Colors.white,
-                                      ),
+                                Positioned(
+                                  right: -2,
+                                  bottom: -2,
+                                  child: Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primary,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                    ),
+                                    child: const Icon(
+                                      Icons.edit,
+                                      size: 18,
+                                      color: Colors.white,
                                     ),
                                   ),
+                                ),
                               ],
                             ),
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            hasLogo && logoExists
+                            _logoPath.trim().isNotEmpty
                                 ? (_shopName.trim().isEmpty ? 'Business Logo' : _shopName)
                                 : 'Add Shop Logo',
                             style: const TextStyle(fontWeight: FontWeight.w600),
@@ -575,12 +675,12 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           'Owner Name',
                           _ownerName.isEmpty ? '-' : _ownerName,
                           Icons.person,
-                          _isCloudMode ? null : () => _editBusinessTextField(
+                          () => _editBusinessTextField(
                             title: 'Owner Name',
                             initialValue: _ownerName,
                             onSave: (value) async {
                               _ownerName = value;
-                              await _saveBusinessProfile();
+                              await _saveProfile();
                             },
                           ),
                         ),
@@ -637,12 +737,12 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           'City',
                           _city.isEmpty ? '-' : _city,
                           Icons.location_city,
-                          _isCloudMode ? null : () => _editBusinessTextField(
+                          () => _editBusinessTextField(
                             title: 'City',
                             initialValue: _city,
                             onSave: (value) async {
                               _city = value;
-                              await _saveBusinessProfile();
+                              await _saveProfile();
                             },
                           ),
                         ),
@@ -651,12 +751,12 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           'State',
                           _state.isEmpty ? '-' : _state,
                           Icons.map,
-                          _isCloudMode ? null : () => _editBusinessTextField(
+                          () => _editBusinessTextField(
                             title: 'State',
                             initialValue: _state,
                             onSave: (value) async {
                               _state = value;
-                              await _saveBusinessProfile();
+                              await _saveProfile();
                             },
                           ),
                         ),
@@ -665,7 +765,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           'PIN Code',
                           _pinCode.isEmpty ? '-' : _pinCode,
                           Icons.pin,
-                          _isCloudMode ? null : () => _editBusinessTextField(
+                          () => _editBusinessTextField(
                             title: 'PIN Code',
                             initialValue: _pinCode,
                             keyboardType: TextInputType.number,
@@ -675,7 +775,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                             ],
                             onSave: (value) async {
                               _pinCode = value;
-                              await _saveBusinessProfile();
+                              await _saveProfile();
                             },
                           ),
                         ),
@@ -699,8 +799,11 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
 
   Widget _buildFiscalSettingsCard() {
     final taxIdLabel = _getTaxIdLabel(_fiscalProfile.countryCode);
-    final currencyDisplay =
-        '${_fiscalProfile.currencyCode} (${_fiscalProfile.currencySymbol})';
+    final currInfo =
+        CountryPresets.currencyForCode(_fiscalProfile.currencyCode);
+    final currencyDisplay = currInfo != null
+        ? '${currInfo.name}\n${_fiscalProfile.currencyCode} (${_fiscalProfile.currencySymbol})'
+        : '${_fiscalProfile.currencyCode} (${_fiscalProfile.currencySymbol})';
 
     return AppCard(
       child: Column(
@@ -734,7 +837,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
             'Currency',
             currencyDisplay,
             Icons.currency_exchange,
-            null,
+            () => _showCurrencyPicker(),
           ),
           const Divider(),
           SwitchListTile(
@@ -744,11 +847,45 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                 : 'Disabled (Zero Tax)'),
             value: _fiscalProfile.taxEnabled,
             onChanged: (value) async {
-              setState(() {
-                _fiscalProfile = _fiscalProfile.copyWith(taxEnabled: value);
-                _gstRegistered = value;
-              });
-              await _saveFiscalProfile();
+              if (value) {
+                if (_fiscalProfile.taxIdentifier == null ||
+                    _fiscalProfile.taxIdentifier!.trim().isEmpty) {
+                  await _editBusinessTextField(
+                    title: taxIdLabel,
+                    initialValue: '',
+                    onSave: (val) async {
+                      final trimmed = val.trim();
+                      if (trimmed.isNotEmpty) {
+                        setState(() {
+                          _fiscalProfile = _fiscalProfile.copyWith(
+                            taxEnabled: true,
+                            taxIdentifier: trimmed,
+                          );
+                          _gstRegistered = true;
+                          _gstNumber = trimmed;
+                        });
+                        await _saveFiscalProfile();
+                      }
+                    },
+                  );
+                  return;
+                }
+                setState(() {
+                  _fiscalProfile = _fiscalProfile.copyWith(taxEnabled: true);
+                  _gstRegistered = true;
+                });
+                await _saveFiscalProfile();
+              } else {
+                setState(() {
+                  _fiscalProfile = _fiscalProfile.copyWith(
+                    taxEnabled: false,
+                    taxIdentifier: null,
+                  );
+                  _gstRegistered = false;
+                  _gstNumber = '';
+                });
+                await _saveFiscalProfile();
+              }
             },
             secondary: const Icon(Icons.receipt_long),
           ),
@@ -797,11 +934,15 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
               title: taxIdLabel,
               initialValue: _fiscalProfile.taxIdentifier ?? '',
               onSave: (value) async {
+                final trimmed = value.trim();
+                final hasId = trimmed.isNotEmpty;
                 setState(() {
                   _fiscalProfile = _fiscalProfile.copyWith(
-                    taxIdentifier: value.trim().isEmpty ? null : value.trim(),
+                    taxIdentifier: hasId ? trimmed : null,
+                    taxEnabled: hasId,
                   );
-                  _gstNumber = value.trim();
+                  _gstRegistered = hasId;
+                  _gstNumber = hasId ? trimmed : '';
                 });
                 await _saveFiscalProfile();
               },
@@ -815,40 +956,142 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   Future<void> _showCountryPicker() async {
     final selected = await showDialog<String>(
       context: context,
-      builder: (context) => SimpleDialog(
+      builder: (dialogContext) => SimpleDialog(
         title: const Text('Select Country'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'IN'),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Text('🇮🇳  India (INR - ₹)'),
+        children: CountryPresets.supportedCountries.map((country) {
+          final isSelected = country.code.toUpperCase() ==
+              _fiscalProfile.countryCode.toUpperCase();
+          return SimpleDialogOption(
+            onPressed: () => Navigator.pop(dialogContext, country.code),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${country.flag}  ${country.name} (${country.defaultCurrencyCode} - ${country.defaultCurrencySymbol})',
+                      style: TextStyle(
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                    ),
+                  ),
+                  if (isSelected)
+                    Icon(
+                      Icons.check,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                ],
+              ),
             ),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'AE'),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Text('🇦🇪  United Arab Emirates (AED - د.إ)'),
-            ),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'US'),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Text('🇺🇸  United States (USD - \$)'),
-            ),
-          ),
-        ],
+          );
+        }).toList(),
       ),
     );
 
     if (selected != null && selected != _fiscalProfile.countryCode) {
-      final preset = CountryPresets.forCountry(selected);
+      final oldPreset = CountryPresets.forCountry(_fiscalProfile.countryCode);
+      final newPreset = CountryPresets.forCountry(selected);
+
+      // If currency was default for old country, switch to new country default currency.
+      // If user had explicitly customized currency to a non-default currency, preserve it.
+      final isDefaultCurrency = _fiscalProfile.currencyCode.toUpperCase() ==
+          oldPreset.currencyCode.toUpperCase();
+      final updatedCurrencyCode = isDefaultCurrency
+          ? newPreset.currencyCode
+          : _fiscalProfile.currencyCode;
+      final updatedCurrencySymbol = isDefaultCurrency
+          ? newPreset.currencySymbol
+          : _fiscalProfile.currencySymbol;
+
       setState(() {
-        _fiscalProfile = preset;
-        _gstRegistered = preset.taxEnabled;
-        _gstNumber = preset.taxIdentifier ?? '';
+        _fiscalProfile = _fiscalProfile.copyWith(
+          countryCode: newPreset.countryCode,
+          currencyCode: updatedCurrencyCode,
+          currencySymbol: updatedCurrencySymbol,
+          taxLabel: newPreset.taxLabel,
+          taxRatePercent: newPreset.taxRatePercent,
+          taxInclusive: newPreset.taxInclusive,
+          locale: newPreset.locale,
+          timeZone: newPreset.timeZone,
+        );
+        _gstRegistered = _fiscalProfile.taxEnabled;
+        _gstNumber = _fiscalProfile.taxIdentifier ?? '';
+      });
+      await _saveFiscalProfile();
+    }
+  }
+
+  Future<void> _showCurrencyPicker() async {
+    final selected = await showDialog<CurrencyDescriptor>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Select Currency'),
+        children: CountryPresets.supportedCurrencies.map((currency) {
+          final isSelected = currency.code.toUpperCase() ==
+              _fiscalProfile.currencyCode.toUpperCase();
+          return SimpleDialogOption(
+            onPressed: () => Navigator.pop(dialogContext, currency),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          currency.name,
+                          style: TextStyle(
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            fontSize: 14,
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${currency.code} (${currency.symbol})',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isSelected)
+                    Icon(
+                      Icons.check,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+
+    if (selected != null &&
+        (selected.code.toUpperCase() !=
+                _fiscalProfile.currencyCode.toUpperCase() ||
+            selected.symbol != _fiscalProfile.currencySymbol)) {
+      setState(() {
+        _fiscalProfile = _fiscalProfile.copyWith(
+          currencyCode: selected.code,
+          currencySymbol: selected.symbol,
+        );
       });
       await _saveFiscalProfile();
     }
@@ -966,6 +1209,14 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   }
 
   Future<void> _saveFiscalProfile() async {
+    final hasGst = _fiscalProfile.taxEnabled &&
+        (_fiscalProfile.taxIdentifier?.trim().isNotEmpty ?? false);
+    _fiscalProfile = _fiscalProfile.copyWith(
+      taxEnabled: hasGst,
+      taxIdentifier: hasGst ? _fiscalProfile.taxIdentifier!.trim() : null,
+    );
+    _gstRegistered = hasGst;
+    _gstNumber = hasGst ? _fiscalProfile.taxIdentifier! : '';
     await _businessSettingsManager.setFiscalProfile(_fiscalProfile);
     if (_isCloudMode) {
       try {
@@ -976,10 +1227,10 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
             baseUrl: baseUrl,
             accessToken: accessToken,
             currencyCode: _fiscalProfile.currencyCode,
-            taxIdentifier: _fiscalProfile.taxIdentifier,
+            taxIdentifier: hasGst ? _fiscalProfile.taxIdentifier! : '',
             timeZone: _fiscalProfile.timeZone,
             region: _fiscalProfile.countryCode,
-            taxEnabled: _fiscalProfile.taxEnabled,
+            taxEnabled: hasGst,
             taxLabel: _fiscalProfile.taxLabel,
             taxRatePercent: _fiscalProfile.taxRatePercent,
             taxInclusive: _fiscalProfile.taxInclusive,
@@ -993,29 +1244,15 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   }
 
   String _getCountryDisplayName(String code) {
-    switch (code.toUpperCase()) {
-      case 'IN':
-        return 'India 🇮🇳';
-      case 'AE':
-        return 'United Arab Emirates 🇦🇪';
-      case 'US':
-        return 'United States 🇺🇸';
-      default:
-        return code;
+    final country = CountryPresets.countryForCode(code);
+    if (country != null) {
+      return '${country.name} ${country.flag}';
     }
+    return code;
   }
 
   String _getTaxIdLabel(String countryCode) {
-    switch (countryCode.toUpperCase()) {
-      case 'IN':
-        return 'GSTIN';
-      case 'AE':
-        return 'TRN';
-      case 'US':
-        return 'Tax ID / EIN';
-      default:
-        return 'Tax ID';
-    }
+    return _fiscalProfile.taxIdentifierLabel;
   }
 
   Widget _buildDetailRow(

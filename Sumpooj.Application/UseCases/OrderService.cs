@@ -357,7 +357,7 @@ public class OrderService
                 if (!Enum.TryParse<PaymentMethod>(methodStr, true, out var method))
                     method = PaymentMethod.Cash;
 
-                var payment = new Payment(companyId, order.Id, method, p.Amount);
+                var payment = new Payment(companyId, order.Id, method, p.Amount, PaymentType.SaleTender);
                 if (request.LocationId.HasValue)
                     payment.SetLocation(request.LocationId.Value);
 
@@ -753,7 +753,7 @@ public class OrderService
         if (!Enum.TryParse<PaymentMethod>(methodStr, true, out var method))
             method = PaymentMethod.Cash;
 
-        var payment = new Payment(companyId, order.Id, method, order.TotalAmount);
+        var payment = new Payment(companyId, order.Id, method, order.TotalAmount, PaymentType.SaleTender);
         payment.SetLocation(locationId);
         if (method == PaymentMethod.Cash) payment.Approve(null, null);
         await _paymentRepository.AddAsync(payment);
@@ -887,7 +887,12 @@ public class OrderService
                 continue;
             }
 
-            var product = await _productRepository.GetByIdAsync(item.ProductId);
+            if (!item.ProductId.HasValue)
+            {
+                continue;
+            }
+
+            var product = await _productRepository.GetByIdAsync(item.ProductId.Value);
 
             // Finished goods are sold from production batches (not Products table rows).
             if (product == null)
@@ -1042,7 +1047,9 @@ public class OrderService
                     continue;
                 }
 
-                var product = await _productRepository.GetByIdAsync(companyId, item.ProductId);
+                var product = item.ProductId.HasValue
+                    ? await _productRepository.GetByIdAsync(companyId, item.ProductId.Value)
+                    : null;
                 if (product != null && product.TrackInventory)
                 {
                     var lineCogs = product.CostPrice * item.Quantity;
@@ -1167,7 +1174,9 @@ public class OrderService
                     continue;
                 }
 
-                var product = await _productRepository.GetByIdAsync(companyId, item.ProductId);
+                var product = item.ProductId.HasValue
+                    ? await _productRepository.GetByIdAsync(companyId, item.ProductId.Value)
+                    : null;
                 if (product != null)
                 {
                     if (product.TrackInventory)
@@ -1220,7 +1229,7 @@ public class OrderService
             return null;
 
         // Preferred match: exact batch id.
-        var byId = activeBatches.FirstOrDefault(b => b.Id == item.ProductId);
+        var byId = item.ProductId.HasValue ? activeBatches.FirstOrDefault(b => b.Id == item.ProductId.Value) : null;
         if (byId != null)
             return byId;
 

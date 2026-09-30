@@ -11,6 +11,7 @@ import '../widgets/app_header.dart';
 import '../widgets/camera_barcode_scanner_page.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/floraprise_page_header.dart';
+import '../widgets/library/library_product_picker_sheet.dart';
 import 'bouquet_builder_screen.dart';
 
 class CloudProductsScreen extends StatefulWidget {
@@ -44,6 +45,13 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.read<CloudProductProvider>().load();
     });
+  }
+
+  Future<void> _importFromLibrary() async {
+    final result = await LibraryProductPickerSheet.show(context);
+    if (result != null && mounted) {
+      context.read<CloudProductProvider>().load();
+    }
   }
 
   @override
@@ -230,6 +238,11 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
             ],
           ),
           IconButton(
+            tooltip: 'Add from Library',
+            icon: const Icon(Icons.menu_book_rounded),
+            onPressed: _importFromLibrary,
+          ),
+          IconButton(
             tooltip: 'Sync Cloud Products to POS Catalog',
             onPressed: _isSyncingPosCatalog ? null : _syncPosCatalog,
             icon: _isSyncingPosCatalog
@@ -265,6 +278,12 @@ class _CloudProductsScreenState extends State<CloudProductsScreen> {
                 icon: Icons.add_rounded,
                 primary: true,
                 onPressed: () => _editProduct(),
+              ),
+              FloraprisePageHeaderAction(
+                label: 'Add from Library',
+                icon: Icons.menu_book_rounded,
+                primary: false,
+                onPressed: _importFromLibrary,
               ),
             ],
             decorationAlignment: Alignment.centerLeft,

@@ -24,32 +24,58 @@ export default function Header() {
         </Link>
         <nav className="desktop-nav" aria-label="Primary navigation">
           <div className="product-menu">
-            <Link href="#products">Products <span>⌄</span></Link>
+            <Link href="/#products">Products <span>⌄</span></Link>
             <div className="product-menu-panel">
-              <Link href="#erp"><small>01</small><span><b>Floraprise ERP</b>Run the business</span></Link>
-              <Link href="#app"><small>02</small><span><b>Floraprise App</b>Run it anywhere</span></Link>
-              <Link href="#assist"><small>03</small><span><b>Flora Assist</b>Respond faster</span></Link>
+              <Link href="/#solo">
+                <small>01</small>
+                <span>
+                  <b>Floraprise Solo</b>
+                  Simple florist app, right on your phone
+                </span>
+              </Link>
+              <Link href="/#pro">
+                <small>02</small>
+                <span>
+                  <b>Floraprise Pro</b>
+                  Everyday cloud florist platform
+                </span>
+              </Link>
+              <Link href="/#erp">
+                <small>03</small>
+                <span>
+                  <b>Floraprise ERP</b>
+                  Advanced & multi-location ERP
+                </span>
+              </Link>
             </div>
           </div>
-          <Link href="#platform">Platform</Link>
           <Link href="/features">Features</Link>
-          <Link href="/integrations">Integrations</Link>
           <Link href="/pricing">Pricing</Link>
+          <Link href="/integrations">Integrations</Link>
+          <Link href="/contact">Contact</Link>
           <Link href="/login" className="nav-login">Login</Link>
-          <Link href="/demo" className="nav-cta">Book a demo</Link>
+          <Link href="/demo" className="nav-cta">Book a Demo</Link>
         </nav>
-        <button className="menu-button" type="button" aria-label="Open menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? "×" : "☰"}</button>
+        <button
+          className="menu-button"
+          type="button"
+          aria-label="Open menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          {menuOpen ? "×" : "☰"}
+        </button>
       </div>
       <nav className={`mobile-nav ${menuOpen ? "open" : ""}`} aria-label="Mobile navigation">
-        <Link href="#erp" onClick={close}>Floraprise ERP</Link>
-        <Link href="#app" onClick={close}>Floraprise App</Link>
-        <Link href="#assist" onClick={close}>Flora Assist</Link>
-        <Link href="#platform" onClick={close}>Platform</Link>
+        <Link href="/#solo" onClick={close}>Floraprise Solo (Single Device)</Link>
+        <Link href="/#pro" onClick={close}>Floraprise Pro (Everyday Cloud)</Link>
+        <Link href="/#erp" onClick={close}>Floraprise ERP (Advanced Operations)</Link>
         <Link href="/features" onClick={close}>Features</Link>
+        <Link href="/pricing" onClick={close}>Pricing & Plans</Link>
         <Link href="/integrations" onClick={close}>Integrations</Link>
-        <Link href="/pricing" onClick={close}>Pricing</Link>
+        <Link href="/contact" onClick={close}>Contact Us</Link>
         <Link href="/login" onClick={close}>Login</Link>
-        <Link href="/demo" className="nav-cta" onClick={close}>Book a demo</Link>
+        <Link href="/demo" className="nav-cta" onClick={close}>Book a Demo</Link>
       </nav>
     </header>
   );

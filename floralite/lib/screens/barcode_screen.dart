@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../data/repositories/cloud_product_repository.dart';
 import '../data/repositories/job_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../l10n/app_localizations.dart';
@@ -51,15 +53,75 @@ class _BarcodeScreenState extends State<BarcodeScreen> {
     });
 
     try {
-      final records =
-          await _productRepository.listActiveProductsWithInventory();
-      if (!mounted) return;
+      final inventoryProvider = context.read<InventoryProvider>();
+      final isCloud = inventoryProvider.isCloud || kIsWeb;
+      final values = <_BarcodeProduct>[];
 
-      setState(() {
-        _products = records.expand((record) {
-          final values = <_BarcodeProduct>[];
-          final manufacturer = record.manufacturerBarcode.trim();
-          final florist = record.florapriseBarcode.trim();
+      if (isCloud) {
+        final cloudRepo = CloudProductRepository();
+        final results = await Future.wait([
+          cloudRepo.listProducts(),
+          cloudRepo.listSellableFinishedGoods(),
+        ]);
+        final regular = results[0];
+        final sellable = results[1];
+        final seen = <String>{};
+        final merged = <CloudProduct>[];
+        for (final p in regular) {
+          if (seen.add(p.id.trim().toLowerCase())) {
+            merged.add(p);
+          }
+        }
+        for (final p in sellable) {
+          if (seen.add(p.id.trim().toLowerCase())) {
+            merged.add(p);
+          }
+        }
+
+        for (final product in merged) {
+          final mfg =
+              (product.manufacturerBarcode ?? product.barcode ?? '').trim();
+          final florist = (product.internalBarcode ??
+                  (product.sku.isNotEmpty
+                      ? product.sku
+                      : 'FLR-${product.id.hashCode.abs()}'))
+              .trim();
+          final intId = product.id.hashCode.abs();
+
+          if (mfg.isNotEmpty) {
+            values.add(
+              _BarcodeProduct(
+                id: intId,
+                name: product.name,
+                barcode: mfg,
+                barcodeType: 'manufacturer',
+              ),
+            );
+          }
+
+          if (florist.isNotEmpty) {
+            values.add(
+              _BarcodeProduct(
+                id: intId,
+                name: product.name,
+                barcode: florist,
+                barcodeType: 'florist',
+              ),
+            );
+          }
+        }
+      } else {
+        final records =
+            await _productRepository.listActiveProductsWithInventory();
+        for (final record in records) {
+          final manufacturer = record.manufacturerBarcode.trim().isNotEmpty
+              ? record.manufacturerBarcode.trim()
+              : record.barcode.trim();
+          final florist = record.florapriseBarcode.trim().isNotEmpty
+              ? record.florapriseBarcode.trim()
+              : (record.sku.trim().isNotEmpty
+                  ? record.sku.trim()
+                  : 'FLR-${record.id}');
 
           if (manufacturer.isNotEmpty) {
             values.add(
@@ -82,9 +144,12 @@ class _BarcodeScreenState extends State<BarcodeScreen> {
               ),
             );
           }
+        }
+      }
 
-          return values;
-        }).toList();
+      if (!mounted) return;
+      setState(() {
+        _products = values;
         _isLoading = false;
       });
     } catch (_) {
@@ -763,13 +828,15 @@ class _BarcodeScreenState extends State<BarcodeScreen> {
     required String barcode,
   }) async {
     final printerProvider = context.read<PrinterProvider>();
-    await _jobRepository.enqueueBarcodePrintJob(
-      productId: productId,
-      payload: {
-        'productName': productName,
-        'barcode': barcode,
-      },
-    );
+    if (!kIsWeb) {
+      await _jobRepository.enqueueBarcodePrintJob(
+        productId: productId,
+        payload: {
+          'productName': productName,
+          'barcode': barcode,
+        },
+      );
+    }
     await printerProvider.enqueueBarcodeLabel(
       productName: productName,
       barcode: barcode,

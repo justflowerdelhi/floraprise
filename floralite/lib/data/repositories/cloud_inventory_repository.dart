@@ -78,14 +78,36 @@ class CloudInventoryRepository {
   static const String _lowStockStorageKey = 'cloud_low_stock_cache';
 
   Future<List<InventoryProductRecord>> listInventoryProducts() async {
-    final response = await _send(
-      'GET',
-      Uri.parse('${_auth.baseUrl}/api/inventory/products'),
-    );
-    if (response is! List) return const [];
+    final inventoryProductsFuture = () async {
+      try {
+        final response = await _send(
+          'GET',
+          Uri.parse('${_auth.baseUrl}/api/inventory/products'),
+        );
+        if (response is List) return response;
+      } catch (_) {}
+      return const [];
+    }();
+
+    final finishedGoodsFuture = () async {
+      try {
+        final response = await _send(
+          'GET',
+          Uri.parse('${_auth.baseUrl}/api/production/finished-goods'),
+        );
+        if (response is List) return response;
+      } catch (_) {}
+      return const [];
+    }();
+
+    final results = await Future.wait([inventoryProductsFuture, finishedGoodsFuture]);
+    final rawInventory = results[0];
+    final rawFinishedGoods = results[1];
 
     final products = <InventoryProductRecord>[];
-    for (final raw in response.whereType<Map>()) {
+    final seenProductIds = <String>{};
+
+    for (final raw in rawInventory.whereType<Map>()) {
       final json = raw.cast<String, dynamic>();
       final cloudId = _string(
         json,
@@ -93,6 +115,7 @@ class CloudInventoryRepository {
         fallback: _string(json, 'id'),
       );
       if (cloudId.isEmpty) continue;
+      seenProductIds.add(cloudId.toLowerCase());
       products.add(
         InventoryProductRecord(
           productId: -(products.length + 1),
@@ -114,6 +137,71 @@ class CloudInventoryRepository {
         ),
       );
     }
+
+    final finishedGoodsAggregates = <String, _FinishedGoodsAggregate>{};
+    for (final raw in rawFinishedGoods.whereType<Map>()) {
+      final json = raw.cast<String, dynamic>();
+      final recipeId = _string(json, 'recipeId');
+      final batchId = _string(json, 'id');
+      final batchCode = _string(json, 'batchCode');
+      final hasFinishedBatchFields = recipeId.isNotEmpty ||
+          batchCode.isNotEmpty ||
+          json.containsKey('quantityProduced') ||
+          json.containsKey('QuantityProduced') ||
+          json.containsKey('quantityAvailable') ||
+          json.containsKey('QuantityAvailable');
+      if (!hasFinishedBatchFields) continue;
+
+      final recipeName = _string(json, 'recipeName', fallback: _string(json, 'productName', fallback: 'Bouquet'));
+      final barcode = _string(json, 'barcode');
+      final qtyAvail = json.containsKey('quantityAvailable') || json.containsKey('QuantityAvailable')
+          ? _int(json, 'quantityAvailable')
+          : _int(json, 'remainingQuantity');
+      final safeQty = qtyAvail < 0 ? 0 : qtyAvail;
+
+      final key = recipeId.isNotEmpty ? recipeId.toLowerCase() : (recipeName.isNotEmpty ? recipeName.toLowerCase() : batchId.toLowerCase());
+      if (key.isEmpty) continue;
+
+      if (!finishedGoodsAggregates.containsKey(key)) {
+        finishedGoodsAggregates[key] = _FinishedGoodsAggregate(
+          cloudId: recipeId.isNotEmpty ? recipeId : batchId,
+          name: recipeName,
+          sku: batchCode,
+          barcode: barcode,
+          totalQty: safeQty,
+        );
+      } else {
+        finishedGoodsAggregates[key]!.totalQty += safeQty;
+      }
+    }
+
+    for (final agg in finishedGoodsAggregates.values) {
+      final idLower = agg.cloudId.toLowerCase();
+      final nameLower = agg.name.toLowerCase();
+      if (!seenProductIds.contains(idLower) && !seenProductIds.contains(nameLower)) {
+        seenProductIds.add(idLower);
+        seenProductIds.add(nameLower);
+        products.add(
+          InventoryProductRecord(
+            productId: -(products.length + 1),
+            cloudProductId: agg.cloudId,
+            name: agg.name,
+            category: 'Bouquets',
+            unit: 'Piece',
+            sku: agg.sku,
+            barcode: agg.barcode,
+            manufacturerBarcode: agg.barcode.isNotEmpty ? agg.barcode : null,
+            internalBarcode: agg.sku.isNotEmpty ? agg.sku : null,
+            trackInventory: true,
+            gstPercent: 0,
+            gstCalculationType: GstCalculationType.inclusive,
+            currentQty: agg.totalQty,
+            minQty: 0,
+          ),
+        );
+      }
+    }
+
     return products;
   }
 
@@ -455,3 +543,19 @@ double? _nullableNumber(Map<String, dynamic> json, String key) =>
 
 bool _bool(Map<String, dynamic> json, String key) =>
     json[_key(json, key)] is bool && json[_key(json, key)] as bool;
+
+class _FinishedGoodsAggregate {
+  _FinishedGoodsAggregate({
+    required this.cloudId,
+    required this.name,
+    required this.sku,
+    required this.barcode,
+    required this.totalQty,
+  });
+
+  final String cloudId;
+  final String name;
+  final String sku;
+  final String barcode;
+  int totalQty;
+}
