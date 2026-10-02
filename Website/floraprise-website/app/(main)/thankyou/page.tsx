@@ -1,3 +1,12 @@
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata = pageMetadata({
+  title: "Request Received | Floraprise",
+  description: "Thank you for your interest in Floraprise. Our team will contact you shortly.",
+  path: "/thankyou/",
+  noIndex: true,
+});
+
 export default function ThankYouPage() {
   return (
     <section className="py-28 bg-white text-center">

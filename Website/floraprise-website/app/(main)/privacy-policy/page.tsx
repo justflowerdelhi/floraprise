@@ -1,22 +1,12 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Privacy Policy | Floraprise",
   description:
     "Privacy Policy for Floraprise florist business management software and mobile applications. Learn how we collect, protect, and manage your business and customer data.",
-  alternates: {
-    canonical: "/privacy-policy/",
-  },
-  openGraph: {
-    title: "Privacy Policy | Floraprise",
-    description:
-      "Comprehensive Privacy Policy for Floraprise florist ERP and POS platform.",
-    url: "https://floraprise.com/privacy-policy/",
-    siteName: "Floraprise",
-    type: "website",
-  },
-};
+  path: "/privacy-policy/",
+});
 
 export default function PrivacyPolicyPage() {
   return (

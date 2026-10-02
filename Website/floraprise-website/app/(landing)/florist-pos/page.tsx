@@ -1,14 +1,12 @@
 import Link from "next/link";
-import { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Florist POS Software & Inventory System — Floraprise",
   description:
     "Purpose-built Point of Sale (POS) and inventory software for retail flower shops, studio florists, and floral delivery businesses. Offline-first, WhatsApp billing, and perishable batch tracking.",
-  alternates: {
-    canonical: "https://floraprise.com/florist-pos",
-  },
-};
+  path: "/florist-pos/",
+});
 
 export default function FloristPOSLandingPage() {
   return (

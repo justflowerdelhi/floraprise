@@ -70,6 +70,12 @@ const features = [
     icon: "📋",
   },
   {
+    tag: "Event Sales",
+    title: "Event Sales Management",
+    desc: "Plan, prepare & fulfill events with dedicated event orders, inventory reservation, production tracking and fulfillment.",
+    icon: "🎉",
+  },
+  {
     tag: "Delivery Tracking",
     title: "Scheduled florist logistics",
     desc: "Plan and manage flower deliveries without losing track of venue addresses, recipient timings, or rider coordination.",
@@ -176,7 +182,7 @@ export default function RedesignedHome() {
             Run Your Flower Business. <em>Simply.</em>
           </h1>
           <p>
-            POS, perishable inventory, orders, deliveries, customers, staff, and accounts — all in one florist-first platform.
+            Floraprise is florist business management software built for flower shops — with POS, perishable inventory, orders, deliveries, customer management, staff and accounts in one platform.
           </p>
           <div className="action-row">
             <Link href="/pricing" className="primary-action">
@@ -615,11 +621,12 @@ export default function RedesignedHome() {
                       {isOpen ? "−" : "+"}
                     </span>
                   </button>
-                  {isOpen && (
-                    <div className="px-6 pb-5 pt-1 text-gray-600 text-sm leading-relaxed border-t border-[#d9dfd7]/60">
-                      {faq.a}
-                    </div>
-                  )}
+                  <div
+                    hidden={!isOpen}
+                    className="px-6 pb-5 pt-1 text-gray-600 text-sm leading-relaxed border-t border-[#d9dfd7]/60"
+                  >
+                    {faq.a}
+                  </div>
                 </div>
               );
             })}

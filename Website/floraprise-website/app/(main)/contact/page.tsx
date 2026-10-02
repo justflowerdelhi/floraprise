@@ -1,3 +1,12 @@
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata = pageMetadata({
+  title: "Contact Floraprise | Florist Software Support & Sales",
+  description:
+    "Contact Floraprise for product questions, implementation details, or migration support for your flower shop. Call us Monday to Saturday, 10:00 AM to 6:00 PM IST.",
+  path: "/contact/",
+});
+
 export default function ContactPage() {
   return (
     <main className="bg-white py-20">

@@ -1,14 +1,12 @@
 import Link from "next/link";
-import { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Features — Floraprise Florist POS, Inventory & ERP",
   description:
     "Explore Floraprise features built specifically for flower shops: florist POS, perishable flower batch inventory, bouquet recipe costing, delivery dispatch, day close cash variance, and multi-store ERP.",
-  alternates: {
-    canonical: "https://floraprise.com/features",
-  },
-};
+  path: "/features/",
+});
 
 const FEATURES_LIST = [
   {
@@ -52,7 +50,7 @@ const FEATURES_LIST = [
       "Custom arrangement builder for walk-in customers with live pricing",
       "Wastage allowance buffers built into arrangement costing",
       "Seasonal price fluctuation updates across all bouquet recipes",
-      "Wedding & large event proposal costing with multi-item quotes",
+      "Event sales pricing for weddings and large events, combining recipe-costed products with custom decor and service lines",
     ],
     badgeColor: "bg-amber-50 text-amber-800 border-amber-200",
   },
@@ -63,13 +61,28 @@ const FEATURES_LIST = [
     desc: "Replace disorganized paper notepads and WhatsApp chats. Every floral order moves through clear operational stages: Received → In Production → Ready for Dispatch → Out for Delivery → Delivered.",
     points: [
       "Unified order board for walk-in, phone, WhatsApp, and online orders",
-      "Advance event order scheduling with calendar and production timelines",
+      "Advance event orders with event date, venue and production status, managed under Event Sales",
       "Status alerts keeping counter staff, florists, and drivers aligned",
       "Card message capturing with font-ready greeting card printing",
       "Recipient delivery notes and special instruction highlighting",
       "Audit trail tracking order modifications, cancellations, and refunds",
     ],
     badgeColor: "bg-blue-50 text-blue-800 border-blue-200",
+  },
+  {
+    category: "Event Sales Management",
+    tag: "Weddings & Corporate Events",
+    title: "Event Sales Management for Weddings, Parties & Corporate Events",
+    desc: "Create event orders for weddings, corporate events, parties and special occasions. Reserve inventory, manage production from preparation to ready, and track every event order through to fulfillment.",
+    points: [
+      "Dedicated event orders with event type, event date, venue and special instructions",
+      "Catalogue products combined with custom decor and service lines such as stage or mandap setup",
+      "Inventory reservation on Android: hold stock for an event, deducted only when the event is fulfilled",
+      "Production tracking from Production Started to Ready for Event, then Fulfill Event",
+      "Full payment, partial advance or pay later, with the outstanding balance tracked in receivables",
+      "Event Sales view in Orders to filter and review all event orders",
+    ],
+    badgeColor: "bg-pink-50 text-pink-800 border-pink-200",
   },
   {
     category: "Designer Workflow",
@@ -111,7 +124,7 @@ const FEATURES_LIST = [
       "Split tender reconciliation across cash, UPI, cards, and payment links",
       "Staff shift handover reporting with drawer accountability",
       "Daily, weekly, and monthly sales summaries with profit margins",
-      "Accounting exports compatible with Tally and QuickBooks",
+      "Export profit & loss reports as CSV",
     ],
     badgeColor: "bg-teal-50 text-teal-800 border-teal-200",
   },

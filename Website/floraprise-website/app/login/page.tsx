@@ -1,3 +1,12 @@
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata = pageMetadata({
+  title: "Login | Floraprise",
+  description: "Log in to your Floraprise account.",
+  path: "/login/",
+  noIndex: true,
+});
+
 export default function LoginPage() {
 return ( <section className="min-h-screen flex items-center justify-center bg-gray-50"> <div className="bg-white p-10 rounded-xl shadow-md w-full max-w-md">
 
